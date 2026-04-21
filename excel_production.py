@@ -346,8 +346,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     input_file = args.input_file
-    # input_file = r"/Users/kearney/Library/CloudStorage/OneDrive-个人/工作/01蒙古业务部/[2]子公司资料/01北山公司/01生产数据/2025/2025.01/01/2025.01.01 Өдөр Б ээлж 白班.xlsx"
-    # input_file = r"/Users/kearney/Library/CloudStorage/OneDrive-个人/工作/01蒙古业务部/[2]子公司资料/01北山公司/01生产数据/2025/2025.01"
+    # input_file = r"01生产数据/2025/2025.01/01/2025.01.01 Өдөр Б ээлж 白班.xlsx"
+    # input_file = r"01生产数据/2025/2025.01"
     # 结果输出在输入文件夹下
     output_file = r"合并产量.xlsx"
     processor = MiningDataProcessor()
