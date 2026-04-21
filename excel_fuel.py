@@ -27,11 +27,28 @@ def process_diesel_data(file_path, target_year=None):
             continue
 
         # 2. 处理表头
-        # 我们只对日期(h2)和班组长(h3)进行向右填充
-        # 对h4(小时数/班次行)需要特殊处理
-        header_rows = df_raw.iloc[start_row - 5:start_row - 1, :].copy()
-        header_rows.iloc[0, :] = header_rows.iloc[0, :].ffill()  # 日期填充
-        header_rows.iloc[1, :] = header_rows.iloc[1, :].ffill()  # 班组长填充
+        # # 我们只对日期(h2)和班组长(h3)进行向右填充
+        # # 对h4(小时数/班次行)需要特殊处理
+        # header_rows = df_raw.iloc[start_row - 5:start_row - 1, :].copy()
+        # header_rows.iloc[0, :] = header_rows.iloc[0, :].ffill()  # 日期填充
+        # header_rows.iloc[1, :] = header_rows.iloc[1, :].ffill()  # 班组长填充
+
+        # 提取表头 4 行 (日期/班组长/班次/油品)
+        header_rows = df_raw.iloc[start_row - 5:start_row - 1, :].copy().astype(object)
+
+        # 备份最原始的日期行（用于判断该列是否是Excel中真实存在的日期格）
+        raw_header_date_row = header_rows.iloc[0, :].copy()
+        # 填充日期和班组长
+        header_rows.iloc[0, :] = header_rows.iloc[0, :].ffill()
+        header_rows.iloc[1, :] = header_rows.iloc[1, :].ffill()
+        # 3. 预解析班次位置
+        col_to_shift = {}
+        for col_idx in range(header_rows.shape[1]):
+            h4_val = str(header_rows.iloc[2, col_idx]).strip()
+            if "白班" in h4_val or "өдөр" in h4_val.lower():
+                col_to_shift[col_idx] = "Day"
+            elif "夜班" in h4_val or "шөнө" in h4_val.lower():
+                col_to_shift[col_idx] = "Night"
 
         # 3. 预解析班次位置
         # 建立一个列索引到班次的映射
