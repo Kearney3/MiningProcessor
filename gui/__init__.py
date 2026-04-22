@@ -1,4 +1,4 @@
-"""
-GUI 模块
-矿山数据处理工具图形化界面
-"""
+"""GUI Package"""
+from gui.main import main
+
+__all__ = ["main"]

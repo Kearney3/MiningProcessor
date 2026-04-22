@@ -60,6 +60,9 @@ def process_excel_data(file_path, year, month, output_file):
         # 3. 清理：忽略空表头列，并去掉全是空值的行
         # 去掉列名为 NaN 的列
         combined_day_df = combined_day_df.loc[:, combined_day_df.columns.notna()]
+        # 去掉第二列为空的行
+        combined_day_df.dropna(subset=[combined_day_df.columns[1]], inplace=True)
+
         # 去掉包含在“日期”和“班次”之外全部为空的行
         subset_cols = [c for c in combined_day_df.columns if c not in ['日期', '班次']]
         combined_day_df.dropna(how='all', subset=subset_cols, inplace=True)
