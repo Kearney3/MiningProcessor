@@ -1,0 +1,15 @@
+[project]
+name = "script"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "openpyxl>=3.1.2",
+    "pandas>=3.0.2",
+    "flet>=0.21.0",
+    "rapidfuzz>=3.0.0",
+]
+
+[project.scripts]
+script = "gui.main:main"
