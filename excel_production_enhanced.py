@@ -11,43 +11,51 @@ import re
 
 
 class MiningDataProcessor:
-    def __init__(self):
-        # 设备型号 -> 单趟装载量
-        # 2024年9月前的装载量
-        # self.load_map = {
-        #     'NTE240': 80,
-        #     'LIEBHERR T264': 80,
-        #     'EH4000': 80,
-        #     'MT4400AC': 80,
-        #     'TR100': 32,
-        #     'TEREX 60': 20,
-        #     'Terex 60': 20,
-        #     'TR60': 20,
-        #     'MT-10': 20,
-        #     'XDM100': 32,
-        #     'XDE120': 40,
-        #     'XDE130': 45,
-        #     'T-264':80,
-        #     'SANY SET150S':52,
-        #     'CAT773':20
-        #
-        # }
+    def __init__(self, version: str = "new"):
+        self.version = version
+        try:
+            import config_loader
+            self.load_map: dict[str, int] = config_loader.get_device_load_map(version)
+            if not self.load_map:
+                raise FileNotFoundError
+        except Exception:
+            if version == "old":
+                # 2024年9月前的装载量（旧版）
+                self.load_map = {
+                    'NTE240': 80,
+                    'LIEBHERR T264': 80,
+                    'EH4000': 80,
+                    'MT4400AC': 80,
+                    'TR100': 32,
+                    'TEREX 60': 20,
+                    'Terex 60': 20,
+                    'TR60': 20,
+                    'MT-10': 20,
+                    'XDM100': 32,
+                    'XDE120': 40,
+                    'XDE130': 45,
+                    'T-264':80,
+                    'SANY SET150S':52,
+                    'CAT773':20
 
-        # 2024年9月后的装载量
-        self.load_map = {
-            'NTE240': 85,
-            'EH4000': 85,
-            'LIEBHERR T264': 80,
-            'TR100': 35,
-            'TEREX 60': 22,
-            'Terex 60': 22,
-            'TR60': 22,
-            'XDM100': 35,
-            'XDE120': 43,
-            'XDE130': 43,
-            'T-264': 80,
-            'SANY SET150S': 52,
-        }
+                }
+            else:
+                # 2024年9月后的装载量（新版）
+                self.load_map = {
+                    'NTE240': 85,
+                    'EH4000': 85,
+                    'LIEBHERR T264': 80,
+                    'TR100': 35,
+                    'TEREX 60': 22,
+                    'Terex 60': 22,
+                    'TR60': 22,
+                    'XDM100': 35,
+                    'XDE120': 43,
+                    'XDE130': 43,
+                    'T-264': 80,
+                    'SANY SET150S': 52,
+                    'CAT773': 20
+                }
 
     # ---------------------------
     # 基础工具函数
@@ -428,13 +436,16 @@ if __name__ == "__main__":
     parser.add_argument("input_file", help="输入Excel文件路径")
     parser.add_argument("--workers", type=int, default=min(8, (os.cpu_count() or 4) * 2),
                         help="线程数，默认 min(8, CPU*2)")
+    parser.add_argument("--version", choices=["new", "old"], default="new",
+                        help="装载量映射版本，new（默认）或 old")
 
     args = parser.parse_args()
     input_file = args.input_file
     workers = args.workers
+    version = args.version
 
     output_file = r"合并产量.xlsx"
-    processor = MiningDataProcessor()
+    processor = MiningDataProcessor(version=version)
 
     if os.path.isdir(input_file):
         print(f"正在处理文件夹: {input_file}")

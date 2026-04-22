@@ -13,7 +13,6 @@ import equipment_ledger
 from excel_fuel import process_diesel_data
 from excel_production_enhanced import MiningDataProcessor as ProdProcessor
 from excel_electrical import parse_excel_data
-from excel_worktime import MiningDataProcessor
 
 
 def main(page: ft.Page):
@@ -42,7 +41,7 @@ def main(page: ft.Page):
     # 台账区域
     # ============================================================
     ledger_records: list[dict] = []
-    ledger_path_label = ft.Text("未加载台账", size=12, color=ft.colors.GREY)
+    ledger_path_label = ft.Text("未加载台账", size=12, color=ft.Colors.GREY)
     ledger_table = ft.DataTable(
         columns=[
             ft.DataColumn(ft.Text("设备编号")),
@@ -74,12 +73,12 @@ def main(page: ft.Page):
             nonlocal ledger_records
             ledger_records = ledger.to_dict()
             ledger_path_label.value = os.path.basename(path)
-            ledger_path_label.color = ft.colors.GREEN
+            ledger_path_label.color = ft.Colors.GREEN
             build_ledger_table(ledger_records)
             log(f"已加载台账: {path}")
         except Exception as ex:
             ledger_path_label.value = f"加载失败: {ex}"
-            ledger_path_label.color = ft.colors.RED
+            ledger_path_label.color = ft.Colors.RED
             log(f"加载台账失败: {ex}")
         page.update()
 
@@ -123,7 +122,7 @@ def main(page: ft.Page):
                 ),
                 ft.Container(
                     content=ft.ListView([ledger_table], expand=True),
-                    border=ft.border.all(1, ft.colors.OUTLINE),
+                    border=ft.border.all(1, ft.Colors.OUTLINE),
                     border_radius=8,
                     padding=5,
                     expand=True,
@@ -133,14 +132,15 @@ def main(page: ft.Page):
             spacing=10,
         ),
         padding=15,
-        border=ft.border.all(1, ft.colors.OUTLINE),
+        border=ft.border.all(1, ft.Colors.OUTLINE),
         border_radius=10,
     )
 
     fp.on_result = on_load_ledger
 
     # ---- FilePicker 副本用于保存 ----
-    fp_save = ft.FilePicker(on_result=on_export_template)
+    fp_save = ft.FilePicker()
+    fp_save.on_result = on_export_template
     page.overlay.append(fp_save)
 
     # ============================================================
@@ -226,7 +226,7 @@ def main(page: ft.Page):
                 ),
                 ft.Container(
                     content=ft.ListView([config_table], expand=True),
-                    border=ft.border.all(1, ft.colors.OUTLINE),
+                    border=ft.border.all(1, ft.Colors.OUTLINE),
                     border_radius=8,
                     padding=5,
                     expand=True,
@@ -236,7 +236,7 @@ def main(page: ft.Page):
             spacing=10,
         ),
         padding=15,
-        border=ft.border.all(1, ft.colors.OUTLINE),
+        border=ft.border.all(1, ft.Colors.OUTLINE),
         border_radius=10,
     )
 
@@ -392,9 +392,7 @@ def main(page: ft.Page):
                 elif module_type == "electrical":
                     parse_excel_data(path, kwargs.get("year"))
                 elif module_type == "worktime":
-                    device_map = config_loader.get_device_load_map()
-                    processor = MiningDataProcessor()
-                    processor.load_map = device_map
+                    processor = ProdProcessor()
                     if os.path.isdir(path):
                         output_file = os.path.join(path, "合并产量.xlsx")
                         processor.process_folder(path, output_file)
@@ -469,7 +467,7 @@ def main(page: ft.Page):
             spacing=10,
         ),
         padding=15,
-        border=ft.border.all(1, ft.colors.OUTLINE),
+        border=ft.border.all(1, ft.Colors.OUTLINE),
         border_radius=10,
     )
 

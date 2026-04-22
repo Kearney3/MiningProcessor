@@ -7,7 +7,27 @@
         "EH4000": 85,
         "XDM100": 35,
         "XDE120": 43,
-        "XDE130": 43
+        "XDE130": 43,
+        "T-264": 80,
+        "SANY SET150S": 52,
+        "CAT773": 20
+    },
+    "device_load_map_old": {
+        "NTE240": 80,
+        "LIEBHERR T264": 80,
+        "EH4000": 80,
+        "MT4400AC": 80,
+        "TR100": 32,
+        "TEREX 60": 20,
+        "Terex 60": 20,
+        "TR60": 20,
+        "MT-10": 20,
+        "XDM100": 32,
+        "XDE120": 40,
+        "XDE130": 45,
+        "T-264": 80,
+        "SANY SET150S": 52,
+        "CAT773": 20
     },
     "default_year": 2025,
     "default_month": 1,

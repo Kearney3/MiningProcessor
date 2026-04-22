@@ -24,10 +24,14 @@ def save_config(config: dict[str, Any]) -> None:
         json.dump(config, f, ensure_ascii=False, indent=4)
 
 
-def get_device_load_map() -> dict[str, int]:
-    """获取设备装载量映射"""
+def get_device_load_map(version: str = "new") -> dict[str, int]:
+    """
+    获取设备装载量映射
+    version: "new" (默认) 或 "old"
+    """
     config = load_config()
-    return config.get("device_load_map", {})
+    key = f"device_load_map_{version}" if version != "new" else "device_load_map"
+    return config.get(key, {})
 
 
 def update_device_load_map(updates: dict[str, int]) -> dict[str, int]:
