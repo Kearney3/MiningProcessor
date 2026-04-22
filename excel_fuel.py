@@ -117,7 +117,7 @@ def process_diesel_data(file_path, target_year=None):
                 data_type = "work_hours"
             elif "小时数" in h4 or "мц" in h4.lower():
                 data_type = "end_hours"
-            elif "/" in h5 or (idx in col_to_shift):  # 燃油列
+            else:  # 燃油列
                 data_type = "fuel"
 
             col_mapping.append({
