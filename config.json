@@ -1,0 +1,24 @@
+{
+    "device_load_map": {
+        "NTE240": 85,
+        "TR100": 35,
+        "TEREX 60": 22,
+        "Terex 60": 22,
+        "EH4000": 85,
+        "XDM100": 35,
+        "XDE120": 43,
+        "XDE130": 43
+    },
+    "default_year": 2025,
+    "default_month": 1,
+    "output_naming": {
+        "include_date": true,
+        "include_shift": true
+    },
+    "shift_mapping": {
+        "白班": "Day",
+        "夜班": "Night",
+        "Өдөр": "Day",
+        "шөнө": "Night"
+    }
+}
