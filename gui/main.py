@@ -34,6 +34,7 @@ def main(page: ft.Page):
 
     # ---- 页面级 FilePicker ----
     fp = ft.FilePicker()
+    fp.visible = False
     page.overlay.append(fp)
     page.update()
 
@@ -122,7 +123,7 @@ def main(page: ft.Page):
                 ),
                 ft.Container(
                     content=ft.ListView([ledger_table], expand=True),
-                    border=ft.border.all(1, ft.Colors.OUTLINE),
+                    border=ft.Border.all(1, ft.Colors.OUTLINE),
                     border_radius=8,
                     padding=5,
                     expand=True,
@@ -132,7 +133,7 @@ def main(page: ft.Page):
             spacing=10,
         ),
         padding=15,
-        border=ft.border.all(1, ft.Colors.OUTLINE),
+        border=ft.Border.all(1, ft.Colors.OUTLINE),
         border_radius=10,
     )
 
@@ -140,6 +141,7 @@ def main(page: ft.Page):
 
     # ---- FilePicker 副本用于保存 ----
     fp_save = ft.FilePicker()
+    fp_save.visible = False
     fp_save.on_result = on_export_template
     page.overlay.append(fp_save)
 
@@ -207,7 +209,7 @@ def main(page: ft.Page):
         build_config_table()
 
     def remove_selected(e: ft.ControlEvent):
-        checked = [row for row in config_rows if row.checked]
+        checked = [row for row in config_rows if row.selected]
         for row in checked:
             config_rows.remove(row)
         build_config_table()
@@ -226,7 +228,7 @@ def main(page: ft.Page):
                 ),
                 ft.Container(
                     content=ft.ListView([config_table], expand=True),
-                    border=ft.border.all(1, ft.Colors.OUTLINE),
+                    border=ft.Border.all(1, ft.Colors.OUTLINE),
                     border_radius=8,
                     padding=5,
                     expand=True,
@@ -236,7 +238,7 @@ def main(page: ft.Page):
             spacing=10,
         ),
         padding=15,
-        border=ft.border.all(1, ft.Colors.OUTLINE),
+        border=ft.Border.all(1, ft.Colors.OUTLINE),
         border_radius=10,
     )
 
@@ -246,9 +248,13 @@ def main(page: ft.Page):
 
     # File pickers for each module
     fp_fuel = ft.FilePicker()
+    fp_fuel.visible = False
     fp_prod = ft.FilePicker()
+    fp_prod.visible = False
     fp_elec = ft.FilePicker()
+    fp_elec.visible = False
     fp_work = ft.FilePicker()
+    fp_work.visible = False
     page.overlay.extend([fp_fuel, fp_prod, fp_elec, fp_work])
 
     # --- 燃油 ---
@@ -467,7 +473,7 @@ def main(page: ft.Page):
             spacing=10,
         ),
         padding=15,
-        border=ft.border.all(1, ft.Colors.OUTLINE),
+        border=ft.Border.all(1, ft.Colors.OUTLINE),
         border_radius=10,
     )
 
@@ -506,4 +512,4 @@ def main(page: ft.Page):
     log("已就绪")
 
 
-ft.app(target=main)
+ft.run(main)
