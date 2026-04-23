@@ -4,6 +4,7 @@
 import argparse
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any
 
 import pandas as pd
 import os
@@ -117,15 +118,26 @@ class MiningDataProcessor:
             return default
         return float(num)
 
-    def find_first_matching_column(self, columns, keywords):
+    def find_first_matching_column(self, columns: object, keywords: object) -> Any | None:
         """
         在列名中按关键字模糊匹配，返回第一个匹配列名
-        keywords: list[str]
+        keywords: list[str] 或 list[list[str]]
+        - 如果是 list[str]：只要匹配其中任意一个关键字即可 (OR 逻辑)
+        - 如果是 list[list[str]]：需要匹配内部列表中的所有关键字 (AND 逻辑)，且满足任意一组内部列表即可
         """
         for col in columns:
             col_str = self.safe_str(col)
-            if all(k in col_str for k in keywords):
-                return col
+            # print(f"当前列名: {col_str}, 关键字: {keywords}")
+            # 判断 keywords 是否是嵌套列表 (list of lists)
+            if keywords and isinstance(keywords[0], list):
+                # 嵌套模式：需要满足某一组内的所有关键字 (AND 逻辑)
+                for group in keywords:
+                    if all(k in col_str for k in group):
+                        return col
+            else:
+                # 扁平模式：只要匹配任意一个关键字 (OR 逻辑)
+                if any(k in col_str for k in keywords):
+                    return col
         return None
 
     # ---------------------------
@@ -184,11 +196,11 @@ class MiningDataProcessor:
         data = data.rename(columns={first_col: "矿卡名称"})
 
         # 5. 找运行指标列
-        hour_start_col = self.find_first_matching_column(data.columns, ["小时数", "开始"])
-        hour_end_col = self.find_first_matching_column(data.columns, ["小时数", "结束"])
-        km_start_col = self.find_first_matching_column(data.columns, ["公里数", "开始"])
-        km_end_col = self.find_first_matching_column(data.columns, ["公里数", "结束"])
-        company_col = self.find_first_matching_column(data.columns, ["公司"])
+        hour_start_col = self.find_first_matching_column(data.columns, [["小时数", "开始"],["Мото", "Эхэлсэн"]])
+        hour_end_col = self.find_first_matching_column(data.columns, [["小时数", "结束"],["Мото", "Дууссан"]])
+        km_start_col = self.find_first_matching_column(data.columns, [["公里数", "开始"],["км-ын", "Эхэлсэн"]])
+        km_end_col = self.find_first_matching_column(data.columns, [["公里数", "结束"],["км-ын", "Дууссан"]])
+        company_col = self.find_first_matching_column(data.columns, ["公司","Компани"])
 
         running_rows = []
         production_rows = []
@@ -230,8 +242,10 @@ class MiningDataProcessor:
 
                 parts = col_str.split("｜", 1)
                 excavator_name = self.safe_str(parts[0])
+                # 排除运行类列，只保留“挖机｜矿石类型”类列
+                if any(k in excavator_name for k in ["Мото", "Эхэлсэн", "Компани", "км", "Дууссан"]):
+                    continue
                 ore_type = self.safe_str(parts[1])
-
                 if not excavator_name and not ore_type:
                     continue
 
