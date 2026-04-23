@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import pathlib
 import sys
 import types
@@ -18,16 +19,25 @@ class DummyPage:
         pass
 
 
+class DummyCheckbox:
+    def __init__(self, value):
+        self.value = value
+
+
 class FrozenDateTime:
     @classmethod
     def now(cls):
         return types.SimpleNamespace(year=2026, month=4)
 
 
-def _row_values(rows):
+def _config_table_values(refs):
     return [
-        (row.cells[0].content.value, row.cells[1].content.value)
-        for row in rows
+        {
+            "selected": row["selected"],
+            "device": row["device"],
+            "capacity": str(row["capacity"]),
+        }
+        for row in refs["config_state"]
     ]
 
 
@@ -54,29 +64,90 @@ def test_work_month_dropdown_offers_all_calendar_months(monkeypatch):
     assert month_options == [str(month) for month in range(1, 13)]
 
 
-def test_delete_selected_uses_helper_refs_to_remove_only_checked_rows():
+def test_config_rows_render_with_explicit_checkbox_controls():
     _, refs = components.create_config_section(DummyPage(), lambda message: None)
 
-    refs["append_row"]("TR100", 35)
-    refs["append_row"]("EH4000", 85)
-    refs["append_row"]("NTE240", 85)
-    refs["config_rows"][0].selected = True
-    refs["config_rows"][2].selected = True
+    refs["set_config_state"]([
+        {"selected": False, "device": "TR100", "capacity": 35},
+        {"selected": True, "device": "EH4000", "capacity": 85},
+    ])
+
+    first_checkbox = refs["config_table"].rows[0].cells[0].content
+    second_checkbox = refs["config_table"].rows[1].cells[0].content
+
+    assert first_checkbox.value is False
+    assert second_checkbox.value is True
+    assert refs["config_table"].rows[0].cells[1].content.value == "TR100"
+    assert refs["config_table"].rows[1].cells[2].content.value == "85"
+
+
+def test_delete_selected_removes_only_checked_config_rows():
+    _, refs = components.create_config_section(DummyPage(), lambda message: None)
+
+    refs["set_config_state"]([
+        {"selected": True, "device": "TR100", "capacity": 35},
+        {"selected": False, "device": "EH4000", "capacity": 85},
+        {"selected": True, "device": "NTE240", "capacity": 90},
+    ])
 
     refs["remove_selected_rows"]()
 
-    assert _row_values(refs["config_rows"]) == [("EH4000", "85")]
+    assert _config_table_values(refs) == [
+        {"selected": False, "device": "EH4000", "capacity": "85"}
+    ]
 
 
-def test_delete_selected_leaves_unchecked_rows_unchanged():
+def test_restore_default_config_replaces_ui_state_without_writing_files(tmp_path):
     _, refs = components.create_config_section(DummyPage(), lambda message: None)
 
-    refs["append_row"]("TR100", 35)
-    refs["append_row"]("EH4000", 85)
-    refs["append_row"]("NTE240", 85)
-    before_unchecked = _row_values(refs["config_rows"])[1:]
-    refs["config_rows"][0].selected = True
+    refs["set_config_state"]([
+        {"selected": False, "device": "TEMP", "capacity": 1},
+    ])
 
-    refs["remove_selected_rows"]()
+    default_config = tmp_path / "config.json"
+    default_config.write_text(
+        json.dumps({"device_load_map": {"TR100": 35, "EH4000": 85}}),
+        encoding="utf-8",
+    )
 
-    assert _row_values(refs["config_rows"]) == before_unchecked
+    refs["load_default_config_file"](default_config)
+
+    assert _config_table_values(refs) == [
+        {"selected": False, "device": "EH4000", "capacity": "85"},
+        {"selected": False, "device": "TR100", "capacity": "35"},
+    ]
+
+
+def test_save_config_writes_json_to_user_selected_path(tmp_path):
+    _, refs = components.create_config_section(DummyPage(), lambda message: None)
+
+    refs["set_config_state"]([
+        {"selected": False, "device": "TR100", "capacity": "35"},
+        {"selected": False, "device": "EH4000", "capacity": "85"},
+    ])
+
+    output_path = tmp_path / "my-config.json"
+
+    refs["save_config_to_path"](output_path)
+
+    saved = json.loads(output_path.read_text(encoding="utf-8"))
+    assert saved == {
+        "device_load_map": {
+            "TR100": 35,
+            "EH4000": 85,
+        }
+    }
+
+
+def test_save_config_cancel_keeps_state_and_writes_nothing(tmp_path):
+    _, refs = components.create_config_section(DummyPage(), lambda message: None)
+
+    refs["set_config_state"]([
+        {"selected": False, "device": "TR100", "capacity": "35"},
+    ])
+    before = list(refs["config_state"])
+
+    refs["save_config_to_path"](None)
+
+    assert refs["config_state"] == before
+    assert list(tmp_path.iterdir()) == []
