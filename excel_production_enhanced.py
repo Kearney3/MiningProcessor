@@ -93,8 +93,15 @@ class MiningDataProcessor:
 
     def safe_str(self, val):
         """安全转字符串"""
-        if pd.isna(val):
-            return ""
+        try:
+            if pd.isna(val):
+                return ""
+        except Exception:
+            print(f"异常：\n{val}")
+            # 删除换行符
+            val = str(val).replace("\n", "")
+            print(f"转换后：{str(val).strip()}")
+        print(f"当前列名: {val}")
         return str(val).strip()
 
     def safe_number(self, val, default=0):
@@ -127,7 +134,7 @@ class MiningDataProcessor:
         """
         for col in columns:
             col_str = self.safe_str(col)
-            # print(f"当前列名: {col_str}, 关键字: {keywords}")
+            # print(f"当前列名: {col}, 关键字: {keywords}")
             # 判断 keywords 是否是嵌套列表 (list of lists)
             if keywords and isinstance(keywords[0], list):
                 # 嵌套模式：需要满足某一组内的所有关键字 (AND 逻辑)
