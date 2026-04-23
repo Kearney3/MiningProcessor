@@ -12,6 +12,9 @@ wheels/
 # IDE
 .idea/
 
+# Worktrees
+.worktrees/
+
 # Lock files (use uv.lock if using uv)
 # uv.lock
 
