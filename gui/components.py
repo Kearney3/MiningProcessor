@@ -2,8 +2,12 @@
 GUI 组件工厂函数
 提供各区域 UI 组件的创建接口
 """
-import flet as ft
+import json
 import os
+from datetime import datetime
+from pathlib import Path
+
+import flet as ft
 import equipment_ledger
 
 
@@ -125,43 +129,134 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
     """创建设备装载量配置区域，返回 (container, refs)"""
     import config_loader
 
-    config_rows = []
+    config_state: list[dict] = []
+    refs = {}
+
+    def normalize_row(row: dict) -> dict:
+        return {
+            "selected": bool(row.get("selected", False)),
+            "device": str(row.get("device", "")),
+            "capacity": str(row.get("capacity", "0")),
+        }
 
     config_table = ft.DataTable(
         columns=[
+            ft.DataColumn(ft.Text("选择")),
             ft.DataColumn(ft.Text("设备型号")),
             ft.DataColumn(ft.Text("装载量 (吨)")),
         ],
         rows=[],
-        show_checkbox_column=True,
+        show_checkbox_column=False,
     )
 
     def build_table():
-        config_table.rows = config_rows[:]
+        rows = []
+        for index, row_state in enumerate(config_state):
+            checkbox = ft.Checkbox(value=row_state["selected"])
+            device_field = ft.TextField(
+                value=row_state["device"],
+                text_size=13,
+                hint_text="设备型号" if not row_state["device"] else None,
+                border_color="transparent",
+            )
+            capacity_field = ft.TextField(
+                value=str(row_state["capacity"]),
+                text_size=13,
+                width=80,
+                hint_text="吨" if not str(row_state["capacity"]).strip() else None,
+                border_color="transparent",
+            )
+
+            def on_checkbox_change(e: ft.ControlEvent, idx=index):
+                config_state[idx]["selected"] = bool(e.control.value)
+
+            def on_device_change(e: ft.ControlEvent, idx=index):
+                config_state[idx]["device"] = e.control.value
+
+            def on_capacity_change(e: ft.ControlEvent, idx=index):
+                config_state[idx]["capacity"] = e.control.value
+
+            checkbox.on_change = on_checkbox_change
+            device_field.on_change = on_device_change
+            capacity_field.on_change = on_capacity_change
+
+            rows.append(
+                ft.DataRow(
+                    cells=[
+                        ft.DataCell(checkbox),
+                        ft.DataCell(device_field),
+                        ft.DataCell(capacity_field),
+                    ]
+                )
+            )
+
+        config_table.rows = rows
         page.update()
 
+    def set_config_state(rows: list[dict]):
+        nonlocal config_state
+        config_state = [normalize_row(row) for row in rows]
+        refs["config_state"] = config_state
+        build_table()
+
+    def append_row(device: str = "", capacity: int | str = 0):
+        config_state.append(normalize_row({"selected": False, "device": device, "capacity": capacity}))
+        build_table()
+
+    def remove_selected_rows():
+        nonlocal config_state
+        config_state = [row for row in config_state if not row["selected"]]
+        refs["config_state"] = config_state
+        build_table()
+
     def load_config():
-        nonlocal config_rows
         try:
             device_map = config_loader.get_device_load_map()
         except Exception:
             device_map = {}
-        config_rows = [
-            ft.DataRow(
-                cells=[
-                    ft.DataCell(ft.TextField(value=device, text_size=13, border_color="transparent")),
-                    ft.DataCell(ft.TextField(value=str(cap), text_size=13, width=80, border_color="transparent")),
-                ]
-            )
-            for device, cap in sorted(device_map.items())
-        ]
-        build_table()
+        set_config_state(
+            [
+                {"selected": False, "device": device, "capacity": cap}
+                for device, cap in sorted(device_map.items())
+            ]
+        )
+
+    def load_default_config_file(path):
+        if not path:
+            return
+        with Path(path).open("r", encoding="utf-8") as f:
+            data = json.load(f)
+        imported = data.get("device_load_map", {})
+        set_config_state(
+            [
+                {"selected": False, "device": device, "capacity": cap}
+                for device, cap in sorted(imported.items())
+            ]
+        )
+
+    def save_config_to_path(path):
+        if not path:
+            return
+
+        device_load_map = {}
+        for row in config_state:
+            device = row["device"]
+            cap_text = row["capacity"]
+            if not device or not cap_text:
+                continue
+            try:
+                device_load_map[device] = int(cap_text)
+            except (TypeError, ValueError):
+                log(f"警告: '{cap_text}' 不是有效数字，跳过 {device}")
+
+        with Path(path).open("w", encoding="utf-8") as f:
+            json.dump({"device_load_map": device_load_map}, f, ensure_ascii=False)
 
     def save_config(e: ft.ControlEvent):
         new_map = {}
-        for row in config_rows:
-            device = row.cells[0].content.value
-            cap_text = row.cells[1].content.value
+        for row in config_state:
+            device = row["device"]
+            cap_text = row["capacity"]
             if device and cap_text:
                 try:
                     new_map[device] = int(cap_text)
@@ -175,21 +270,10 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
             log(f"保存配置失败: {ex}")
 
     def add_device(e: ft.ControlEvent):
-        config_rows.append(
-            ft.DataRow(
-                cells=[
-                    ft.DataCell(ft.TextField(value="", text_size=13, hint_text="设备型号", border_color="transparent")),
-                    ft.DataCell(ft.TextField(value="0", text_size=13, width=80, hint_text="吨", border_color="transparent")),
-                ]
-            )
-        )
-        build_table()
+        append_row()
 
     def remove_selected(e: ft.ControlEvent):
-        checked = [row for row in config_rows if row.selected]
-        for row in checked:
-            config_rows.remove(row)
-        build_table()
+        remove_selected_rows()
 
     async def import_config(e: ft.ControlEvent):
         picker = ft.FilePicker()
@@ -209,15 +293,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
                 log("文件不含 device_load_map")
                 return
             for device, cap in imported.items():
-                config_rows.append(
-                    ft.DataRow(
-                        cells=[
-                            ft.DataCell(ft.TextField(value=device, text_size=13, border_color="transparent")),
-                            ft.DataCell(ft.TextField(value=str(cap), text_size=13, width=80, border_color="transparent")),
-                        ]
-                    )
-                )
-            build_table()
+                append_row(device, cap)
             log(f"已导入 {len(imported)} 条设备装载量配置")
         except Exception as ex:
             log(f"导入配置失败: {ex}")
@@ -252,8 +328,13 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
 
     refs = {
         "config_table": config_table,
-        "config_rows": config_rows,
+        "config_state": config_state,
         "load_config": load_config,
+        "load_default_config_file": load_default_config_file,
+        "save_config_to_path": save_config_to_path,
+        "set_config_state": set_config_state,
+        "append_row": append_row,
+        "remove_selected_rows": remove_selected_rows,
     }
     return container, refs
 
@@ -263,6 +344,10 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
 # ---------------------------------------------------------------------------
 def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
     """创建数据处理模块区域，返回 (container, module_refs)"""
+
+    current_date = datetime.now()
+    current_year = str(current_date.year)
+    current_month = str(current_date.month)
 
     # --- Fuel ---
     fuel_path = ft.TextField(
@@ -338,6 +423,18 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
             tooltip="浏览",
         ),
     )
+    work_year = ft.Dropdown(
+        label="年份",
+        width=125,
+        options=[ft.dropdown.Option(str(y)) for y in range(2020, 2031)],
+        value=current_year,
+    )
+    work_month = ft.Dropdown(
+        label="月份",
+        width=125,
+        options=[ft.dropdown.Option(str(month)) for month in range(1, 13)],
+        value=current_month,
+    )
     work_btn = ft.Button(
         "处理",
         icon=ft.icons.Icons.PLAY_ARROW,
@@ -402,7 +499,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
                             ft.Row([fuel_path, fuel_year, fuel_btn], spacing=10),
                             ft.Row([prod_path, prod_btn], spacing=10),
                             ft.Row([elec_path, elec_year, elec_btn], spacing=10),
-                            ft.Row([work_path, work_btn], spacing=10),
+                            ft.Row([work_path, work_year, work_month, work_btn], spacing=10),
                         ],
                         spacing=8,
                     ),
@@ -420,7 +517,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "fuel": {"path": fuel_path, "year": fuel_year, "btn": fuel_btn},
         "prod": {"path": prod_path, "btn": prod_btn},
         "elec": {"path": elec_path, "year": elec_year, "btn": elec_btn},
-        "work": {"path": work_path, "btn": work_btn},
+        "work": {"path": work_path, "year": work_year, "month": work_month, "btn": work_btn},
     }
     return container, module_refs
 
