@@ -34,6 +34,7 @@ def process_diesel_data(file_path, target_year=None):
         # 填充日期和班组长
         header_rows.iloc[0, :] = header_rows.iloc[0, :].ffill()
         header_rows.iloc[1, :] = header_rows.iloc[1, :].ffill()
+        header_rows.iloc[2, :] = header_rows.iloc[2, :].ffill()
         # 3. 预解析班次位置
         col_to_shift = {}
         for col_idx in range(header_rows.shape[1]):
@@ -63,7 +64,7 @@ def process_diesel_data(file_path, target_year=None):
             h3 = str(header_rows.iloc[1, idx]).strip()  # 班组/关键字
             h4 = str(header_rows.iloc[2, idx]).strip()  # 小时数或班次名
             h5 = str(header_rows.iloc[3, idx]).strip()  # 油品
-
+            # print(f"列索引: {idx}, h2: {h2}, h3: {h3}, h4: {h4}, h5: {h5}")
             if "按照班子柴油准备" in h3:
                 stop_signal = True
                 continue
@@ -120,11 +121,9 @@ def process_diesel_data(file_path, target_year=None):
                 "fuel_type": h5 if data_type == "fuel" else None
             })
 
-        # print(f"列映射: {col_mapping}")
 
         # 5. 提取数据体
         data_body = df_raw.iloc[start_row - 1:].copy()
-
         for _, row in data_body.iterrows():
             device_name = row[1]
             device_id = row[2]
@@ -188,18 +187,30 @@ def process_diesel_data(file_path, target_year=None):
     else:
         print("没有找到任何发动机数据")
 
-    df_fuel = pd.DataFrame(fuel_data_list)
-    df_fuel['shift_rank'] = df_fuel['班次'].map(shift_order)
-    df_fuel.sort_values(by=["日期", "shift_rank", "设备编号"], inplace=True)
-    df_fuel["日期"] = df_fuel["日期"].dt.date
+    df_fuel = pd.DataFrame()
+    if fuel_data_list:
+        df_fuel = pd.DataFrame(fuel_data_list)
+        df_fuel['shift_rank'] = df_fuel['班次'].map(shift_order)
+        df_fuel.sort_values(by=["日期", "shift_rank", "设备编号"], inplace=True)
+        df_fuel["日期"] = df_fuel["日期"].dt.date
+    else:
+        print("没有找到任何油耗数据")
 
     output_file = os.path.join(os.path.dirname(file_path), "Fuel.xlsx")
+    # 如果数据都为空，那么不导出
+    if df_engine.shape[0] == 0 and df_fuel.shape[0] == 0:
+        print("没有找到任何发动机数据和油耗数据，导出失败")
+        return None
+
     with pd.ExcelWriter(output_file) as writer:
         if df_engine.shape[0] > 0:
             df_engine.drop(columns=['shift_rank']).to_excel(writer, sheet_name="设备信息", index=False)
         else:
             df_engine.to_excel(writer, sheet_name="设备信息", index=False)
-        df_fuel.drop(columns=['shift_rank']).to_excel(writer, sheet_name="油耗信息", index=False)
+        if df_fuel.shape[0] > 0:
+            df_fuel.drop(columns=['shift_rank']).to_excel(writer, sheet_name="油耗信息", index=False)
+        else:
+            df_fuel.to_excel(writer, sheet_name="油耗信息", index=False)
 
     print(f"处理完成！文件已保存: {output_file}")
 
