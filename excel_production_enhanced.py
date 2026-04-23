@@ -11,8 +11,9 @@ import re
 
 
 class MiningDataProcessor:
-    def __init__(self, version: str = "new"):
+    def __init__(self, version: str = "new", raw_start: int = 6):
         self.version = version
+        self.raw_start = raw_start
         try:
             import config_loader
             self.load_map: dict[str, int] = config_loader.get_device_load_map(version)
@@ -148,10 +149,11 @@ class MiningDataProcessor:
         last_row_idx = non_empty_a.index[-1]
 
         # 2. 找最后一列：第6行匹配“总趟数”，前一列为最后一列
-        row6 = df_raw.iloc[5, :]
+        row6 = df_raw.iloc[self.raw_start-1, :]
         total_col_idx = None
         for idx, val in row6.items():
-            if "总趟数" in self.safe_str(val):
+            if "总趟数" in self.safe_str(val) or "Нийт рейс" in self.safe_str(val):
+                # print(f"找到总趟数列：{idx},{self.safe_str(val)}")
                 total_col_idx = idx
                 break
 
@@ -161,8 +163,8 @@ class MiningDataProcessor:
             last_col_idx = df_raw.shape[1] - 1
 
         # 3. 构造复合表头
-        header6 = df_raw.iloc[5, :last_col_idx + 1].ffill()
-        header7 = df_raw.iloc[6, :last_col_idx + 1]
+        header6 = df_raw.iloc[self.raw_start-1, :last_col_idx + 1].ffill()
+        header7 = df_raw.iloc[self.raw_start, :last_col_idx + 1]
 
         combined_headers = []
         for h6, h7 in zip(header6, header7):
@@ -170,8 +172,8 @@ class MiningDataProcessor:
             h7_str = self.safe_str(h7)
             combined_headers.append(f"{h6_str}｜{h7_str}")
 
-        # 4. 数据区：第8行开始
-        data = df_raw.iloc[7:last_row_idx + 1, :last_col_idx + 1].copy()
+        # 4. 数据区：第self.raw_start+1行开始
+        data = df_raw.iloc[self.raw_start + 1: last_row_idx + 1, :last_col_idx + 1].copy()
         if data.empty:
             return pd.DataFrame(), pd.DataFrame()
 
@@ -197,9 +199,6 @@ class MiningDataProcessor:
         for _, row in data.iterrows():
             truck_name = self.safe_str(row["矿卡名称"])
 
-            # 修复原逻辑 bug：
-            # 原代码: if not truck_name and "Нийт" not in truck_name:
-            # 当 truck_name="" 时，"Нийт" not in truck_name 恒为 True
             # 这里按你的意图应该过滤空值和合计行
             if not truck_name or "Нийт" in truck_name:
                 continue
@@ -438,14 +437,16 @@ if __name__ == "__main__":
                         help="线程数，默认 min(8, CPU*2)")
     parser.add_argument("--version", choices=["new", "old"], default="new",
                         help="装载量映射版本，new（默认）或 old")
+    parser.add_argument("--raw_start", type=int, default=6, help="复合表头起始行，默认 6")
 
     args = parser.parse_args()
     input_file = args.input_file
     workers = args.workers
     version = args.version
+    raw_start = args.raw_start
 
     output_file = r"合并产量.xlsx"
-    processor = MiningDataProcessor(version=version)
+    processor = MiningDataProcessor(version=version, raw_start=raw_start)
 
     if os.path.isdir(input_file):
         print(f"正在处理文件夹: {input_file}")
