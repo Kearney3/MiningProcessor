@@ -143,7 +143,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
         columns=[
             ft.DataColumn(ft.Text("选择")),
             ft.DataColumn(ft.Text("设备型号")),
-            ft.DataColumn(ft.Text("装载量 (吨)")),
+            ft.DataColumn(ft.Text("装载量 (方)")),
         ],
         rows=[],
         show_checkbox_column=False,
@@ -363,7 +363,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
     fuel_year = ft.Dropdown(
         label="年份",
         width=125,
-        options=[ft.dropdown.Option(str(y)) for y in range(2020, 2031)],
+        options=[ft.dropdown.Option(str(y)) for y in range(2015, 2040)],
         value="2025",
     )
     fuel_btn = ft.Button(
@@ -403,7 +403,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
     elec_year = ft.Dropdown(
         label="年份",
         width=125,
-        options=[ft.dropdown.Option(str(y)) for y in range(2020, 2031)],
+        options=[ft.dropdown.Option(str(y)) for y in range(2015, 2040)],
         value="2025",
     )
     elec_btn = ft.Button(
@@ -426,7 +426,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
     work_year = ft.Dropdown(
         label="年份",
         width=125,
-        options=[ft.dropdown.Option(str(y)) for y in range(2020, 2031)],
+        options=[ft.dropdown.Option(str(y)) for y in range(2015, 2040)],
         value=current_year,
     )
     work_month = ft.Dropdown(

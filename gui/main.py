@@ -62,4 +62,5 @@ def main(page: ft.Page):
     log("已就绪")
 
 
-ft.run(main)
+if __name__ == "__main__":
+    ft.run(main)
