@@ -3,11 +3,14 @@ GUI 业务逻辑层
 处理各模块的后台任务、线程管理
 """
 import flet as ft
+import io
 import os
+import sys
 import threading
 from excel_fuel import process_diesel_data
 from excel_production_enhanced import MiningDataProcessor as ProdProcessor
 from excel_electrical import parse_excel_data
+from excel_worktime import process_excel_data
 
 
 # ---------------------------------------------------------------------------
@@ -26,6 +29,10 @@ def set_btn_state(btn: ft.Button, enabled: bool, label: str = "处理"):
 def run_task(page: ft.Page, module_type: str, path: str, btn: ft.Button, log, **kwargs):
     """在后台线程中执行处理任务"""
     def do():
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
+        sys.stdout = io.StringIO()
+        sys.stderr = io.StringIO()
         try:
             log(f"[{module_type}] 开始处理...")
             if module_type == "fuel":
@@ -39,18 +46,34 @@ def run_task(page: ft.Page, module_type: str, path: str, btn: ft.Button, log, **
             elif module_type == "electrical":
                 parse_excel_data(path, kwargs.get("year"))
             elif module_type == "worktime":
-                processor = ProdProcessor()
-                if os.path.isdir(path):
-                    output_file = os.path.join(path, "合并产量.xlsx")
-                    processor.process_folder(path, output_file)
-                else:
-                    output_file = os.path.join(os.path.dirname(path) or ".", "合并产量.xlsx")
-                    processor.process_single_file(path, output_file)
+                year = kwargs.get("year", 2025)
+                month = kwargs.get("month", 1)
+                file_dir = os.path.dirname(path) or "."
+                output_file = os.path.join(file_dir, f"{year}{month:02d}_工作效率表.xlsx")
+                process_excel_data(path, year, month, output_file)
+
+            captured_stdout = sys.stdout.getvalue()
+            captured_stderr = sys.stderr.getvalue()
+            if captured_stdout:
+                for line in captured_stdout.rstrip("\n").split("\n"):
+                    if line.strip():
+                        log(f"[stdout] {line}")
+            if captured_stderr:
+                for line in captured_stderr.rstrip("\n").split("\n"):
+                    if line.strip():
+                        log(f"[stderr] {line}")
             log(f"[{module_type}] 处理成功")
         except Exception as ex:
+            captured_stderr = sys.stderr.getvalue()
+            if captured_stderr:
+                for line in captured_stderr.rstrip("\n").split("\n"):
+                    if line.strip():
+                        log(f"[stderr] {line}")
             log(f"[{module_type}] 处理失败: {ex}")
         finally:
-            # 恢复按钮状态
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
+
             def restore():
                 set_btn_state(btn, True, "处理")
             page.call_on_main_thread(restore)
@@ -105,8 +128,10 @@ def on_work_process(page: ft.Page, work_refs: dict, log):
         log("请先选择文件或文件夹")
         return
     btn = work_refs["btn"]
+    year = int(work_refs["year"].value)
+    month = int(work_refs["month"].value)
     set_btn_state(btn, False, "处理中...")
-    run_task(page, "worktime", path, btn, log)
+    run_task(page, "worktime", path, btn, log, year=year, month=month)
 
 
 # ---------------------------------------------------------------------------
