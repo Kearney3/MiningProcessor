@@ -120,7 +120,7 @@ def process_diesel_data(file_path, target_year=None):
                 "fuel_type": h5 if data_type == "fuel" else None
             })
 
-        print(f"列映射: {col_mapping}")
+        # print(f"列映射: {col_mapping}")
 
         # 5. 提取数据体
         data_body = df_raw.iloc[start_row - 1:].copy()
