@@ -24,12 +24,15 @@ def process_excel_data(file_path, year, month, output_file):
         date_str = f"{year}-{month:02d}-{day:02d}"
         day_list.append(day)
 
-        # 2. 寻找“夜班”关键字在B列（索引1）的位置
+        # 2. 寻找“夜班”或“Шөнө”关键字在B列（索引1）的位置，先尝试找到“夜班”
         # 注意：这里假设“夜班”字样在B列
         night_shift_index = df_raw[df_raw[1].astype(str).str.contains("夜班", na=False)].index
-        
+        if len(night_shift_index) ==0:
+            print(f"警告: Sheet {sheet_name} 未找到'夜班'标记,尝试查找'Шөнө'")
+            night_shift_index = df_raw[df_raw[1].astype(str).str.contains("Шөнө", na=False)].index
+
         if len(night_shift_index) == 0:
-            print(f"警告: Sheet {sheet_name} 未找到'夜班'标记")
+            print(f"警告: Sheet {sheet_name} 未找到'夜班'和'Шөнө'标记")
             # 如果没找到夜班，则认为全表为白班（视情况调整逻辑）
             continue
 
@@ -86,7 +89,7 @@ def process_excel_data(file_path, year, month, output_file):
     final_df['日期'] = pd.to_datetime(final_df['日期'], format='%Y-%m-%d').dt.date
 
     final_df.to_excel(output_file, index=False)
-    final_df.sort_values(by=['日期', '班次'], ascending=[True, False], inplace=True) # 白班在夜班前（拼音排序）
+    final_df.sort_values(by=['日期', '班次'], ascending=[True, True], inplace=True) # 白班在夜班前（拼音排序）
 
     # 把日期和班次的位置放在第一列和第二列
     final_df = final_df[['日期', '班次'] + [col for col in final_df.columns if col not in ['日期', '班次']]]

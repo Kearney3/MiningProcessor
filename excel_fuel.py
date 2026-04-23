@@ -6,10 +6,10 @@ import numpy as np
 
 def process_diesel_data(file_path, target_year=None):
     xl = pd.ExcelFile(file_path)
-    sheet_names = [s for s in xl.sheet_names if "设备柴油消耗" in s]
+    sheet_names = [s for s in xl.sheet_names if "设备柴油消耗" in s or "Техник" in s]
 
     if not sheet_names:
-        print("未找到包含'设备柴油消耗'的Sheet")
+        print("未找到包含'设备柴油消耗'或'Техник'的Sheet")
         return
 
     engine_data_list = []
@@ -25,13 +25,6 @@ def process_diesel_data(file_path, target_year=None):
         except IndexError:
             print(f"Sheet {sheet} 格式异常")
             continue
-
-        # 2. 处理表头
-        # # 我们只对日期(h2)和班组长(h3)进行向右填充
-        # # 对h4(小时数/班次行)需要特殊处理
-        # header_rows = df_raw.iloc[start_row - 5:start_row - 1, :].copy()
-        # header_rows.iloc[0, :] = header_rows.iloc[0, :].ffill()  # 日期填充
-        # header_rows.iloc[1, :] = header_rows.iloc[1, :].ffill()  # 班组长填充
 
         # 提取表头 4 行 (日期/班组长/班次/油品)
         header_rows = df_raw.iloc[start_row - 5:start_row - 1, :].copy().astype(object)
@@ -63,7 +56,6 @@ def process_diesel_data(file_path, target_year=None):
         # 4. 识别列属性
         col_mapping = []
         stop_signal = False
-
         for idx in range(header_rows.shape[1]):
             if stop_signal: break
 
@@ -128,6 +120,8 @@ def process_diesel_data(file_path, target_year=None):
                 "fuel_type": h5 if data_type == "fuel" else None
             })
 
+        print(f"列映射: {col_mapping}")
+
         # 5. 提取数据体
         data_body = df_raw.iloc[start_row - 1:].copy()
 
@@ -183,13 +177,15 @@ def process_diesel_data(file_path, target_year=None):
                 prev_end = curr_end
 
     # 7. 导出
-    if not engine_data_list: return
-
-    df_engine = pd.DataFrame(engine_data_list)
     shift_order = {'Day': 0, 'Night': 1}
-    df_engine['shift_rank'] = df_engine['班次'].map(shift_order)
-    df_engine.sort_values(by=["日期", "shift_rank", "设备编号"], inplace=True)
-    df_engine["日期"] = df_engine["日期"].dt.date
+    df_engine = pd.DataFrame()
+    if engine_data_list:
+        df_engine = pd.DataFrame(engine_data_list)
+        df_engine['shift_rank'] = df_engine['班次'].map(shift_order)
+        df_engine.sort_values(by=["日期", "shift_rank", "设备编号"], inplace=True)
+        df_engine["日期"] = df_engine["日期"].dt.date
+    else:
+        print("没有找到任何发动机数据")
 
     df_fuel = pd.DataFrame(fuel_data_list)
     df_fuel['shift_rank'] = df_fuel['班次'].map(shift_order)
@@ -198,7 +194,10 @@ def process_diesel_data(file_path, target_year=None):
 
     output_file = os.path.join(os.path.dirname(file_path), "Fuel.xlsx")
     with pd.ExcelWriter(output_file) as writer:
-        df_engine.drop(columns=['shift_rank']).to_excel(writer, sheet_name="设备信息", index=False)
+        if df_engine.shape[0] > 0:
+            df_engine.drop(columns=['shift_rank']).to_excel(writer, sheet_name="设备信息", index=False)
+        else:
+            df_engine.to_excel(writer, sheet_name="设备信息", index=False)
         df_fuel.drop(columns=['shift_rank']).to_excel(writer, sheet_name="油耗信息", index=False)
 
     print(f"处理完成！文件已保存: {output_file}")
