@@ -149,8 +149,8 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
         config_rows = [
             ft.DataRow(
                 cells=[
-                    ft.DataCell(ft.Text(device)),
-                    ft.DataCell(ft.Text(str(cap))),
+                    ft.DataCell(ft.TextField(value=device, text_size=13, border_color="transparent")),
+                    ft.DataCell(ft.TextField(value=str(cap), text_size=13, width=80, border_color="transparent")),
                 ]
             )
             for device, cap in sorted(device_map.items())
@@ -162,20 +162,24 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
         for row in config_rows:
             device = row.cells[0].content.value
             cap_text = row.cells[1].content.value
-            if device:
+            if device and cap_text:
                 try:
-                    new_map[device] = int(cap_text) if cap_text else 0
+                    new_map[device] = int(cap_text)
                 except ValueError:
-                    pass
-        config_loader.update_device_load_map(new_map)
-        log("配置已保存")
+                    log(f"警告: '{cap_text}' 不是有效数字，跳过 {device}")
+                    continue
+        try:
+            config_loader.update_device_load_map(new_map)
+            log("配置已保存")
+        except Exception as ex:
+            log(f"保存配置失败: {ex}")
 
     def add_device(e: ft.ControlEvent):
         config_rows.append(
             ft.DataRow(
                 cells=[
-                    ft.DataCell(ft.Text("")),
-                    ft.DataCell(ft.Text("0")),
+                    ft.DataCell(ft.TextField(value="", text_size=13, hint_text="设备型号", border_color="transparent")),
+                    ft.DataCell(ft.TextField(value="0", text_size=13, width=80, hint_text="吨", border_color="transparent")),
                 ]
             )
         )
@@ -187,6 +191,37 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
             config_rows.remove(row)
         build_table()
 
+    async def import_config(e: ft.ControlEvent):
+        picker = ft.FilePicker()
+        files = await picker.pick_files(
+            dialog_title="导入配置文件",
+            allowed_extensions=["json"],
+        )
+        if not files:
+            return
+        path = files[0].path
+        try:
+            import json as _json
+            with open(path, "r", encoding="utf-8") as f:
+                data = _json.load(f)
+            imported = data.get("device_load_map", {})
+            if not imported:
+                log("文件不含 device_load_map")
+                return
+            for device, cap in imported.items():
+                config_rows.append(
+                    ft.DataRow(
+                        cells=[
+                            ft.DataCell(ft.TextField(value=device, text_size=13, border_color="transparent")),
+                            ft.DataCell(ft.TextField(value=str(cap), text_size=13, width=80, border_color="transparent")),
+                        ]
+                    )
+                )
+            build_table()
+            log(f"已导入 {len(imported)} 条设备装载量配置")
+        except Exception as ex:
+            log(f"导入配置失败: {ex}")
+
     container = ft.Container(
         content=ft.Column(
             [
@@ -195,6 +230,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
                     [
                         ft.Button("添加设备", icon=ft.icons.Icons.ADD, on_click=add_device),
                         ft.Button("删除选中", icon=ft.icons.Icons.DELETE, on_click=remove_selected),
+                        ft.Button("导入配置", icon=ft.icons.Icons.FILE_UPLOAD, on_click=import_config),
                         ft.Button("保存配置", icon=ft.icons.Icons.SAVE, on_click=save_config),
                     ],
                     spacing=10,
