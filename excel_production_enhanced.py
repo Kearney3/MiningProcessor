@@ -97,11 +97,11 @@ class MiningDataProcessor:
             if pd.isna(val):
                 return ""
         except Exception:
-            print(f"异常：\n{val}")
+            # print(f"异常：\n{val}")
             # 删除换行符
             val = str(val).replace("\n", "")
-            print(f"转换后：{str(val).strip()}")
-        print(f"当前列名: {val}")
+            # print(f"转换后：{str(val).strip()}")
+        # print(f"当前列名: {val}")
         return str(val).strip()
 
     def safe_number(self, val, default=0):
