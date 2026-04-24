@@ -375,13 +375,23 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
     # --- Production ---
     prod_path = ft.TextField(
         label="生产数据处理",
-        hint_text="选择文件夹...",
+        hint_text="选择 Excel 文件或文件夹...",
         expand=2,
         read_only=True,
-        suffix=ft.IconButton(
-            icon=ft.icons.Icons.FOLDER_OPEN,
-            tooltip="浏览",
-        ),
+    )
+    prod_file_btn = ft.Button(
+        "选文件",
+        icon=ft.icons.Icons.UPLOAD_FILE,
+    )
+    prod_folder_btn = ft.Button(
+        "选文件夹",
+        icon=ft.icons.Icons.FOLDER_OPEN,
+    )
+    prod_raw_start = ft.TextField(
+        label="表头起始行",
+        width=100,
+        value="6",
+        hint_text="6",
     )
     prod_btn = ft.Button(
         "处理",
@@ -415,7 +425,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
     # --- Work time ---
     work_path = ft.TextField(
         label="工时数据处理",
-        hint_text="选择文件或文件夹...",
+        hint_text="选择 Excel 文件...",
         expand=2,
         read_only=True,
         suffix=ft.IconButton(
@@ -453,7 +463,19 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
             fuel_btn.disabled = False
             fuel_btn.update()
 
-    async def on_prod_browse(e: ft.ControlEvent):
+    async def on_prod_pick_file(e: ft.ControlEvent):
+        picker = ft.FilePicker()
+        files = await picker.pick_files(
+            dialog_title="选择生产数据文件",
+            allowed_extensions=["xlsx", "xls"],
+        )
+        if files:
+            prod_path.value = files[0].path
+            prod_path.update()
+            prod_btn.disabled = False
+            prod_btn.update()
+
+    async def on_prod_pick_folder(e: ft.ControlEvent):
         picker = ft.FilePicker()
         path = await picker.get_directory_path(dialog_title="选择生产数据文件夹")
         if path:
@@ -476,16 +498,20 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     async def on_work_browse(e: ft.ControlEvent):
         picker = ft.FilePicker()
-        path = await picker.get_directory_path(dialog_title="选择工时数据")
-        if path:
-            work_path.value = path
+        files = await picker.pick_files(
+            dialog_title="选择工时数据文件",
+            allowed_extensions=["xlsx", "xls"],
+        )
+        if files:
+            work_path.value = files[0].path
             work_path.update()
             work_btn.disabled = False
             work_btn.update()
 
     # 绑定浏览按钮
     fuel_path.suffix.on_click = on_fuel_browse
-    prod_path.suffix.on_click = on_prod_browse
+    prod_file_btn.on_click = on_prod_pick_file
+    prod_folder_btn.on_click = on_prod_pick_folder
     elec_path.suffix.on_click = on_elec_browse
     work_path.suffix.on_click = on_work_browse
 
@@ -497,7 +523,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
                     content=ft.Column(
                         [
                             ft.Row([fuel_path, fuel_year, fuel_btn], spacing=10),
-                            ft.Row([prod_path, prod_btn], spacing=10),
+                            ft.Row([prod_path, prod_file_btn, prod_folder_btn, prod_raw_start, prod_btn], spacing=10),
                             ft.Row([elec_path, elec_year, elec_btn], spacing=10),
                             ft.Row([work_path, work_year, work_month, work_btn], spacing=10),
                         ],
@@ -515,7 +541,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     module_refs = {
         "fuel": {"path": fuel_path, "year": fuel_year, "btn": fuel_btn},
-        "prod": {"path": prod_path, "btn": prod_btn},
+        "prod": {"path": prod_path, "raw_start": prod_raw_start, "btn": prod_btn},
         "elec": {"path": elec_path, "year": elec_year, "btn": elec_btn},
         "work": {"path": work_path, "year": work_year, "month": work_month, "btn": work_btn},
     }
