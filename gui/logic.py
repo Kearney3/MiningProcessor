@@ -2,11 +2,11 @@
 GUI 业务逻辑层
 处理各模块的后台任务、线程管理
 """
+import asyncio
 import flet as ft
 import io
 import os
 import sys
-import threading
 from excel_fuel import process_diesel_data
 from excel_production_enhanced import MiningDataProcessor as ProdProcessor
 from excel_electrical import parse_excel_data
@@ -24,114 +24,142 @@ def set_btn_state(btn: ft.Button, enabled: bool, label: str = "处理"):
 
 
 # ---------------------------------------------------------------------------
-# 线程任务包装
+# 任务执行
 # ---------------------------------------------------------------------------
-def run_task(page: ft.Page, module_type: str, path: str, btn: ft.Button, log, **kwargs):
-    """在后台线程中执行处理任务"""
-    def do():
-        old_stdout = sys.stdout
-        old_stderr = sys.stderr
-        sys.stdout = io.StringIO()
-        sys.stderr = io.StringIO()
-        try:
-            log(f"[{module_type}] 开始处理...")
-            if module_type == "fuel":
-                process_diesel_data(path, kwargs.get("year"))
-            elif module_type == "production":
-                output_file = os.path.join(
-                    os.path.dirname(path) or ".", "工作效率表_合并.xlsx"
-                )
-                processor = ProdProcessor()
+def _execute_task(module_type: str, path: str, **kwargs) -> tuple[list[str], str | None]:
+    """在后台线程中执行处理任务并收集输出"""
+    old_stdout = sys.stdout
+    old_stderr = sys.stderr
+    stdout_buffer = io.StringIO()
+    stderr_buffer = io.StringIO()
+    sys.stdout = stdout_buffer
+    sys.stderr = stderr_buffer
+    error_message = None
+
+    try:
+        if module_type == "fuel":
+            process_diesel_data(path, kwargs.get("year"))
+        elif module_type == "production":
+            raw_start = kwargs.get("raw_start", 6)
+            processor = ProdProcessor(raw_start=raw_start)
+            if os.path.isdir(path):
+                output_file = os.path.join(path, "合并产量.xlsx")
                 processor.process_folder(path, output_file)
-            elif module_type == "electrical":
-                parse_excel_data(path, kwargs.get("year"))
-            elif module_type == "worktime":
-                year = kwargs.get("year", 2025)
-                month = kwargs.get("month", 1)
-                file_dir = os.path.dirname(path) or "."
-                output_file = os.path.join(file_dir, f"{year}{month:02d}_工作效率表.xlsx")
-                process_excel_data(path, year, month, output_file)
+            else:
+                output_file = os.path.join(os.path.dirname(path) or ".", "合并产量.xlsx")
+                processor.process_single_file(path, output_file)
+        elif module_type == "electrical":
+            parse_excel_data(path, kwargs.get("year"))
+        elif module_type == "worktime":
+            year = kwargs.get("year", 2025)
+            month = kwargs.get("month", 1)
+            file_dir = os.path.dirname(path) or "."
+            output_file = os.path.join(file_dir, f"{year}{month:02d}_工作效率表.xlsx")
+            process_excel_data(path, year, month, output_file)
+    except Exception as ex:
+        error_message = str(ex)
+    finally:
+        captured_stdout = stdout_buffer.getvalue()
+        captured_stderr = stderr_buffer.getvalue()
+        sys.stdout = old_stdout
+        sys.stderr = old_stderr
 
-            captured_stdout = sys.stdout.getvalue()
-            captured_stderr = sys.stderr.getvalue()
-            if captured_stdout:
-                for line in captured_stdout.rstrip("\n").split("\n"):
-                    if line.strip():
-                        log(f"[stdout] {line}")
-            if captured_stderr:
-                for line in captured_stderr.rstrip("\n").split("\n"):
-                    if line.strip():
-                        log(f"[stderr] {line}")
+    log_lines = []
+    if captured_stdout:
+        for line in captured_stdout.rstrip("\n").split("\n"):
+            if line.strip():
+                log_lines.append(f"[stdout] {line}")
+    if captured_stderr:
+        for line in captured_stderr.rstrip("\n").split("\n"):
+            if line.strip():
+                log_lines.append(f"[stderr] {line}")
+
+    return log_lines, error_message
+
+
+async def run_task(page: ft.Page, module_type: str, path: str, btn: ft.Button, log, **kwargs):
+    """异步执行处理任务，并在 UI 线程中恢复界面状态"""
+    del page  # 保留现有调用签名，避免影响其他调用方
+
+    log(f"[{module_type}] 开始处理...")
+    try:
+        log_lines, error_message = await asyncio.to_thread(_execute_task, module_type, path, **kwargs)
+        for line in log_lines:
+            log(line)
+        if error_message:
+            log(f"[{module_type}] 处理失败: {error_message}")
+        else:
             log(f"[{module_type}] 处理成功")
-        except Exception as ex:
-            captured_stderr = sys.stderr.getvalue()
-            if captured_stderr:
-                for line in captured_stderr.rstrip("\n").split("\n"):
-                    if line.strip():
-                        log(f"[stderr] {line}")
-            log(f"[{module_type}] 处理失败: {ex}")
-        finally:
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
-
-            def restore():
-                set_btn_state(btn, True, "处理")
-            page.call_on_main_thread(restore)
-            page.update()
-
-    t = threading.Thread(target=do, daemon=True)
-    t.start()
+    finally:
+        set_btn_state(btn, True, "处理")
 
 
 # ---------------------------------------------------------------------------
 # 按钮点击处理
 # ---------------------------------------------------------------------------
-def on_fuel_process(page: ft.Page, fuel_refs: dict, log):
+async def on_fuel_process(page: ft.Page, fuel_refs: dict, log):
     """燃油处理按钮回调"""
     path = fuel_refs["path"].value
     if not path:
         log("请先选择文件")
         return
     btn = fuel_refs["btn"]
-    year = fuel_refs["year"].value
+    year = int(fuel_refs["year"].value)
     set_btn_state(btn, False, "处理中...")
-    run_task(page, "fuel", path, btn, log, year=year)
+    await run_task(page, "fuel", path, btn, log, year=year)
 
 
-def on_prod_process(page: ft.Page, prod_refs: dict, log):
+async def on_prod_process(page: ft.Page, prod_refs: dict, log):
     """生产处理按钮回调"""
     path = prod_refs["path"].value
     if not path:
-        log("请先选择文件夹")
+        log("请先选择 Excel 文件或文件夹")
         return
+
+    raw_start_text = (prod_refs["raw_start"].value or "6").strip()
+    try:
+        raw_start = int(raw_start_text)
+        if raw_start < 1:
+            raise ValueError
+    except ValueError:
+        log("请输入有效的 raw_start（正整数）")
+        return
+
     btn = prod_refs["btn"]
     set_btn_state(btn, False, "处理中...")
-    run_task(page, "production", path, btn, log)
+    await run_task(page, "production", path, btn, log, raw_start=raw_start)
 
 
-def on_elec_process(page: ft.Page, elec_refs: dict, log):
+async def on_elec_process(page: ft.Page, elec_refs: dict, log):
     """电力处理按钮回调"""
     path = elec_refs["path"].value
     if not path:
         log("请先选择文件")
         return
+
+    year_text = elec_refs["year"].value
+    try:
+        year = int(year_text)
+    except (TypeError, ValueError):
+        log("请输入有效的年份")
+        return
+
     btn = elec_refs["btn"]
-    year = elec_refs["year"].value
     set_btn_state(btn, False, "处理中...")
-    run_task(page, "electrical", path, btn, log, year=year)
+    await run_task(page, "electrical", path, btn, log, year=year)
 
 
-def on_work_process(page: ft.Page, work_refs: dict, log):
+async def on_work_process(page: ft.Page, work_refs: dict, log):
     """工时处理按钮回调"""
     path = work_refs["path"].value
     if not path:
-        log("请先选择文件或文件夹")
+        log("请先选择文件")
         return
     btn = work_refs["btn"]
     year = int(work_refs["year"].value)
     month = int(work_refs["month"].value)
     set_btn_state(btn, False, "处理中...")
-    run_task(page, "worktime", path, btn, log, year=year, month=month)
+    await run_task(page, "worktime", path, btn, log, year=year, month=month)
 
 
 # ---------------------------------------------------------------------------
@@ -142,10 +170,23 @@ def wire_processing_buttons(module_refs: dict, page: ft.Page, log):
     将模块 refs 中的按钮绑定到处理回调
     必须在模块区域创建完成后调用
     """
-    module_refs["fuel"]["btn"].on_click = lambda e: on_fuel_process(page, module_refs["fuel"], log)
-    module_refs["prod"]["btn"].on_click = lambda e: on_prod_process(page, module_refs["prod"], log)
-    module_refs["elec"]["btn"].on_click = lambda e: on_elec_process(page, module_refs["elec"], log)
-    module_refs["work"]["btn"].on_click = lambda e: on_work_process(page, module_refs["work"], log)
+
+    async def handle_fuel_click(e: ft.ControlEvent):
+        await on_fuel_process(page, module_refs["fuel"], log)
+
+    async def handle_prod_click(e: ft.ControlEvent):
+        await on_prod_process(page, module_refs["prod"], log)
+
+    async def handle_elec_click(e: ft.ControlEvent):
+        await on_elec_process(page, module_refs["elec"], log)
+
+    async def handle_work_click(e: ft.ControlEvent):
+        await on_work_process(page, module_refs["work"], log)
+
+    module_refs["fuel"]["btn"].on_click = handle_fuel_click
+    module_refs["prod"]["btn"].on_click = handle_prod_click
+    module_refs["elec"]["btn"].on_click = handle_elec_click
+    module_refs["work"]["btn"].on_click = handle_work_click
 
 
 def init(config_section_refs: dict):
