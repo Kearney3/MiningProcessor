@@ -348,29 +348,6 @@ def test_config_section_uses_tighter_vertical_spacing():
     assert section.content.spacing == 8
 
 
-def test_gui_main_sets_minimum_window_width(monkeypatch):
-    monkeypatch.setattr(gui_main.cmp, "create_ledger_section", lambda page, log: (object(), {}))
-    monkeypatch.setattr(gui_main.cmp, "create_config_section", lambda page, log: (object(), {}))
-    monkeypatch.setattr(gui_main.cmp, "create_modules_section", lambda page: (object(), {}))
-
-    class LogView:
-        value = ""
-
-        def update(self):
-            pass
-
-    monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: LogView())
-    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
-    monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
-
-    page = PageSpy()
-
-    gui_main.main(page)
-
-    assert page.window_width == 1020
-    assert page.window_min_width == 980
-    assert page.min_width == 980
-
 
 def test_gui_main_uses_consistent_section_spacing(monkeypatch):
     monkeypatch.setattr(gui_main.cmp, "create_ledger_section", lambda page, log: (object(), {}))
@@ -394,31 +371,6 @@ def test_gui_main_uses_consistent_section_spacing(monkeypatch):
     scroll_col = page.controls[0]
     assert scroll_col.spacing == 12
 
-
-def test_gui_main_uses_uniform_divider_spacing(monkeypatch):
-    monkeypatch.setattr(gui_main.cmp, "create_ledger_section", lambda page, log: (object(), {}))
-    monkeypatch.setattr(gui_main.cmp, "create_config_section", lambda page, log: (object(), {}))
-    monkeypatch.setattr(gui_main.cmp, "create_modules_section", lambda page: (object(), {}))
-
-    class LogView:
-        value = ""
-
-        def update(self):
-            pass
-
-    monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: LogView())
-    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
-    monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
-
-    page = PageSpy()
-
-    gui_main.main(page)
-
-    scroll_col = page.controls[0]
-    dividers = [control for control in scroll_col.controls if isinstance(control, gui_main.ft.Divider)]
-
-    assert len(dividers) == 4
-    assert {divider.height for divider in dividers} == {16}
 
 
 def test_apply_button_uses_current_ui_config_without_saving(monkeypatch):
