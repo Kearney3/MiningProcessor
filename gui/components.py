@@ -474,6 +474,166 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
         disabled=True,
     )
 
+    # --- Excel Merger ---
+    merge_path = ft.TextField(
+        label="Excel 合并",
+        hint_text="选择包含 Excel 文件的文件夹...",
+        expand=2,
+        read_only=True,
+        suffix=ft.IconButton(
+            icon=ft.icons.Icons.FOLDER_OPEN,
+            tooltip="浏览",
+        ),
+    )
+    merge_keyword = ft.TextField(
+        label="关键字",
+        hint_text="例如: Fuel",
+        width=150,
+    )
+    merge_strip_time = ft.Checkbox(
+        label="仅保留日期",
+        value=False,
+        tooltip="勾选后，时间列将去除时分秒，格式为 YYYY-MM-DD",
+    )
+    merge_btn = ft.Button(
+        "合并",
+        icon=ft.icons.Icons.MERGE_TYPE,
+        disabled=True,
+    )
+
+    # --- 排序配置列表（Excel 合并用，支持拖拽调整优先级） ---
+    sort_configs_state: list[dict] = []
+
+    sort_rules_column = ft.Column(spacing=4)
+
+    def build_sort_rules():
+        controls = []
+        for i, cfg in enumerate(sort_configs_state):
+            idx = i  # 捕获当前索引
+
+            col_field = ft.TextField(
+                value=cfg.get("column", ""),
+                text_size=12,
+                border_color="transparent",
+                width=140,
+                hint_text="列名",
+            )
+            order_dropdown = ft.Dropdown(
+                value="升序" if cfg.get("ascending", True) else "降序",
+                options=[ft.dropdown.Option("升序"), ft.dropdown.Option("降序")],
+                width=90,
+                text_size=12,
+            )
+
+            def on_col_change(e, _idx=idx):
+                sort_configs_state[_idx]["column"] = e.control.value
+
+            def on_order_change(e, _idx=idx):
+                sort_configs_state[_idx]["ascending"] = (e.control.value == "升序")
+
+            col_field.on_change = on_col_change
+            order_dropdown.on_change = on_order_change
+
+            def move_up(e, _idx=idx):
+                if _idx > 0:
+                    sort_configs_state[_idx - 1], sort_configs_state[_idx] = (
+                        sort_configs_state[_idx],
+                        sort_configs_state[_idx - 1],
+                    )
+                    build_sort_rules()
+                    page.update()
+
+            def move_down(e, _idx=idx):
+                if _idx < len(sort_configs_state) - 1:
+                    sort_configs_state[_idx + 1], sort_configs_state[_idx] = (
+                        sort_configs_state[_idx],
+                        sort_configs_state[_idx + 1],
+                    )
+                    build_sort_rules()
+                    page.update()
+
+            def remove_row(e, _idx=idx):
+                sort_configs_state.pop(_idx)
+                build_sort_rules()
+                page.update()
+
+            up_btn = ft.IconButton(
+                icon=ft.icons.Icons.ARROW_UPWARD, tooltip="上移", on_click=move_up, icon_size=16
+            )
+            down_btn = ft.IconButton(
+                icon=ft.icons.Icons.ARROW_DOWNWARD, tooltip="下移", on_click=move_down, icon_size=16
+            )
+            del_btn = ft.IconButton(
+                icon=ft.icons.Icons.DELETE, tooltip="删除", on_click=remove_row, icon_size=16
+            )
+
+            # 行内容容器
+            row_container = ft.Container(
+                content=ft.Row(
+                    [
+                        ft.Icon(ft.icons.Icons.DRAG_HANDLE, size=20, color=ft.Colors.GREY_600),
+                        ft.Text(str(idx + 1), width=30, size=12),
+                        col_field,
+                        order_dropdown,
+                        ft.Row([up_btn, down_btn, del_btn], spacing=2),
+                    ],
+                    spacing=8,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
+                padding=ft.padding.symmetric(horizontal=8, vertical=4),
+                border=ft.border.all(1, ft.Colors.OUTLINE_VARIANT),
+                border_radius=6,
+                bgcolor=ft.Colors.SURFACE,
+            )
+
+            # 拖拽源
+            draggable = ft.Draggable(
+                group="sort_rules",
+                content=row_container,
+                data=str(idx),
+            )
+
+            # 拖拽目标
+            def make_on_accept(target_idx):
+                def handler(e: ft.DragTargetEvent):
+                    # e.data 可能为 None，从 e.src.data 获取拖拽源索引
+                    src_data = e.src.data if e.src else e.data
+                    if src_data is None:
+                        return
+                    src_idx = int(src_data)
+                    if src_idx != target_idx:
+                        # 交换位置
+                        sort_configs_state[src_idx], sort_configs_state[target_idx] = (
+                            sort_configs_state[target_idx],
+                            sort_configs_state[src_idx],
+                        )
+                        build_sort_rules()
+                        page.update()
+                return handler
+
+            target = ft.DragTarget(
+                group="sort_rules",
+                content=draggable,
+                data=str(idx),
+                on_accept=make_on_accept(idx),
+            )
+
+            controls.append(target)
+
+        sort_rules_column.controls = controls
+        page.update()
+
+    def add_sort_config(e):
+        sort_configs_state.append({"column": "", "ascending": True})
+        build_sort_rules()
+
+    add_sort_btn = ft.Button(
+        "添加排序条件",
+        icon=ft.icons.Icons.ADD,
+        on_click=add_sort_config,
+        height=36,
+    )
+
     async def on_fuel_browse(e: ft.ControlEvent):
         picker = ft.FilePicker()
         files = await picker.pick_files(
@@ -531,12 +691,22 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
             work_btn.disabled = False
             work_btn.update()
 
+    async def on_merge_browse(e: ft.ControlEvent):
+        picker = ft.FilePicker()
+        path = await picker.get_directory_path(dialog_title="选择包含 Excel 文件的文件夹")
+        if path:
+            merge_path.value = path
+            merge_path.update()
+            merge_btn.disabled = False
+            merge_btn.update()
+
     # 绑定浏览按钮
     fuel_path.suffix.on_click = on_fuel_browse
     prod_file_btn.on_click = on_prod_pick_file
     prod_folder_btn.on_click = on_prod_pick_folder
     elec_path.suffix.on_click = on_elec_browse
     work_path.suffix.on_click = on_work_browse
+    merge_path.suffix.on_click = on_merge_browse
 
     container = ft.Container(
         content=ft.Column(
@@ -549,6 +719,24 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
                             ft.Row([prod_path, prod_file_btn, prod_folder_btn, prod_raw_start, prod_btn], spacing=10),
                             ft.Row([elec_path, elec_year, elec_btn], spacing=10),
                             ft.Row([work_path, work_year, work_month, work_btn], spacing=10),
+                            ft.Column(
+                                [
+                                    ft.Row([merge_path, merge_keyword, merge_strip_time, merge_btn], spacing=10),
+                                    ft.Row(
+                                        [
+                                            ft.Column(
+                                                [
+                                                    ft.Text("排序配置（可选，留空则自动按第一个时间列排序）", size=12, color=ft.Colors.GREY),
+                                                    ft.Row([sort_rules_column, add_sort_btn], spacing=10, alignment=ft.MainAxisAlignment.START),
+                                                ],
+                                                spacing=4,
+                                            )
+                                        ],
+                                        spacing=10,
+                                    ),
+                                ],
+                                spacing=4,
+                            ),
                         ],
                         spacing=8,
                     ),
@@ -567,6 +755,13 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "prod": {"path": prod_path, "raw_start": prod_raw_start, "btn": prod_btn},
         "elec": {"path": elec_path, "year": elec_year, "btn": elec_btn},
         "work": {"path": work_path, "year": work_year, "month": work_month, "btn": work_btn},
+        "merge": {
+            "path": merge_path,
+            "keyword": merge_keyword,
+            "strip_time": merge_strip_time,
+            "btn": merge_btn,
+            "sort_configs_state": sort_configs_state,
+        },
     }
     return container, module_refs
 
