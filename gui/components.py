@@ -501,10 +501,12 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
         disabled=True,
     )
 
-    # --- 排序配置列表（Excel 合并用，支持拖拽调整优先级） ---
+    # --- 排序配置列表（Excel 合并用） ---
     sort_configs_state: list[dict] = []
 
-    sort_rules_column = ft.Column(spacing=4)
+    sort_rules_column = ft.Column(
+        spacing=4,
+    )
 
     def build_sort_rules():
         controls = []
@@ -515,7 +517,6 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
                 value=cfg.get("column", ""),
                 text_size=12,
                 border_color="transparent",
-                width=140,
                 hint_text="列名",
             )
             order_dropdown = ft.Dropdown(
@@ -528,11 +529,11 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
             def on_col_change(e, _idx=idx):
                 sort_configs_state[_idx]["column"] = e.control.value
 
-            def on_order_change(e, _idx=idx):
+            def on_order_select(e, _idx=idx):
                 sort_configs_state[_idx]["ascending"] = (e.control.value == "升序")
 
             col_field.on_change = on_col_change
-            order_dropdown.on_change = on_order_change
+            order_dropdown.on_select = on_order_select
 
             def move_up(e, _idx=idx):
                 if _idx > 0:
@@ -541,7 +542,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
                         sort_configs_state[_idx - 1],
                     )
                     build_sort_rules()
-                    page.update()
+                    sort_rules_column.update()
 
             def move_down(e, _idx=idx):
                 if _idx < len(sort_configs_state) - 1:
@@ -550,12 +551,12 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
                         sort_configs_state[_idx + 1],
                     )
                     build_sort_rules()
-                    page.update()
+                    sort_rules_column.update()
 
             def remove_row(e, _idx=idx):
                 sort_configs_state.pop(_idx)
                 build_sort_rules()
-                page.update()
+                sort_rules_column.update()
 
             up_btn = ft.IconButton(
                 icon=ft.icons.Icons.ARROW_UPWARD, tooltip="上移", on_click=move_up, icon_size=16
@@ -567,11 +568,9 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
                 icon=ft.icons.Icons.DELETE, tooltip="删除", on_click=remove_row, icon_size=16
             )
 
-            # 行内容容器
             row_container = ft.Container(
                 content=ft.Row(
                     [
-                        ft.Icon(ft.icons.Icons.DRAG_HANDLE, size=20, color=ft.Colors.GREY_600),
                         ft.Text(str(idx + 1), width=30, size=12),
                         col_field,
                         order_dropdown,
@@ -586,42 +585,10 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
                 bgcolor=ft.Colors.SURFACE,
             )
 
-            # 拖拽源
-            draggable = ft.Draggable(
-                group="sort_rules",
-                content=row_container,
-                data=str(idx),
-            )
-
-            # 拖拽目标
-            def make_on_accept(target_idx):
-                def handler(e: ft.DragTargetEvent):
-                    # e.data 可能为 None，从 e.src.data 获取拖拽源索引
-                    src_data = e.src.data if e.src else e.data
-                    if src_data is None:
-                        return
-                    src_idx = int(src_data)
-                    if src_idx != target_idx:
-                        # 交换位置
-                        sort_configs_state[src_idx], sort_configs_state[target_idx] = (
-                            sort_configs_state[target_idx],
-                            sort_configs_state[src_idx],
-                        )
-                        build_sort_rules()
-                        page.update()
-                return handler
-
-            target = ft.DragTarget(
-                group="sort_rules",
-                content=draggable,
-                data=str(idx),
-                on_accept=make_on_accept(idx),
-            )
-
-            controls.append(target)
+            controls.append(row_container)
 
         sort_rules_column.controls = controls
-        page.update()
+        sort_rules_column.update()
 
     def add_sort_config(e):
         sort_configs_state.append({"column": "", "ascending": True})
@@ -727,7 +694,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
                                             ft.Column(
                                                 [
                                                     ft.Text("排序配置（可选，留空则自动按第一个时间列排序）", size=12, color=ft.Colors.GREY),
-                                                    ft.Row([sort_rules_column, add_sort_btn], spacing=10, alignment=ft.MainAxisAlignment.START),
+                                                    ft.Row([sort_rules_column, add_sort_btn], spacing=10, alignment=ft.MainAxisAlignment.START, expand=True),
                                                 ],
                                                 spacing=4,
                                             )
