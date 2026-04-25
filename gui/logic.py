@@ -4,7 +4,6 @@ GUI 业务逻辑层
 """
 import asyncio
 import flet as ft
-import io
 import os
 import sys
 from excel_fuel import process_diesel_data
@@ -25,16 +24,40 @@ def set_btn_state(btn: ft.Button, enabled: bool, label: str = "处理"):
 
 
 # ---------------------------------------------------------------------------
+# 实时日志 IO
+# ---------------------------------------------------------------------------
+class _RealtimeLogIO:
+    """将写入的内容实时推送到 asyncio.Queue 的类文件对象"""
+
+    def __init__(self, queue: asyncio.Queue, prefix: str = ""):
+        self._queue = queue
+        self._prefix = prefix
+        self._buffer = ""
+
+    def write(self, s: str) -> int:
+        self._buffer += s
+        lines = self._buffer.split("\n")
+        self._buffer = lines[-1]  # 保留未完成的最后一行
+        for line in lines[:-1]:
+            if line.strip():
+                self._queue.put_nowait(f"{self._prefix}{line}")
+        return len(s)
+
+    def flush(self) -> None:
+        if self._buffer.strip():
+            self._queue.put_nowait(f"{self._prefix}{self._buffer}")
+            self._buffer = ""
+
+
+# ---------------------------------------------------------------------------
 # 任务执行
 # ---------------------------------------------------------------------------
-def _execute_task(module_type: str, path: str, **kwargs) -> tuple[list[str], str | None]:
-    """在后台线程中执行处理任务并收集输出"""
+def _execute_task(module_type: str, path: str, queue: asyncio.Queue, **kwargs) -> str | None:
+    """在后台线程中执行处理任务，通过 queue 实时发送日志"""
     old_stdout = sys.stdout
     old_stderr = sys.stderr
-    stdout_buffer = io.StringIO()
-    stderr_buffer = io.StringIO()
-    sys.stdout = stdout_buffer
-    sys.stderr = stderr_buffer
+    sys.stdout = _RealtimeLogIO(queue, "[stdout] ")
+    sys.stderr = _RealtimeLogIO(queue, "[stderr] ")
     error_message = None
 
     try:
@@ -65,22 +88,12 @@ def _execute_task(module_type: str, path: str, **kwargs) -> tuple[list[str], str
     except Exception as ex:
         error_message = str(ex)
     finally:
-        captured_stdout = stdout_buffer.getvalue()
-        captured_stderr = stderr_buffer.getvalue()
+        sys.stdout.flush()
+        sys.stderr.flush()
         sys.stdout = old_stdout
         sys.stderr = old_stderr
 
-    log_lines = []
-    if captured_stdout:
-        for line in captured_stdout.rstrip("\n").split("\n"):
-            if line.strip():
-                log_lines.append(f"[stdout] {line}")
-    if captured_stderr:
-        for line in captured_stderr.rstrip("\n").split("\n"):
-            if line.strip():
-                log_lines.append(f"[stderr] {line}")
-
-    return log_lines, error_message
+    return error_message
 
 
 async def run_task(page: ft.Page, module_type: str, path: str, btn: ft.Button, log, **kwargs):
@@ -88,10 +101,20 @@ async def run_task(page: ft.Page, module_type: str, path: str, btn: ft.Button, l
     del page  # 保留现有调用签名，避免影响其他调用方
 
     log(f"[{module_type}] 开始处理...")
-    try:
-        log_lines, error_message = await asyncio.to_thread(_execute_task, module_type, path, **kwargs)
-        for line in log_lines:
+    queue = asyncio.Queue()
+
+    async def _consume():
+        while True:
+            line = await queue.get()
+            if line is None:  # sentinel
+                break
             log(line)
+
+    consumer = asyncio.create_task(_consume())
+    try:
+        error_message = await asyncio.to_thread(_execute_task, module_type, path, queue, **kwargs)
+        queue.put_nowait(None)
+        await consumer
         if error_message:
             log(f"[{module_type}] 处理失败: {error_message}")
         else:

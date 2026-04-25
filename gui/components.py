@@ -506,6 +506,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     sort_rules_column = ft.Column(
         spacing=4,
+        expand=2
     )
 
     def build_sort_rules():
@@ -516,7 +517,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
             col_field = ft.TextField(
                 value=cfg.get("column", ""),
                 text_size=12,
-                border_color="transparent",
+                # border_color="transparent",
                 hint_text="列名",
             )
             order_dropdown = ft.Dropdown(
@@ -745,5 +746,5 @@ def create_log_view() -> ft.TextField:
         min_lines=6,
         max_lines=8,
         expand=True,
-        text_size=11,
+        text_size=13,
     )
