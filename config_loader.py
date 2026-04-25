@@ -8,6 +8,12 @@ from pathlib import Path
 from typing import Any
 
 _CONFIG_FILE = Path(__file__).parent / "config.json"
+_runtime_config: dict[str, Any] | None = None
+
+
+def get_config_file_path() -> Path:
+    """获取内置配置文件路径"""
+    return _CONFIG_FILE
 
 
 def load_config() -> dict[str, Any]:
@@ -29,9 +35,18 @@ def get_device_load_map(version: str = "new") -> dict[str, int]:
     获取设备装载量映射
     version: "new" (默认) 或 "old"
     """
-    config = load_config()
+    config = _runtime_config if _runtime_config is not None else load_config()
     key = f"device_load_map_{version}" if version != "new" else "device_load_map"
     return config.get(key, {})
+
+
+def apply_device_load_map(device_load_map: dict[str, int]) -> dict[str, int]:
+    """仅在当前运行时应用设备装载量映射，不持久化到文件"""
+    global _runtime_config
+    config = load_config()
+    config["device_load_map"] = dict(device_load_map)
+    _runtime_config = config
+    return _runtime_config["device_load_map"]
 
 
 def update_device_load_map(updates: dict[str, int]) -> dict[str, int]:

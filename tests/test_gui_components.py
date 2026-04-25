@@ -7,14 +7,40 @@ import types
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+import config_loader
+
 spec = importlib.util.spec_from_file_location(
     "gui_components_under_test", ROOT / "gui" / "components.py"
 )
 components = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(components)
 
+main_spec = importlib.util.spec_from_file_location(
+    "gui_main_under_test", ROOT / "gui" / "main.py"
+)
+gui_main = importlib.util.module_from_spec(main_spec)
+main_spec.loader.exec_module(gui_main)
+
 
 class DummyPage:
+    def update(self):
+        pass
+
+
+class PageSpy:
+    def __init__(self):
+        self.title = None
+        self.theme_mode = None
+        self.window_width = None
+        self.window_height = None
+        self.window_min_width = None
+        self.min_width = None
+        self.width = 1020
+        self.controls = []
+
+    def add(self, *controls):
+        self.controls.extend(controls)
+
     def update(self):
         pass
 
@@ -30,6 +56,49 @@ class FrozenDateTime:
         return types.SimpleNamespace(year=2026, month=4)
 
 
+class DummyControlEvent:
+    def __init__(self, control=None):
+        self.control = control
+
+
+class DummyFile:
+    def __init__(self, path):
+        self.path = str(path)
+
+
+class SavePicker:
+    next_path = None
+
+    async def save_file(self, **kwargs):
+        return self.next_path
+
+
+class ImportPicker:
+    next_files = None
+
+    async def pick_files(self, **kwargs):
+        return self.next_files
+
+
+class ApplyConfigSpy:
+    def __init__(self):
+        self.calls = []
+
+    def __call__(self, config):
+        self.calls.append(config)
+
+
+class UpdateDeviceLoadMapSpy:
+    def __init__(self):
+        self.calls = []
+
+    def __call__(self, updates):
+        self.calls.append(updates)
+        return updates
+
+
+
+
 def _config_table_values(refs):
     return [
         {
@@ -39,6 +108,43 @@ def _config_table_values(refs):
         }
         for row in refs["config_state"]
     ]
+
+
+def _find_button(refs, label):
+    for button in refs["action_buttons"]:
+        for attr in ("text", "value"):
+            if getattr(button, attr, None) == label:
+                return button
+        if label in repr(button):
+            return button
+        content = getattr(button, "content", None)
+        if getattr(content, "value", None) == label:
+            return button
+        for attr in ("content", "controls"):
+            nested = getattr(content, attr, None)
+            if isinstance(nested, list):
+                for item in nested:
+                    if getattr(item, "value", None) == label or label in repr(item):
+                        return button
+    raise LookupError(label)
+
+
+
+
+def test_ledger_section_uses_consistent_vertical_spacing():
+    section, _ = components.create_ledger_section(DummyPage(), lambda message: None)
+
+    assert section.padding == 12
+    assert section.content.spacing == 8
+
+
+def test_modules_section_uses_consistent_vertical_spacing(monkeypatch):
+    monkeypatch.setattr(components, "datetime", FrozenDateTime, raising=False)
+
+    section, _ = components.create_modules_section(DummyPage())
+
+    assert section.padding == 12
+    assert section.content.spacing == 8
 
 
 def test_work_module_exposes_year_month_refs_with_current_date_defaults(monkeypatch):
@@ -151,3 +257,187 @@ def test_save_config_cancel_keeps_state_and_writes_nothing(tmp_path):
 
     assert refs["config_state"] == before
     assert list(tmp_path.iterdir()) == []
+
+
+def test_save_button_uses_selected_path_instead_of_mutating_default_config(monkeypatch, tmp_path):
+    logs = []
+    update_spy = UpdateDeviceLoadMapSpy()
+    monkeypatch.setattr(components.ft, "FilePicker", SavePicker)
+    monkeypatch.setattr(config_loader, "update_device_load_map", update_spy)
+
+    output_path = tmp_path / "exported-config.json"
+    SavePicker.next_path = str(output_path)
+
+    _, refs = components.create_config_section(DummyPage(), logs.append)
+    refs["set_config_state"]([
+        {"selected": False, "device": "TR100", "capacity": "35"},
+        {"selected": False, "device": "EH4000", "capacity": "85"},
+    ])
+
+    save_button = _find_button(refs, "保存配置")
+
+    import asyncio
+    asyncio.run(save_button.on_click(DummyControlEvent()))
+
+    assert output_path.exists()
+    assert json.loads(output_path.read_text(encoding="utf-8")) == {
+        "device_load_map": {"TR100": 35, "EH4000": 85}
+    }
+    assert update_spy.calls == []
+    assert logs[-1] == f"配置已另存为: {output_path}"
+
+
+def test_restore_default_button_loads_builtin_config_file(monkeypatch, tmp_path):
+    logs = []
+    built_in_config = tmp_path / "builtin-config.json"
+    built_in_config.write_text(
+        json.dumps({"device_load_map": {"NTE240": 90}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(config_loader, "get_config_file_path", lambda: built_in_config)
+
+    _, refs = components.create_config_section(DummyPage(), logs.append)
+    refs["set_config_state"]([
+        {"selected": False, "device": "TEMP", "capacity": "1"},
+    ])
+
+    restore_button = _find_button(refs, "恢复默认配置")
+
+    restore_button.on_click(DummyControlEvent())
+
+    assert _config_table_values(refs) == [
+        {"selected": False, "device": "NTE240", "capacity": "90"}
+    ]
+    assert logs[-1] == "已恢复默认配置"
+
+
+
+
+
+
+def test_config_actions_are_split_into_two_button_rows():
+    _, refs = components.create_config_section(DummyPage(), lambda message: None)
+
+    assert len(refs["action_button_rows"]) == 2
+    assert [button for button in refs["action_button_rows"][0].controls] == refs["action_buttons"][:3]
+    assert [button for button in refs["action_button_rows"][1].controls] == refs["action_buttons"][3:]
+
+
+
+
+def test_config_action_buttons_use_consistent_widths():
+    _, refs = components.create_config_section(DummyPage(), lambda message: None)
+
+    assert {button.width for button in refs["action_buttons"]} == {160}
+
+
+def test_config_action_button_rows_are_left_aligned():
+    _, refs = components.create_config_section(DummyPage(), lambda message: None)
+
+    assert all(row.alignment == components.ft.MainAxisAlignment.START for row in refs["action_button_rows"])
+
+
+
+
+
+
+def test_config_section_uses_tighter_vertical_spacing():
+    section, _ = components.create_config_section(DummyPage(), lambda message: None)
+
+    assert section.padding == 12
+    assert section.content.spacing == 8
+
+
+def test_gui_main_sets_minimum_window_width(monkeypatch):
+    monkeypatch.setattr(gui_main.cmp, "create_ledger_section", lambda page, log: (object(), {}))
+    monkeypatch.setattr(gui_main.cmp, "create_config_section", lambda page, log: (object(), {}))
+    monkeypatch.setattr(gui_main.cmp, "create_modules_section", lambda page: (object(), {}))
+
+    class LogView:
+        value = ""
+
+        def update(self):
+            pass
+
+    monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: LogView())
+    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
+    monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
+
+    page = PageSpy()
+
+    gui_main.main(page)
+
+    assert page.window_width == 1020
+    assert page.window_min_width == 980
+    assert page.min_width == 980
+
+
+def test_gui_main_uses_consistent_section_spacing(monkeypatch):
+    monkeypatch.setattr(gui_main.cmp, "create_ledger_section", lambda page, log: (object(), {}))
+    monkeypatch.setattr(gui_main.cmp, "create_config_section", lambda page, log: (object(), {}))
+    monkeypatch.setattr(gui_main.cmp, "create_modules_section", lambda page: (object(), {}))
+
+    class LogView:
+        value = ""
+
+        def update(self):
+            pass
+
+    monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: LogView())
+    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
+    monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
+
+    page = PageSpy()
+
+    gui_main.main(page)
+
+    scroll_col = page.controls[0]
+    assert scroll_col.spacing == 12
+
+
+def test_gui_main_uses_uniform_divider_spacing(monkeypatch):
+    monkeypatch.setattr(gui_main.cmp, "create_ledger_section", lambda page, log: (object(), {}))
+    monkeypatch.setattr(gui_main.cmp, "create_config_section", lambda page, log: (object(), {}))
+    monkeypatch.setattr(gui_main.cmp, "create_modules_section", lambda page: (object(), {}))
+
+    class LogView:
+        value = ""
+
+        def update(self):
+            pass
+
+    monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: LogView())
+    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
+    monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
+
+    page = PageSpy()
+
+    gui_main.main(page)
+
+    scroll_col = page.controls[0]
+    dividers = [control for control in scroll_col.controls if isinstance(control, gui_main.ft.Divider)]
+
+    assert len(dividers) == 4
+    assert {divider.height for divider in dividers} == {16}
+
+
+def test_apply_button_uses_current_ui_config_without_saving(monkeypatch):
+    logs = []
+    apply_spy = ApplyConfigSpy()
+    update_spy = UpdateDeviceLoadMapSpy()
+    monkeypatch.setattr(config_loader, "apply_device_load_map", apply_spy)
+    monkeypatch.setattr(config_loader, "update_device_load_map", update_spy)
+
+    _, refs = components.create_config_section(DummyPage(), logs.append)
+    refs["set_config_state"]([
+        {"selected": False, "device": "TR100", "capacity": "35"},
+        {"selected": False, "device": "EH4000", "capacity": "85"},
+    ])
+
+    apply_button = _find_button(refs, "应用当前配置")
+
+    apply_button.on_click(DummyControlEvent())
+
+    assert apply_spy.calls == [{"TR100": 35, "EH4000": 85}]
+    assert update_spy.calls == []
+    assert logs[-1] == "当前配置已应用"
