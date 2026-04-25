@@ -23,7 +23,6 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
             ft.DataColumn(ft.Text("设备编号")),
             ft.DataColumn(ft.Text("标准设备名称")),
             ft.DataColumn(ft.Text("设备类型")),
-            ft.DataColumn(ft.Text("额定装载量")),
             ft.DataColumn(ft.Text("所属公司")),
         ],
         rows=[],
@@ -33,7 +32,7 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
         ledger_table.rows = [
             ft.DataRow(
                 cells=[ft.DataCell(ft.Text(str(r.get(c, "")))) for c in
-                       ["设备编号", "标准设备名称", "设备类型", "额定装载量", "所属公司"]]
+                       ["设备编号", "标准设备名称", "设备类型", "所属公司"]]
             )
             for r in records
         ]
@@ -107,9 +106,9 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
                     expand=True,
                 ),
             ],
-            spacing=10,
+            spacing=8,
         ),
-        padding=15,
+        padding=12,
         border=ft.Border.all(1, ft.Colors.OUTLINE),
         border_radius=10,
     )
@@ -127,6 +126,7 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
 # ---------------------------------------------------------------------------
 def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
     """创建设备装载量配置区域，返回 (container, refs)"""
+    import asyncio
     import config_loader
 
     config_state: list[dict] = []
@@ -221,6 +221,19 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
             ]
         )
 
+    def build_device_load_map() -> dict[str, int]:
+        device_load_map = {}
+        for row in config_state:
+            device = row["device"]
+            cap_text = row["capacity"]
+            if not device or not cap_text:
+                continue
+            try:
+                device_load_map[device] = int(cap_text)
+            except (TypeError, ValueError):
+                log(f"警告: '{cap_text}' 不是有效数字，跳过 {device}")
+        return device_load_map
+
     def load_default_config_file(path):
         if not path:
             return
@@ -238,36 +251,39 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
         if not path:
             return
 
-        device_load_map = {}
-        for row in config_state:
-            device = row["device"]
-            cap_text = row["capacity"]
-            if not device or not cap_text:
-                continue
-            try:
-                device_load_map[device] = int(cap_text)
-            except (TypeError, ValueError):
-                log(f"警告: '{cap_text}' 不是有效数字，跳过 {device}")
+        device_load_map = build_device_load_map()
 
         with Path(path).open("w", encoding="utf-8") as f:
             json.dump({"device_load_map": device_load_map}, f, ensure_ascii=False)
 
-    def save_config(e: ft.ControlEvent):
-        new_map = {}
-        for row in config_state:
-            device = row["device"]
-            cap_text = row["capacity"]
-            if device and cap_text:
-                try:
-                    new_map[device] = int(cap_text)
-                except ValueError:
-                    log(f"警告: '{cap_text}' 不是有效数字，跳过 {device}")
-                    continue
+    async def save_config(e: ft.ControlEvent):
+        picker = ft.FilePicker()
+        path = await picker.save_file(
+            dialog_title="保存配置文件",
+            file_name="device-load-map.json",
+            allowed_extensions=["json"],
+        )
+        if not path:
+            return
         try:
-            config_loader.update_device_load_map(new_map)
-            log("配置已保存")
+            save_config_to_path(path)
+            log(f"配置已另存为: {path}")
         except Exception as ex:
             log(f"保存配置失败: {ex}")
+
+    def restore_default_config(e: ft.ControlEvent):
+        try:
+            load_default_config_file(config_loader.get_config_file_path())
+            log("已恢复默认配置")
+        except Exception as ex:
+            log(f"恢复默认配置失败: {ex}")
+
+    def apply_current_config(e: ft.ControlEvent):
+        try:
+            config_loader.apply_device_load_map(build_device_load_map())
+            log("当前配置已应用")
+        except Exception as ex:
+            log(f"应用当前配置失败: {ex}")
 
     def add_device(e: ft.ControlEvent):
         append_row()
@@ -298,19 +314,24 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
         except Exception as ex:
             log(f"导入配置失败: {ex}")
 
+    action_buttons = [
+        ft.Button("添加设备", icon=ft.icons.Icons.ADD, on_click=add_device, width=160),
+        ft.Button("删除选中", icon=ft.icons.Icons.DELETE, on_click=remove_selected, width=160),
+        ft.Button("导入配置", icon=ft.icons.Icons.FILE_UPLOAD, on_click=import_config, width=160),
+        ft.Button("恢复默认配置", icon=ft.icons.Icons.RESTART_ALT, on_click=restore_default_config, width=160),
+        ft.Button("应用当前配置", icon=ft.icons.Icons.CHECK_CIRCLE, on_click=apply_current_config, width=160),
+        ft.Button("保存配置", icon=ft.icons.Icons.SAVE, on_click=save_config, width=160),
+    ]
+    action_button_rows = [
+        ft.Row(action_buttons[:3], spacing=10, wrap=False, alignment=ft.MainAxisAlignment.START),
+        ft.Row(action_buttons[3:], spacing=10, wrap=False, alignment=ft.MainAxisAlignment.START),
+    ]
+
     container = ft.Container(
         content=ft.Column(
             [
                 ft.Text("设备装载量配置", size=18, weight=ft.FontWeight.W_600),
-                ft.Row(
-                    [
-                        ft.Button("添加设备", icon=ft.icons.Icons.ADD, on_click=add_device),
-                        ft.Button("删除选中", icon=ft.icons.Icons.DELETE, on_click=remove_selected),
-                        ft.Button("导入配置", icon=ft.icons.Icons.FILE_UPLOAD, on_click=import_config),
-                        ft.Button("保存配置", icon=ft.icons.Icons.SAVE, on_click=save_config),
-                    ],
-                    spacing=10,
-                ),
+                *action_button_rows,
                 ft.Container(
                     content=ft.ListView([config_table], height=200, spacing=5),
                     border=ft.Border.all(1, ft.Colors.OUTLINE),
@@ -319,9 +340,9 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
                     expand=True,
                 ),
             ],
-            spacing=10,
+            spacing=8,
         ),
-        padding=15,
+        padding=12,
         border=ft.Border.all(1, ft.Colors.OUTLINE),
         border_radius=10,
     )
@@ -335,6 +356,8 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
         "set_config_state": set_config_state,
         "append_row": append_row,
         "remove_selected_rows": remove_selected_rows,
+        "action_buttons": action_buttons,
+        "action_button_rows": action_button_rows,
     }
     return container, refs
 
@@ -532,9 +555,9 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
                     padding=10,
                 ),
             ],
-            spacing=10,
+            spacing=8,
         ),
-        padding=15,
+        padding=12,
         border=ft.Border.all(1, ft.Colors.OUTLINE),
         border_radius=10,
     )

@@ -19,7 +19,7 @@ def main(page: ft.Page):
     page.window_height = 850
 
     # ---- 滚动容器 ----
-    scroll_col = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True)
+    scroll_col = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True, spacing=12)
 
     # ---- 共享日志状态 ----
     log_lines: list[str] = []
@@ -39,22 +39,22 @@ def main(page: ft.Page):
     config_section, config_refs = cmp.create_config_section(page, log)
     modules_section, module_refs = cmp.create_modules_section(page)
     log_view = cmp.create_log_view()
-    progress_bar = ft.ProgressBar(value=0, width=page.width - 40)
+    # progress_bar = ft.ProgressBar(value=0, width=page.width - 40)
 
     # ---- 绑定处理按钮 ----
     logic.wire_processing_buttons(module_refs, page, log)
 
     # ---- 组装页面 ----
     scroll_col.controls.append(ft.Text("矿山数据处理工具", size=24, weight=ft.FontWeight.BOLD))
-    scroll_col.controls.append(ft.Divider())
+    # scroll_col.controls.append(ft.Divider(height=16))
     scroll_col.controls.append(ledger_section)
-    scroll_col.controls.append(ft.Divider())
+    # scroll_col.controls.append(ft.Divider(height=16))
     scroll_col.controls.append(config_section)
-    scroll_col.controls.append(ft.Divider())
+    # scroll_col.controls.append(ft.Divider(height=16))
     scroll_col.controls.append(modules_section)
-    scroll_col.controls.append(ft.Divider())
+    # scroll_col.controls.append(ft.Divider(height=16))
     scroll_col.controls.append(log_view)
-    scroll_col.controls.append(progress_bar)
+    # scroll_col.controls.append(progress_bar)
     page.add(scroll_col)
 
     # ---- 初始化（放在 page.add 之后） ----
