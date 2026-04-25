@@ -10,9 +10,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import gui.components as cmp
 import gui.logic as logic
+from func.logger import setup_logging
 
 
 def main(page: ft.Page):
+    setup_logging()
     page.title = "矿山数据处理工具"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.window_width = 1020

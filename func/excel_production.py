@@ -1,66 +1,30 @@
 """
-用于白班和日班表的导入（多线程优化版）
+用于白班和日班表的导入
 """
 import argparse
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any
 
 import pandas as pd
 import os
 import re
-from logger import get_logger
+from func.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 class MiningDataProcessor:
-    def __init__(self, version: str = "new", raw_start: int = 6):
-        self.version = version
-        self.raw_start = raw_start
-        try:
-            import config_loader
-            self.load_map: dict[str, int] = config_loader.get_device_load_map(version)
-            if not self.load_map:
-                raise FileNotFoundError
-        except Exception:
-            if version == "old":
-                # 2024年9月前的装载量（旧版）
-                self.load_map = {
-                    'NTE240': 80,
-                    'LIEBHERR T264': 80,
-                    'EH4000': 80,
-                    'MT4400AC': 80,
-                    'TR100': 32,
-                    'TEREX 60': 20,
-                    'Terex 60': 20,
-                    'TR60': 20,
-                    'MT-10': 20,
-                    'XDM100': 32,
-                    'XDE120': 40,
-                    'XDE130': 45,
-                    'T-264':80,
-                    'SANY SET150S':52,
-                    'CAT773':20
-
-                }
-            else:
-                # 2024年9月后的装载量（新版）
-                self.load_map = {
-                    'NTE240': 85,
-                    'EH4000': 85,
-                    'LIEBHERR T264': 80,
-                    'TR100': 35,
-                    'TEREX 60': 22,
-                    'Terex 60': 22,
-                    'TR60': 22,
-                    'XDM100': 35,
-                    'XDE120': 43,
-                    'XDE130': 43,
-                    'T-264': 80,
-                    'SANY SET150S': 52,
-                    'CAT773': 20
-                }
+    def __init__(self):
+        # 设备型号 -> 单趟装载量
+        self.load_map = {
+            'NTE240': 85,
+            'TR100': 35,
+            'TEREX 60': 22,
+            'Terex 60': 22,
+            'EH4000': 85,
+            'XDM100': 35,
+            'XDE120': 43,
+            'XDE130': 43,
+        }
 
     # ---------------------------
     # 基础工具函数
@@ -68,11 +32,9 @@ class MiningDataProcessor:
     def parse_filename(self, filename):
         """从文件名中提取日期、班次"""
         date_match = re.search(r'(\d{4}\.\d{2}\.\d{2})', filename)
-        if not date_match:
-            raise ValueError(f"文件名中未找到日期: {filename}")
-
-        date_str = date_match.group(1)
-        date_val = datetime.strptime(date_str, "%Y.%m.%d").date()
+        date_str = date_match.group(1) if date_match else ""
+        # 日期转换, 从字符串2025.01.01 转换为日期对象,不要时间部分
+        date_str = datetime.strptime(date_str, "%Y.%m.%d").date()
 
         if "白班" in filename:
             shift = "Day"
@@ -81,7 +43,7 @@ class MiningDataProcessor:
         else:
             shift = ""
 
-        return date_val, shift
+        return date_str, shift
 
     def get_load_capacity(self, truck_name):
         """根据矿卡名称模糊匹配装载量"""
@@ -96,15 +58,8 @@ class MiningDataProcessor:
 
     def safe_str(self, val):
         """安全转字符串"""
-        try:
-            if pd.isna(val):
-                return ""
-        except Exception:
-            # print(f"异常：\n{val}")
-            # 删除换行符
-            val = str(val).replace("\n", "")
-            # print(f"转换后：{str(val).strip()}")
-        # print(f"当前列名: {val}")
+        if pd.isna(val):
+            return ""
         return str(val).strip()
 
     def safe_number(self, val, default=0):
@@ -128,26 +83,15 @@ class MiningDataProcessor:
             return default
         return float(num)
 
-    def find_first_matching_column(self, columns: object, keywords: object) -> Any | None:
+    def find_first_matching_column(self, columns, keywords):
         """
         在列名中按关键字模糊匹配，返回第一个匹配列名
-        keywords: list[str] 或 list[list[str]]
-        - 如果是 list[str]：只要匹配其中任意一个关键字即可 (OR 逻辑)
-        - 如果是 list[list[str]]：需要匹配内部列表中的所有关键字 (AND 逻辑)，且满足任意一组内部列表即可
+        keywords: list[str]
         """
         for col in columns:
             col_str = self.safe_str(col)
-            # print(f"当前列名: {col}, 关键字: {keywords}")
-            # 判断 keywords 是否是嵌套列表 (list of lists)
-            if keywords and isinstance(keywords[0], list):
-                # 嵌套模式：需要满足某一组内的所有关键字 (AND 逻辑)
-                for group in keywords:
-                    if all(k in col_str for k in group):
-                        return col
-            else:
-                # 扁平模式：只要匹配任意一个关键字 (OR 逻辑)
-                if any(k in col_str for k in keywords):
-                    return col
+            if all(k in col_str for k in keywords):
+                return col
         return None
 
     # ---------------------------
@@ -159,9 +103,6 @@ class MiningDataProcessor:
         - 解析矿卡运行数据
         - 解析生产数据
         """
-        if df_raw.empty or df_raw.shape[0] < 7:
-            return pd.DataFrame(), pd.DataFrame()
-
         # 1. 找最后一行：A列最后非空
         col_a = df_raw.iloc[:, 0]
         non_empty_a = col_a[col_a.notna()]
@@ -171,11 +112,10 @@ class MiningDataProcessor:
         last_row_idx = non_empty_a.index[-1]
 
         # 2. 找最后一列：第6行匹配“总趟数”，前一列为最后一列
-        row6 = df_raw.iloc[self.raw_start-1, :]
+        row6 = df_raw.iloc[5, :]
         total_col_idx = None
         for idx, val in row6.items():
-            if "总趟数" in self.safe_str(val) or "Нийт рейс" in self.safe_str(val):
-                # print(f"找到总趟数列：{idx},{self.safe_str(val)}")
+            if "总趟数" in self.safe_str(val):
                 total_col_idx = idx
                 break
 
@@ -185,8 +125,8 @@ class MiningDataProcessor:
             last_col_idx = df_raw.shape[1] - 1
 
         # 3. 构造复合表头
-        header6 = df_raw.iloc[self.raw_start-1, :last_col_idx + 1].ffill()
-        header7 = df_raw.iloc[self.raw_start, :last_col_idx + 1]
+        header6 = df_raw.iloc[5, :last_col_idx + 1].ffill()
+        header7 = df_raw.iloc[6, :last_col_idx + 1]
 
         combined_headers = []
         for h6, h7 in zip(header6, header7):
@@ -194,11 +134,8 @@ class MiningDataProcessor:
             h7_str = self.safe_str(h7)
             combined_headers.append(f"{h6_str}｜{h7_str}")
 
-        # 4. 数据区：第self.raw_start+1行开始
-        data = df_raw.iloc[self.raw_start + 1: last_row_idx + 1, :last_col_idx + 1].copy()
-        if data.empty:
-            return pd.DataFrame(), pd.DataFrame()
-
+        # 4. 数据区：第8行开始
+        data = df_raw.iloc[7:last_row_idx + 1, :last_col_idx + 1].copy()
         data.columns = combined_headers
 
         # 第一列固定为矿卡名称
@@ -206,23 +143,22 @@ class MiningDataProcessor:
         data = data.rename(columns={first_col: "矿卡名称"})
 
         # 5. 找运行指标列
-        hour_start_col = self.find_first_matching_column(data.columns, [["小时数", "开始"],["Мото", "Эхэлсэн"]])
-        hour_end_col = self.find_first_matching_column(data.columns, [["小时数", "结束"],["Мото", "Дууссан"]])
-        km_start_col = self.find_first_matching_column(data.columns, [["公里数", "开始"],["км-ын", "Эхэлсэн"]])
-        km_end_col = self.find_first_matching_column(data.columns, [["公里数", "结束"],["км-ын", "Дууссан"]])
-        company_col = self.find_first_matching_column(data.columns, ["公司","Компани"])
+        hour_start_col = self.find_first_matching_column(data.columns, ["小时数", "开始"])
+        hour_end_col = self.find_first_matching_column(data.columns, ["小时数", "结束"])
+        km_start_col = self.find_first_matching_column(data.columns, ["公里数", "开始"])
+        km_end_col = self.find_first_matching_column(data.columns, ["公里数", "结束"])
+        company_col = self.find_first_matching_column(data.columns, ["公司"])
 
         running_rows = []
         production_rows = []
 
         # 哪些列属于“生产列”
-        exclude_keywords = ["小时数", "公里数", "总趟数", "备注", "开始", "结束", "公司"]
+        exclude_keywords = ["小时数", "公里数", "总趟数", "备注", "开始", "结束"]
 
         for _, row in data.iterrows():
             truck_name = self.safe_str(row["矿卡名称"])
-
-            # 这里按你的意图应该过滤空值和合计行
-            if not truck_name or "Нийт" in truck_name:
+            # 过滤掉“Нийт”等空值
+            if not truck_name and "Нийт" not in truck_name:
                 continue
 
             h_start = self.safe_number(row[hour_start_col]) if hour_start_col in data.columns else 0
@@ -230,10 +166,8 @@ class MiningDataProcessor:
             k_start = self.safe_number(row[km_start_col]) if km_start_col in data.columns else 0
             k_end = self.safe_number(row[km_end_col]) if km_end_col in data.columns else 0
             company = self.safe_str(row[company_col]) if company_col in data.columns else ""
-
             if not company:
                 continue
-
             total_trips = 0
             capacity = self.get_load_capacity(truck_name)
 
@@ -252,10 +186,8 @@ class MiningDataProcessor:
 
                 parts = col_str.split("｜", 1)
                 excavator_name = self.safe_str(parts[0])
-                # 排除运行类列，只保留“挖机｜矿石类型”类列
-                if any(k in excavator_name for k in ["Мото", "Эхэлсэн", "Компани", "км", "Дууссан"]):
-                    continue
                 ore_type = self.safe_str(parts[1])
+
                 if not excavator_name and not ore_type:
                     continue
 
@@ -298,19 +230,20 @@ class MiningDataProcessor:
     def process_sheet2(self, df_raw, date_val, shift_val):
         """
         第二个sheet:
-        B列设备名称, C列公司, F列小时数开始, G列小时数结束
+        B列设备名称, C列公司, F列小时数开始, G列小时数结束, I列备注
         输出到运行数据表
         """
         result_rows = []
 
-        # 默认从第4行开始
+        # 这里默认从第4行开始遍历，如需调整可改 start_row
         start_row = 3
 
         for i in range(start_row, len(df_raw)):
             device_name = self.safe_str(df_raw.iloc[i, 1])  # B列
-            company = self.safe_str(df_raw.iloc[i, 2])      # C列
-            h_start = self.safe_number(df_raw.iloc[i, 5])   # F列
-            h_end = self.safe_number(df_raw.iloc[i, 6])     # G列
+            company = self.safe_str(df_raw.iloc[i, 2])  # C列
+            h_start = self.safe_number(df_raw.iloc[i, 5])  # F列
+            h_end = self.safe_number(df_raw.iloc[i, 6])  # G列
+            # remark = self.safe_str(df_raw.iloc[i, 8])     # I列，如后续需要可启用
 
             if not device_name:
                 continue
@@ -337,24 +270,25 @@ class MiningDataProcessor:
     def process_single_file(self, file_path, output_file=None):
         filename = os.path.basename(file_path)
         date_val, shift_val = self.parse_filename(filename)
+        # 日期转换, 从字符串2025.01.01 转换为日期对象
 
-        # 只打开一次 Excel 文件
         xls = pd.ExcelFile(file_path)
 
         if len(xls.sheet_names) < 2:
             raise ValueError("文件中少于2个sheet，请检查Excel结构。")
 
-        # 用同一个 xls 解析，避免重复打开文件
-        df_sheet1 = pd.read_excel(xls, sheet_name=0, header=None)
+        # sheet1
+        df_sheet1 = pd.read_excel(file_path, sheet_name=0, header=None)
         running_df_1, production_df = self.process_sheet1(df_sheet1, date_val, shift_val)
 
-        df_sheet2 = pd.read_excel(xls, sheet_name=1, header=None)
+        # sheet2
+        df_sheet2 = pd.read_excel(file_path, sheet_name=1, header=None)
         running_df_2 = self.process_sheet2(df_sheet2, date_val, shift_val)
 
         # 合并运行数据
         running_df = pd.concat([running_df_1, running_df_2], ignore_index=True)
 
-        # 输出单文件结果
+        # 输出
         if output_file:
             with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
                 running_df.to_excel(writer, sheet_name='运行数据', index=False)
@@ -363,88 +297,42 @@ class MiningDataProcessor:
         return running_df, production_df
 
     # ---------------------------
-    # 收集待处理文件
+    # 文件夹处理
     # ---------------------------
-    def collect_excel_files(self, folder_path):
-        file_list = []
+    def process_folder(self, folder_path, output_file):
+        all_running = []
+        all_production = []
+        total_files = 0
+        success_files = 0
+
+        # 使用 os.walk 遍历所有子文件夹
         for root, dirs, files in os.walk(folder_path):
             for filename in files:
                 if filename.startswith("~$"):
                     continue
                 if not filename.lower().endswith((".xlsx", ".xlsm", ".xls")):
                     continue
+                # 文件名不包括白班、夜班的排除
                 if "白班" not in filename and "夜班" not in filename:
                     continue
 
+                total_files += 1
                 file_path = os.path.join(root, filename)
-                file_list.append(file_path)
-        return file_list
-
-    # ---------------------------
-    # 线程任务包装
-    # ---------------------------
-    def process_single_file_safe(self, file_path, folder_path=None):
-        """
-        线程池任务函数：
-        成功返回 (True, file_path, running_df, production_df, None)
-        失败返回 (False, file_path, None, None, error_msg)
-        """
-        try:
-            running_df, production_df = self.process_single_file(file_path)
-            return True, file_path, running_df, production_df, None
-        except Exception as e:
-            return False, file_path, None, None, str(e)
-
-    # ---------------------------
-    # 文件夹处理（多线程）
-    # ---------------------------
-    def process_folder(self, folder_path, output_file, max_workers=4):
-        all_running = []
-        all_production = []
-        success_files = 0
-
-        file_list = self.collect_excel_files(folder_path)
-        total_files = len(file_list)
-
-        if total_files == 0:
-            logger.warning("未找到符合条件的 Excel 文件。")
-            with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
-                pd.DataFrame().to_excel(writer, sheet_name='运行数据', index=False)
-                pd.DataFrame().to_excel(writer, sheet_name='生产数据', index=False)
-            return
-
-        logger.info(f"共发现 {total_files} 个待处理文件，启动 {max_workers} 个线程...")
-
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            future_to_file = {
-                executor.submit(self.process_single_file_safe, file_path, folder_path): file_path
-                for file_path in file_list
-            }
-
-            for future in as_completed(future_to_file):
-                file_path = future_to_file[future]
-                rel_path = os.path.relpath(file_path, folder_path)
+                logger.info(f"正在处理: {os.path.relpath(file_path, folder_path)}")
 
                 try:
-                    ok, _, running_df, production_df, error_msg = future.result()
-                    if ok:
-                        all_running.append(running_df)
-                        all_production.append(production_df)
-                        success_files += 1
-                        logger.info(f"处理成功: {rel_path}")
-                    else:
-                        logger.error(f"处理失败: {rel_path} -> {error_msg}")
+                    running_df, production_df = self.process_single_file(file_path)
+                    all_running.append(running_df)
+                    all_production.append(production_df)
+                    success_files += 1
                 except Exception as e:
-                    logger.error(f"处理异常: {rel_path} -> {e}")
+                    logger.error(f"处理失败: {os.path.relpath(file_path, folder_path)} -> {e}")
 
         final_running = pd.concat(all_running, ignore_index=True) if all_running else pd.DataFrame()
         final_production = pd.concat(all_production, ignore_index=True) if all_production else pd.DataFrame()
-
         # 按时间排序
-        if not final_running.empty:
-            final_running = final_running.sort_values(by=["日期", "班次"], kind="stable")
-        if not final_production.empty:
-            final_production = final_production.sort_values(by=["日期", "班次"], kind="stable")
+        final_running = final_running.sort_values(by=["日期", "班次"])
+        final_production = final_production.sort_values(by=["日期", "班次"])
 
         with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
             final_running.to_excel(writer, sheet_name='运行数据', index=False)
@@ -457,29 +345,24 @@ class MiningDataProcessor:
 if __name__ == "__main__":
     from logger import setup_logging
     setup_logging()
+    # 改造成cli参数输入
     parser = argparse.ArgumentParser(description="处理矿卡数据")
     parser.add_argument("input_file", help="输入Excel文件路径")
-    parser.add_argument("--workers", type=int, default=min(8, (os.cpu_count() or 4) * 2),
-                        help="线程数，默认 min(8, CPU*2)")
-    parser.add_argument("--version", choices=["new", "old"], default="new",
-                        help="装载量映射版本，new（默认）或 old")
-    parser.add_argument("--raw_start", type=int, default=6, help="复合表头起始行，默认 6")
 
     args = parser.parse_args()
     input_file = args.input_file
-    workers = args.workers
-    version = args.version
-    raw_start = args.raw_start
-
+    # input_file = r"01生产数据/2025/2025.01/01/2025.01.01 Өдөр Б ээлж 白班.xlsx"
+    # input_file = r"01生产数据/2025/2025.01"
+    # 结果输出在输入文件夹下
     output_file = r"合并产量.xlsx"
-    processor = MiningDataProcessor(version=version, raw_start=raw_start)
-
+    processor = MiningDataProcessor()
+    # 判断是否是文件夹
     if os.path.isdir(input_file):
         logger.info(f"正在处理文件夹: {input_file}")
+        # 存放在输入的文件夹下
         output_file = os.path.join(input_file, os.path.basename(output_file))
-        processor.process_folder(input_file, output_file, max_workers=workers)
+        processor.process_folder(input_file, output_file)
     else:
         parent_folder = os.path.dirname(input_file)
         output_file = os.path.join(parent_folder, os.path.basename(output_file))
         processor.process_single_file(input_file, output_file)
-        logger.info(f"单文件处理完成，输出文件：{output_file}")
