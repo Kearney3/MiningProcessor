@@ -1,0 +1,210 @@
+import argparse
+import json
+import os
+import sys
+from typing import List, Tuple
+
+import pandas as pd
+
+
+def find_first_datetime_column(df: pd.DataFrame) -> str | None:
+    """找到 DataFrame 中第一个可解析为日期时间的列，返回列名或 None"""
+    for col in df.columns:
+        # 尝试转换该列，排除完全为空的列
+        if df[col].notna().sum() == 0:
+            continue
+        try:
+            converted = pd.to_datetime(df[col], errors="coerce")
+            # 如果至少有一半非空值成功转换为日期，则认为是时间列
+            if converted.notna().sum() > 0:
+                return col
+        except Exception:
+            continue
+    return None
+
+
+def merge_excel_files(
+    folder_path: str,
+    keyword: str,
+    output_file: str | None = None,
+    strip_time: bool = False,
+    sort_configs: List[dict] | None = None,
+) -> str:
+    """
+    合并指定文件夹中包含关键字的 Excel 文件。
+
+    参数:
+        folder_path: 要扫描的文件夹路径
+        keyword: 文件名需包含的关键字
+        output_file: 输出文件路径（可选，默认在 folder_path 下生成）
+        strip_time: 为 True 时，第一个时间列仅保留日期部分（YYYY-MM-DD）
+        sort_configs: 排序配置列表，如 [{"column": "日期", "ascending": True}, ...]
+                      提供时优先使用，不再自动按日期排序
+
+    返回:
+        输出文件的完整路径
+    """
+    # 1. 收集匹配的 Excel 文件
+    matched_files: List[str] = []
+    # 预设的输出文件名（用于自我排除）
+    expected_output_name = f"{keyword}_合并.xlsx"
+    for fname in sorted(os.listdir(folder_path)):
+        lower = fname.lower()
+        if lower.endswith("_合并.xlsx"):
+            continue  # 排除已生成的合并文件
+        if keyword.lower() in lower and (lower.endswith(".xlsx") or lower.endswith(".xls")):
+            matched_files.append(os.path.join(folder_path, fname))
+
+    if not matched_files:
+        raise FileNotFoundError(
+            f"在 '{folder_path}' 中未找到包含关键字 '{keyword}' 的 Excel 文件"
+        )
+
+    print(f"找到 {len(matched_files)} 个匹配文件:")
+    for f in matched_files:
+        print(f"  - {os.path.basename(f)}")
+
+    # 2. 读取所有文件的 sheet 结构
+    # file_sheets[file_path] = {sheet_name: DataFrame}
+    file_sheets: dict[str, dict[str, pd.DataFrame]] = {}
+    all_sheet_names: set[str] = set()
+
+    for fpath in matched_files:
+        xl = pd.ExcelFile(fpath)
+        sheets = {}
+        for sname in xl.sheet_names:
+            df = pd.read_excel(xl, sheet_name=sname)
+            sheets[sname] = df
+            all_sheet_names.add(sname)
+        file_sheets[fpath] = sheets
+
+    # 3. 按 sheet_name 逐组合并
+    merged_sheets: dict[str, pd.DataFrame] = {}
+    for sname in sorted(all_sheet_names):
+        sheet_dataframes: List[pd.DataFrame] = []
+        expected_headers: Tuple | None = None
+
+        for fpath in matched_files:
+            if sname not in file_sheets[fpath]:
+                print(f"  警告: {os.path.basename(fpath)} 缺少 Sheet '{sname}'，已跳过")
+                continue
+
+            df = file_sheets[fpath][sname].copy()
+
+            if df.empty:
+                print(f"  警告: {os.path.basename(fpath)} 的 Sheet '{sname}' 为空，已跳过")
+                continue
+
+            current_headers = tuple(str(h) for h in df.columns)
+
+            if expected_headers is None:
+                expected_headers = current_headers
+            else:
+                if current_headers != expected_headers:
+                    raise ValueError(
+                        f"Sheet '{sname}' 的表头不一致！\n"
+                        f"  期望: {expected_headers}\n"
+                        f"  实际 ({os.path.basename(fpath)}): {current_headers}\n"
+                        f"请检查并修正后再合并。"
+                    )
+
+            # 去掉空行/全空行（可选，保留原样更稳妥，只在非首表时去掉表头）
+            if sheet_dataframes:
+                # 已经有数据，当前 df 作为后续，跳过表头行
+                pass
+            sheet_dataframes.append(df)
+
+        if not sheet_dataframes:
+            print(f"Sheet '{sname}' 无有效数据，跳过")
+            continue
+
+        # 合并：第一个保留表头，其余直接拼接
+        merged_df = pd.concat(sheet_dataframes, ignore_index=True)
+
+        # 4. 排序处理
+        if sort_configs:
+            # 使用用户配置的排序规则
+            sort_columns = []
+            sort_ascending = []
+            for cfg in sort_configs:
+                col = cfg.get("column", "").strip()
+                asc = bool(cfg.get("ascending", True))
+                if not col:
+                    continue
+                if col not in merged_df.columns:
+                    print(f"  警告: Sheet '{sname}' 中不存在列 '{col}'，跳过该排序条件")
+                    continue
+                sort_columns.append(col)
+                sort_ascending.append(asc)
+
+            if sort_columns:
+                print(f"Sheet '{sname}' 正在按以下规则排序: {list(zip(sort_columns, ['升序' if a else '降序' for a in sort_ascending]))}")
+                merged_df = merged_df.sort_values(by=sort_columns, ascending=sort_ascending, na_position="last").reset_index(drop=True)
+            else:
+                print(f"Sheet '{sname}' 无可用的排序条件，跳过排序")
+        else:
+            # 默认：自动识别第一个时间列并升序排序
+            time_col = find_first_datetime_column(merged_df)
+            if time_col:
+                print(f"Sheet '{sname}' 识别到时间列: '{time_col}'，正在按时间升序排序...")
+                merged_df[time_col] = pd.to_datetime(merged_df[time_col], errors="coerce")
+                merged_df = merged_df.sort_values(by=time_col, na_position="last").reset_index(drop=True)
+            else:
+                print(f"Sheet '{sname}' 未识别到时间列，跳过排序")
+
+        # 5. 仅保留日期（独立于排序逻辑）
+        if strip_time:
+            time_col = find_first_datetime_column(merged_df)
+            if time_col:
+                merged_df[time_col] = pd.to_datetime(merged_df[time_col], errors="coerce")
+                merged_df[time_col] = merged_df[time_col].dt.strftime("%Y-%m-%d")
+                print(f"Sheet '{sname}' 时间列 '{time_col}' 已格式化为日期（YYYY-MM-DD）")
+            else:
+                print(f"Sheet '{sname}' 未识别到时间列，跳过日期格式化")
+
+        merged_sheets[sname] = merged_df
+
+    # 5. 输出文件
+    if output_file is None:
+        output_file = os.path.join(folder_path, f"{keyword}_合并.xlsx")
+
+    with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
+        for sname, df in merged_sheets.items():
+            df.to_excel(writer, sheet_name=sname, index=False)
+
+    print(f"\n合并完成！输出文件: {output_file}")
+    return output_file
+
+
+def main():
+    parser = argparse.ArgumentParser(description="合并包含相同关键字的多个 Excel 文件")
+    parser.add_argument("folder", help="要扫描的文件夹路径")
+    parser.add_argument("keyword", help="文件名需包含的关键字")
+    parser.add_argument("-o", "--output", help="输出文件路径（可选）")
+    parser.add_argument("-s", "--strip-time", action="store_true", help="时间列仅保留日期（YYYY-MM-DD）")
+    parser.add_argument("--sort", type=str, default=None, help='排序规则 JSON，如: [{"column":"日期","ascending":true}]')
+    args = parser.parse_args()
+
+    folder = os.path.abspath(args.folder)
+    if not os.path.isdir(folder):
+        print(f"错误: '{folder}' 不是有效的文件夹路径")
+        sys.exit(1)
+
+    try:
+        sort_configs = None
+        if args.sort:
+            try:
+                sort_configs = json.loads(args.sort)
+                if not isinstance(sort_configs, list):
+                    raise ValueError("排序规则必须是列表")
+            except Exception as e:
+                print(f"错误: 排序规则 JSON 解析失败: {e}")
+                sys.exit(1)
+        merge_excel_files(folder, args.keyword, args.output, strip_time=args.strip_time, sort_configs=sort_configs)
+    except Exception as e:
+        print(f"错误: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
