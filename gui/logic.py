@@ -4,13 +4,14 @@ GUI 业务逻辑层
 """
 import asyncio
 import flet as ft
+import logging
 import os
-import sys
-from excel_fuel import process_diesel_data
-from excel_production_enhanced import MiningDataProcessor as ProdProcessor
-from excel_electrical import parse_excel_data
-from excel_worktime import process_excel_data
-from excel_merger import merge_excel_files
+from func.excel_fuel import process_diesel_data
+from func.excel_production_enhanced import MiningDataProcessor as ProdProcessor
+from func.excel_electrical import parse_excel_data
+from func.excel_worktime import process_excel_data
+from func.excel_merger import merge_excel_files
+from func.logger import QueueHandler, DEFAULT_FORMAT
 
 
 # ---------------------------------------------------------------------------
@@ -24,40 +25,10 @@ def set_btn_state(btn: ft.Button, enabled: bool, label: str = "处理"):
 
 
 # ---------------------------------------------------------------------------
-# 实时日志 IO
-# ---------------------------------------------------------------------------
-class _RealtimeLogIO:
-    """将写入的内容实时推送到 asyncio.Queue 的类文件对象"""
-
-    def __init__(self, queue: asyncio.Queue, prefix: str = ""):
-        self._queue = queue
-        self._prefix = prefix
-        self._buffer = ""
-
-    def write(self, s: str) -> int:
-        self._buffer += s
-        lines = self._buffer.split("\n")
-        self._buffer = lines[-1]  # 保留未完成的最后一行
-        for line in lines[:-1]:
-            if line.strip():
-                self._queue.put_nowait(f"{self._prefix}{line}")
-        return len(s)
-
-    def flush(self) -> None:
-        if self._buffer.strip():
-            self._queue.put_nowait(f"{self._prefix}{self._buffer}")
-            self._buffer = ""
-
-
-# ---------------------------------------------------------------------------
 # 任务执行
 # ---------------------------------------------------------------------------
-def _execute_task(module_type: str, path: str, queue: asyncio.Queue, **kwargs) -> str | None:
-    """在后台线程中执行处理任务，通过 queue 实时发送日志"""
-    old_stdout = sys.stdout
-    old_stderr = sys.stderr
-    sys.stdout = _RealtimeLogIO(queue, "[stdout] ")
-    sys.stderr = _RealtimeLogIO(queue, "[stderr] ")
+def _execute_task(module_type: str, path: str, **kwargs) -> str | None:
+    """在后台线程中执行处理任务"""
     error_message = None
 
     try:
@@ -87,11 +58,6 @@ def _execute_task(module_type: str, path: str, queue: asyncio.Queue, **kwargs) -
             merge_excel_files(path, keyword, strip_time=strip_time, sort_configs=sort_configs)
     except Exception as ex:
         error_message = str(ex)
-    finally:
-        sys.stdout.flush()
-        sys.stderr.flush()
-        sys.stdout = old_stdout
-        sys.stderr = old_stderr
 
     return error_message
 
@@ -103,6 +69,11 @@ async def run_task(page: ft.Page, module_type: str, path: str, btn: ft.Button, l
     log(f"[{module_type}] 开始处理...")
     queue = asyncio.Queue()
 
+    queue_handler = QueueHandler(queue)
+    queue_handler.setFormatter(logging.Formatter(DEFAULT_FORMAT, datefmt="%Y-%m-%d %H:%M:%S"))
+    root_logger = logging.getLogger()
+    root_logger.addHandler(queue_handler)
+
     async def _consume():
         while True:
             line = await queue.get()
@@ -112,7 +83,7 @@ async def run_task(page: ft.Page, module_type: str, path: str, btn: ft.Button, l
 
     consumer = asyncio.create_task(_consume())
     try:
-        error_message = await asyncio.to_thread(_execute_task, module_type, path, queue, **kwargs)
+        error_message = await asyncio.to_thread(_execute_task, module_type, path, **kwargs)
         queue.put_nowait(None)
         await consumer
         if error_message:
@@ -120,6 +91,7 @@ async def run_task(page: ft.Page, module_type: str, path: str, btn: ft.Button, l
         else:
             log(f"[{module_type}] 处理成功")
     finally:
+        root_logger.removeHandler(queue_handler)
         set_btn_state(btn, True, "处理")
 
 

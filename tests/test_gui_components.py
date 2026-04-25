@@ -7,7 +7,7 @@ import types
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-import config_loader
+from func import config_loader
 
 spec = importlib.util.spec_from_file_location(
     "gui_components_under_test", ROOT / "gui" / "components.py"

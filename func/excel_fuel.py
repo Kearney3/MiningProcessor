@@ -2,7 +2,7 @@ import argparse
 import os
 import pandas as pd
 import numpy as np
-from logger import get_logger
+from func.logger import get_logger
 
 logger = get_logger(__name__)
 

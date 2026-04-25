@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 import flet as ft
-import equipment_ledger
+import func.equipment_ledger as equipment_ledger
 
 
 # ---------------------------------------------------------------------------
@@ -126,8 +126,7 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
 # ---------------------------------------------------------------------------
 def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
     """创建设备装载量配置区域，返回 (container, refs)"""
-    import asyncio
-    import config_loader
+    from func import config_loader
 
     config_state: list[dict] = []
     refs = {}

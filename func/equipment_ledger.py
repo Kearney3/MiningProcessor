@@ -6,7 +6,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Optional
 from rapidfuzz import fuzz, process
-from logger import get_logger
+from func.logger import get_logger
 
 logger = get_logger(__name__)
 
