@@ -11,6 +11,7 @@ from excel_fuel import process_diesel_data
 from excel_production_enhanced import MiningDataProcessor as ProdProcessor
 from excel_electrical import parse_excel_data
 from excel_worktime import process_excel_data
+from excel_merger import merge_excel_files
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +57,11 @@ def _execute_task(module_type: str, path: str, **kwargs) -> tuple[list[str], str
             file_dir = os.path.dirname(path) or "."
             output_file = os.path.join(file_dir, f"{year}{month:02d}_工作效率表.xlsx")
             process_excel_data(path, year, month, output_file)
+        elif module_type == "merge":
+            keyword = kwargs.get("keyword", "")
+            strip_time = kwargs.get("strip_time", False)
+            sort_configs = kwargs.get("sort_configs", None)
+            merge_excel_files(path, keyword, strip_time=strip_time, sort_configs=sort_configs)
     except Exception as ex:
         error_message = str(ex)
     finally:
@@ -162,6 +168,28 @@ async def on_work_process(page: ft.Page, work_refs: dict, log):
     await run_task(page, "worktime", path, btn, log, year=year, month=month)
 
 
+async def on_merge_process(page: ft.Page, merge_refs: dict, log):
+    """Excel 合并按钮回调"""
+    path = merge_refs["path"].value
+    if not path:
+        log("请先选择文件夹")
+        return
+    keyword = (merge_refs["keyword"].value or "").strip()
+    if not keyword:
+        log("请输入文件名关键字")
+        return
+    strip_time = bool(merge_refs["strip_time"].value)
+    # 收集排序配置
+    sort_configs = []
+    for cfg in merge_refs.get("sort_configs_state", []):
+        col = (cfg.get("column") or "").strip()
+        if col:
+            sort_configs.append({"column": col, "ascending": bool(cfg.get("ascending", True))})
+    btn = merge_refs["btn"]
+    set_btn_state(btn, False, "合并中...")
+    await run_task(page, "merge", path, btn, log, keyword=keyword, strip_time=strip_time, sort_configs=sort_configs)
+
+
 # ---------------------------------------------------------------------------
 # 初始化 & 绑定
 # ---------------------------------------------------------------------------
@@ -187,6 +215,11 @@ def wire_processing_buttons(module_refs: dict, page: ft.Page, log):
     module_refs["prod"]["btn"].on_click = handle_prod_click
     module_refs["elec"]["btn"].on_click = handle_elec_click
     module_refs["work"]["btn"].on_click = handle_work_click
+
+    async def handle_merge_click(e: ft.ControlEvent):
+        await on_merge_process(page, module_refs["merge"], log)
+
+    module_refs["merge"]["btn"].on_click = handle_merge_click
 
 
 def init(config_section_refs: dict):
