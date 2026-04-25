@@ -5,6 +5,9 @@ import sys
 from typing import List, Tuple
 
 import pandas as pd
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def find_first_datetime_column(df: pd.DataFrame) -> str | None:
@@ -60,9 +63,9 @@ def merge_excel_files(
             f"在 '{folder_path}' 中未找到包含关键字 '{keyword}' 的 Excel 文件"
         )
 
-    print(f"找到 {len(matched_files)} 个匹配文件:")
+    logger.info(f"找到 {len(matched_files)} 个匹配文件:")
     for f in matched_files:
-        print(f"  - {os.path.basename(f)}")
+        logger.info(f"  - {os.path.basename(f)}")
 
     # 2. 读取所有文件的 sheet 结构
     # file_sheets[file_path] = {sheet_name: DataFrame}
@@ -86,13 +89,13 @@ def merge_excel_files(
 
         for fpath in matched_files:
             if sname not in file_sheets[fpath]:
-                print(f"  警告: {os.path.basename(fpath)} 缺少 Sheet '{sname}'，已跳过")
+                logger.warning(f"  警告: {os.path.basename(fpath)} 缺少 Sheet '{sname}'，已跳过")
                 continue
 
             df = file_sheets[fpath][sname].copy()
 
             if df.empty:
-                print(f"  警告: {os.path.basename(fpath)} 的 Sheet '{sname}' 为空，已跳过")
+                logger.warning(f"  警告: {os.path.basename(fpath)} 的 Sheet '{sname}' 为空，已跳过")
                 continue
 
             current_headers = tuple(str(h) for h in df.columns)
@@ -115,7 +118,7 @@ def merge_excel_files(
             sheet_dataframes.append(df)
 
         if not sheet_dataframes:
-            print(f"Sheet '{sname}' 无有效数据，跳过")
+            logger.warning(f"Sheet '{sname}' 无有效数据，跳过")
             continue
 
         # 合并：第一个保留表头，其余直接拼接
@@ -132,25 +135,25 @@ def merge_excel_files(
                 if not col:
                     continue
                 if col not in merged_df.columns:
-                    print(f"  警告: Sheet '{sname}' 中不存在列 '{col}'，跳过该排序条件")
+                    logger.warning(f"  警告: Sheet '{sname}' 中不存在列 '{col}'，跳过该排序条件")
                     continue
                 sort_columns.append(col)
                 sort_ascending.append(asc)
 
             if sort_columns:
-                print(f"Sheet '{sname}' 正在按以下规则排序: {list(zip(sort_columns, ['升序' if a else '降序' for a in sort_ascending]))}")
+                logger.info(f"Sheet '{sname}' 正在按以下规则排序: {list(zip(sort_columns, ['升序' if a else '降序' for a in sort_ascending]))}")
                 merged_df = merged_df.sort_values(by=sort_columns, ascending=sort_ascending, na_position="last").reset_index(drop=True)
             else:
-                print(f"Sheet '{sname}' 无可用的排序条件，跳过排序")
+                logger.warning(f"Sheet '{sname}' 无可用的排序条件，跳过排序")
         else:
             # 默认：自动识别第一个时间列并升序排序
             time_col = find_first_datetime_column(merged_df)
             if time_col:
-                print(f"Sheet '{sname}' 识别到时间列: '{time_col}'，正在按时间升序排序...")
+                logger.info(f"Sheet '{sname}' 识别到时间列: '{time_col}'，正在按时间升序排序...")
                 merged_df[time_col] = pd.to_datetime(merged_df[time_col], errors="coerce")
                 merged_df = merged_df.sort_values(by=time_col, na_position="last").reset_index(drop=True)
             else:
-                print(f"Sheet '{sname}' 未识别到时间列，跳过排序")
+                logger.warning(f"Sheet '{sname}' 未识别到时间列，跳过排序")
 
         # 5. 仅保留日期（独立于排序逻辑）
         if strip_time:
@@ -158,9 +161,9 @@ def merge_excel_files(
             if time_col:
                 merged_df[time_col] = pd.to_datetime(merged_df[time_col], errors="coerce")
                 merged_df[time_col] = merged_df[time_col].dt.strftime("%Y-%m-%d")
-                print(f"Sheet '{sname}' 时间列 '{time_col}' 已格式化为日期（YYYY-MM-DD）")
+                logger.info(f"Sheet '{sname}' 时间列 '{time_col}' 已格式化为日期（YYYY-MM-DD）")
             else:
-                print(f"Sheet '{sname}' 未识别到时间列，跳过日期格式化")
+                logger.warning(f"Sheet '{sname}' 未识别到时间列，跳过日期格式化")
 
         merged_sheets[sname] = merged_df
 
@@ -172,7 +175,7 @@ def merge_excel_files(
         for sname, df in merged_sheets.items():
             df.to_excel(writer, sheet_name=sname, index=False)
 
-    print(f"\n合并完成！输出文件: {output_file}")
+    logger.info(f"\n合并完成！输出文件: {output_file}")
     return output_file
 
 
@@ -187,7 +190,7 @@ def main():
 
     folder = os.path.abspath(args.folder)
     if not os.path.isdir(folder):
-        print(f"错误: '{folder}' 不是有效的文件夹路径")
+        logger.error(f"错误: '{folder}' 不是有效的文件夹路径")
         sys.exit(1)
 
     try:
@@ -198,13 +201,15 @@ def main():
                 if not isinstance(sort_configs, list):
                     raise ValueError("排序规则必须是列表")
             except Exception as e:
-                print(f"错误: 排序规则 JSON 解析失败: {e}")
+                logger.error(f"错误: 排序规则 JSON 解析失败: {e}")
                 sys.exit(1)
         merge_excel_files(folder, args.keyword, args.output, strip_time=args.strip_time, sort_configs=sort_configs)
     except Exception as e:
-        print(f"错误: {e}")
+        logger.error(f"错误: {e}")
         sys.exit(1)
 
 
 if __name__ == "__main__":
+    from logger import setup_logging
+    setup_logging()
     main()

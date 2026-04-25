@@ -2,6 +2,9 @@ import argparse
 import os
 import pandas as pd
 import numpy as np
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def process_diesel_data(file_path, target_year=None):
@@ -9,21 +12,21 @@ def process_diesel_data(file_path, target_year=None):
     sheet_names = [s for s in xl.sheet_names if "设备柴油消耗" in s or "Техник" in s]
 
     if not sheet_names:
-        print("未找到包含'设备柴油消耗'或'Техник'的Sheet")
+        logger.warning("未找到包含'设备柴油消耗'或'Техник'的Sheet")
         return
 
     engine_data_list = []
     fuel_data_list = []
 
     for sheet in sheet_names:
-        print(f"正在处理 Sheet: {sheet}")
+        logger.info(f"正在处理 Sheet: {sheet}")
         df_raw = xl.parse(sheet, header=None)
 
         try:
             start_row_idx = df_raw[df_raw.iloc[:, 0] == 1].index[0]
             start_row = start_row_idx + 1
         except IndexError:
-            print(f"Sheet {sheet} 格式异常")
+            logger.warning(f"Sheet {sheet} 格式异常")
             continue
 
         # 提取表头 4 行 (日期/班组长/班次/油品)
@@ -185,7 +188,7 @@ def process_diesel_data(file_path, target_year=None):
         df_engine.sort_values(by=["日期", "shift_rank", "设备编号"], inplace=True)
         df_engine["日期"] = df_engine["日期"].dt.date
     else:
-        print("没有找到任何发动机数据")
+        logger.warning("没有找到任何发动机数据")
 
     df_fuel = pd.DataFrame()
     if fuel_data_list:
@@ -194,12 +197,12 @@ def process_diesel_data(file_path, target_year=None):
         df_fuel.sort_values(by=["日期", "shift_rank", "设备编号"], inplace=True)
         df_fuel["日期"] = df_fuel["日期"].dt.date
     else:
-        print("没有找到任何油耗数据")
+        logger.warning("没有找到任何油耗数据")
 
     output_file = os.path.join(os.path.dirname(file_path), "Fuel.xlsx")
     # 如果数据都为空，那么不导出
     if df_engine.shape[0] == 0 and df_fuel.shape[0] == 0:
-        print("没有找到任何发动机数据和油耗数据，导出失败")
+        logger.error("没有找到任何发动机数据和油耗数据，导出失败")
         return None
 
     with pd.ExcelWriter(output_file) as writer:
@@ -212,10 +215,12 @@ def process_diesel_data(file_path, target_year=None):
         else:
             df_fuel.to_excel(writer, sheet_name="油耗信息", index=False)
 
-    print(f"处理完成！文件已保存: {output_file}")
+    logger.info(f"处理完成！文件已保存: {output_file}")
 
 
 if __name__ == "__main__":
+    from logger import setup_logging
+    setup_logging()
     parser = argparse.ArgumentParser()
     parser.add_argument("input_file")
     parser.add_argument("--year", type=int)

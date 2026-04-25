@@ -6,6 +6,9 @@ import pandas as pd
 from pathlib import Path
 from typing import Optional
 from rapidfuzz import fuzz, process
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 # 台账 Excel 表头定义
 LEDGER_COLUMNS = [
@@ -92,7 +95,7 @@ class EquipmentLedger:
             "",  # 旧名称
         ]
         df.to_excel(output_path, index=False)
-        print(f"台账模板已导出: {output_path}")
+        logger.info(f"台账模板已导出: {output_path}")
 
     def match(self, raw_name: str) -> Optional[dict]:
         """
