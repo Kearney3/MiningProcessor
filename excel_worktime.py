@@ -1,5 +1,9 @@
 import pandas as pd
 import os
+from logger import get_logger
+
+logger = get_logger(__name__)
+
 
 def process_excel_data(file_path, year, month, output_file):
     """
@@ -13,7 +17,7 @@ def process_excel_data(file_path, year, month, output_file):
     for sheet_name in xls.sheet_names:
         # 确保sheet名称是数字（代表日期）
         if not sheet_name.strip().isdigit():
-            print(f"跳过非日期Sheet: {sheet_name}")
+            logger.warning(f"跳过非日期Sheet: {sheet_name}")
             continue
 
         # 读取整个sheet，不设表头
@@ -28,11 +32,11 @@ def process_excel_data(file_path, year, month, output_file):
         # 注意：这里假设“夜班”字样在B列
         night_shift_index = df_raw[df_raw[1].astype(str).str.contains("夜班", na=False)].index
         if len(night_shift_index) ==0:
-            print(f"警告: Sheet {sheet_name} 未找到'夜班'标记,尝试查找'Шөнө'")
+            logger.warning(f"警告: Sheet {sheet_name} 未找到'夜班'标记,尝试查找'Шөнө'")
             night_shift_index = df_raw[df_raw[1].astype(str).str.contains("Шөнө", na=False)].index
 
         if len(night_shift_index) == 0:
-            print(f"警告: Sheet {sheet_name} 未找到'夜班'和'Шөнө'标记")
+            logger.warning(f"警告: Sheet {sheet_name} 未找到'夜班'和'Шөнө'标记")
             # 如果没找到夜班，则认为全表为白班（视情况调整逻辑）
             continue
 
@@ -72,15 +76,15 @@ def process_excel_data(file_path, year, month, output_file):
 
         all_data.append(combined_day_df)
         success_count += 1
-        print(f"成功处理日期: {day}, 数据行数: {len(combined_day_df)}")
+        logger.info(f"成功处理日期: {day}, 数据行数: {len(combined_day_df)}")
 
     # 4. 合并所有日期的数据
     if not all_data:
-        print("未提取到任何有效数据。")
+        logger.warning("未提取到任何有效数据。")
         return
 
-    print(f"成功处理 {success_count} 个日期数据")
-    print(f"成功导入的日期为: {sorted(day_list)}")
+    logger.info(f"成功处理 {success_count} 个日期数据")
+    logger.info(f"成功导入的日期为: {sorted(day_list)}")
     final_df = pd.concat(all_data, axis=0, ignore_index=True)
     final_df.to_excel(output_file, index=False)
 
@@ -96,10 +100,12 @@ def process_excel_data(file_path, year, month, output_file):
 
     # 6. 输出到Excel
     final_df.to_excel(output_file, index=False)
-    print(f"数据处理完成，已保存至: {output_file}")
+    logger.info(f"数据处理完成，已保存至: {output_file}")
 
 # --- 参数配置 ---
 if __name__ == "__main__":
+    from logger import setup_logging
+    setup_logging()
     # 使用cli参数解析
     import argparse
     parser = argparse.ArgumentParser()
@@ -114,4 +120,4 @@ if __name__ == "__main__":
     if os.path.exists(args.input_file):
         process_excel_data(args.input_file, args.year, args.month, output_xlsx)
     else:
-        print("错误：找不到输入文件！")
+        logger.error("错误：找不到输入文件！")

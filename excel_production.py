@@ -7,6 +7,9 @@ from datetime import datetime
 import pandas as pd
 import os
 import re
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class MiningDataProcessor:
@@ -315,7 +318,7 @@ class MiningDataProcessor:
 
                 total_files += 1
                 file_path = os.path.join(root, filename)
-                print(f"正在处理: {os.path.relpath(file_path, folder_path)}")
+                logger.info(f"正在处理: {os.path.relpath(file_path, folder_path)}")
 
                 try:
                     running_df, production_df = self.process_single_file(file_path)
@@ -323,7 +326,7 @@ class MiningDataProcessor:
                     all_production.append(production_df)
                     success_files += 1
                 except Exception as e:
-                    print(f"处理失败: {os.path.relpath(file_path, folder_path)} -> {e}")
+                    logger.error(f"处理失败: {os.path.relpath(file_path, folder_path)} -> {e}")
 
         final_running = pd.concat(all_running, ignore_index=True) if all_running else pd.DataFrame()
         final_production = pd.concat(all_production, ignore_index=True) if all_production else pd.DataFrame()
@@ -335,11 +338,13 @@ class MiningDataProcessor:
             final_running.to_excel(writer, sheet_name='运行数据', index=False)
             final_production.to_excel(writer, sheet_name='生产数据', index=False)
 
-        print(f"汇总完成，输出文件：{output_file}")
-        print(f"统计信息：共处理 {total_files} 个文件，成功 {success_files} 个，失败 {total_files - success_files} 个")
+        logger.info(f"汇总完成，输出文件：{output_file}")
+        logger.info(f"统计信息：共处理 {total_files} 个文件，成功 {success_files} 个，失败 {total_files - success_files} 个")
 
 
 if __name__ == "__main__":
+    from logger import setup_logging
+    setup_logging()
     # 改造成cli参数输入
     parser = argparse.ArgumentParser(description="处理矿卡数据")
     parser.add_argument("input_file", help="输入Excel文件路径")
@@ -353,7 +358,7 @@ if __name__ == "__main__":
     processor = MiningDataProcessor()
     # 判断是否是文件夹
     if os.path.isdir(input_file):
-        print(f"正在处理文件夹: {input_file}")
+        logger.info(f"正在处理文件夹: {input_file}")
         # 存放在输入的文件夹下
         output_file = os.path.join(input_file, os.path.basename(output_file))
         processor.process_folder(input_file, output_file)

@@ -9,6 +9,9 @@ from typing import Any
 import pandas as pd
 import os
 import re
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 
 class MiningDataProcessor:
@@ -404,13 +407,13 @@ class MiningDataProcessor:
         total_files = len(file_list)
 
         if total_files == 0:
-            print("未找到符合条件的 Excel 文件。")
+            logger.warning("未找到符合条件的 Excel 文件。")
             with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
                 pd.DataFrame().to_excel(writer, sheet_name='运行数据', index=False)
                 pd.DataFrame().to_excel(writer, sheet_name='生产数据', index=False)
             return
 
-        print(f"共发现 {total_files} 个待处理文件，启动 {max_workers} 个线程...")
+        logger.info(f"共发现 {total_files} 个待处理文件，启动 {max_workers} 个线程...")
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_file = {
@@ -428,11 +431,11 @@ class MiningDataProcessor:
                         all_running.append(running_df)
                         all_production.append(production_df)
                         success_files += 1
-                        print(f"处理成功: {rel_path}")
+                        logger.info(f"处理成功: {rel_path}")
                     else:
-                        print(f"处理失败: {rel_path} -> {error_msg}")
+                        logger.error(f"处理失败: {rel_path} -> {error_msg}")
                 except Exception as e:
-                    print(f"处理异常: {rel_path} -> {e}")
+                    logger.error(f"处理异常: {rel_path} -> {e}")
 
         final_running = pd.concat(all_running, ignore_index=True) if all_running else pd.DataFrame()
         final_production = pd.concat(all_production, ignore_index=True) if all_production else pd.DataFrame()
@@ -447,11 +450,13 @@ class MiningDataProcessor:
             final_running.to_excel(writer, sheet_name='运行数据', index=False)
             final_production.to_excel(writer, sheet_name='生产数据', index=False)
 
-        print(f"汇总完成，输出文件：{output_file}")
-        print(f"统计信息：共处理 {total_files} 个文件，成功 {success_files} 个，失败 {total_files - success_files} 个")
+        logger.info(f"汇总完成，输出文件：{output_file}")
+        logger.info(f"统计信息：共处理 {total_files} 个文件，成功 {success_files} 个，失败 {total_files - success_files} 个")
 
 
 if __name__ == "__main__":
+    from logger import setup_logging
+    setup_logging()
     parser = argparse.ArgumentParser(description="处理矿卡数据")
     parser.add_argument("input_file", help="输入Excel文件路径")
     parser.add_argument("--workers", type=int, default=min(8, (os.cpu_count() or 4) * 2),
@@ -470,11 +475,11 @@ if __name__ == "__main__":
     processor = MiningDataProcessor(version=version, raw_start=raw_start)
 
     if os.path.isdir(input_file):
-        print(f"正在处理文件夹: {input_file}")
+        logger.info(f"正在处理文件夹: {input_file}")
         output_file = os.path.join(input_file, os.path.basename(output_file))
         processor.process_folder(input_file, output_file, max_workers=workers)
     else:
         parent_folder = os.path.dirname(input_file)
         output_file = os.path.join(parent_folder, os.path.basename(output_file))
         processor.process_single_file(input_file, output_file)
-        print(f"单文件处理完成，输出文件：{output_file}")
+        logger.info(f"单文件处理完成，输出文件：{output_file}")

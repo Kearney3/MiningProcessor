@@ -7,6 +7,9 @@ import pandas as pd
 import re
 from datetime import datetime
 import argparse
+from logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def parse_excel_data(file_path, target_year=None):
@@ -22,7 +25,7 @@ def parse_excel_data(file_path, target_year=None):
     sheet_names = [s for s in xl.sheet_names if "Electrical" in s]
 
     for sheet_name in sheet_names:
-        print(f"正在处理 Sheet: {sheet_name}")
+        logger.info(f"正在处理 Sheet: {sheet_name}")
         df = xl.parse(sheet_name, header=None)  # 不设表头，手动定位
 
         # 2. 找到“日期”所在行
@@ -33,7 +36,7 @@ def parse_excel_data(file_path, target_year=None):
                 break
 
         if date_row_idx is None:
-            print(f"跳过 Sheet {sheet_name}: 未找到关键字'日期'")
+            logger.warning(f"跳过 Sheet {sheet_name}: 未找到关键字'日期'")
             continue
 
         # 3. 解析日期列 (从E列开始，即索引4)
@@ -81,7 +84,7 @@ def parse_excel_data(file_path, target_year=None):
 
     # 6. 整合结果并导出
     if not all_extracted_data:
-        print("未提取到任何数据，请检查文件格式。")
+        logger.warning("未提取到任何数据，请检查文件格式。")
         return
 
     result_df = pd.DataFrame(all_extracted_data)
@@ -94,11 +97,13 @@ def parse_excel_data(file_path, target_year=None):
     # 导出
     output_file = os.path.join(os.path.dirname(file_path), "电力消耗统计.xlsx")
     result_df.to_excel(output_file, index=False, sheet_name="电力消耗")
-    print(f"处理完成！结果已保存至: {output_file}")
+    logger.info(f"处理完成！结果已保存至: {output_file}")
 
 
 # --- 使用示例 ---
 if __name__ == "__main__":
+    from logger import setup_logging
+    setup_logging()
     # 使用cli
     parser = argparse.ArgumentParser(description="解析电力消耗报表")
     parser.add_argument("input_file", type=str, help="输入Excel文件路径")
