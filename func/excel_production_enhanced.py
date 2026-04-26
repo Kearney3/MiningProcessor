@@ -9,21 +9,26 @@ from typing import Any
 import pandas as pd
 import os
 import re
+from func import config_loader
 from func.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 class MiningDataProcessor:
-    def __init__(self, version: str = "new", raw_start: int = 6):
+    def __init__(self, version: str = "new", raw_start: int = 6, device_load_map: dict[str, int] | None = None):
         self.version = version
         self.raw_start = raw_start
+        if device_load_map is not None:
+            self.load_map: dict[str, int] = dict(device_load_map)
+            return
+
         try:
-            import config_loader
-            self.load_map: dict[str, int] = config_loader.get_device_load_map(version)
+            self.load_map = config_loader.get_device_load_map(version)
             if not self.load_map:
-                raise FileNotFoundError
-        except Exception:
+                raise FileNotFoundError("设备装载量配置为空")
+        except Exception as ex:
+            logger.warning("加载设备装载量配置失败，使用默认配置: %s", ex)
             if version == "old":
                 # 2024年9月前的装载量（旧版）
                 self.load_map = {
@@ -161,6 +166,8 @@ class MiningDataProcessor:
         """
         if df_raw.empty or df_raw.shape[0] < 7:
             return pd.DataFrame(), pd.DataFrame()
+
+        logger.info(f"配置：{self.load_map}")
 
         # 1. 找最后一行：A列最后非空
         col_a = df_raw.iloc[:, 0]

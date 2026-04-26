@@ -6,6 +6,7 @@ import asyncio
 import logging
 import flet as ft
 import os
+from func import config_loader
 from func.excel_fuel import process_diesel_data
 from func.excel_production_enhanced import MiningDataProcessor as ProdProcessor
 from func.excel_electrical import parse_excel_data
@@ -44,7 +45,9 @@ def _execute_task(module_type: str, path: str, **kwargs) -> str | None:
             process_diesel_data(path, kwargs.get("year"))
         elif module_type == "production":
             raw_start = kwargs.get("raw_start", 6)
-            processor = ProdProcessor(raw_start=raw_start)
+            device_load_map = config_loader.get_device_load_map()
+            processor = ProdProcessor(raw_start=raw_start, device_load_map=device_load_map)
+            logging.debug(f"装载量参数：{device_load_map}")
             if os.path.isdir(path):
                 output_file = os.path.join(path, "合并产量.xlsx")
                 processor.process_folder(path, output_file)

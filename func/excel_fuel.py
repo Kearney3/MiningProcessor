@@ -76,7 +76,7 @@ def process_diesel_data(file_path, target_year=None):
                 col_mapping.append({"type": "info", "name": f"col_{idx}"})
                 continue
 
-            if "起运小时数" in h2 or "Начальный" in h2:
+            if "起运小时数" in h2 or "Эхэлсэн" in h2:
                 col_mapping.append({"type": "initial_start"})
                 continue
 
@@ -134,6 +134,8 @@ def process_diesel_data(file_path, target_year=None):
 
             if device_name in ["HITACHI EX2600"]:
                 device_name = f"{device_name} #{device_id}"
+            if not device_name or pd.isna(device_name) or str(device_name).strip() == "":
+                continue
 
             current_row_initial_val = np.nan
             shift_data_map = {}
