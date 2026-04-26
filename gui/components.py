@@ -9,6 +9,7 @@ from pathlib import Path
 
 import flet as ft
 import func.equipment_ledger as equipment_ledger
+from func.equipment_ledger import LEDGER_COLUMNS
 
 
 # ---------------------------------------------------------------------------
@@ -20,19 +21,25 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
     ledger_path_label = ft.Text("未加载台账", size=12, color=ft.Colors.GREY)
     ledger_table = ft.DataTable(
         columns=[
-            ft.DataColumn(ft.Text("设备编号")),
-            ft.DataColumn(ft.Text("标准设备名称")),
-            ft.DataColumn(ft.Text("设备类型")),
-            ft.DataColumn(ft.Text("所属公司")),
+            ft.DataColumn(ft.Text(c)) for c in LEDGER_COLUMNS
         ],
         rows=[],
+    )
+    ledger_table_wrapper = ft.Column(
+        controls=[
+            ft.Row(
+                controls=[ledger_table],
+                scroll=ft.ScrollMode.AUTO,
+            )
+        ],
+        scroll=ft.ScrollMode.AUTO,
+        height=220,
     )
 
     def build_table(records):
         ledger_table.rows = [
             ft.DataRow(
-                cells=[ft.DataCell(ft.Text(str(r.get(c, "")))) for c in
-                       ["设备编号", "标准设备名称", "设备类型", "所属公司"]]
+                cells=[ft.DataCell(ft.Text(str(r.get(c, "")))) for c in LEDGER_COLUMNS]
             )
             for r in records
         ]
@@ -99,11 +106,10 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
                     spacing=10,
                 ),
                 ft.Container(
-                    content=ft.ListView([ledger_table], height=180, spacing=5),
+                    content=ledger_table_wrapper,
                     border=ft.Border.all(1, ft.Colors.OUTLINE),
                     border_radius=8,
                     padding=5,
-                    expand=True,
                 ),
             ],
             spacing=8,
@@ -745,7 +751,7 @@ def create_log_view() -> ft.Container:
             auto_scroll=True,
             expand=True,
         ),
-        height=180,
+        height=200,
         border=ft.Border.all(1, ft.Colors.OUTLINE),
         border_radius=8,
         padding=8,
