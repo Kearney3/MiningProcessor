@@ -10,7 +10,7 @@ DEFAULT_FORMAT = "[%(levelname)s]%(asctime)s | %(filename)s | %(message)s"
 
 
 class QueueHandler(logging.Handler):
-    """将日志记录推送到 asyncio.Queue 的 Handler，支持跨线程实时输出"""
+    """将日志记录推送到队列的 Handler，支持 asyncio.Queue 与 queue.Queue，跨线程实时输出"""
 
     def __init__(self, queue):
         super().__init__()
@@ -19,7 +19,10 @@ class QueueHandler(logging.Handler):
     def emit(self, record):
         try:
             msg = self.format(record)
-            self.queue.put_nowait(msg)
+            if hasattr(self.queue, "put_nowait"):
+                self.queue.put_nowait(msg)
+            else:
+                self.queue.put(msg, block=False)
         except Exception:
             self.handleError(record)
 

@@ -736,14 +736,17 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
 # ---------------------------------------------------------------------------
 # 日志视图
 # ---------------------------------------------------------------------------
-def create_log_view() -> ft.TextField:
-    """创建日志视图组件"""
-    return ft.TextField(
-        label="处理日志",
-        multiline=True,
-        read_only=True,
-        min_lines=6,
-        max_lines=8,
-        expand=True,
-        text_size=13,
+def create_log_view() -> ft.Container:
+    """创建适合实时追加的日志视图组件"""
+    return ft.Container(
+        content=ft.ListView(
+            controls=[],
+            spacing=4,
+            auto_scroll=True,
+            expand=True,
+        ),
+        height=180,
+        border=ft.Border.all(1, ft.Colors.OUTLINE),
+        border_radius=8,
+        padding=8,
     )
