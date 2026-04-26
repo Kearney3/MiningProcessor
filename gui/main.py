@@ -95,9 +95,9 @@ def main(page: ft.Page):
     page.on_disconnect = _shutdown_log_consumer
     page.on_close = _shutdown_log_consumer
 
-    def log(msg: str):
+    def log(msg: str, level: int = logging.INFO):
         """统一通过全局 logger 输出，确保 GUI 与控制台实时同步"""
-        logging.getLogger().info(msg)
+        logging.getLogger().log(level, msg)
 
     # ---- 创建各区域 UI ----
     ledger_section, ledger_refs = cmp.create_ledger_section(page, log)

@@ -418,7 +418,42 @@ def test_gui_main_uses_consistent_section_spacing(monkeypatch):
     assert scroll_col.spacing == 12
 
 
-def test_gui_main_routes_log_updates_through_run_thread(monkeypatch):
+def test_gui_main_log_helper_supports_custom_levels(monkeypatch):
+    monkeypatch.setattr(gui_main.cmp, "create_ledger_section", lambda page, log: (object(), {"log": log}))
+    monkeypatch.setattr(gui_main.cmp, "create_config_section", lambda page, log: (object(), {}))
+    monkeypatch.setattr(gui_main.cmp, "create_modules_section", lambda page: (object(), {}))
+
+    class LogView:
+        def __init__(self):
+            self.content = types.SimpleNamespace(controls=[])
+
+        def update(self):
+            pass
+
+    monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: LogView())
+    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
+    monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
+
+    captured = {}
+
+    def capture_ledger_section(page, log):
+        captured["log"] = log
+        return object(), {}
+
+    monkeypatch.setattr(gui_main.cmp, "create_ledger_section", capture_ledger_section)
+
+    page = PageSpy()
+    gui_main.main(page)
+
+    captured["log"]("警告消息", level=logging.WARNING)
+    time.sleep(0.05)
+
+    log_view = page.controls[0].controls[-1]
+    last_text = log_view.content.controls[-1]
+    assert last_text.value.endswith("警告消息")
+    assert last_text.color == components.ft.Colors.ORANGE
+
+
     monkeypatch.setattr(gui_main.cmp, "create_ledger_section", lambda page, log: (object(), {}))
     monkeypatch.setattr(gui_main.cmp, "create_config_section", lambda page, log: (object(), {}))
     monkeypatch.setattr(gui_main.cmp, "create_modules_section", lambda page: (object(), {}))
