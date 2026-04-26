@@ -202,8 +202,12 @@ class MiningDataProcessor:
         data.columns = combined_headers
 
         # 第一列固定为矿卡名称
-        first_col = data.columns[0]
-        data = data.rename(columns={first_col: "矿卡名称"})
+        # first_col = data.columns[0]
+        # data = data.rename(columns={first_col: "矿卡名称"})
+        data.columns.values[0] = "矿卡名称"
+
+        # 第二列固定为公司名称
+        data.columns.values[1] = "公司"
 
         # 5. 找运行指标列
         hour_start_col = self.find_first_matching_column(data.columns, [["小时数", "开始"],["Мото", "Эхэлсэн"]])

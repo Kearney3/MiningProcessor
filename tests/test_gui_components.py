@@ -304,6 +304,39 @@ def test_save_button_uses_selected_path_instead_of_mutating_default_config(monke
     assert logs[-1] == f"配置已另存为: {output_path}"
 
 
+def test_import_config_replaces_existing_ui_state(monkeypatch, tmp_path):
+    logs = []
+    monkeypatch.setattr(components.ft, "FilePicker", ImportPicker)
+
+    imported_config = tmp_path / "imported-config.json"
+    imported_config.write_text(
+        json.dumps({"device_load_map": {"TR100": 35, "EH4000": 85}}),
+        encoding="utf-8",
+    )
+    ImportPicker.next_files = [DummyFile(imported_config)]
+
+    _, refs = components.create_config_section(DummyPage(), logs.append)
+    refs["set_config_state"]([
+        {"selected": False, "device": "TEMP", "capacity": "1"},
+        {"selected": False, "device": "OLD", "capacity": "2"},
+    ])
+
+    import_button = _find_button(refs, "导入配置")
+
+    import asyncio
+    asyncio.run(import_button.on_click(DummyControlEvent()))
+
+    assert _config_table_values(refs) == [
+        {"selected": False, "device": "EH4000", "capacity": "85"},
+        {"selected": False, "device": "TR100", "capacity": "35"},
+    ]
+    assert logs[-1] == "已导入 2 条设备装载量配置"
+
+
+
+
+
+
 def test_restore_default_button_loads_builtin_config_file(monkeypatch, tmp_path):
     logs = []
     built_in_config = tmp_path / "builtin-config.json"
@@ -328,11 +361,6 @@ def test_restore_default_button_loads_builtin_config_file(monkeypatch, tmp_path)
     assert logs[-1] == "已恢复默认配置"
 
 
-
-
-
-
-def test_config_actions_are_split_into_two_button_rows():
     _, refs = components.create_config_section(DummyPage(), lambda message: None)
 
     assert len(refs["action_button_rows"]) == 2

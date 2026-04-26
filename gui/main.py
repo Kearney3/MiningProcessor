@@ -45,15 +45,23 @@ def main(page: ft.Page):
     log_lines: list[str] = []
     shutdown_event = threading.Event()
 
-    def _update_log_view(msg: str):
+    def _update_log_view(log_item: dict[str, object]):
         if shutdown_event.is_set():
             return
+        msg = str(log_item["message"])
+        levelno = int(log_item["levelno"])
+        if levelno >= logging.ERROR:
+            color = ft.Colors.RED
+        elif levelno >= logging.WARNING:
+            color = ft.Colors.ORANGE
+        else:
+            color = None
         log_lines.append(msg)
         if len(log_lines) > 500:
             log_lines.pop(0)
             if log_list.controls:
                 log_list.controls.pop(0)
-        log_list.controls.append(ft.Text(msg, size=13, selectable=True))
+        log_list.controls.append(ft.Text(msg, size=13, selectable=True, color=color))
         try:
             log_view.update()
         except RuntimeError:
@@ -61,13 +69,13 @@ def main(page: ft.Page):
 
     def _consume_logs():
         while True:
-            msg = log_queue.get()
-            if msg is None:
+            log_item = log_queue.get()
+            if log_item is None:
                 break
             if shutdown_event.is_set():
                 continue
             try:
-                page.run_thread(_update_log_view, msg)
+                page.run_thread(_update_log_view, log_item)
             except RuntimeError:
                 break
 

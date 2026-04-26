@@ -313,8 +313,12 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
             if not imported:
                 log("文件不含 device_load_map")
                 return
-            for device, cap in imported.items():
-                append_row(device, cap)
+            set_config_state(
+                [
+                    {"selected": False, "device": device, "capacity": cap}
+                    for device, cap in sorted(imported.items())
+                ]
+            )
             log(f"已导入 {len(imported)} 条设备装载量配置")
         except Exception as ex:
             log(f"导入配置失败: {ex}")
@@ -382,7 +386,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
         label="燃油数据处理",
         hint_text="选择 Excel 文件...",
         expand=2,
-        read_only=True,
+        read_only=False,
         suffix=ft.IconButton(
             icon=ft.icons.Icons.FOLDER_OPEN,
             tooltip="浏览",
@@ -397,7 +401,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
     fuel_btn = ft.Button(
         "处理",
         icon=ft.icons.Icons.PLAY_ARROW,
-        disabled=True,
+        disabled=False,
     )
 
     # --- Production ---
@@ -405,7 +409,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
         label="生产数据处理",
         hint_text="选择 Excel 文件或文件夹...",
         expand=2,
-        read_only=True,
+        read_only=False,
     )
     prod_file_btn = ft.Button(
         "选文件",
@@ -424,7 +428,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
     prod_btn = ft.Button(
         "处理",
         icon=ft.icons.Icons.PLAY_ARROW,
-        disabled=True,
+        disabled=False,
     )
 
     # --- Electrical ---
@@ -432,7 +436,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
         label="电力数据处理",
         hint_text="选择 Excel 文件...",
         expand=2,
-        read_only=True,
+        read_only=False,
         suffix=ft.IconButton(
             icon=ft.icons.Icons.FOLDER_OPEN,
             tooltip="浏览",
@@ -447,7 +451,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
     elec_btn = ft.Button(
         "处理",
         icon=ft.icons.Icons.PLAY_ARROW,
-        disabled=True,
+        disabled=False,
     )
 
     # --- Work time ---
@@ -455,7 +459,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
         label="工时数据处理",
         hint_text="选择 Excel 文件...",
         expand=2,
-        read_only=True,
+        read_only=False,
         suffix=ft.IconButton(
             icon=ft.icons.Icons.FOLDER_OPEN,
             tooltip="浏览",
@@ -476,7 +480,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
     work_btn = ft.Button(
         "处理",
         icon=ft.icons.Icons.PLAY_ARROW,
-        disabled=True,
+        disabled=False,
     )
 
     # --- Excel Merger ---
@@ -484,7 +488,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
         label="Excel 合并",
         hint_text="选择包含 Excel 文件的文件夹...",
         expand=2,
-        read_only=True,
+        read_only=False,
         suffix=ft.IconButton(
             icon=ft.icons.Icons.FOLDER_OPEN,
             tooltip="浏览",
@@ -503,7 +507,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
     merge_btn = ft.Button(
         "合并",
         icon=ft.icons.Icons.MERGE_TYPE,
-        disabled=True,
+        disabled=False,
     )
 
     # --- 排序配置列表（Excel 合并用） ---
