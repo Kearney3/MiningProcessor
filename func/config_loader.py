@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-_CONFIG_FILE = Path(__file__).parent / "config.json"
+_CONFIG_FILE = Path(__file__).parent.parent / "config.json"
 _runtime_config: dict[str, Any] | None = None
 
 
