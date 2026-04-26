@@ -3,6 +3,7 @@ GUI 组件工厂函数
 提供各区域 UI 组件的创建接口
 """
 import json
+import logging
 import os
 from datetime import datetime
 from pathlib import Path
@@ -10,6 +11,14 @@ from pathlib import Path
 import flet as ft
 import func.equipment_ledger as equipment_ledger
 from func.equipment_ledger import LEDGER_COLUMNS
+
+
+def _log_message(log, message: str, level: int = logging.INFO):
+    """兼容仅接收 message 的旧回调，也支持显式日志级别。"""
+    try:
+        log(message, level=level)
+    except TypeError:
+        log(message)
 
 
 # ---------------------------------------------------------------------------
@@ -61,11 +70,11 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
             ledger_path_label.value = os.path.basename(path)
             ledger_path_label.color = ft.Colors.GREEN
             build_table(ledger_records)
-            log(f"已加载台账: {path}")
+            _log_message(log, f"已加载台账: {path}")
         except Exception as ex:
             ledger_path_label.value = f"加载失败: {ex}"
             ledger_path_label.color = ft.Colors.RED
-            log(f"加载台账失败: {ex}")
+            _log_message(log, f"加载台账失败: {ex}", level=logging.ERROR)
         page.update()
 
     async def on_export_template(e: ft.ControlEvent):
@@ -80,9 +89,9 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
         try:
             ledger = equipment_ledger.EquipmentLedger()
             ledger.export_template(path)
-            log(f"已导出模板: {path}")
+            _log_message(log, f"已导出模板: {path}")
         except Exception as ex:
-            log(f"导出模板失败: {ex}")
+            _log_message(log, f"导出模板失败: {ex}", level=logging.ERROR)
         page.update()
 
     container = ft.Container(
@@ -236,7 +245,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
             try:
                 device_load_map[device] = int(cap_text)
             except (TypeError, ValueError):
-                log(f"警告: '{cap_text}' 不是有效数字，跳过 {device}")
+                _log_message(log, f"'{cap_text}' 不是有效数字，跳过 {device}", level=logging.WARNING)
         return device_load_map
 
     def load_default_config_file(path):
@@ -272,23 +281,23 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
             return
         try:
             save_config_to_path(path)
-            log(f"配置已另存为: {path}")
+            _log_message(log, f"配置已另存为: {path}")
         except Exception as ex:
-            log(f"保存配置失败: {ex}")
+            _log_message(log, f"保存配置失败: {ex}", level=logging.ERROR)
 
     def restore_default_config(e: ft.ControlEvent):
         try:
             load_default_config_file(config_loader.get_config_file_path())
-            log("已恢复默认配置")
+            _log_message(log, "已恢复默认配置")
         except Exception as ex:
-            log(f"恢复默认配置失败: {ex}")
+            _log_message(log, f"恢复默认配置失败: {ex}", level=logging.ERROR)
 
     def apply_current_config(e: ft.ControlEvent):
         try:
             config_loader.apply_device_load_map(build_device_load_map())
-            log("当前配置已应用")
+            _log_message(log, "当前配置已应用")
         except Exception as ex:
-            log(f"应用当前配置失败: {ex}")
+            _log_message(log, f"应用当前配置失败: {ex}", level=logging.ERROR)
 
     def add_device(e: ft.ControlEvent):
         append_row()
@@ -311,7 +320,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
                 data = _json.load(f)
             imported = data.get("device_load_map", {})
             if not imported:
-                log("文件不含 device_load_map")
+                _log_message(log, "文件不含 device_load_map", level=logging.WARNING)
                 return
             set_config_state(
                 [
@@ -319,9 +328,9 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
                     for device, cap in sorted(imported.items())
                 ]
             )
-            log(f"已导入 {len(imported)} 条设备装载量配置")
+            _log_message(log, f"已导入 {len(imported)} 条设备装载量配置")
         except Exception as ex:
-            log(f"导入配置失败: {ex}")
+            _log_message(log, f"导入配置失败: {ex}", level=logging.ERROR)
 
     action_buttons = [
         ft.Button("添加设备", icon=ft.icons.Icons.ADD, on_click=add_device, width=160),

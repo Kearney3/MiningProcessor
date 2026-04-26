@@ -3,6 +3,7 @@ GUI 业务逻辑层
 处理各模块的后台任务、线程管理
 """
 import asyncio
+import logging
 import flet as ft
 import os
 from func.excel_fuel import process_diesel_data
@@ -10,6 +11,14 @@ from func.excel_production_enhanced import MiningDataProcessor as ProdProcessor
 from func.excel_electrical import parse_excel_data
 from func.excel_worktime import process_excel_data
 from func.excel_merger import merge_excel_files
+
+
+def _log_message(log, message: str, level: int = logging.INFO):
+    """兼容仅接收 message 的旧回调，也支持显式日志级别。"""
+    try:
+        log(message, level=level)
+    except TypeError:
+        log(message)
 
 
 
@@ -65,13 +74,13 @@ async def run_task(page: ft.Page, module_type: str, path: str, btn: ft.Button, l
     """异步执行处理任务，并在 UI 线程中恢复界面状态"""
     del page  # 保留现有调用签名，避免影响其他调用方
 
-    log(f"[{module_type}] 开始处理...")
+    _log_message(log, f"[{module_type}] 开始处理...")
     try:
         error_message = await asyncio.to_thread(_execute_task, module_type, path, **kwargs)
         if error_message:
-            log(f"[{module_type}] 处理失败: {error_message}")
+            _log_message(log, f"[{module_type}] 处理失败: {error_message}", level=logging.ERROR)
         else:
-            log(f"[{module_type}] 处理成功")
+            _log_message(log, f"[{module_type}] 处理成功")
     finally:
         set_btn_state(btn, True, "处理")
 
@@ -83,7 +92,7 @@ async def on_fuel_process(page: ft.Page, fuel_refs: dict, log):
     """燃油处理按钮回调"""
     path = fuel_refs["path"].value
     if not path:
-        log("请先选择文件")
+        _log_message(log, "请先选择文件", level=logging.WARNING)
         return
     btn = fuel_refs["btn"]
     year = int(fuel_refs["year"].value)
@@ -95,7 +104,7 @@ async def on_prod_process(page: ft.Page, prod_refs: dict, log):
     """生产处理按钮回调"""
     path = prod_refs["path"].value
     if not path:
-        log("请先选择 Excel 文件或文件夹")
+        _log_message(log, "请先选择 Excel 文件或文件夹", level=logging.WARNING)
         return
 
     raw_start_text = (prod_refs["raw_start"].value or "6").strip()
@@ -104,7 +113,7 @@ async def on_prod_process(page: ft.Page, prod_refs: dict, log):
         if raw_start < 1:
             raise ValueError
     except ValueError:
-        log("请输入有效的 raw_start（正整数）")
+        _log_message(log, "请输入有效的 raw_start（正整数）", level=logging.WARNING)
         return
 
     btn = prod_refs["btn"]
@@ -116,14 +125,14 @@ async def on_elec_process(page: ft.Page, elec_refs: dict, log):
     """电力处理按钮回调"""
     path = elec_refs["path"].value
     if not path:
-        log("请先选择文件")
+        _log_message(log, "请先选择文件", level=logging.WARNING)
         return
 
     year_text = elec_refs["year"].value
     try:
         year = int(year_text)
     except (TypeError, ValueError):
-        log("请输入有效的年份")
+        _log_message(log, "请输入有效的年份", level=logging.WARNING)
         return
 
     btn = elec_refs["btn"]
@@ -135,7 +144,7 @@ async def on_work_process(page: ft.Page, work_refs: dict, log):
     """工时处理按钮回调"""
     path = work_refs["path"].value
     if not path:
-        log("请先选择文件")
+        _log_message(log, "请先选择文件", level=logging.WARNING)
         return
     btn = work_refs["btn"]
     year = int(work_refs["year"].value)
@@ -148,11 +157,11 @@ async def on_merge_process(page: ft.Page, merge_refs: dict, log):
     """Excel 合并按钮回调"""
     path = merge_refs["path"].value
     if not path:
-        log("请先选择文件夹")
+        _log_message(log, "请先选择文件夹", level=logging.WARNING)
         return
     keyword = (merge_refs["keyword"].value or "").strip()
     if not keyword:
-        log("请输入文件名关键字")
+        _log_message(log, "请输入文件名关键字", level=logging.WARNING)
         return
     strip_time = bool(merge_refs["strip_time"].value)
     # 收集排序配置
