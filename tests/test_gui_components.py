@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import logging
 import pathlib
 import sys
 import time
@@ -39,6 +40,8 @@ class PageSpy:
         self.width = 1020
         self.controls = []
         self.thread_calls = []
+        self.on_close = None
+        self.on_disconnect = None
 
     def add(self, *controls):
         self.controls.extend(controls)
@@ -411,7 +414,35 @@ def test_gui_main_routes_log_updates_through_run_thread(monkeypatch):
     assert page.thread_calls, "expected GUI log updates to be scheduled through run_thread"
 
 
-def test_create_log_view_uses_append_friendly_list_view():
+def test_gui_main_stops_log_consumer_on_disconnect(monkeypatch):
+    monkeypatch.setattr(gui_main.cmp, "create_ledger_section", lambda page, log: (object(), {}))
+    monkeypatch.setattr(gui_main.cmp, "create_config_section", lambda page, log: (object(), {}))
+    monkeypatch.setattr(gui_main.cmp, "create_modules_section", lambda page: (object(), {}))
+
+    class LogView:
+        def __init__(self):
+            self.content = types.SimpleNamespace(controls=[])
+
+        def update(self):
+            pass
+
+    monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: LogView())
+    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
+    monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
+
+    page = PageSpy()
+
+    gui_main.main(page)
+    assert page.on_disconnect is not None
+
+    before_disconnect = len(page.thread_calls)
+    page.on_disconnect(None)
+    logging.getLogger().info("关闭后日志")
+    time.sleep(0.05)
+
+    assert len(page.thread_calls) == before_disconnect
+
+
     log_view = components.create_log_view()
 
     assert isinstance(log_view, components.ft.Container)

@@ -43,8 +43,11 @@ def main(page: ft.Page):
     root_logger.addHandler(queue_handler)
 
     log_lines: list[str] = []
+    shutdown_event = threading.Event()
 
     def _update_log_view(msg: str):
+        if shutdown_event.is_set():
+            return
         log_lines.append(msg)
         if len(log_lines) > 500:
             log_lines.pop(0)
@@ -61,10 +64,28 @@ def main(page: ft.Page):
             msg = log_queue.get()
             if msg is None:
                 break
-            page.run_thread(_update_log_view, msg)
+            if shutdown_event.is_set():
+                continue
+            try:
+                page.run_thread(_update_log_view, msg)
+            except RuntimeError:
+                break
 
     consumer_thread = threading.Thread(target=_consume_logs, daemon=True)
     consumer_thread.start()
+
+    def _shutdown_log_consumer(_e=None):
+        if shutdown_event.is_set():
+            return
+        shutdown_event.set()
+        root_logger.removeHandler(queue_handler)
+        try:
+            log_queue.put_nowait(None)
+        except queue.Full:
+            pass
+
+    page.on_disconnect = _shutdown_log_consumer
+    page.on_close = _shutdown_log_consumer
 
     def log(msg: str):
         """统一通过全局 logger 输出，确保 GUI 与控制台实时同步"""
