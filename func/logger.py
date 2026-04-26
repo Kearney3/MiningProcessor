@@ -19,10 +19,15 @@ class QueueHandler(logging.Handler):
     def emit(self, record):
         try:
             msg = self.format(record)
+            payload = {
+                "levelno": record.levelno,
+                "levelname": record.levelname,
+                "message": msg,
+            }
             if hasattr(self.queue, "put_nowait"):
-                self.queue.put_nowait(msg)
+                self.queue.put_nowait(payload)
             else:
-                self.queue.put(msg, block=False)
+                self.queue.put(payload, block=False)
         except Exception:
             self.handleError(record)
 
