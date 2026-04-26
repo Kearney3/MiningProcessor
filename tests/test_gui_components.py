@@ -2,6 +2,7 @@ import importlib.util
 import json
 import pathlib
 import sys
+import time
 import types
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -37,12 +38,25 @@ class PageSpy:
         self.min_width = None
         self.width = 1020
         self.controls = []
+        self.thread_calls = []
 
     def add(self, *controls):
         self.controls.extend(controls)
 
     def update(self):
         pass
+
+    def run_task(self, coro):
+        try:
+            import asyncio
+            loop = asyncio.get_running_loop()
+            return loop.create_task(coro())
+        except RuntimeError:
+            return None
+
+    def run_thread(self, handler, *args):
+        self.thread_calls.append((handler, args))
+        handler(*args)
 
 
 class DummyCheckbox:
@@ -355,7 +369,8 @@ def test_gui_main_uses_consistent_section_spacing(monkeypatch):
     monkeypatch.setattr(gui_main.cmp, "create_modules_section", lambda page: (object(), {}))
 
     class LogView:
-        value = ""
+        def __init__(self):
+            self.content = types.SimpleNamespace(controls=[])
 
         def update(self):
             pass
@@ -370,6 +385,39 @@ def test_gui_main_uses_consistent_section_spacing(monkeypatch):
 
     scroll_col = page.controls[0]
     assert scroll_col.spacing == 12
+
+
+def test_gui_main_routes_log_updates_through_run_thread(monkeypatch):
+    monkeypatch.setattr(gui_main.cmp, "create_ledger_section", lambda page, log: (object(), {}))
+    monkeypatch.setattr(gui_main.cmp, "create_config_section", lambda page, log: (object(), {}))
+    monkeypatch.setattr(gui_main.cmp, "create_modules_section", lambda page: (object(), {}))
+
+    class LogView:
+        def __init__(self):
+            self.content = types.SimpleNamespace(controls=[])
+
+        def update(self):
+            pass
+
+    monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: LogView())
+    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
+    monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
+
+    page = PageSpy()
+
+    gui_main.main(page)
+    time.sleep(0.05)
+
+    assert page.thread_calls, "expected GUI log updates to be scheduled through run_thread"
+
+
+def test_create_log_view_uses_append_friendly_list_view():
+    log_view = components.create_log_view()
+
+    assert isinstance(log_view, components.ft.Container)
+    assert isinstance(log_view.content, components.ft.ListView)
+    assert log_view.content.auto_scroll is True
+    assert log_view.content.spacing == 4
 
 
 

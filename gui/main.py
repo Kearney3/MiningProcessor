@@ -3,14 +3,17 @@ GUI 主窗口 - Flet 实现
 使用模块化结构：components.py（UI组件）+ logic.py（业务逻辑）
 """
 import flet as ft
+import logging
 import os
+import queue
 import sys
+import threading
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import gui.components as cmp
 import gui.logic as logic
-from func.logger import setup_logging
+from func.logger import setup_logging, QueueHandler, DEFAULT_FORMAT
 
 
 def main(page: ft.Page):
@@ -23,40 +26,64 @@ def main(page: ft.Page):
     # ---- 滚动容器 ----
     scroll_col = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True, spacing=12)
 
-    # ---- 共享日志状态 ----
+    # ---- 日志视图 ----
+    log_view = cmp.create_log_view()
+    log_list = log_view.content
+
+    # ---- 全局日志队列与 Handler ----
+    log_queue = queue.Queue()
+    queue_handler = QueueHandler(log_queue)
+    queue_handler.setFormatter(logging.Formatter(DEFAULT_FORMAT, datefmt="%Y-%m-%d %H:%M:%S"))
+    root_logger = logging.getLogger()
+
+    # 避免重复添加 QueueHandler
+    for h in list(root_logger.handlers):
+        if isinstance(h, QueueHandler):
+            root_logger.removeHandler(h)
+    root_logger.addHandler(queue_handler)
+
     log_lines: list[str] = []
 
-    def log(msg: str):
+    def _update_log_view(msg: str):
         log_lines.append(msg)
         if len(log_lines) > 500:
             log_lines.pop(0)
-        log_view.value = "\n".join(log_lines)
+            if log_list.controls:
+                log_list.controls.pop(0)
+        log_list.controls.append(ft.Text(msg, size=13, selectable=True))
         try:
             log_view.update()
         except RuntimeError:
-            pass  # Guard: log_view not yet added to page
+            pass
+
+    def _consume_logs():
+        while True:
+            msg = log_queue.get()
+            if msg is None:
+                break
+            page.run_thread(_update_log_view, msg)
+
+    consumer_thread = threading.Thread(target=_consume_logs, daemon=True)
+    consumer_thread.start()
+
+    def log(msg: str):
+        """统一通过全局 logger 输出，确保 GUI 与控制台实时同步"""
+        logging.getLogger().info(msg)
 
     # ---- 创建各区域 UI ----
     ledger_section, ledger_refs = cmp.create_ledger_section(page, log)
     config_section, config_refs = cmp.create_config_section(page, log)
     modules_section, module_refs = cmp.create_modules_section(page)
-    log_view = cmp.create_log_view()
-    # progress_bar = ft.ProgressBar(value=0, width=page.width - 40)
 
     # ---- 绑定处理按钮 ----
     logic.wire_processing_buttons(module_refs, page, log)
 
     # ---- 组装页面 ----
     scroll_col.controls.append(ft.Text("矿山数据处理工具", size=24, weight=ft.FontWeight.BOLD))
-    # scroll_col.controls.append(ft.Divider(height=16))
     scroll_col.controls.append(ledger_section)
-    # scroll_col.controls.append(ft.Divider(height=16))
     scroll_col.controls.append(config_section)
-    # scroll_col.controls.append(ft.Divider(height=16))
     scroll_col.controls.append(modules_section)
-    # scroll_col.controls.append(ft.Divider(height=16))
     scroll_col.controls.append(log_view)
-    # scroll_col.controls.append(progress_bar)
     page.add(scroll_col)
 
     # ---- 初始化（放在 page.add 之后） ----

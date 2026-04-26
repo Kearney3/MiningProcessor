@@ -4,14 +4,13 @@ GUI 业务逻辑层
 """
 import asyncio
 import flet as ft
-import logging
 import os
 from func.excel_fuel import process_diesel_data
 from func.excel_production_enhanced import MiningDataProcessor as ProdProcessor
 from func.excel_electrical import parse_excel_data
 from func.excel_worktime import process_excel_data
 from func.excel_merger import merge_excel_files
-from func.logger import QueueHandler, DEFAULT_FORMAT
+
 
 
 # ---------------------------------------------------------------------------
@@ -67,31 +66,13 @@ async def run_task(page: ft.Page, module_type: str, path: str, btn: ft.Button, l
     del page  # 保留现有调用签名，避免影响其他调用方
 
     log(f"[{module_type}] 开始处理...")
-    queue = asyncio.Queue()
-
-    queue_handler = QueueHandler(queue)
-    queue_handler.setFormatter(logging.Formatter(DEFAULT_FORMAT, datefmt="%Y-%m-%d %H:%M:%S"))
-    root_logger = logging.getLogger()
-    root_logger.addHandler(queue_handler)
-
-    async def _consume():
-        while True:
-            line = await queue.get()
-            if line is None:  # sentinel
-                break
-            log(line)
-
-    consumer = asyncio.create_task(_consume())
     try:
         error_message = await asyncio.to_thread(_execute_task, module_type, path, **kwargs)
-        queue.put_nowait(None)
-        await consumer
         if error_message:
             log(f"[{module_type}] 处理失败: {error_message}")
         else:
             log(f"[{module_type}] 处理成功")
     finally:
-        root_logger.removeHandler(queue_handler)
         set_btn_state(btn, True, "处理")
 
 
