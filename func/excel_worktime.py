@@ -56,8 +56,8 @@ def process_excel_data(file_path, year, month, output_file):
         # 从第3行（index 2）开始向下遍历，寻找再次出现的表头
         for idx in range(2, len(df_raw)):
             current_row_vals = df_raw.iloc[idx][valid_cols].astype(str).str.strip().tolist()
-            # 如果当前行的有效列内容与提取的表头完全一致，则判定为夜班表头
-            if current_row_vals == valid_headers:
+            # 如果当前行的有效列内容与提取的表头
+            if current_row_vals[0] == valid_headers[0]:
                 split_idx = idx
                 break
 
