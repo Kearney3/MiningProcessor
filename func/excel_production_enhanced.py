@@ -74,9 +74,12 @@ class MiningDataProcessor:
         """从文件名中提取日期、班次"""
         date_match = re.search(r'(\d{4}\.\d{2}\.\d{2})', filename)
         if not date_match:
-            raise ValueError(f"文件名中未找到日期: {filename}")
+            date_match = re.search(r'(\d{4}\-\d{2}\-\d{2})', filename)
+            if not date_match:
+                raise ValueError(f"文件名中未找到日期: {filename}")
 
         date_str = date_match.group(1)
+        date_str = date_str.replace("-", ".")
         date_val = datetime.strptime(date_str, "%Y.%m.%d").date()
 
         if "白班" in filename:
@@ -181,7 +184,8 @@ class MiningDataProcessor:
         row6 = df_raw.iloc[self.raw_start-1, :]
         total_col_idx = None
         for idx, val in row6.items():
-            if "总趟数" in self.safe_str(val) or "Нийт рейс" in self.safe_str(val):
+            # if "总趟数" in self.safe_str(val) or "Нийт рейс" in self.safe_str(val):
+            if any(k in self.safe_str(val) for k in ["总趟数", "Нийт рейс"]):
                 # print(f"找到总趟数列：{idx},{self.safe_str(val)}")
                 total_col_idx = idx
                 break
@@ -272,7 +276,7 @@ class MiningDataProcessor:
 
                 trips = self.safe_number(row[col], default=0)
 
-                if trips > 0:
+                if trips > 0 and ore_type != "":
                     production = trips * capacity
                     production_rows.append({
                         "日期": date_val,
