@@ -167,7 +167,7 @@ class MiningDataProcessor:
         if df_raw.empty or df_raw.shape[0] < 7:
             return pd.DataFrame(), pd.DataFrame()
 
-        logger.info(f"配置：{self.load_map}")
+        logger.debug(f"配置：{self.load_map}")
 
         # 1. 找最后一行：A列最后非空
         col_a = df_raw.iloc[:, 0]
