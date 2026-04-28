@@ -70,7 +70,7 @@ def process_excel_data(file_path, year, month, output_file):
         else:
             # --- 处理白班数据 ---
             # 白班数据从第3行 (index 2) 到 夜班表头前一行 (split_idx - 1)
-            day_data = df_raw.iloc[2:split_idx].copy()
+            day_data = df_raw.iloc[2:split_idx-1].copy()
             day_data.columns = header_row
             day_data['班次'] = 'Day'
 
