@@ -1,8 +1,15 @@
 import argparse
 import os
+
+
 import pandas as pd
 import numpy as np
-from logger import get_logger
+import sys
+from pathlib import Path
+# 定位到当前项目的根目录
+root = Path(__file__).resolve().parent.parent
+sys.path.append(str(root))
+from func.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -124,7 +131,6 @@ def process_diesel_data(file_path, target_year=None):
                 "fuel_type": h5 if data_type == "fuel" else None
             })
 
-
         # 5. 提取数据体
         data_body = df_raw.iloc[start_row - 1:].copy()
         for _, row in data_body.iterrows():
@@ -153,7 +159,8 @@ def process_diesel_data(file_path, target_year=None):
                     shift = col_info["shift"]
                     key = (dt, shift)
 
-                    if col_info["data_type"] == "fuel" and not pd.isna(col_info["fuel_type"]) and col_info["fuel_type"] != "nan":
+                    if col_info["data_type"] == "fuel" and not pd.isna(col_info["fuel_type"]) and col_info[
+                        "fuel_type"] != "nan":
                         fuel_data_list.append({
                             "日期": dt, "班次": shift, "设备名称": device_name,
                             "设备编号": device_id, "油品种类": col_info["fuel_type"], "油品消耗": val
@@ -222,6 +229,7 @@ def process_diesel_data(file_path, target_year=None):
 
 if __name__ == "__main__":
     from logger import setup_logging
+
     setup_logging()
     parser = argparse.ArgumentParser()
     parser.add_argument("input_file")

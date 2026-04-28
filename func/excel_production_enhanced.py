@@ -5,12 +5,16 @@ import argparse
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
-import numpy as np
 import pandas as pd
 import os
 import re
-import config_loader
-from logger import get_logger
+import sys
+from pathlib import Path
+# 定位到当前项目的根目录
+root = Path(__file__).resolve().parent.parent
+sys.path.append(str(root))
+from func import config_loader
+from func.logger import get_logger
 
 logger = get_logger(__name__)
 

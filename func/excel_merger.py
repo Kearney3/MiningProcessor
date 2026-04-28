@@ -3,9 +3,13 @@ import json
 import os
 import sys
 from typing import List, Tuple
-
+import sys
+from pathlib import Path
+# 定位到当前项目的根目录
+root = Path(__file__).resolve().parent.parent
+sys.path.append(str(root))
 import pandas as pd
-from logger import get_logger
+from func.logger import get_logger
 
 logger = get_logger(__name__)
 
