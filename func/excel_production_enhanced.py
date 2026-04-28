@@ -10,6 +10,7 @@ import os
 import re
 import sys
 from pathlib import Path
+
 # 定位到当前项目的根目录
 root = Path(__file__).resolve().parent.parent
 sys.path.append(str(root))
@@ -20,7 +21,8 @@ logger = get_logger(__name__)
 
 
 class MiningDataProcessor:
-    def __init__(self, version: str = "new", raw_start: int = 6, device_load_map: dict[str, int] | None = None, target_text: str = "Мото цагийн заалт"):
+    def __init__(self, version: str = "new", raw_start: int = 6, device_load_map: dict[str, int] | None = None,
+                 target_text: str = "Мото цагийн заалт"):
         """
         初始化数据处理器
         :param version: 版本，"new"或"old"
@@ -60,9 +62,9 @@ class MiningDataProcessor:
                     'XDM100': 32,
                     'XDE120': 40,
                     'XDE130': 45,
-                    'T-264':80,
-                    'SANY SET150S':52,
-                    'CAT773':20
+                    'T-264': 80,
+                    'SANY SET150S': 52,
+                    'CAT773': 20
 
                 }
             else:
@@ -209,13 +211,13 @@ class MiningDataProcessor:
             # 获取对应的索引
             row_indices = df_raw[mask].index.tolist()
             if len(row_indices) > 0:
-                self.raw_start = row_indices[0]+1
+                self.raw_start = row_indices[0] + 1
                 logger.info(f"开启自动检测，找到目标文本{self.target_text}，行号为: {self.raw_start}")
             else:
                 raise ValueError(f"未找到目标文本{self.target_text},请检查数据是否正确")
 
         # 2. 找最后一列：第6行匹配“总趟数”，前一列为最后一列
-        row6 = df_raw.iloc[self.raw_start-1, :]
+        row6 = df_raw.iloc[self.raw_start - 1, :]
         total_col_idx = None
         for idx, val in row6.items():
             if any(k in self.safe_str(val) for k in ["总趟数", "Нийт рейс"]):
@@ -229,7 +231,7 @@ class MiningDataProcessor:
             last_col_idx = df_raw.shape[1] - 1
 
         # 3. 构造复合表头
-        header6 = df_raw.iloc[self.raw_start-1, :last_col_idx + 1].ffill()
+        header6 = df_raw.iloc[self.raw_start - 1, :last_col_idx + 1].ffill()
         header7 = df_raw.iloc[self.raw_start, :last_col_idx + 1]
 
         combined_headers = []
@@ -254,11 +256,11 @@ class MiningDataProcessor:
         # data.columns.values[1] = "公司"
 
         # 5. 找运行指标列
-        hour_start_col = self.find_first_matching_column(data.columns, [["小时数", "开始"],["Мото", "Эхэлсэн"]])
-        hour_end_col = self.find_first_matching_column(data.columns, [["小时数", "结束"],["Мото", "Дууссан"]])
-        km_start_col = self.find_first_matching_column(data.columns, [["公里数", "开始"],["км-ын", "Эхэлсэн"]])
-        km_end_col = self.find_first_matching_column(data.columns, [["公里数", "结束"],["км-ын", "Дууссан"]])
-        company_col = self.find_first_matching_column(data.columns, ["公司","Компани"])
+        hour_start_col = self.find_first_matching_column(data.columns, [["小时数", "开始"], ["Мото", "Эхэлсэн"]])
+        hour_end_col = self.find_first_matching_column(data.columns, [["小时数", "结束"], ["Мото", "Дууссан"]])
+        km_start_col = self.find_first_matching_column(data.columns, [["公里数", "开始"], ["км-ын", "Эхэлсэн"]])
+        km_end_col = self.find_first_matching_column(data.columns, [["公里数", "结束"], ["км-ын", "Дууссан"]])
+        company_col = self.find_first_matching_column(data.columns, ["公司", "Компани"])
 
         running_rows = []
         production_rows = []
@@ -279,7 +281,7 @@ class MiningDataProcessor:
             k_end = self.safe_number(row[km_end_col]) if km_end_col in data.columns else 0
             company = self.safe_str(row[company_col]) if company_col in data.columns else ""
 
-            if company_col is not None and company=="":
+            if company_col is not None and company == "":
                 continue
 
             total_trips = 0
@@ -356,10 +358,10 @@ class MiningDataProcessor:
 
         for i in range(start_row, len(df_raw)):
             device_name = self.safe_str(df_raw.iloc[i, 1])  # B列
-            company = self.safe_str(df_raw.iloc[i, 2])      # C列
-            h_start = self.safe_number(df_raw.iloc[i, 5])   # F列
-            h_end = self.safe_number(df_raw.iloc[i, 6])     # G列
-            comment = self.safe_str(df_raw.iloc[i, 8])    # I列备注
+            company = self.safe_str(df_raw.iloc[i, 2])  # C列
+            h_start = self.safe_number(df_raw.iloc[i, 5])  # F列
+            h_end = self.safe_number(df_raw.iloc[i, 6])  # G列
+            comment = self.safe_str(df_raw.iloc[i, 8])  # I列备注
 
             if not device_name:
                 continue
@@ -505,11 +507,13 @@ class MiningDataProcessor:
             final_production.to_excel(writer, sheet_name='生产数据', index=False)
 
         logger.info(f"汇总完成，输出文件：{output_file}")
-        logger.info(f"统计信息：共处理 {total_files} 个文件，成功 {success_files} 个，失败 {total_files - success_files} 个")
+        logger.info(
+            f"统计信息：共处理 {total_files} 个文件，成功 {success_files} 个，失败 {total_files - success_files} 个")
 
 
 if __name__ == "__main__":
     from logger import setup_logging
+
     setup_logging()
     parser = argparse.ArgumentParser(description="处理矿卡数据")
     parser.add_argument("input_file", help="输入Excel文件路径")

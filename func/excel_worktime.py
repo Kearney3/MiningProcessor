@@ -4,6 +4,7 @@ import os
 import argparse
 import sys
 from pathlib import Path
+
 # 定位到当前项目的根目录
 root = Path(__file__).resolve().parent.parent
 sys.path.append(str(root))
@@ -74,7 +75,7 @@ def process_excel_data(file_path, year, month, output_file):
         else:
             # --- 处理白班数据 ---
             # 白班数据从第3行 (index 2) 到 夜班表头前一行 (split_idx - 1)
-            day_data = df_raw.iloc[2:split_idx-1].copy()
+            day_data = df_raw.iloc[2:split_idx - 1].copy()
             day_data.columns = header_row
             day_data['班次'] = 'Day'
 

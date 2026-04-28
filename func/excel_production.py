@@ -9,6 +9,7 @@ import os
 import re
 import sys
 from pathlib import Path
+
 # 定位到当前项目的根目录
 root = Path(__file__).resolve().parent.parent
 sys.path.append(str(root))
@@ -344,11 +345,13 @@ class MiningDataProcessor:
             final_production.to_excel(writer, sheet_name='生产数据', index=False)
 
         logger.info(f"汇总完成，输出文件：{output_file}")
-        logger.info(f"统计信息：共处理 {total_files} 个文件，成功 {success_files} 个，失败 {total_files - success_files} 个")
+        logger.info(
+            f"统计信息：共处理 {total_files} 个文件，成功 {success_files} 个，失败 {total_files - success_files} 个")
 
 
 if __name__ == "__main__":
     from logger import setup_logging
+
     setup_logging()
     # 改造成cli参数输入
     parser = argparse.ArgumentParser(description="处理矿卡数据")

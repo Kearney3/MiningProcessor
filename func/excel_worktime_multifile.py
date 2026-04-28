@@ -5,6 +5,7 @@ import re
 import argparse
 import sys
 from pathlib import Path
+
 # 定位到当前项目的根目录
 root = Path(__file__).resolve().parent.parent
 sys.path.append(str(root))
@@ -139,8 +140,6 @@ def process_directory(base_dir, year, month, output_file):
             except Exception as e:
                 logger.error(f"读取文件失败 '{excel_path}': {e}")
                 continue
-
-
 
             # 寻找与目标日期对应的 Sheet
             target_sheet_name = None

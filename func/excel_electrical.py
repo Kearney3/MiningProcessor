@@ -9,6 +9,7 @@ from datetime import datetime
 import argparse
 import sys
 from pathlib import Path
+
 # 定位到当前项目的根目录
 root = Path(__file__).resolve().parent.parent
 sys.path.append(str(root))
@@ -108,6 +109,7 @@ def parse_excel_data(file_path, target_year=None):
 # --- 使用示例 ---
 if __name__ == "__main__":
     from logger import setup_logging
+
     setup_logging()
     # 使用cli
     parser = argparse.ArgumentParser(description="解析电力消耗报表")
