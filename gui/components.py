@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 import sys
 import flet as ft
+
 # 定位到当前项目的根目录
 root = Path(__file__).resolve().parent.parent
 sys.path.append(str(root))
@@ -716,8 +717,10 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
                                         [
                                             ft.Column(
                                                 [
-                                                    ft.Text("排序配置（可选，留空则自动按第一个时间列排序）", size=12, color=ft.Colors.GREY),
-                                                    ft.Row([sort_rules_column, add_sort_btn], spacing=10, alignment=ft.MainAxisAlignment.START, expand=True),
+                                                    ft.Text("排序配置（可选，留空则自动按第一个时间列排序）", size=12,
+                                                            color=ft.Colors.GREY),
+                                                    ft.Row([sort_rules_column, add_sort_btn], spacing=10,
+                                                           alignment=ft.MainAxisAlignment.START, expand=True),
                                                 ],
                                                 spacing=4,
                                             )

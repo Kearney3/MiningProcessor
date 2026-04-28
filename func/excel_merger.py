@@ -5,6 +5,7 @@ import sys
 from typing import List, Tuple
 import sys
 from pathlib import Path
+
 # 定位到当前项目的根目录
 root = Path(__file__).resolve().parent.parent
 sys.path.append(str(root))
@@ -31,11 +32,11 @@ def find_first_datetime_column(df: pd.DataFrame) -> str | None:
 
 
 def merge_excel_files(
-    folder_path: str,
-    keyword: str,
-    output_file: str | None = None,
-    strip_time: bool = False,
-    sort_configs: List[dict] | None = None,
+        folder_path: str,
+        keyword: str,
+        output_file: str | None = None,
+        strip_time: bool = False,
+        sort_configs: List[dict] | None = None,
 ) -> str:
     """
     合并指定文件夹中包含关键字的 Excel 文件。
@@ -145,8 +146,10 @@ def merge_excel_files(
                 sort_ascending.append(asc)
 
             if sort_columns:
-                logger.info(f"Sheet '{sname}' 正在按以下规则排序: {list(zip(sort_columns, ['升序' if a else '降序' for a in sort_ascending]))}")
-                merged_df = merged_df.sort_values(by=sort_columns, ascending=sort_ascending, na_position="last").reset_index(drop=True)
+                logger.info(
+                    f"Sheet '{sname}' 正在按以下规则排序: {list(zip(sort_columns, ['升序' if a else '降序' for a in sort_ascending]))}")
+                merged_df = merged_df.sort_values(by=sort_columns, ascending=sort_ascending,
+                                                  na_position="last").reset_index(drop=True)
             else:
                 logger.warning(f"Sheet '{sname}' 无可用的排序条件，跳过排序")
         else:
@@ -215,5 +218,6 @@ def main():
 
 if __name__ == "__main__":
     from logger import setup_logging
+
     setup_logging()
     main()
