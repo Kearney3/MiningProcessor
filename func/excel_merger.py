@@ -167,7 +167,7 @@ def merge_excel_files(
             time_col = find_first_datetime_column(merged_df)
             if time_col:
                 merged_df[time_col] = pd.to_datetime(merged_df[time_col], errors="coerce")
-                merged_df[time_col] = merged_df[time_col].dt.strftime("%Y-%m-%d")
+                merged_df[time_col] = merged_df[time_col].dt.date
                 logger.info(f"Sheet '{sname}' 时间列 '{time_col}' 已格式化为日期（YYYY-MM-DD）")
             else:
                 logger.warning(f"Sheet '{sname}' 未识别到时间列，跳过日期格式化")
