@@ -2,11 +2,17 @@
 设备台账模块
 用于导入和管理设备台账表，提供设备名称模糊匹配功能
 """
+import sys
+
 import pandas as pd
 from pathlib import Path
 from typing import Optional
 from rapidfuzz import fuzz, process
-from logger import get_logger
+# 定位到当前项目的根目录
+root = Path(__file__).resolve().parent.parent
+sys.path.append(str(root))
+
+from func.logger import get_logger
 
 logger = get_logger(__name__)
 
