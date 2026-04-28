@@ -16,9 +16,17 @@ logger = get_logger(__name__)
 
 
 class MiningDataProcessor:
-    def __init__(self, version: str = "new", raw_start: int = 6, device_load_map: dict[str, int] | None = None):
+    def __init__(self, version: str = "new", raw_start: int = 6, device_load_map: dict[str, int] | None = None, target_text: str = "Мото цагийн заалт"):
+        """
+        初始化数据处理器
+        :param version: 版本，"new"或"old"
+        :param raw_start: 开始行号，默认6
+        :param device_load_map: 自定义设备装载量映射
+        :param target_text: 目标文本，默认"Мото цагийн заалт"
+        """
         self.version = version
         self.raw_start = raw_start
+        self.target_text = target_text
         if device_load_map is not None:
             self.load_map: dict[str, int] = dict(device_load_map)
             return
@@ -180,25 +188,23 @@ class MiningDataProcessor:
 
         last_row_idx = non_empty_a.index[-1]
 
-        # 找到坐标
-        target_text = "Мото цагийн заалт"
-        # positions = np.where(df_raw == target_text)
+        # 通过目标文本self.target_text找到复合表头的行号
+        # positions = np.where(df_raw == self.target_text)
         # positions[0] 是行号数组，positions[1] 是列索引数组
         # for row, col in zip(positions[0], positions[1]):
         #     logger.info(f"在第 {row} 行，第 {col} 列找到文本")
 
-        mask = df_raw.apply(lambda row: row.astype(str).str.contains(target_text).any(), axis=1)
+        mask = df_raw.apply(lambda row: row.astype(str).str.contains(self.target_text).any(), axis=1)
         # 获取对应的索引
         row_indices = df_raw[mask].index.tolist()
         if row_indices[0]!= 0 and self.raw_start == -1:
             self.raw_start = row_indices[0]+1
-            logger.info(f"开启自动检测，找到目标文本{target_text}，行号为: {self.raw_start}")
+            logger.info(f"开启自动检测，找到目标文本{self.target_text}，行号为: {self.raw_start}")
 
         # 2. 找最后一列：第6行匹配“总趟数”，前一列为最后一列
         row6 = df_raw.iloc[self.raw_start-1, :]
         total_col_idx = None
         for idx, val in row6.items():
-            # if "总趟数" in self.safe_str(val) or "Нийт рейс" in self.safe_str(val):
             if any(k in self.safe_str(val) for k in ["总趟数", "Нийт рейс"]):
                 # logger.info(f"找到总趟数列：{idx},{self.safe_str(val)}")
                 total_col_idx = idx
@@ -493,14 +499,18 @@ if __name__ == "__main__":
     parser.add_argument("--version", choices=["new", "old"], default="new",
                         help="装载量映射版本，new（默认）或 old")
     parser.add_argument("--raw_start", type=int, default=6, help="复合表头起始行，默认 6, 使用-1自动检测")
+    parser.add_argument("--target_text", type=str, default="Мото цагийн заалт",
+                        help="目标文本，默认'Мото цагийн заалт'，当raw_start为-1时，根据此文本自动检测复合表头行号")
+
     args = parser.parse_args()
     input_file = args.input_file
     workers = args.workers
     version = args.version
     raw_start = args.raw_start
+    target_text = args.target_text
 
     output_file = r"合并产量.xlsx"
-    processor = MiningDataProcessor(version=version, raw_start=raw_start)
+    processor = MiningDataProcessor(version=version, raw_start=raw_start, target_text=target_text)
 
     if os.path.isdir(input_file):
         logger.info(f"正在处理文件夹: {input_file}")
