@@ -113,10 +113,10 @@ async def on_prod_process(page: ft.Page, prod_refs: dict, log):
     raw_start_text = (prod_refs["raw_start"].value or "6").strip()
     try:
         raw_start = int(raw_start_text)
-        if raw_start < 1:
+        if raw_start != -1 and raw_start < 1:
             raise ValueError
     except ValueError:
-        _log_message(log, "请输入有效的 raw_start（正整数）", level=logging.WARNING)
+        _log_message(log, "请输入有效的 raw_start（正整数或-1【自动检测行】）", level=logging.WARNING)
         return
 
     btn = prod_refs["btn"]
