@@ -26,6 +26,10 @@ class MiningDataProcessor:
         """
         self.version = version
         self.raw_start = raw_start
+        if raw_start == -1:
+            self.auto_detect = True
+        else:
+            self.auto_detect = False
         self.target_text = target_text
         if device_load_map is not None:
             self.load_map: dict[str, int] = dict(device_load_map)
@@ -113,6 +117,8 @@ class MiningDataProcessor:
     def safe_str(self, val):
         """安全转字符串"""
         try:
+            if isinstance(val, pd.Series):
+                val = val.iloc[0]
             if pd.isna(val):
                 return ""
         except Exception:
@@ -194,12 +200,15 @@ class MiningDataProcessor:
         # for row, col in zip(positions[0], positions[1]):
         #     logger.info(f"在第 {row} 行，第 {col} 列找到文本")
 
-        mask = df_raw.apply(lambda row: row.astype(str).str.contains(self.target_text).any(), axis=1)
-        # 获取对应的索引
-        row_indices = df_raw[mask].index.tolist()
-        if row_indices[0]!= 0 and self.raw_start == -1:
-            self.raw_start = row_indices[0]+1
-            logger.info(f"开启自动检测，找到目标文本{self.target_text}，行号为: {self.raw_start}")
+        if self.auto_detect == True:
+            mask = df_raw.apply(lambda row: row.astype(str).str.contains(self.target_text).any(), axis=1)
+            # 获取对应的索引
+            row_indices = df_raw[mask].index.tolist()
+            if len(row_indices) > 0:
+                self.raw_start = row_indices[0]+1
+                logger.info(f"开启自动检测，找到目标文本{self.target_text}，行号为: {self.raw_start}")
+            else:
+                raise ValueError(f"未找到目标文本{self.target_text},请检查数据是否正确")
 
         # 2. 找最后一列：第6行匹配“总趟数”，前一列为最后一列
         row6 = df_raw.iloc[self.raw_start-1, :]

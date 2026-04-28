@@ -4,6 +4,7 @@
 """
 import logging
 import sys
+from datetime import datetime
 
 # 默认日志格式“[日志级别]时间戳(秒级)｜文件名｜消息内容”
 DEFAULT_FORMAT = "[%(levelname)s]%(asctime)s | %(filename)s | %(message)s"
@@ -20,6 +21,7 @@ class QueueHandler(logging.Handler):
         try:
             msg = self.format(record)
             payload = {
+                "timestamp": datetime.fromtimestamp(record.created).strftime("%Y-%m-%d %H:%M:%S"),
                 "levelno": record.levelno,
                 "levelname": record.levelname,
                 "message": msg,

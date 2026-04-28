@@ -755,17 +755,84 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
 # ---------------------------------------------------------------------------
 # 日志视图
 # ---------------------------------------------------------------------------
-def create_log_view() -> ft.Container:
+def create_log_view(height: int = 200) -> tuple[ft.Container, dict]:
     """创建适合实时追加的日志视图组件"""
-    return ft.Container(
-        content=ft.ListView(
-            controls=[],
-            spacing=4,
-            auto_scroll=True,
-            expand=True,
+    log_list = ft.ListView(
+        controls=[],
+        spacing=4,
+        auto_scroll=True,
+        expand=True,
+    )
+    level_filter = ft.Dropdown(
+        label="等级筛选",
+        width=132,
+        dense=True,
+        content_padding=ft.Padding.symmetric(horizontal=8, vertical=6),
+        value="ALL",
+        options=[
+            ft.dropdown.Option(key="ALL", text="全部"),
+            ft.dropdown.Option(key="DEBUG", text="DEBUG"),
+            ft.dropdown.Option(key="INFO", text="INFO"),
+            ft.dropdown.Option(key="WARNING", text="WARNING"),
+            ft.dropdown.Option(key="ERROR", text="ERROR"),
+            ft.dropdown.Option(key="CRITICAL", text="CRITICAL"),
+        ],
+    )
+    export_button = ft.Button(
+        "导出日志",
+        icon=ft.icons.Icons.DOWNLOAD,
+        height=32,
+        style=ft.ButtonStyle(
+            padding=ft.Padding.symmetric(horizontal=10, vertical=0),
+            shape=ft.RoundedRectangleBorder(radius=8),
         ),
-        height=200,
+    )
+    resize_handle = ft.GestureDetector(
+        content=ft.Container(
+            height=12,
+            padding=ft.Padding.only(top=2),
+            content=ft.Row(
+                [
+                    ft.Container(
+                        width=64,
+                        height=4,
+                        border_radius=999,
+                        bgcolor=ft.Colors.OUTLINE_VARIANT,
+                    )
+                ],
+                alignment=ft.MainAxisAlignment.CENTER,
+            ),
+            tooltip="拖拽调整日志区域高度",
+        ),
+        mouse_cursor=ft.MouseCursor.RESIZE_UP_DOWN,
+    )
+    list_container = ft.Container(
+        content=log_list,
+        height=height,
         border=ft.Border.all(1, ft.Colors.OUTLINE),
         border_radius=8,
         padding=8,
     )
+    toolbar = ft.Row(
+        [level_filter, export_button],
+        spacing=8,
+        wrap=False,
+        alignment=ft.MainAxisAlignment.START,
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+    )
+    root = ft.Container(
+        content=ft.Column(
+            [toolbar, resize_handle, list_container],
+            spacing=6,
+        ),
+        padding=ft.Padding.only(top=2),
+    )
+    refs = {
+        "toolbar": toolbar,
+        "level_filter": level_filter,
+        "export_button": export_button,
+        "resize_handle": resize_handle,
+        "list_container": list_container,
+        "log_list": log_list,
+    }
+    return root, refs
