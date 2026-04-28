@@ -90,6 +90,43 @@ class SavePicker:
         return self.next_path
 
 
+class DummyDragEvent:
+    def __init__(self, delta_y):
+        self.primary_delta = delta_y
+        self.local_delta = types.SimpleNamespace(y=delta_y)
+
+
+class StubLogView:
+    def __init__(self):
+        self.log_list = types.SimpleNamespace(controls=[], auto_scroll=True, spacing=4)
+        self.level_filter = types.SimpleNamespace(value="ALL", on_select=None)
+        self.export_button = types.SimpleNamespace(on_click=None)
+        self.resize_handle = types.SimpleNamespace(on_vertical_drag_update=None)
+        self.list_container = types.SimpleNamespace(height=200, update=lambda: None)
+        self.content = types.SimpleNamespace(
+            controls=[
+                types.SimpleNamespace(),
+                self.resize_handle,
+                self.list_container,
+            ]
+        )
+
+    def update(self):
+        pass
+
+
+def make_stub_log_view():
+    view = StubLogView()
+    refs = {
+        "level_filter": view.level_filter,
+        "export_button": view.export_button,
+        "resize_handle": view.resize_handle,
+        "list_container": view.list_container,
+        "log_list": view.log_list,
+    }
+    return view, refs
+
+
 class ImportPicker:
     next_files = None
 
@@ -399,14 +436,8 @@ def test_gui_main_uses_consistent_section_spacing(monkeypatch):
     monkeypatch.setattr(gui_main.cmp, "create_config_section", lambda page, log: (object(), {}))
     monkeypatch.setattr(gui_main.cmp, "create_modules_section", lambda page: (object(), {}))
 
-    class LogView:
-        def __init__(self):
-            self.content = types.SimpleNamespace(controls=[])
-
-        def update(self):
-            pass
-
-    monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: LogView())
+    log_view, refs = make_stub_log_view()
+    monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: (log_view, refs))
     monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
     monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
 
@@ -423,14 +454,8 @@ def test_gui_main_log_helper_supports_custom_levels(monkeypatch):
     monkeypatch.setattr(gui_main.cmp, "create_config_section", lambda page, log: (object(), {}))
     monkeypatch.setattr(gui_main.cmp, "create_modules_section", lambda page: (object(), {}))
 
-    class LogView:
-        def __init__(self):
-            self.content = types.SimpleNamespace(controls=[])
-
-        def update(self):
-            pass
-
-    monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: LogView())
+    log_view, refs = make_stub_log_view()
+    monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: (log_view, refs))
     monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
     monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
 
@@ -449,7 +474,7 @@ def test_gui_main_log_helper_supports_custom_levels(monkeypatch):
     time.sleep(0.05)
 
     log_view = page.controls[0].controls[-1]
-    last_text = log_view.content.controls[-1]
+    last_text = refs["log_list"].controls[-1]
     assert last_text.value.endswith("警告消息")
     assert last_text.color == components.ft.Colors.ORANGE
 
@@ -458,14 +483,8 @@ def test_gui_main_log_helper_supports_custom_levels(monkeypatch):
     monkeypatch.setattr(gui_main.cmp, "create_config_section", lambda page, log: (object(), {}))
     monkeypatch.setattr(gui_main.cmp, "create_modules_section", lambda page: (object(), {}))
 
-    class LogView:
-        def __init__(self):
-            self.content = types.SimpleNamespace(controls=[])
-
-        def update(self):
-            pass
-
-    monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: LogView())
+    log_view, refs = make_stub_log_view()
+    monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: (log_view, refs))
     monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
     monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
 
@@ -482,14 +501,8 @@ def test_gui_main_stops_log_consumer_on_disconnect(monkeypatch):
     monkeypatch.setattr(gui_main.cmp, "create_config_section", lambda page, log: (object(), {}))
     monkeypatch.setattr(gui_main.cmp, "create_modules_section", lambda page: (object(), {}))
 
-    class LogView:
-        def __init__(self):
-            self.content = types.SimpleNamespace(controls=[])
-
-        def update(self):
-            pass
-
-    monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: LogView())
+    log_view, refs = make_stub_log_view()
+    monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: (log_view, refs))
     monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
     monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
 
@@ -506,12 +519,127 @@ def test_gui_main_stops_log_consumer_on_disconnect(monkeypatch):
     assert len(page.thread_calls) == before_disconnect
 
 
-    log_view = components.create_log_view()
+    log_view, refs = components.create_log_view()
 
     assert isinstance(log_view, components.ft.Container)
-    assert isinstance(log_view.content, components.ft.ListView)
-    assert log_view.content.auto_scroll is True
-    assert log_view.content.spacing == 4
+    assert refs["log_list"].auto_scroll is True
+    assert refs["log_list"].spacing == 4
+    assert refs["list_container"].height == 200
+    assert getattr(refs["export_button"], "text", None) == "导出日志" or getattr(refs["export_button"], "content", None) == "导出日志"
+
+
+
+def test_log_view_exposes_filter_resize_and_export_controls():
+    log_view, refs = components.create_log_view(height=260)
+
+    toolbar, resize_handle, list_container = log_view.content.controls
+
+    assert toolbar.controls[0] is refs["level_filter"]
+    assert toolbar.controls[1] is refs["export_button"]
+    assert toolbar.spacing == 8
+    assert refs["level_filter"].value == "ALL"
+    assert resize_handle is refs["resize_handle"]
+    assert list_container is refs["list_container"]
+    assert refs["list_container"].height == 260
+
+
+
+def test_gui_main_filters_logs_by_level(monkeypatch):
+    monkeypatch.setattr(gui_main.cmp, "create_ledger_section", lambda page, log: (object(), {}))
+    monkeypatch.setattr(gui_main.cmp, "create_config_section", lambda page, log: (object(), {}))
+    monkeypatch.setattr(gui_main.cmp, "create_modules_section", lambda page: (object(), {}))
+
+    log_view, refs = make_stub_log_view()
+    monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: (log_view, refs))
+    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
+    monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
+
+    captured = {}
+
+    def capture_ledger_section(page, log):
+        captured["log"] = log
+        return object(), {}
+
+    monkeypatch.setattr(gui_main.cmp, "create_ledger_section", capture_ledger_section)
+
+    page = PageSpy()
+    gui_main.main(page)
+
+    captured["log"]("信息消息", level=logging.INFO)
+    captured["log"]("错误消息", level=logging.ERROR)
+    time.sleep(0.05)
+
+    refs["level_filter"].value = "ERROR"
+    refs["level_filter"].on_select(DummyControlEvent(refs["level_filter"]))
+    assert len(refs["log_list"].controls) == 1
+    assert refs["log_list"].controls[0].value.endswith("错误消息")
+
+    refs["level_filter"].value = "ALL"
+    refs["level_filter"].on_select(DummyControlEvent(refs["level_filter"]))
+    assert len(refs["log_list"].controls) >= 2
+
+
+
+def test_gui_main_exports_filtered_logs(monkeypatch, tmp_path):
+    monkeypatch.setattr(gui_main.cmp, "create_ledger_section", lambda page, log: (object(), {}))
+    monkeypatch.setattr(gui_main.cmp, "create_config_section", lambda page, log: (object(), {}))
+    monkeypatch.setattr(gui_main.cmp, "create_modules_section", lambda page: (object(), {}))
+    monkeypatch.setattr(gui_main.ft, "FilePicker", SavePicker)
+
+    export_path = tmp_path / "logs.txt"
+    SavePicker.next_path = str(export_path)
+
+    log_view, refs = make_stub_log_view()
+    monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: (log_view, refs))
+    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
+    monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
+
+    captured = {}
+
+    def capture_ledger_section(page, log):
+        captured["log"] = log
+        return object(), {}
+
+    monkeypatch.setattr(gui_main.cmp, "create_ledger_section", capture_ledger_section)
+
+    page = PageSpy()
+    gui_main.main(page)
+
+    captured["log"]("普通日志", level=logging.INFO)
+    captured["log"]("错误日志", level=logging.ERROR)
+    time.sleep(0.05)
+
+    refs["level_filter"].value = "ERROR"
+    refs["level_filter"].on_select(DummyControlEvent(refs["level_filter"]))
+
+    import asyncio
+    asyncio.run(refs["export_button"].on_click(DummyControlEvent(refs["export_button"])))
+
+    exported_text = export_path.read_text(encoding="utf-8")
+    assert export_path.exists()
+    assert "错误日志" in exported_text
+    assert "普通日志" not in exported_text
+
+
+
+def test_gui_main_resizes_log_view_with_drag(monkeypatch):
+    monkeypatch.setattr(gui_main.cmp, "create_ledger_section", lambda page, log: (object(), {}))
+    monkeypatch.setattr(gui_main.cmp, "create_config_section", lambda page, log: (object(), {}))
+    monkeypatch.setattr(gui_main.cmp, "create_modules_section", lambda page: (object(), {}))
+
+    log_view, refs = make_stub_log_view()
+    monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: (log_view, refs))
+    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
+    monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
+
+    page = PageSpy()
+    gui_main.main(page)
+
+    refs["resize_handle"].on_vertical_drag_update(DummyDragEvent(-80))
+    assert refs["list_container"].height == 280
+
+    refs["resize_handle"].on_vertical_drag_update(DummyDragEvent(500))
+    assert refs["list_container"].height == gui_main.MIN_LOG_HEIGHT
 
 
 
