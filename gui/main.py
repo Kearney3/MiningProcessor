@@ -2,6 +2,7 @@
 GUI 主窗口 - Flet 实现
 使用模块化结构：components.py（UI组件）+ logic.py（业务逻辑）
 """
+import bisect
 import flet as ft
 import logging
 import os
@@ -53,6 +54,7 @@ def main(page: ft.Page):
     root_logger.addHandler(queue_handler)
 
     log_records: list[dict[str, object]] = []
+    log_records_lock = threading.Lock()
     log_view_height = int(log_height_container.height or 200)
     shutdown_event = threading.Event()
 
@@ -71,13 +73,16 @@ def main(page: ft.Page):
 
     def _get_filtered_log_records() -> list[dict[str, object]]:
         selected_level = _get_selected_level()
-        filtered = []
-        for record in log_records:
-            record_level = str(record.get("levelname", ""))
-            if selected_level != "ALL" and record_level != selected_level:
-                continue
-            filtered.append(record)
-        return filtered
+        with log_records_lock:
+            if selected_level == "ALL":
+                return list(log_records)
+            filtered = []
+            for record in log_records:
+                record_level = str(record.get("levelname", ""))
+                if record_level != selected_level:
+                    continue
+                filtered.append(record)
+            return filtered
 
     def _render_log_records():
         if shutdown_event.is_set():
@@ -93,6 +98,10 @@ def main(page: ft.Page):
             for record in visible_records
         ]
         try:
+            log_list.update()
+        except (RuntimeError, AttributeError):
+            pass
+        try:
             log_view.update()
         except RuntimeError:
             pass
@@ -105,11 +114,13 @@ def main(page: ft.Page):
             "levelname": str(log_item["levelname"]),
             "message": str(log_item["message"]),
         }
-        log_records.append(record)
-        # 多线程环境下队列顺序与实际时间不一定一致，按创建时间排序
-        log_records.sort(key=lambda r: r["created"])
-        if len(log_records) > MAX_LOG_RECORDS:
-            del log_records[:-MAX_LOG_RECORDS]
+        with log_records_lock:
+            # 使用 bisect 保持有序，避免整表排序
+            keys = [r["created"] for r in log_records]
+            idx = bisect.bisect_right(keys, record["created"])
+            log_records.insert(idx, record)
+            if len(log_records) > MAX_LOG_RECORDS:
+                del log_records[:-MAX_LOG_RECORDS]
 
     def _update_log_view():
         if shutdown_event.is_set():

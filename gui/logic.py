@@ -101,6 +101,7 @@ async def on_fuel_process(page: ft.Page, fuel_refs: dict, log):
     year = int(fuel_refs["year"].value)
     set_btn_state(btn, False, "处理中...")
     await run_task(page, "fuel", path, btn, log, year=year)
+    set_btn_state(btn, True, "处理")
 
 
 async def on_prod_process(page: ft.Page, prod_refs: dict, log):
@@ -122,6 +123,7 @@ async def on_prod_process(page: ft.Page, prod_refs: dict, log):
     btn = prod_refs["btn"]
     set_btn_state(btn, False, "处理中...")
     await run_task(page, "production", path, btn, log, raw_start=raw_start)
+    set_btn_state(btn, True, "处理")
 
 
 async def on_elec_process(page: ft.Page, elec_refs: dict, log):
@@ -141,6 +143,7 @@ async def on_elec_process(page: ft.Page, elec_refs: dict, log):
     btn = elec_refs["btn"]
     set_btn_state(btn, False, "处理中...")
     await run_task(page, "electrical", path, btn, log, year=year)
+    set_btn_state(btn, True, "处理")
 
 
 async def on_work_process(page: ft.Page, work_refs: dict, log):
@@ -154,6 +157,7 @@ async def on_work_process(page: ft.Page, work_refs: dict, log):
     month = int(work_refs["month"].value)
     set_btn_state(btn, False, "处理中...")
     await run_task(page, "worktime", path, btn, log, year=year, month=month)
+    set_btn_state(btn, True, "处理")
 
 
 async def on_merge_process(page: ft.Page, merge_refs: dict, log):
@@ -176,6 +180,7 @@ async def on_merge_process(page: ft.Page, merge_refs: dict, log):
     btn = merge_refs["btn"]
     set_btn_state(btn, False, "合并中...")
     await run_task(page, "merge", path, btn, log, keyword=keyword, strip_time=strip_time, sort_configs=sort_configs)
+    set_btn_state(btn, True, "合并")
 
 
 # ---------------------------------------------------------------------------
