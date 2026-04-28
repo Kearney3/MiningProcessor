@@ -22,6 +22,7 @@ class QueueHandler(logging.Handler):
             msg = self.format(record)
             payload = {
                 "timestamp": datetime.fromtimestamp(record.created).strftime("%Y-%m-%d %H:%M:%S"),
+                "created": record.created,
                 "levelno": record.levelno,
                 "levelname": record.levelname,
                 "message": msg,

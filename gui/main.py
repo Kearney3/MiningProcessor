@@ -100,11 +100,14 @@ def main(page: ft.Page):
     def _append_log_record(log_item: dict[str, object]):
         record = {
             "timestamp": str(log_item.get("timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            "created": float(log_item.get("created", 0)),
             "levelno": int(log_item["levelno"]),
             "levelname": str(log_item["levelname"]),
             "message": str(log_item["message"]),
         }
         log_records.append(record)
+        # 多线程环境下队列顺序与实际时间不一定一致，按创建时间排序
+        log_records.sort(key=lambda r: r["created"])
         if len(log_records) > MAX_LOG_RECORDS:
             del log_records[:-MAX_LOG_RECORDS]
 
