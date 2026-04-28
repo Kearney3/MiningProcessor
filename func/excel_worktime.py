@@ -4,7 +4,7 @@ import os
 import argparse
 
 # 假设 func.logger 已经正确配置
-from func.logger import get_logger
+from logger import get_logger
 
 logger = get_logger(__name__)
 

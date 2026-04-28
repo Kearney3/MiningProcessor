@@ -5,7 +5,7 @@ import sys
 from typing import List, Tuple
 
 import pandas as pd
-from func.logger import get_logger
+from logger import get_logger
 
 logger = get_logger(__name__)
 
