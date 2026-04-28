@@ -346,6 +346,7 @@ class MiningDataProcessor:
             company = self.safe_str(df_raw.iloc[i, 2])      # C列
             h_start = self.safe_number(df_raw.iloc[i, 5])   # F列
             h_end = self.safe_number(df_raw.iloc[i, 6])     # G列
+            comment = self.safe_str(df_raw.iloc[i, 8])    # I列备注
 
             if not device_name:
                 continue
@@ -361,7 +362,8 @@ class MiningDataProcessor:
                 "公里数仪表开始": 0,
                 "公里数仪表结束": 0,
                 "运行里程": 0,
-                "趟数": 0
+                "趟数": 0,
+                "备注": comment,
             })
 
         return pd.DataFrame(result_rows)
@@ -377,14 +379,18 @@ class MiningDataProcessor:
         xls = pd.ExcelFile(file_path)
 
         if len(xls.sheet_names) < 2:
-            raise ValueError("文件中少于2个sheet，请检查Excel结构。")
+            logger.warning(f"文件 {file_path} 中少于2个sheet，尝试将第一个sheet作为生产数据处理。")
+            # raise ValueError("文件中少于2个sheet，请检查Excel结构。")
 
         # 用同一个 xls 解析，避免重复打开文件
         df_sheet1 = pd.read_excel(xls, sheet_name=0, header=None)
         running_df_1, production_df = self.process_sheet1(df_sheet1, date_val, shift_val)
 
-        df_sheet2 = pd.read_excel(xls, sheet_name=1, header=None)
-        running_df_2 = self.process_sheet2(df_sheet2, date_val, shift_val)
+        if len(xls.sheet_names) > 1:
+            df_sheet2 = pd.read_excel(xls, sheet_name=1, header=None)
+            running_df_2 = self.process_sheet2(df_sheet2, date_val, shift_val)
+        else:
+            running_df_2 = pd.DataFrame()
 
         # 合并运行数据
         running_df = pd.concat([running_df_1, running_df_2], ignore_index=True)
