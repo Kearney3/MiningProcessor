@@ -5,7 +5,7 @@ import argparse
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
-
+import numpy as np
 import pandas as pd
 import os
 import re
@@ -180,13 +180,27 @@ class MiningDataProcessor:
 
         last_row_idx = non_empty_a.index[-1]
 
+        # 找到坐标
+        target_text = "Мото цагийн заалт"
+        # positions = np.where(df_raw == target_text)
+        # positions[0] 是行号数组，positions[1] 是列索引数组
+        # for row, col in zip(positions[0], positions[1]):
+        #     logger.info(f"在第 {row} 行，第 {col} 列找到文本")
+
+        mask = df_raw.apply(lambda row: row.astype(str).str.contains(target_text).any(), axis=1)
+        # 获取对应的索引
+        row_indices = df_raw[mask].index.tolist()
+        if row_indices[0]!= 0 and self.raw_start == -1:
+            self.raw_start = row_indices[0]+1
+            logger.info(f"开启自动检测，找到目标文本{target_text}，行号为: {self.raw_start}")
+
         # 2. 找最后一列：第6行匹配“总趟数”，前一列为最后一列
         row6 = df_raw.iloc[self.raw_start-1, :]
         total_col_idx = None
         for idx, val in row6.items():
             # if "总趟数" in self.safe_str(val) or "Нийт рейс" in self.safe_str(val):
             if any(k in self.safe_str(val) for k in ["总趟数", "Нийт рейс"]):
-                # print(f"找到总趟数列：{idx},{self.safe_str(val)}")
+                # logger.info(f"找到总趟数列：{idx},{self.safe_str(val)}")
                 total_col_idx = idx
                 break
 
@@ -218,7 +232,7 @@ class MiningDataProcessor:
         data.columns.values[0] = "矿卡名称"
 
         # 第二列固定为公司名称
-        data.columns.values[1] = "公司"
+        # data.columns.values[1] = "公司"
 
         # 5. 找运行指标列
         hour_start_col = self.find_first_matching_column(data.columns, [["小时数", "开始"],["Мото", "Эхэлсэн"]])
@@ -246,7 +260,7 @@ class MiningDataProcessor:
             k_end = self.safe_number(row[km_end_col]) if km_end_col in data.columns else 0
             company = self.safe_str(row[company_col]) if company_col in data.columns else ""
 
-            if not company:
+            if company_col is not None and company=="":
                 continue
 
             total_trips = 0
@@ -478,8 +492,7 @@ if __name__ == "__main__":
                         help="线程数，默认 min(8, CPU*2)")
     parser.add_argument("--version", choices=["new", "old"], default="new",
                         help="装载量映射版本，new（默认）或 old")
-    parser.add_argument("--raw_start", type=int, default=6, help="复合表头起始行，默认 6")
-
+    parser.add_argument("--raw_start", type=int, default=6, help="复合表头起始行，默认 6, 使用-1自动检测")
     args = parser.parse_args()
     input_file = args.input_file
     workers = args.workers
