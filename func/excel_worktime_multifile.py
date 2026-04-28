@@ -6,7 +6,7 @@ import argparse
 
 # 假设 func.logger 已经正确配置
 try:
-    from func.logger import get_logger
+    from logger import get_logger
 
     logger = get_logger(__name__)
 except ImportError:

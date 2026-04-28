@@ -9,8 +9,8 @@ import numpy as np
 import pandas as pd
 import os
 import re
-from func import config_loader
-from func.logger import get_logger
+import config_loader
+from logger import get_logger
 
 logger = get_logger(__name__)
 

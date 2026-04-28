@@ -7,7 +7,7 @@ import pandas as pd
 import re
 from datetime import datetime
 import argparse
-from func.logger import get_logger
+from logger import get_logger
 
 logger = get_logger(__name__)
 
