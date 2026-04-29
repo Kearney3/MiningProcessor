@@ -350,9 +350,12 @@ class MiningDataProcessor:
 
 
 if __name__ == "__main__":
-    from logger import setup_logging
+    try:
+        from func.logger import setup_logging
+        setup_logging()
+    except ImportError:
+        pass
 
-    setup_logging()
     # 改造成cli参数输入
     parser = argparse.ArgumentParser(description="处理矿卡数据")
     parser.add_argument("input_file", help="输入Excel文件路径")

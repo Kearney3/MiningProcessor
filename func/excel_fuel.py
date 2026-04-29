@@ -228,9 +228,11 @@ def process_diesel_data(file_path, target_year=None):
 
 
 if __name__ == "__main__":
-    from logger import setup_logging
-
-    setup_logging()
+    try:
+        from func.logger import setup_logging
+        setup_logging()
+    except ImportError:
+        pass
     parser = argparse.ArgumentParser()
     parser.add_argument("input_file")
     parser.add_argument("--year", type=int)

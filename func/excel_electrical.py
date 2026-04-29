@@ -108,9 +108,11 @@ def parse_excel_data(file_path, target_year=None):
 
 # --- 使用示例 ---
 if __name__ == "__main__":
-    from logger import setup_logging
-
-    setup_logging()
+    try:
+        from func.logger import setup_logging
+        setup_logging()
+    except ImportError:
+        pass
     # 使用cli
     parser = argparse.ArgumentParser(description="解析电力消耗报表")
     parser.add_argument("input_file", type=str, help="输入Excel文件路径")
