@@ -85,6 +85,7 @@ async def run_task(page: ft.Page, module_type: str, path: str, btn: ft.Button, l
             _log_message(log, f"[{module_type}] 处理成功")
     finally:
         set_btn_state(btn, True, "处理")
+        set_btn_state(btn, True, "合并")
 
 
 # ---------------------------------------------------------------------------
@@ -203,14 +204,13 @@ def wire_processing_buttons(module_refs: dict, page: ft.Page, log):
     async def handle_work_click(e: ft.ControlEvent):
         await on_work_process(page, module_refs["work"], log)
 
+    async def handle_merge_click(e: ft.ControlEvent):
+        await on_merge_process(page, module_refs["merge"], log)
+
     module_refs["fuel"]["btn"].on_click = handle_fuel_click
     module_refs["prod"]["btn"].on_click = handle_prod_click
     module_refs["elec"]["btn"].on_click = handle_elec_click
     module_refs["work"]["btn"].on_click = handle_work_click
-
-    async def handle_merge_click(e: ft.ControlEvent):
-        await on_merge_process(page, module_refs["merge"], log)
-
     module_refs["merge"]["btn"].on_click = handle_merge_click
 
 
