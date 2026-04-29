@@ -76,14 +76,21 @@ def merge_excel_files(
     # file_sheets[file_path] = {sheet_name: DataFrame}
     file_sheets: dict[str, dict[str, pd.DataFrame]] = {}
     all_sheet_names: set[str] = set()
+    header_dict: dict = {}
 
     for fpath in matched_files:
         xl = pd.ExcelFile(fpath)
         sheets = {}
+        header_dict[os.path.basename(fpath)] = {}
         for sname in xl.sheet_names:
             df = pd.read_excel(xl, sheet_name=sname)
             sheets[sname] = df
             all_sheet_names.add(sname)
+            try:
+                header_dict[os.path.basename(fpath)][sname] = tuple(str(h) for h in df.columns)
+            except Exception as e:
+                logger.error(f"读取文件 '{fpath}' 的 Sheet '{sname}' 失败: {e}")
+                header_dict[os.path.basename(fpath)][sname] = ()
         file_sheets[fpath] = sheets
 
     # 3. 按 sheet_name 逐组合并
@@ -104,16 +111,26 @@ def merge_excel_files(
                 continue
 
             current_headers = tuple(str(h) for h in df.columns)
-
             if expected_headers is None:
                 expected_headers = current_headers
             else:
                 if current_headers != expected_headers:
+                    # 格式化输出所有文件的表名和对应的表头（header_dict）
+                    error_string = ""
+                    # 遍历外层字典
+                    for outer_key, inner_dict in header_dict.items():
+                        error_string += f"【{outer_key}】\n"
+                        # 遍历内层字典
+                        for inner_key, value_tuple in inner_dict.items():
+                            error_string += f"  {inner_key}: {value_tuple}\t"
+                        error_string += f"\n-{'-' * 30}\n"  # 分隔线
+
                     raise ValueError(
                         f"Sheet '{sname}' 的表头不一致！\n"
                         f"  期望: {expected_headers}\n"
                         f"  实际 ({os.path.basename(fpath)}): {current_headers}\n"
                         f"请检查并修正后再合并。"
+                        f"  所有已导入的表头: \n{error_string}"
                     )
 
             # 去掉空行/全空行（可选，保留原样更稳妥，只在非首表时去掉表头）
@@ -148,8 +165,11 @@ def merge_excel_files(
             if sort_columns:
                 logger.info(
                     f"Sheet '{sname}' 正在按以下规则排序: {list(zip(sort_columns, ['升序' if a else '降序' for a in sort_ascending]))}")
-                merged_df = merged_df.sort_values(by=sort_columns, ascending=sort_ascending,
-                                                  na_position="last").reset_index(drop=True)
+                try:
+                    merged_df = merged_df.sort_values(by=sort_columns, ascending=sort_ascending,
+                                                      na_position="last").reset_index(drop=True)
+                except Exception as e:
+                    logger.error(f"Sheet '{sname}' 排序时出错: {e}")
             else:
                 logger.warning(f"Sheet '{sname}' 无可用的排序条件，跳过排序")
         else:
