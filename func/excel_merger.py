@@ -187,6 +187,12 @@ def merge_excel_files(
 
 
 def main():
+    try:
+        from func.logger import setup_logging
+        setup_logging()
+    except ImportError:
+        pass
+
     parser = argparse.ArgumentParser(description="合并包含相同关键字的多个 Excel 文件")
     parser.add_argument("folder", help="要扫描的文件夹路径")
     parser.add_argument("keyword", help="文件名需包含的关键字")

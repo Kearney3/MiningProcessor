@@ -9,17 +9,8 @@ from pathlib import Path
 # 定位到当前项目的根目录
 root = Path(__file__).resolve().parent.parent
 sys.path.append(str(root))
-# 假设 func.logger 已经正确配置
-try:
-    from func.logger import get_logger
-
-    logger = get_logger(__name__)
-except ImportError:
-    # 如果没有自定义 logger，使用标准库 logging 作为后备方案
-    import logging
-
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-    logger = logging.getLogger(__name__)
+from func.logger import get_logger
+logger = get_logger(__name__)
 
 
 def extract_data_from_sheet(df_raw, year, month, day):
@@ -214,6 +205,12 @@ def process_directory(base_dir, year, month, output_file):
 
 
 if __name__ == "__main__":
+    try:
+        from func.logger import setup_logging
+        setup_logging()
+    except ImportError:
+        pass
+
     parser = argparse.ArgumentParser(description="按目录结构合并多个排班Excel文件。")
     parser.add_argument("input_dir", help="包含按日期命名的文件夹的根目录")
     parser.add_argument("--year", type=int, default=2025, help="目标年份")
