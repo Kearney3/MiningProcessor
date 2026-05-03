@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
     inputs:
       release_version:
-        description: 'Release version (e.g., 1.0.0)'
         required: true
         default: '1.0.0'
 
@@ -12,53 +11,45 @@ jobs:
   build-macos:
     runs-on: macos-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.14.4'
+          python-version: '3.14'
 
-      - name: Install dependencies using UV
-        run: |
-          curl -sSL https://get.uvpkg.com | bash
-          uv sync  # Ensure all dependencies are in sync
+      - name: Install uv (pip)
+        run: pip install uv
 
-      - name: Build macOS app
-        run: |
-          flet build macos \
-            --output dist \
-            --no-interactive
+      - name: Install deps
+        run: uv pip install --system flet
 
-      - name: Upload macOS artifact
-        uses: actions/upload-artifact@v4
+      - name: Build macOS
+        run: flet build macos --no-interactive
+
+      - uses: actions/upload-artifact@v4
         with:
-          name: MiningProcessor-macOS
-          path: dist/MiningProcessor.app
+          name: macOS
+          path: build/macos
 
   build-windows:
     runs-on: windows-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.14.4'
+          python-version: '3.14'
 
-      - name: Install dependencies using UV
-        run: |
-          curl -sSL https://get.uvpkg.com | bash
-          uv sync  # Ensure all dependencies are in sync
+      - name: Install uv (pip)
+        run: pip install uv
 
-      - name: Build Windows app
-        run: |
-          flet build windows --output dist --no-interactive
+      - name: Install deps
+        run: uv pip install --system flet
 
-      - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
+      - name: Build Windows
+        run: flet build windows --no-interactive
+
+      - uses: actions/upload-artifact@v4
         with:
-          name: MiningProcessor-Windows
-          path: dist/MiningProcessor.exe
+          name: windows
+          path: build/windows
