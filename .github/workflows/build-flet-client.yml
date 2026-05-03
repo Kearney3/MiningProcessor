@@ -27,7 +27,7 @@ jobs:
 
       - name: Build macOS app
         run: |
-          flet pack main.py --name "MiningProcessor" --product-name "MiningProcessor" --version ${{ github.event.inputs.release_version }} 
+          flet build macos --output dist
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
@@ -53,7 +53,7 @@ jobs:
 
       - name: Build Windows app
         run: |
-          flet pack main.py --name "MiningProcessor" --product-name "MiningProcessor" --version ${{ github.event.inputs.release_version }} 
+          flet build windows --output dist
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
