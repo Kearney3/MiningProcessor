@@ -1,5 +1,5 @@
 [project]
-name = "script"
+name = "MiningProcessor"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
-script = "gui.main:main"
+MiningProcessor = "gui.main:main"
 
 [dependency-groups]
 dev = [

@@ -31,7 +31,7 @@ python -m flet gui/main.py
 `pyproject.toml` 里还注册了入口脚本：
 
 ```bash
-uv run script
+uv run main.py
 ```
 
 ### 运行各处理脚本
