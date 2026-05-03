@@ -24,7 +24,7 @@ jobs:
         run: uv pip install --system flet
 
       - name: Build macOS
-        run: flet build macos --no-interactive
+        run: flet build macos
 
       - uses: actions/upload-artifact@v4
         with:
@@ -47,7 +47,7 @@ jobs:
         run: uv pip install --system flet
 
       - name: Build Windows
-        run: flet build windows --no-interactive
+        run: flet build windows
 
       - uses: actions/upload-artifact@v4
         with:
