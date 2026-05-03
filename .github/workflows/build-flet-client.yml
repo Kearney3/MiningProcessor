@@ -1,0 +1,106 @@
+name: Build Flet Client
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (例如: v1.0.0)'
+        required: false
+        default: 'latest'
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        
+    - name: Install dependencies
+      run: |
+        uv sync --group dev
+        
+    - name: Install Flet CLI
+      run: |
+        pip install flet-cli
+        
+    - name: Build macOS app
+      run: |
+        # 使用 Flet 构建 macOS 应用
+        flet build macos --app-version "${{ github.event.inputs.version }}" --package-name "mining-processor"
+        
+    - name: Upload macOS artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: mining-processor-macos-${{ github.event.inputs.version }}
+        path: build/macos/
+        retention-days: 30
+
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        
+    - name: Install uv
+      run: |
+        powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+        echo "$env:USERPROFILE\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+        
+    - name: Install dependencies
+      run: |
+        uv sync --group dev
+        
+    - name: Install Flet CLI
+      run: |
+        pip install flet-cli
+        
+    - name: Build Windows app
+      run: |
+        # 使用 Flet 构建 Windows 应用
+        flet build windows --app-version "${{ github.event.inputs.version }}" --package-name "mining-processor"
+        
+    - name: Upload Windows artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: mining-processor-windows-${{ github.event.inputs.version }}
+        path: build/windows/
+        retention-days: 30
+
+  create-release:
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    if: github.event.inputs.version != 'latest'
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+      
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.event.inputs.version }}
+        name: Release ${{ github.event.inputs.version }}
+        files: |
+          mining-processor-macos-${{ github.event.inputs.version }}/**
+          mining-processor-windows-${{ github.event.inputs.version }}/**
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
