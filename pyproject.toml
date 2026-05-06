@@ -9,6 +9,8 @@ dependencies = [
     "pandas>=3.0.2",
     "flet>=0.21.0",
     "rapidfuzz>=3.0.0",
+    "matplotlib>=3.10.9",
+    "ipykernel>=7.2.0",
 ]
 
 [project.scripts]
@@ -17,4 +19,5 @@ MiningProcessor = "gui.main:main"
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",
+    "scikit-learn>=1.8.0",
 ]
