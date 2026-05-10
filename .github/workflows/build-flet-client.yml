@@ -61,12 +61,6 @@ jobs:
 #            artifact_path: build/ipa
 #            needs_linux_deps: false
 
-          # -------- Web --------
-          - name: web
-            runner: ubuntu-latest
-            build_cmd: "flet build web"
-            artifact_path: build/web
-            needs_linux_deps: false
 
     steps:
       - name: Checkout repository
