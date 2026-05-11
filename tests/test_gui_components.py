@@ -11,16 +11,29 @@ sys.path.insert(0, str(ROOT))
 
 from func import config_loader
 
+# Set up gui package so relative imports work in importlib-loaded modules
+if "gui" not in sys.modules:
+    gui_pkg = types.ModuleType("gui")
+    gui_pkg.__path__ = [str(ROOT / "gui")]
+    gui_pkg.__package__ = "gui"
+    sys.modules["gui"] = gui_pkg
+
 spec = importlib.util.spec_from_file_location(
-    "gui_components_under_test", ROOT / "gui" / "components.py"
+    "gui.components", ROOT / "gui" / "components.py",
+    submodule_search_locations=[],
 )
 components = importlib.util.module_from_spec(spec)
+components.__package__ = "gui"
+sys.modules["gui.components"] = components
 spec.loader.exec_module(components)
 
 main_spec = importlib.util.spec_from_file_location(
-    "gui_main_under_test", ROOT / "gui" / "main.py"
+    "gui.main", ROOT / "gui" / "main.py",
+    submodule_search_locations=[],
 )
 gui_main = importlib.util.module_from_spec(main_spec)
+gui_main.__package__ = "gui"
+sys.modules["gui.main"] = gui_main
 main_spec.loader.exec_module(gui_main)
 
 
@@ -29,15 +42,20 @@ class DummyPage:
         pass
 
 
+class WindowSpy:
+    def __init__(self):
+        self.width = 1200
+        self.height = 900
+        self.min_width = 900
+        self.on_resize = None
+
+
 class PageSpy:
     def __init__(self):
         self.title = None
         self.theme_mode = None
-        self.window_width = None
-        self.window_height = None
-        self.window_min_width = None
-        self.min_width = None
-        self.width = 1020
+        self.theme = None
+        self.window = WindowSpy()
         self.controls = []
         self.thread_calls = []
         self.on_close = None
@@ -446,7 +464,7 @@ def test_gui_main_uses_consistent_section_spacing(monkeypatch):
     gui_main.main(page)
 
     scroll_col = page.controls[0]
-    assert scroll_col.spacing == 12
+    assert scroll_col.spacing == 0
 
 
 def test_gui_main_log_helper_supports_custom_levels(monkeypatch):
@@ -497,6 +515,9 @@ def test_gui_main_log_helper_supports_custom_levels(monkeypatch):
 
 
 def test_gui_main_stops_log_consumer_on_disconnect(monkeypatch):
+    # Save real create_log_view before monkeypatching (they share the same module)
+    real_create_log_view = components.create_log_view.__wrapped__ if hasattr(components.create_log_view, '__wrapped__') else components.create_log_view
+
     monkeypatch.setattr(gui_main.cmp, "create_ledger_section", lambda page, log: (object(), {}))
     monkeypatch.setattr(gui_main.cmp, "create_config_section", lambda page, log: (object(), {}))
     monkeypatch.setattr(gui_main.cmp, "create_modules_section", lambda page: (object(), {}))
@@ -518,25 +539,27 @@ def test_gui_main_stops_log_consumer_on_disconnect(monkeypatch):
 
     assert len(page.thread_calls) == before_disconnect
 
-
-    log_view, refs = components.create_log_view()
+    # Test real create_log_view (undo monkeypatch first)
+    monkeypatch.undo()
+    log_view, refs = real_create_log_view()
 
     assert isinstance(log_view, components.ft.Container)
     assert refs["log_list"].auto_scroll is True
     assert refs["log_list"].spacing == 4
     assert refs["list_container"].height == 200
-    assert getattr(refs["export_button"], "text", None) == "导出日志" or getattr(refs["export_button"], "content", None) == "导出日志"
+    assert getattr(refs["export_button"], "tooltip", None) == "导出日志"
 
 
 
 def test_log_view_exposes_filter_resize_and_export_controls():
     log_view, refs = components.create_log_view(height=260)
 
-    toolbar, resize_handle, list_container = log_view.content.controls
+    resize_handle, list_container = log_view.content.controls
 
+    toolbar = refs["toolbar"]
     assert toolbar.controls[0] is refs["level_filter"]
     assert toolbar.controls[1] is refs["export_button"]
-    assert toolbar.spacing == 8
+    assert toolbar.spacing == 4
     assert refs["level_filter"].value == "ALL"
     assert resize_handle is refs["resize_handle"]
     assert list_container is refs["list_container"]
