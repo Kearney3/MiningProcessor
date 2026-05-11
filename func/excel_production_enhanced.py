@@ -320,7 +320,7 @@ class MiningDataProcessor:
 
                 trips = self.safe_number(row[col], default=0)
 
-                if trips > 0 and ore_type != "":
+                if trips > 0 and ore_type != "" and "共" not in ore_type and trips % 1 == 0:
                     production = trips * capacity
                     production_rows.append({
                         "日期": date_val,
