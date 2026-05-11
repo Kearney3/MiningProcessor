@@ -178,21 +178,22 @@ def main(page: ft.Page):
                 break
             if shutdown_event.is_set():
                 continue
-            _append_log_record(log_item)
-            # 批量排空队列，避免逐条触发 UI 更新
             try:
-                while True:
-                    log_item = log_queue.get_nowait()
-                    if log_item is None:
-                        return
-                    if not shutdown_event.is_set():
-                        _append_log_record(log_item)
-            except queue.Empty:
-                pass
-            try:
+                _append_log_record(log_item)
+                # 批量排空队列，避免逐条触发 UI 更新
+                try:
+                    while True:
+                        log_item = log_queue.get_nowait()
+                        if log_item is None:
+                            return
+                        if not shutdown_event.is_set():
+                            _append_log_record(log_item)
+                except queue.Empty:
+                    pass
                 page.run_thread(_update_log_view)
-            except RuntimeError:
-                break
+            except Exception as ex:
+                import sys
+                print(f"[日志消费线程异常] {ex}", file=sys.stderr)
 
     consumer_thread = threading.Thread(target=_consume_logs, daemon=True)
     consumer_thread.start()
