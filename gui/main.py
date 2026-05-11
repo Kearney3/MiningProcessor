@@ -24,9 +24,6 @@ from func.logger import setup_logging, QueueHandler, DEFAULT_FORMAT
 MAX_LOG_RECORDS = 500
 MIN_LOG_HEIGHT = 140
 MAX_LOG_HEIGHT = 520
-MIN_CONTENT_HEIGHT = 500
-
-TITLE_TAB_BAR_OVERHEAD = 30
 
 
 def main(page: ft.Page):
@@ -143,10 +140,8 @@ def main(page: ft.Page):
         nonlocal log_view_height
         log_view_height = _clamp_log_height(log_view_height - int(delta_y))
         log_height_container.height = log_view_height
-        content_col.height = max(MIN_CONTENT_HEIGHT, int(page.window.height - TITLE_TAB_BAR_OVERHEAD - log_view_height))
         try:
             log_height_container.update()
-            content_col.update()
         except RuntimeError:
             pass
 
@@ -160,13 +155,10 @@ def main(page: ft.Page):
 
     def _on_page_resize(e):
         nonlocal log_view_height
-        available = page.window.height - TITLE_TAB_BAR_OVERHEAD
         log_view_height = _clamp_log_height(log_view_height)
         log_height_container.height = log_view_height
-        content_col.height = max(MIN_CONTENT_HEIGHT, int(available - log_view_height))
         try:
             log_height_container.update()
-            content_col.update()
         except RuntimeError:
             pass
 
@@ -264,9 +256,8 @@ def main(page: ft.Page):
     def _select_page(key: str):
         def handler(e):
             current_nav["key"] = key
-            for k, page_content in pages.items():
-                page_content.visible = (k == key)
-                page_content.update()
+            content_col.controls = [pages[key]]
+            content_col.update()
             _update_sidebar()
         return handler
 
@@ -318,13 +309,10 @@ def main(page: ft.Page):
 
     # ---- Content area ----
     content_col = ft.Column(
-        [pages["modules"], pages["ledger"], pages["config"]],
-        height=600,
+        [pages["modules"]],
         spacing=0,
         expand=True,
     )
-    pages["ledger"].visible = False
-    pages["config"].visible = False
 
     # Sidebar + content wrapped in a single card container
     unified_body = ft.Container(
