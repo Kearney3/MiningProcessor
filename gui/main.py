@@ -17,18 +17,19 @@ from func.logger import setup_logging, QueueHandler, DEFAULT_FORMAT
 MAX_LOG_RECORDS = 500
 MIN_LOG_HEIGHT = 140
 MAX_LOG_HEIGHT = 520
-
+MIN_CONTENT_HEIGHT = 500
 
 def main(page: ft.Page):
     setup_logging()
     page.title = "矿山数据处理工具"
     page.theme_mode = ft.ThemeMode.LIGHT
+    page.theme = ft.Theme(
+        color_scheme_seed=ft.Colors.BLUE_GREY,
+        visual_density=ft.VisualDensity.COMPACT,
+    )
     page.window.width = 1020
-    page.window.height = 850
+    page.window.height = 1000
     page.window.min_width = 800
-
-    # ---- 滚动容器 ----
-    scroll_col = ft.Column(scroll=ft.ScrollMode.AUTO, expand=True, spacing=12)
 
     # ---- 日志视图 ----
     log_view, log_refs = cmp.create_log_view()
@@ -134,19 +135,34 @@ def main(page: ft.Page):
         nonlocal log_view_height
         log_view_height = _clamp_log_height(log_view_height - int(delta_y))
         log_height_container.height = log_view_height
+        tab_content_col.height = max(MIN_CONTENT_HEIGHT, int(page.window.height - TITLE_TAB_BAR_OVERHEAD - log_view_height))
         try:
             log_height_container.update()
+            tab_content_col.update()
         except RuntimeError:
             pass
+
+    def _on_vertical_drag_start(e):
+        pass
 
     def _on_vertical_drag_update(e: ft.DragUpdateEvent):
         if shutdown_event.is_set():
             return
-        delta = e.primary_delta
-        if delta is None:
-            local_delta = getattr(e, "local_delta", None)
-            delta = getattr(local_delta, "y", 0) if local_delta is not None else 0
-        _resize_log_view(delta)
+        _resize_log_view(e.primary_delta)
+
+    TITLE_TAB_BAR_OVERHEAD = 30
+
+    def _on_page_resize(e):
+        nonlocal log_view_height
+        available = page.window.height - TITLE_TAB_BAR_OVERHEAD
+        log_view_height = _clamp_log_height(int(available))
+        log_height_container.height = log_view_height
+        tab_content_col.height = max(MIN_CONTENT_HEIGHT, int(available - log_view_height))
+        try:
+            log_height_container.update()
+            tab_content_col.update()
+        except RuntimeError:
+            pass
 
     def _build_export_text() -> str:
         return "\n".join(str(record["message"]) for record in _get_filtered_log_records())
@@ -169,6 +185,7 @@ def main(page: ft.Page):
 
     level_filter.on_select = _apply_filters
     export_button.on_click = _export_logs
+    resize_handle.on_vertical_drag_start = _on_vertical_drag_start
     resize_handle.on_vertical_drag_update = _on_vertical_drag_update
 
     def _consume_logs():
@@ -210,6 +227,7 @@ def main(page: ft.Page):
 
     page.on_disconnect = _shutdown_log_consumer
     page.on_close = _shutdown_log_consumer
+    page.window.on_resize = _on_page_resize
 
     def log(msg: str, level: int = logging.INFO):
         """统一通过全局 logger 输出，确保 GUI 与控制台实时同步"""
@@ -223,13 +241,83 @@ def main(page: ft.Page):
     # ---- 绑定处理按钮 ----
     logic.wire_processing_buttons(module_refs, page, log)
 
+    # ---- 标题栏 ----
+    title_row = ft.Row(
+        [
+            ft.Icon(ft.Icons.DATASET, size=28, color=ft.Colors.BLUE_GREY_700),
+            ft.Text("矿山数据处理工具", size=22, weight=ft.FontWeight.BOLD),
+        ],
+        spacing=8,
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+    )
+
+    # ---- Tab 切换（自定义实现） ----
+    tab_contents = [
+        ft.Column([modules_section], scroll=ft.ScrollMode.AUTO, expand=True, spacing=8),
+        ft.Column([ledger_section], scroll=ft.ScrollMode.AUTO, expand=True, spacing=8),
+        ft.Column([config_section], scroll=ft.ScrollMode.AUTO, expand=True, spacing=8),
+    ]
+    for c in tab_contents[1:]:
+        c.visible = False
+
+    tab_buttons = []
+    tab_labels = [
+        ("数据处理", ft.Icons.PLAY_ARROW),
+        ("设备台账", ft.Icons.INVENTORY_2),
+        ("装载量配置", ft.Icons.SETTINGS),
+    ]
+
+    def _select_tab(idx):
+        def handler(e):
+            for i, c in enumerate(tab_contents):
+                c.visible = (i == idx)
+            for i, btn in enumerate(tab_buttons):
+                btn.style = ft.ButtonStyle(
+                    bgcolor=ft.Colors.PRIMARY_CONTAINER if i == idx else ft.Colors.TRANSPARENT,
+                    color=ft.Colors.ON_PRIMARY_CONTAINER if i == idx else ft.Colors.ON_SURFACE,
+                )
+                btn.update()
+            for c in tab_contents:
+                c.update()
+        return handler
+
+    for i, (label, icon) in enumerate(tab_labels):
+        btn = ft.TextButton(
+            label,
+            icon=icon,
+            style=ft.ButtonStyle(
+                bgcolor=ft.Colors.PRIMARY_CONTAINER if i == 0 else ft.Colors.TRANSPARENT,
+                color=ft.Colors.ON_PRIMARY_CONTAINER if i == 0 else ft.Colors.ON_SURFACE,
+                padding=ft.padding.symmetric(horizontal=16, vertical=8),
+            ),
+            on_click=_select_tab(i),
+        )
+        tab_buttons.append(btn)
+
+    tab_bar = ft.Container(
+        content=ft.Row(tab_buttons, spacing=4),
+        bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
+        border=ft.border.only(bottom=ft.BorderSide(1, ft.Colors.OUTLINE_VARIANT)),
+        padding=ft.padding.symmetric(horizontal=8, vertical=4),
+    )
+
     # ---- 组装页面 ----
-    scroll_col.controls.append(ft.Text("矿山数据处理工具", size=24, weight=ft.FontWeight.BOLD))
-    scroll_col.controls.append(ledger_section)
-    scroll_col.controls.append(config_section)
-    scroll_col.controls.append(modules_section)
-    scroll_col.controls.append(log_view)
-    page.add(scroll_col)
+    tab_content_col = ft.Column(tab_contents, height=400, spacing=0)
+    page.add(
+        ft.Column(
+            [
+                ft.Container(content=title_row, padding=ft.padding.only(bottom=4)),
+                tab_bar,
+                tab_content_col,
+                ft.Container(content=log_view),
+            ],
+            expand=True,
+            spacing=0,
+        )
+    )
+
+    # ---- 初始化日志区域高度 ----
+    _on_page_resize(None)
 
     # ---- 初始化（放在 page.add 之后） ----
     logic.init(config_refs)
