@@ -2,7 +2,6 @@ import sys
 import pandas as pd
 import os
 import argparse
-import sys
 from pathlib import Path
 
 # 定位到当前项目的根目录
@@ -19,16 +18,14 @@ def process_excel_data(file_path, year, month, output_file):
     解析非标准结构的Excel文件并合并数据
     """
     if not os.path.exists(file_path):
-        logger.error(f"错误：找不到输入文件 '{file_path}'")
-        sys.exit(1)
+        raise FileNotFoundError(f"找不到输入文件 '{file_path}'")
 
     logger.info(f"正在读取文件: {file_path} ...")
     try:
         # 读取所有的 sheet
         xls = pd.ExcelFile(file_path)
     except Exception as e:
-        logger.error(f"读取 Excel 文件失败: {e}")
-        sys.exit(1)
+        raise RuntimeError(f"读取 Excel 文件失败: {e}") from e
 
     all_data = []
     success_count = 0
