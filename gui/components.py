@@ -122,14 +122,17 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
                     border_radius=theme.RADIUS_MD,
                     padding=4,
                     bgcolor=theme.SURFACE_HIGH,
+                    expand=True,
                 ),
             ],
             spacing=8,
+            expand=True,
         ),
         padding=12,
         border=ft.Border.all(1, theme.BORDER),
         border_radius=theme.RADIUS_LG,
         bgcolor=theme.SURFACE,
+        expand=True,
     )
 
     refs = {
@@ -376,11 +379,13 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
                 ),
             ],
             spacing=8,
+            expand=True,
         ),
         padding=12,
         border=ft.Border.all(1, theme.BORDER),
         border_radius=theme.RADIUS_LG,
         bgcolor=theme.SURFACE,
+        expand=True,
     )
 
     refs = {
@@ -755,11 +760,13 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
                 ),
             ],
             spacing=8,
+            expand=True,
         ),
         padding=12,
         border=ft.Border.all(1, theme.BORDER),
         border_radius=theme.RADIUS_LG,
         bgcolor=theme.SURFACE,
+        expand=True,
     )
 
     module_refs = {

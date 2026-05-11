@@ -21,22 +21,31 @@ except ImportError:
 
 from func.logger import setup_logging, QueueHandler, DEFAULT_FORMAT
 
-MAX_LOG_RECORDS = 500
+MAX_LOG_RECORDS = 5000
 MIN_LOG_HEIGHT = 140
 MAX_LOG_HEIGHT = 520
-
+MIN_WINDOW_HEIGHT = 800
+MIN_WINDOW_WIDTH = 800
+INITIAL_WINDOW_WIDTH = 1000
+INITIAL_WINDOW_HEIGHT = 900
 
 def main(page: ft.Page):
     setup_logging()
     page.title = "矿山数据处理工具"
+    assets_dir = Path(__file__).resolve().parent.parent / "assets"
+    page.assets_dir = str(assets_dir)
+    page.fonts={
+        "MiSans": "fonts/MiSansVF.ttf",
+    }
     page.theme_mode = ft.ThemeMode.LIGHT
     page.theme = ft.Theme(
         color_scheme_seed=ft.Colors.CYAN,
         visual_density=ft.VisualDensity.COMPACT,
     )
-    page.window.width = 1200
-    page.window.height = 900
-    page.window.min_width = 900
+    page.window.width = INITIAL_WINDOW_WIDTH
+    page.window.height = INITIAL_WINDOW_HEIGHT
+    page.window.min_width = MIN_WINDOW_WIDTH
+    page.window.min_height = MIN_WINDOW_HEIGHT
 
     # ---- 日志视图 ----
     log_view, log_refs = cmp.create_log_view()
@@ -250,9 +259,9 @@ def main(page: ft.Page):
 
     # Content pages
     pages = {
-        "modules": ft.Column([modules_section], scroll=ft.ScrollMode.AUTO, expand=True, spacing=8),
-        "ledger": ft.Column([ledger_section], scroll=ft.ScrollMode.AUTO, expand=True, spacing=8),
-        "config": ft.Column([config_section], scroll=ft.ScrollMode.AUTO, expand=True, spacing=8),
+        "modules": ft.Column([modules_section], expand=True, spacing=8),
+        "ledger": ft.Column([ledger_section], expand=True, spacing=8),
+        "config": ft.Column([config_section], expand=True, spacing=8),
     }
 
     current_nav = {"key": "modules"}
