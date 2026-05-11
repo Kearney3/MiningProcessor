@@ -1,5 +1,6 @@
 """
 GUI 主窗口 - Flet 实现
+深色模式 + 侧边栏导航布局
 使用模块化结构：components.py（UI组件）+ logic.py（业务逻辑）
 """
 import bisect
@@ -12,6 +13,12 @@ from pathlib import Path
 
 from . import components as cmp
 from . import logic as logic
+
+try:
+    from . import theme
+except ImportError:
+    import gui.theme as theme
+
 from func.logger import setup_logging, QueueHandler, DEFAULT_FORMAT
 
 MAX_LOG_RECORDS = 500
@@ -19,17 +26,20 @@ MIN_LOG_HEIGHT = 140
 MAX_LOG_HEIGHT = 520
 MIN_CONTENT_HEIGHT = 500
 
+TITLE_TAB_BAR_OVERHEAD = 30
+
+
 def main(page: ft.Page):
     setup_logging()
     page.title = "矿山数据处理工具"
     page.theme_mode = ft.ThemeMode.LIGHT
     page.theme = ft.Theme(
-        color_scheme_seed=ft.Colors.BLUE_GREY,
+        color_scheme_seed=ft.Colors.CYAN,
         visual_density=ft.VisualDensity.COMPACT,
     )
-    page.window.width = 1020
-    page.window.height = 1000
-    page.window.min_width = 800
+    page.window.width = 1200
+    page.window.height = 900
+    page.window.min_width = 900
 
     # ---- 日志视图 ----
     log_view, log_refs = cmp.create_log_view()
@@ -45,7 +55,6 @@ def main(page: ft.Page):
     queue_handler.setFormatter(logging.Formatter(DEFAULT_FORMAT, datefmt="%Y-%m-%d %H:%M:%S"))
     root_logger = logging.getLogger()
 
-    # 避免重复添加 QueueHandler
     for h in list(root_logger.handlers):
         if isinstance(h, QueueHandler):
             root_logger.removeHandler(h)
@@ -53,7 +62,7 @@ def main(page: ft.Page):
 
     log_records: list[dict[str, object]] = []
     log_records_lock = threading.Lock()
-    log_view_height = int(log_height_container.height or 200)
+    log_view_height = int(log_height_container.height or 400)
     shutdown_event = threading.Event()
 
     def _level_color(levelno: int):
@@ -113,7 +122,6 @@ def main(page: ft.Page):
             "message": str(log_item["message"]),
         }
         with log_records_lock:
-            # 使用 bisect 保持有序，避免整表排序
             keys = [r["created"] for r in log_records]
             idx = bisect.bisect_right(keys, record["created"])
             log_records.insert(idx, record)
@@ -135,10 +143,10 @@ def main(page: ft.Page):
         nonlocal log_view_height
         log_view_height = _clamp_log_height(log_view_height - int(delta_y))
         log_height_container.height = log_view_height
-        tab_content_col.height = max(MIN_CONTENT_HEIGHT, int(page.window.height - TITLE_TAB_BAR_OVERHEAD - log_view_height))
+        content_col.height = max(MIN_CONTENT_HEIGHT, int(page.window.height - TITLE_TAB_BAR_OVERHEAD - log_view_height))
         try:
             log_height_container.update()
-            tab_content_col.update()
+            content_col.update()
         except RuntimeError:
             pass
 
@@ -150,17 +158,15 @@ def main(page: ft.Page):
             return
         _resize_log_view(e.primary_delta)
 
-    TITLE_TAB_BAR_OVERHEAD = 30
-
     def _on_page_resize(e):
         nonlocal log_view_height
         available = page.window.height - TITLE_TAB_BAR_OVERHEAD
-        log_view_height = _clamp_log_height(int(available))
+        log_view_height = _clamp_log_height(log_view_height)
         log_height_container.height = log_view_height
-        tab_content_col.height = max(MIN_CONTENT_HEIGHT, int(available - log_view_height))
+        content_col.height = max(MIN_CONTENT_HEIGHT, int(available - log_view_height))
         try:
             log_height_container.update()
-            tab_content_col.update()
+            content_col.update()
         except RuntimeError:
             pass
 
@@ -197,7 +203,6 @@ def main(page: ft.Page):
                 continue
             try:
                 _append_log_record(log_item)
-                # 批量排空队列，避免逐条触发 UI 更新
                 try:
                     while True:
                         log_item = log_queue.get_nowait()
@@ -230,7 +235,6 @@ def main(page: ft.Page):
     page.window.on_resize = _on_page_resize
 
     def log(msg: str, level: int = logging.INFO):
-        """统一通过全局 logger 输出，确保 GUI 与控制台实时同步"""
         logging.getLogger().log(level, msg)
 
     # ---- 创建各区域 UI ----
@@ -241,74 +245,107 @@ def main(page: ft.Page):
     # ---- 绑定处理按钮 ----
     logic.wire_processing_buttons(module_refs, page, log)
 
-    # ---- 标题栏 ----
-    title_row = ft.Row(
-        [
-            ft.Icon(ft.Icons.DATASET, size=28, color=ft.Colors.BLUE_GREY_700),
-            ft.Text("矿山数据处理工具", size=22, weight=ft.FontWeight.BOLD),
-        ],
-        spacing=8,
-        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-    )
-
-    # ---- Tab 切换（自定义实现） ----
-    tab_contents = [
-        ft.Column([modules_section], scroll=ft.ScrollMode.AUTO, expand=True, spacing=8),
-        ft.Column([ledger_section], scroll=ft.ScrollMode.AUTO, expand=True, spacing=8),
-        ft.Column([config_section], scroll=ft.ScrollMode.AUTO, expand=True, spacing=8),
-    ]
-    for c in tab_contents[1:]:
-        c.visible = False
-
-    tab_buttons = []
-    tab_labels = [
-        ("数据处理", ft.Icons.PLAY_ARROW),
-        ("设备台账", ft.Icons.INVENTORY_2),
-        ("装载量配置", ft.Icons.SETTINGS),
+    # ---- 侧边栏导航 ----
+    nav_items_data = [
+        ("数据处理", ft.Icons.PLAY_ARROW, "modules"),
+        ("设备台账", ft.Icons.INVENTORY_2, "ledger"),
+        ("装载量配置", ft.Icons.TUNE, "config"),
     ]
 
-    def _select_tab(idx):
+    # Content pages
+    pages = {
+        "modules": ft.Column([modules_section], scroll=ft.ScrollMode.AUTO, expand=True, spacing=8),
+        "ledger": ft.Column([ledger_section], scroll=ft.ScrollMode.AUTO, expand=True, spacing=8),
+        "config": ft.Column([config_section], scroll=ft.ScrollMode.AUTO, expand=True, spacing=8),
+    }
+
+    current_nav = {"key": "modules"}
+
+    def _select_page(key: str):
         def handler(e):
-            for i, c in enumerate(tab_contents):
-                c.visible = (i == idx)
-            for i, btn in enumerate(tab_buttons):
-                btn.style = ft.ButtonStyle(
-                    bgcolor=ft.Colors.PRIMARY_CONTAINER if i == idx else ft.Colors.TRANSPARENT,
-                    color=ft.Colors.ON_PRIMARY_CONTAINER if i == idx else ft.Colors.ON_SURFACE,
-                )
-                btn.update()
-            for c in tab_contents:
-                c.update()
+            current_nav["key"] = key
+            for k, page_content in pages.items():
+                page_content.visible = (k == key)
+                page_content.update()
+            _update_sidebar()
         return handler
 
-    for i, (label, icon) in enumerate(tab_labels):
-        btn = ft.TextButton(
-            label,
-            icon=icon,
-            style=ft.ButtonStyle(
-                bgcolor=ft.Colors.PRIMARY_CONTAINER if i == 0 else ft.Colors.TRANSPARENT,
-                color=ft.Colors.ON_PRIMARY_CONTAINER if i == 0 else ft.Colors.ON_SURFACE,
-                padding=ft.padding.symmetric(horizontal=16, vertical=8),
-            ),
-            on_click=_select_tab(i),
-        )
-        tab_buttons.append(btn)
+    # Build sidebar nav items
+    sidebar_nav_items = []
+    for label, icon, key in nav_items_data:
+        item = theme.sidebar_item(label, icon, selected=(key == "modules"))
+        item.on_click = _select_page(key)
+        sidebar_nav_items.append(item)
 
-    tab_bar = ft.Container(
-        content=ft.Row(tab_buttons, spacing=4),
-        bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
-        border=ft.border.only(bottom=ft.BorderSide(1, ft.Colors.OUTLINE_VARIANT)),
-        padding=ft.padding.symmetric(horizontal=8, vertical=4),
+    def _update_sidebar():
+        for (_, _, key), item in zip(nav_items_data, sidebar_nav_items):
+            is_selected = (key == current_nav["key"])
+            row = item.content
+            icon_ctrl = row.controls[0]
+            text_ctrl = row.controls[1]
+            item.bgcolor = theme.SIDEBAR_SELECTED if is_selected else "transparent"
+            icon_ctrl.color = theme.PRIMARY if is_selected else theme.TEXT_SECONDARY
+            text_ctrl.color = theme.PRIMARY if is_selected else theme.TEXT_SECONDARY
+            try:
+                item.update()
+            except (RuntimeError, AttributeError):
+                pass
+
+    sidebar = ft.Container(
+        content=ft.Column(
+            sidebar_nav_items,
+            spacing=2,
+        ),
+        width=theme.SIDEBAR_WIDTH,
+        bgcolor=theme.SIDEBAR_BG,
+        padding=ft.padding.symmetric(horizontal=8, vertical=12),
+    )
+
+    # ---- Header ----
+    header = ft.Container(
+        content=ft.Row(
+            [
+                ft.Icon(ft.Icons.DATASET, size=24, color=theme.PRIMARY),
+                ft.Text("矿山数据处理工具", size=18, weight=ft.FontWeight.BOLD, color=theme.TEXT_PRIMARY),
+            ],
+            spacing=theme.SPACING_SM,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        ),
+        bgcolor=theme.SURFACE,
+        padding=ft.padding.symmetric(horizontal=theme.SPACING_LG, vertical=10),
+        border=ft.border.only(bottom=ft.BorderSide(1, theme.BORDER)),
+    )
+
+    # ---- Content area ----
+    content_col = ft.Column(
+        [pages["modules"], pages["ledger"], pages["config"]],
+        height=600,
+        spacing=0,
+        expand=True,
+    )
+    pages["ledger"].visible = False
+    pages["config"].visible = False
+
+    # Sidebar + content wrapped in a single card container
+    unified_body = ft.Container(
+        content=ft.Row(
+            [sidebar, content_col],
+            spacing=0,
+            vertical_alignment=ft.CrossAxisAlignment.STRETCH,
+        ),
+        expand=True,
+        bgcolor=theme.SURFACE,
+        border=ft.border.all(1, theme.BORDER),
+        border_radius=theme.RADIUS_LG,
+        clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
     )
 
     # ---- 组装页面 ----
-    tab_content_col = ft.Column(tab_contents, height=400, spacing=0)
     page.add(
         ft.Column(
             [
-                ft.Container(content=title_row, padding=ft.padding.only(bottom=4)),
-                tab_bar,
-                tab_content_col,
+                header,
+                unified_body,
                 ft.Container(content=log_view),
             ],
             expand=True,
@@ -322,4 +359,3 @@ def main(page: ft.Page):
     # ---- 初始化（放在 page.add 之后） ----
     logic.init(config_refs)
     log("已就绪")
-

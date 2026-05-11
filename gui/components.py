@@ -17,6 +17,11 @@ sys.path.append(str(root))
 import func.equipment_ledger as equipment_ledger
 from func.equipment_ledger import LEDGER_COLUMNS
 
+try:
+    from . import theme
+except ImportError:
+    import gui.theme as theme
+
 
 def _log_message(log, message: str, level: int = logging.INFO):
     """兼容仅接收 message 的旧回调，也支持显式日志级别。"""
@@ -102,45 +107,29 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
     container = ft.Container(
         content=ft.Column(
             [
-                ft.Text("设备台账", size=18, weight=ft.FontWeight.W_600, color=ft.Colors.BLUE_GREY_700),
+                theme.section_title("设备台账"),
                 ft.Row(
                     [
-                        ft.Button(
-                            "导入台账",
-                            icon=ft.icons.Icons.UPLOAD,
-                            on_click=on_load,
-                            style=ft.ButtonStyle(
-                                bgcolor=ft.Colors.SECONDARY_CONTAINER,
-                                color=ft.Colors.ON_SECONDARY_CONTAINER,
-                            ),
-                        ),
-                        ft.Button(
-                            "导出模板",
-                            icon=ft.icons.Icons.DOWNLOAD,
-                            on_click=on_export_template,
-                            style=ft.ButtonStyle(
-                                bgcolor=ft.Colors.SECONDARY_CONTAINER,
-                                color=ft.Colors.ON_SECONDARY_CONTAINER,
-                            ),
-                        ),
+                        theme.secondary_btn("导入台账", icon=ft.icons.Icons.UPLOAD, on_click=on_load),
+                        theme.secondary_btn("导出模板", icon=ft.icons.Icons.DOWNLOAD, on_click=on_export_template),
                         ledger_path_label,
                     ],
                     spacing=8,
                 ),
                 ft.Container(
                     content=ledger_table_wrapper,
-                    border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
-                    border_radius=8,
+                    border=ft.Border.all(1, theme.BORDER),
+                    border_radius=theme.RADIUS_MD,
                     padding=4,
-                    bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST,
+                    bgcolor=theme.SURFACE_HIGH,
                 ),
             ],
             spacing=8,
         ),
-        padding=16,
-        border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
-        border_radius=10,
-        bgcolor=ft.Colors.SURFACE,
+        padding=12,
+        border=ft.Border.all(1, theme.BORDER),
+        border_radius=theme.RADIUS_LG,
+        bgcolor=theme.SURFACE,
     )
 
     refs = {
@@ -187,7 +176,9 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
                 text_size=13,
                 hint_text="设备型号" if not row_state["device"] else None,
                 border_color=ft.Colors.TRANSPARENT,
-                focused_border_color=ft.Colors.PRIMARY,
+                focused_border_color=theme.PRIMARY,
+                color=theme.TEXT_PRIMARY,
+                hint_style=ft.TextStyle(color=theme.TEXT_SECONDARY),
             )
             capacity_field = ft.TextField(
                 value=str(row_state["capacity"]),
@@ -195,7 +186,9 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
                 width=80,
                 hint_text="吨" if not str(row_state["capacity"]).strip() else None,
                 border_color=ft.Colors.TRANSPARENT,
-                focused_border_color=ft.Colors.PRIMARY,
+                focused_border_color=theme.PRIMARY,
+                color=theme.TEXT_PRIMARY,
+                hint_style=ft.TextStyle(color=theme.TEXT_SECONDARY),
             )
 
             def on_checkbox_change(e: ft.ControlEvent, idx=index):
@@ -351,17 +344,17 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
 
     action_buttons = [
         ft.Button("添加设备", icon=ft.icons.Icons.ADD, on_click=add_device, width=160,
-                  style=ft.ButtonStyle(bgcolor=ft.Colors.SECONDARY_CONTAINER, color=ft.Colors.ON_SECONDARY_CONTAINER)),
+                  style=ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_PRIMARY)),
         ft.Button("删除选中", icon=ft.icons.Icons.DELETE, on_click=remove_selected, width=160,
-                  style=ft.ButtonStyle(bgcolor=ft.Colors.ERROR_CONTAINER, color=ft.Colors.ON_ERROR_CONTAINER)),
+                  style=ft.ButtonStyle(bgcolor=theme.ERROR, color="#FFFFFF")),
         ft.Button("导入配置", icon=ft.icons.Icons.FILE_UPLOAD, on_click=import_config, width=160,
-                  style=ft.ButtonStyle(bgcolor=ft.Colors.SECONDARY_CONTAINER, color=ft.Colors.ON_SECONDARY_CONTAINER)),
+                  style=ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_PRIMARY)),
         ft.Button("恢复默认配置", icon=ft.icons.Icons.RESTART_ALT, on_click=restore_default_config, width=160,
-                  style=ft.ButtonStyle(bgcolor=ft.Colors.SECONDARY_CONTAINER, color=ft.Colors.ON_SECONDARY_CONTAINER)),
+                  style=ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_PRIMARY)),
         ft.Button("应用当前配置", icon=ft.icons.Icons.CHECK_CIRCLE, on_click=apply_current_config, width=160,
-                  style=ft.ButtonStyle(bgcolor=ft.Colors.PRIMARY_CONTAINER, color=ft.Colors.ON_PRIMARY_CONTAINER)),
+                  style=ft.ButtonStyle(bgcolor=theme.PRIMARY_CONTAINER, color=theme.TEXT_PRIMARY)),
         ft.Button("保存配置", icon=ft.icons.Icons.SAVE, on_click=save_config, width=160,
-                  style=ft.ButtonStyle(bgcolor=ft.Colors.SECONDARY_CONTAINER, color=ft.Colors.ON_SECONDARY_CONTAINER)),
+                  style=ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_PRIMARY)),
     ]
     action_button_rows = [
         ft.Row(action_buttons[:3], spacing=8, wrap=False, alignment=ft.MainAxisAlignment.START),
@@ -371,23 +364,23 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
     container = ft.Container(
         content=ft.Column(
             [
-                ft.Text("设备装载量配置", size=18, weight=ft.FontWeight.W_600, color=ft.Colors.BLUE_GREY_700),
+                theme.section_title("设备装载量配置"),
                 *action_button_rows,
                 ft.Container(
                     content=ft.ListView([config_table], height=200, spacing=5),
-                    border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
-                    border_radius=8,
+                    border=ft.Border.all(1, theme.BORDER),
+                    border_radius=theme.RADIUS_MD,
                     padding=4,
                     expand=True,
-                    bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST,
+                    bgcolor=theme.SURFACE_HIGH,
                 ),
             ],
             spacing=8,
         ),
-        padding=16,
-        border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
-        border_radius=10,
-        bgcolor=ft.Colors.SURFACE,
+        padding=12,
+        border=ft.Border.all(1, theme.BORDER),
+        border_radius=theme.RADIUS_LG,
+        bgcolor=theme.SURFACE,
     )
 
     refs = {
@@ -436,7 +429,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "处理",
         icon=ft.icons.Icons.PLAY_ARROW,
         disabled=False,
-        style=ft.ButtonStyle(bgcolor=ft.Colors.PRIMARY, color=ft.Colors.ON_PRIMARY),
+        style=ft.ButtonStyle(bgcolor=theme.PRIMARY, color="#FFFFFF"),
     )
 
     # --- Production ---
@@ -449,12 +442,12 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
     prod_file_btn = ft.Button(
         "选文件",
         icon=ft.icons.Icons.UPLOAD_FILE,
-        style=ft.ButtonStyle(bgcolor=ft.Colors.SECONDARY_CONTAINER, color=ft.Colors.ON_SECONDARY_CONTAINER),
+        style=ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_PRIMARY),
     )
     prod_folder_btn = ft.Button(
         "选文件夹",
         icon=ft.icons.Icons.FOLDER_OPEN,
-        style=ft.ButtonStyle(bgcolor=ft.Colors.SECONDARY_CONTAINER, color=ft.Colors.ON_SECONDARY_CONTAINER),
+        style=ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_PRIMARY),
     )
     prod_raw_start = ft.TextField(
         label="表头起始行",
@@ -466,7 +459,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "处理",
         icon=ft.icons.Icons.PLAY_ARROW,
         disabled=False,
-        style=ft.ButtonStyle(bgcolor=ft.Colors.PRIMARY, color=ft.Colors.ON_PRIMARY),
+        style=ft.ButtonStyle(bgcolor=theme.PRIMARY, color="#FFFFFF"),
     )
 
     # --- Electrical ---
@@ -490,7 +483,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "处理",
         icon=ft.icons.Icons.PLAY_ARROW,
         disabled=False,
-        style=ft.ButtonStyle(bgcolor=ft.Colors.PRIMARY, color=ft.Colors.ON_PRIMARY),
+        style=ft.ButtonStyle(bgcolor=theme.PRIMARY, color="#FFFFFF"),
     )
 
     # --- Work time ---
@@ -520,7 +513,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "处理",
         icon=ft.icons.Icons.PLAY_ARROW,
         disabled=False,
-        style=ft.ButtonStyle(bgcolor=ft.Colors.PRIMARY, color=ft.Colors.ON_PRIMARY),
+        style=ft.ButtonStyle(bgcolor=theme.PRIMARY, color="#FFFFFF"),
     )
 
     # --- Excel Merger ---
@@ -548,7 +541,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "合并",
         icon=ft.icons.Icons.MERGE_TYPE,
         disabled=False,
-        style=ft.ButtonStyle(bgcolor=ft.Colors.PRIMARY, color=ft.Colors.ON_PRIMARY),
+        style=ft.ButtonStyle(bgcolor=theme.PRIMARY, color="#FFFFFF"),
     )
 
     # --- 排序配置列表（Excel 合并用） ---
@@ -569,6 +562,8 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
                 text_size=12,
                 hint_text="列名",
                 expand=True,
+                color=theme.TEXT_PRIMARY,
+                hint_style=ft.TextStyle(color=theme.TEXT_SECONDARY),
             )
             order_dropdown = ft.Dropdown(
                 value="升序" if cfg.get("ascending", True) else "降序",
@@ -622,7 +617,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
             row_container = ft.Container(
                 content=ft.Row(
                     [
-                        ft.Text(str(idx + 1), width=30, size=12),
+                        ft.Text(str(idx + 1), width=30, size=12, color=theme.TEXT_SECONDARY),
                         col_field,
                         order_dropdown,
                         ft.Row([up_btn, down_btn, del_btn], spacing=2),
@@ -631,9 +626,9 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
                 padding=ft.padding.symmetric(horizontal=8, vertical=4),
-                border=ft.border.all(1, ft.Colors.OUTLINE_VARIANT),
-                border_radius=6,
-                bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
+                border=ft.border.all(1, theme.BORDER),
+                border_radius=theme.RADIUS_SM,
+                bgcolor=theme.SURFACE_HIGH,
             )
 
             controls.append(row_container)
@@ -650,7 +645,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
         icon=ft.icons.Icons.ADD,
         on_click=add_sort_config,
         height=36,
-        style=ft.ButtonStyle(bgcolor=ft.Colors.SECONDARY_CONTAINER, color=ft.Colors.ON_SECONDARY_CONTAINER),
+        style=ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_PRIMARY),
     )
 
     async def on_fuel_browse(e: ft.ControlEvent):
@@ -730,7 +725,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
     container = ft.Container(
         content=ft.Column(
             [
-                ft.Text("数据处理模块", size=18, weight=ft.FontWeight.W_600, color=ft.Colors.BLUE_GREY_700),
+                theme.section_title("数据处理模块"),
                 ft.Container(
                     content=ft.Column(
                         [
@@ -744,7 +739,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
                                     ft.Column(
                                         [
                                             ft.Text("排序配置（可选，留空则自动按第一个时间列排序）", size=12,
-                                                    color=ft.Colors.GREY),
+                                                    color=theme.TEXT_SECONDARY),
                                             ft.Row([sort_rules_column, add_sort_btn], spacing=8,
                                                    alignment=ft.MainAxisAlignment.START),
                                         ],
@@ -761,10 +756,10 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
             ],
             spacing=8,
         ),
-        padding=16,
-        border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
-        border_radius=10,
-        bgcolor=ft.Colors.SURFACE,
+        padding=12,
+        border=ft.Border.all(1, theme.BORDER),
+        border_radius=theme.RADIUS_LG,
+        bgcolor=theme.SURFACE,
     )
 
     module_refs = {
@@ -786,7 +781,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
 # ---------------------------------------------------------------------------
 # 日志视图
 # ---------------------------------------------------------------------------
-def create_log_view(height: int = 200) -> tuple[ft.Container, dict]:
+def create_log_view(height: int = 300) -> tuple[ft.Container, dict]:
     """创建适合实时追加的日志视图组件"""
     log_list = ft.ListView(
         controls=[],
@@ -823,13 +818,13 @@ def create_log_view(height: int = 200) -> tuple[ft.Container, dict]:
                         width=48,
                         height=4,
                         border_radius=999,
-                        bgcolor=ft.Colors.OUTLINE_VARIANT,
+                        bgcolor=theme.BORDER,
                     )
                 ],
                 alignment=ft.MainAxisAlignment.CENTER,
             ),
-            bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
-            border=ft.border.only(top=ft.BorderSide(1, ft.Colors.OUTLINE_VARIANT)),
+            bgcolor=theme.SURFACE,
+            border=ft.border.only(top=ft.BorderSide(1, theme.BORDER)),
             tooltip="上下拖拽调整日志区域高度",
         ),
         mouse_cursor=ft.MouseCursor.RESIZE_UP_DOWN,
@@ -844,10 +839,10 @@ def create_log_view(height: int = 200) -> tuple[ft.Container, dict]:
     list_container = ft.Container(
         content=ft.Column([toolbar, log_list], spacing=4),
         height=height,
-        border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT),
-        border_radius=8,
+        border=ft.Border.all(1, theme.BORDER),
+        border_radius=theme.RADIUS_MD,
         padding=8,
-        bgcolor=ft.Colors.SURFACE_CONTAINER_LOWEST,
+        bgcolor=theme.SURFACE_HIGH,
     )
     root = ft.Container(
         content=ft.Column(
