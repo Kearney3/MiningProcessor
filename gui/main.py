@@ -106,11 +106,9 @@ def main(page: ft.Page):
 
     def _flush_pending_to_ui():
         """将待显示记录追加到 ListView，由定时器触发"""
-        nonlocal _flush_timer
         with _pending_lock:
             batch = _pending_records[:]
             _pending_records.clear()
-            _flush_timer = None
         if not batch or shutdown_event.is_set():
             return
         selected_level = _get_selected_level()
@@ -143,6 +141,9 @@ def main(page: ft.Page):
 
     def _run_flush_on_page():
         """在 Flet 主线程执行刷新"""
+        nonlocal _flush_timer
+        with _pending_lock:
+            _flush_timer = None
         try:
             page.run_thread(_flush_pending_to_ui)
         except Exception:
@@ -171,7 +172,6 @@ def main(page: ft.Page):
                 del log_records[:-MAX_LOG_RECORDS]
         with _pending_lock:
             _pending_records.append(record)
-        _update_log_view()
 
     def _apply_filters(_e=None):
         """过滤器变更时全量重建 ListView"""
@@ -271,6 +271,7 @@ def main(page: ft.Page):
                         return
                     if not shutdown_event.is_set():
                         _append_log_record(log_item)
+                _update_log_view()
             except Exception as ex:
                 import sys
                 print(f"[日志消费线程异常] {ex}", file=sys.stderr)
