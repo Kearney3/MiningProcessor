@@ -80,6 +80,7 @@ class MiningDataProcessor:
                     'LIEBHERR T264': 80,
                     'HITACHI 4000': 85,
                     'MT4400': 85,
+                    'MT4400AC': 85,
                     'TR100': 35,
                     'TEREX 60': 22,
                     'Terex 60': 22,
