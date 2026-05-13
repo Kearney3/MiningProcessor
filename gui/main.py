@@ -26,6 +26,8 @@ MIN_LOG_HEIGHT = 140
 MAX_LOG_HEIGHT = 520
 MIN_WINDOW_HEIGHT = 800
 MIN_WINDOW_WIDTH = 800
+HEADER_OVERHEAD = 76  # header height(48) + vertical padding(20) + margin(8)
+MIN_BODY_HEIGHT = 200
 INITIAL_WINDOW_WIDTH = 1000
 INITIAL_WINDOW_HEIGHT = 900
 
@@ -71,6 +73,11 @@ def main(page: ft.Page):
     log_view_height = int(log_height_container.height or 400)
     shutdown_event = threading.Event()
 
+    _pending_records: list[dict[str, object]] = []
+    _pending_lock = threading.Lock()
+    _flush_timer: threading.Timer | None = None
+    FLUSH_INTERVAL = 0.15  # 150ms 合并窗口
+
     def _level_color(levelno: int):
         if levelno >= logging.ERROR:
             return ft.Colors.RED
@@ -97,50 +104,94 @@ def main(page: ft.Page):
                 filtered.append(record)
             return filtered
 
-    def _render_log_records():
-        if shutdown_event.is_set():
+    def _flush_pending_to_ui():
+        """将待显示记录追加到 ListView，由定时器触发"""
+        nonlocal _flush_timer
+        with _pending_lock:
+            batch = _pending_records[:]
+            _pending_records.clear()
+            _flush_timer = None
+        if not batch or shutdown_event.is_set():
             return
-        visible_records = _get_filtered_log_records()
-        log_list.controls = [
-            ft.Text(
-                str(record["message"]),
-                size=13,
-                selectable=True,
-                color=_level_color(int(record["levelno"])),
+        selected_level = _get_selected_level()
+        for record in batch:
+            if selected_level != "ALL" and record.get("levelname") != selected_level:
+                continue
+            log_list.controls.append(
+                ft.Text(
+                    str(record["message"]),
+                    size=13,
+                    selectable=True,
+                    color=_level_color(int(record["levelno"])),
+                )
             )
-            for record in visible_records
-        ]
+        if len(log_list.controls) > MAX_LOG_RECORDS:
+            log_list.controls = log_list.controls[-MAX_LOG_RECORDS:]
         try:
             log_list.update()
         except (RuntimeError, AttributeError):
             pass
+
+    def _schedule_flush():
+        """安排一次 UI 刷新（150ms 内合并多批）"""
+        nonlocal _flush_timer
+        with _pending_lock:
+            if _flush_timer is None:
+                _flush_timer = threading.Timer(FLUSH_INTERVAL, _run_flush_on_page)
+                _flush_timer.daemon = True
+                _flush_timer.start()
+
+    def _run_flush_on_page():
+        """在 Flet 主线程执行刷新"""
         try:
-            log_view.update()
-        except RuntimeError:
+            page.run_thread(_flush_pending_to_ui)
+        except Exception:
             pass
+
+    def _update_log_view():
+        """消费线程调用：安排刷新"""
+        if shutdown_event.is_set():
+            return
+        _schedule_flush()
 
     def _append_log_record(log_item: dict[str, object]):
         record = {
             "timestamp": str(log_item.get("timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
             "created": float(log_item.get("created", 0)),
+            "seq": int(log_item.get("seq", 0)),
             "levelno": int(log_item["levelno"]),
             "levelname": str(log_item["levelname"]),
             "message": str(log_item["message"]),
         }
         with log_records_lock:
-            keys = [r["created"] for r in log_records]
-            idx = bisect.bisect_right(keys, record["created"])
+            keys = [r["seq"] for r in log_records]
+            idx = bisect.bisect_right(keys, record["seq"])
             log_records.insert(idx, record)
             if len(log_records) > MAX_LOG_RECORDS:
                 del log_records[:-MAX_LOG_RECORDS]
-
-    def _update_log_view():
-        if shutdown_event.is_set():
-            return
-        _render_log_records()
+        with _pending_lock:
+            _pending_records.append(record)
+        _update_log_view()
 
     def _apply_filters(_e=None):
-        _render_log_records()
+        """过滤器变更时全量重建 ListView"""
+        with log_records_lock:
+            records = list(log_records)
+        selected_level = _get_selected_level()
+        log_list.controls = [
+            ft.Text(
+                str(r["message"]),
+                size=13,
+                selectable=True,
+                color=_level_color(int(r["levelno"])),
+            )
+            for r in records
+            if selected_level == "ALL" or r.get("levelname") == selected_level
+        ]
+        try:
+            log_list.update()
+        except (RuntimeError, AttributeError):
+            pass
 
     def _clamp_log_height(next_height: int) -> int:
         return max(MIN_LOG_HEIGHT, min(MAX_LOG_HEIGHT, next_height))
@@ -149,7 +200,7 @@ def main(page: ft.Page):
         nonlocal log_view_height
         log_view_height = _clamp_log_height(log_view_height - int(delta_y))
         log_height_container.height = log_view_height
-        unified_body.height = max(500, page.window.height - 60 - log_view_height)
+        unified_body.height = max(MIN_BODY_HEIGHT, page.window.height - HEADER_OVERHEAD - log_view_height)
         try:
             log_height_container.update()
             unified_body.update()
@@ -168,7 +219,7 @@ def main(page: ft.Page):
         nonlocal log_view_height
         log_view_height = _clamp_log_height(log_view_height)
         log_height_container.height = log_view_height
-        unified_body.height = max(500, page.window.height - 60 - log_view_height)
+        unified_body.height = max(MIN_BODY_HEIGHT, page.window.height - HEADER_OVERHEAD - log_view_height)
         try:
             log_height_container.update()
             unified_body.update()
@@ -201,23 +252,25 @@ def main(page: ft.Page):
 
     def _consume_logs():
         while True:
-            log_item = log_queue.get()
+            try:
+                log_item = log_queue.get()
+            except Exception:
+                continue
             if log_item is None:
                 break
             if shutdown_event.is_set():
                 continue
             try:
                 _append_log_record(log_item)
-                try:
-                    while True:
+                for _ in range(100):
+                    try:
                         log_item = log_queue.get_nowait()
-                        if log_item is None:
-                            return
-                        if not shutdown_event.is_set():
-                            _append_log_record(log_item)
-                except queue.Empty:
-                    pass
-                page.run_thread(_update_log_view)
+                    except queue.Empty:
+                        break
+                    if log_item is None:
+                        return
+                    if not shutdown_event.is_set():
+                        _append_log_record(log_item)
             except Exception as ex:
                 import sys
                 print(f"[日志消费线程异常] {ex}", file=sys.stderr)
@@ -230,6 +283,16 @@ def main(page: ft.Page):
             return
         shutdown_event.set()
         root_logger.removeHandler(queue_handler)
+        nonlocal _flush_timer
+        with _pending_lock:
+            if _flush_timer is not None:
+                _flush_timer.cancel()
+                _flush_timer = None
+        try:
+            while True:
+                log_queue.get_nowait()
+        except queue.Empty:
+            pass
         try:
             log_queue.put_nowait(None)
         except queue.Full:
