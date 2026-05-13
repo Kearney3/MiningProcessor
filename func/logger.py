@@ -4,10 +4,22 @@
 """
 import logging
 import sys
+import threading
 from datetime import datetime
 
 # 默认日志格式“[日志级别]时间戳(秒级)｜文件名｜消息内容”
 DEFAULT_FORMAT = "[%(levelname)s]%(asctime)s | %(filename)s | %(message)s"
+
+
+_log_seq = 0
+_log_seq_lock = threading.Lock()
+
+
+def _next_seq() -> int:
+    global _log_seq
+    with _log_seq_lock:
+        _log_seq += 1
+        return _log_seq
 
 
 class QueueHandler(logging.Handler):
@@ -23,6 +35,7 @@ class QueueHandler(logging.Handler):
             payload = {
                 "timestamp": datetime.fromtimestamp(record.created).strftime("%Y-%m-%d %H:%M:%S"),
                 "created": record.created,
+                "seq": _next_seq(),
                 "levelno": record.levelno,
                 "levelname": record.levelname,
                 "message": msg,
