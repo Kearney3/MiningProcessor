@@ -8,6 +8,8 @@ import os
 from datetime import datetime
 from pathlib import Path
 import sys
+
+import pandas as pd
 import flet as ft
 
 # 定位到当前项目的根目录
@@ -31,12 +33,103 @@ def _log_message(log, message: str, level: int = logging.INFO):
         log(message)
 
 
+def create_column_mapping_dialog(
+    page: ft.Page,
+    file_columns: list[str],
+    on_confirm,
+) -> ft.AlertDialog:
+    """创建列映射对话框，让用户将 Excel 列映射到标准列"""
+
+    # 标准列名及其中文提示
+    STANDARD_COLS = [
+        ("设备名称", "设备的原始名称（用于匹配）"),
+        ("设备编号", "设备的原始编号"),
+        ("公司", "设备所属公司"),
+        ("标准设备名称", "标准化后的设备名称"),
+        ("标准设备编号", "标准化后的设备编号"),
+        ("标准公司", "标准化后的公司名称"),
+    ]
+
+    mapping_controls = []
+    dropdowns = {}
+
+    for col_name, hint in STANDARD_COLS:
+        # 自动匹配：如果 Excel 中有同名列，预选它
+        default_value = col_name if col_name in file_columns else None
+        dd = ft.Dropdown(
+            label=col_name,
+            hint_text=hint,
+            options=[ft.dropdown.Option(c) for c in file_columns],
+            value=default_value,
+            width=280,
+            dense=True,
+        )
+        dropdowns[col_name] = dd
+        mapping_controls.append(dd)
+
+    skip_header_checkbox = ft.Checkbox(
+        label="第一行为标题行（排除）",
+        value=True,
+    )
+
+    def on_cancel(e):
+        dialog.open = False
+        page.update()
+
+    def on_ok(e):
+        mapping = {}
+        for std_col, dd in dropdowns.items():
+            val = dd.value
+            if val:
+                mapping[std_col] = val
+        if not mapping.get("设备名称") and not mapping.get("标准设备名称"):
+            # 至少需要一个名称列
+            page.snack_bar = ft.SnackBar(
+                ft.Text("请至少映射 '设备名称' 或 '标准设备名称'"),
+                bgcolor=ft.Colors.RED,
+            )
+            page.snack_bar.open = True
+            page.update()
+            return
+        dialog.open = False
+        page.update()
+        on_confirm(mapping, skip_header_checkbox.value)
+
+    dialog = ft.AlertDialog(
+        title=ft.Text("列映射配置"),
+        content=ft.Container(
+            content=ft.Column(
+                [
+                    ft.Text("请将 Excel 文件的列映射到标准列：", size=13),
+                    *mapping_controls,
+                    ft.Divider(),
+                    skip_header_checkbox,
+                ],
+                spacing=8,
+                scroll=ft.ScrollMode.AUTO,
+            ),
+            width=320,
+            height=400,
+        ),
+        actions=[
+            ft.Button("取消", on_click=on_cancel),
+            ft.Button("确认导入", on_click=on_ok, style=ft.ButtonStyle(bgcolor=ft.Colors.GREEN, color="#FFFFFF")),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )
+
+    return dialog
+
+
 # ---------------------------------------------------------------------------
 # 台账区域
 # ---------------------------------------------------------------------------
 def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
     """创建设备台账区域，返回 (container, refs)"""
+    PAGE_SIZE = 20
     ledger_records = []
+    _ledger_page = [0]
+    _ledger_instance = [None]  # 当前加载的 EquipmentLedger 实例
     ledger_path_label = ft.Text("未加载台账", size=12, color=ft.Colors.GREY)
     ledger_table = ft.DataTable(
         columns=[
@@ -44,6 +137,61 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
         ],
         rows=[],
     )
+
+    ledger_page_label = ft.Text("0 / 0", size=12, color=theme.TEXT_SECONDARY)
+    ledger_prev_btn = ft.IconButton(
+        icon=ft.icons.Icons.CHEVRON_LEFT, tooltip="上一页", icon_size=18, disabled=True,
+    )
+    ledger_next_btn = ft.IconButton(
+        icon=ft.icons.Icons.CHEVRON_RIGHT, tooltip="下一页", icon_size=18, disabled=True,
+    )
+    ledger_pagination = ft.Row(
+        [ledger_prev_btn, ledger_page_label, ledger_next_btn],
+        spacing=4, alignment=ft.MainAxisAlignment.CENTER,
+    )
+
+    def _ledger_total_pages():
+        return max(1, (len(ledger_records) + PAGE_SIZE - 1) // PAGE_SIZE)
+
+    def _update_ledger_page_controls():
+        total = _ledger_total_pages()
+        cur = _ledger_page[0]
+        ledger_page_label.value = f"{cur + 1} / {total}"
+        ledger_prev_btn.disabled = cur <= 0
+        ledger_next_btn.disabled = cur >= total - 1
+
+    def build_table(records=None):
+        if records is not None:
+            pass
+        start = _ledger_page[0] * PAGE_SIZE
+        end = start + PAGE_SIZE
+        page_records = ledger_records[start:end]
+        ledger_table.rows = [
+            ft.DataRow(
+                cells=[ft.DataCell(ft.Text(str(r.get(c, "")))) for c in LEDGER_COLUMNS]
+            )
+            for r in page_records
+        ]
+        _update_ledger_page_controls()
+        page.update()
+
+    def _ledger_goto_page(e):
+        _ledger_page[0] = max(0, min(int(e.control.data), _ledger_total_pages() - 1))
+        build_table()
+
+    def _ledger_prev(e):
+        if _ledger_page[0] > 0:
+            _ledger_page[0] -= 1
+            build_table()
+
+    def _ledger_next(e):
+        if _ledger_page[0] < _ledger_total_pages() - 1:
+            _ledger_page[0] += 1
+            build_table()
+
+    ledger_prev_btn.on_click = _ledger_prev
+    ledger_next_btn.on_click = _ledger_next
+
     ledger_table_wrapper = ft.Column(
         controls=[
             ft.Row(
@@ -52,17 +200,9 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
             )
         ],
         scroll=ft.ScrollMode.AUTO,
+        height=450,
         expand=True,
     )
-
-    def build_table(records):
-        ledger_table.rows = [
-            ft.DataRow(
-                cells=[ft.DataCell(ft.Text(str(r.get(c, "")))) for c in LEDGER_COLUMNS]
-            )
-            for r in records
-        ]
-        page.update()
 
     async def on_load(e: ft.ControlEvent):
         picker = ft.FilePicker()
@@ -73,18 +213,40 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
         if not files:
             return
         path = files[0].path
+
         try:
-            ledger = equipment_ledger.EquipmentLedger(path)
-            nonlocal ledger_records
-            ledger_records = ledger.to_dict()
-            ledger_path_label.value = os.path.basename(path)
-            ledger_path_label.color = ft.Colors.GREEN
-            build_table(ledger_records)
-            _log_message(log, f"已加载台账: {path}")
+            # 先读取文件的列名用于映射对话框
+            preview_df = pd.read_excel(path, nrows=0)
+            file_columns = list(preview_df.columns)
         except Exception as ex:
-            ledger_path_label.value = f"加载失败: {ex}"
+            ledger_path_label.value = f"读取文件失败: {ex}"
             ledger_path_label.color = ft.Colors.RED
-            _log_message(log, f"加载台账失败: {ex}", level=logging.ERROR)
+            _log_message(log, f"读取台账文件失败: {ex}", level=logging.ERROR)
+            page.update()
+            return
+
+        def _do_import(column_mapping, skip_header):
+            try:
+                ledger = equipment_ledger.EquipmentLedger()
+                ledger.load(path, column_mapping=column_mapping, skip_header=skip_header)
+                nonlocal ledger_records
+                ledger_records = ledger.to_dict()
+                _ledger_page[0] = 0
+                _ledger_instance[0] = ledger
+                ledger_path_label.value = os.path.basename(path)
+                ledger_path_label.color = ft.Colors.GREEN
+                build_table()
+                _log_message(log, f"已加载台账: {path} ({len(ledger_records)} 条记录)")
+            except Exception as ex:
+                ledger_path_label.value = f"加载失败: {ex}"
+                ledger_path_label.color = ft.Colors.RED
+                _log_message(log, f"加载台账失败: {ex}", level=logging.ERROR)
+            page.update()
+
+        # 弹出列映射对话框
+        dialog = create_column_mapping_dialog(page, file_columns, _do_import)
+        page.overlay.append(dialog)
+        dialog.open = True
         page.update()
 
     async def on_export_template(e: ft.ControlEvent):
@@ -124,6 +286,7 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
                     bgcolor=theme.SURFACE_HIGH,
                     expand=True,
                 ),
+                ledger_pagination,
             ],
             spacing=8,
             expand=True,
@@ -139,6 +302,7 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
         "ledger_table": ledger_table,
         "ledger_path_label": ledger_path_label,
         "ledger_records": ledger_records,
+        "get_ledger": lambda: _ledger_instance[0],
     }
     return container, refs
 
@@ -150,7 +314,9 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
     """创建设备装载量配置区域，返回 (container, refs)"""
     from func import config_loader
 
+    PAGE_SIZE = 20
     config_state: list[dict] = []
+    _config_page = [0]
     refs = {}
 
     def normalize_row(row: dict) -> dict:
@@ -170,9 +336,35 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
         show_checkbox_column=False,
     )
 
+    config_page_label = ft.Text("0 / 0", size=12, color=theme.TEXT_SECONDARY)
+    config_prev_btn = ft.IconButton(
+        icon=ft.icons.Icons.CHEVRON_LEFT, tooltip="上一页", icon_size=18, disabled=True,
+    )
+    config_next_btn = ft.IconButton(
+        icon=ft.icons.Icons.CHEVRON_RIGHT, tooltip="下一页", icon_size=18, disabled=True,
+    )
+    config_pagination = ft.Row(
+        [config_prev_btn, config_page_label, config_next_btn],
+        spacing=4, alignment=ft.MainAxisAlignment.CENTER,
+    )
+
+    def _config_total_pages():
+        return max(1, (len(config_state) + PAGE_SIZE - 1) // PAGE_SIZE)
+
+    def _update_config_page_controls():
+        total = _config_total_pages()
+        cur = _config_page[0]
+        config_page_label.value = f"{cur + 1} / {total}"
+        config_prev_btn.disabled = cur <= 0
+        config_next_btn.disabled = cur >= total - 1
+
     def build_table():
+        start = _config_page[0] * PAGE_SIZE
+        end = start + PAGE_SIZE
+        page_items = list(enumerate(config_state))[start:end]
+
         rows = []
-        for index, row_state in enumerate(config_state):
+        for index, row_state in page_items:
             checkbox = ft.Checkbox(value=row_state["selected"])
             device_field = ft.TextField(
                 value=row_state["device"],
@@ -218,23 +410,41 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
             )
 
         config_table.rows = rows
+        _update_config_page_controls()
         page.update()
 
     def set_config_state(rows: list[dict]):
         nonlocal config_state
         config_state = [normalize_row(row) for row in rows]
         refs["config_state"] = config_state
+        _config_page[0] = 0
         build_table()
 
     def append_row(device: str = "", capacity: int | str = 0):
         config_state.append(normalize_row({"selected": False, "device": device, "capacity": capacity}))
+        _config_page[0] = _config_total_pages() - 1
         build_table()
 
     def remove_selected_rows():
         nonlocal config_state
         config_state = [row for row in config_state if not row["selected"]]
         refs["config_state"] = config_state
+        if _config_page[0] >= _config_total_pages():
+            _config_page[0] = max(0, _config_total_pages() - 1)
         build_table()
+
+    def _config_prev(e):
+        if _config_page[0] > 0:
+            _config_page[0] -= 1
+            build_table()
+
+    def _config_next(e):
+        if _config_page[0] < _config_total_pages() - 1:
+            _config_page[0] += 1
+            build_table()
+
+    config_prev_btn.on_click = _config_prev
+    config_next_btn.on_click = _config_next
 
     def load_config():
         try:
@@ -377,6 +587,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
                     expand=True,
                     bgcolor=theme.SURFACE_HIGH,
                 ),
+                config_pagination,
             ],
             spacing=8,
             expand=True,
