@@ -17,20 +17,14 @@ from func.logger import get_logger
 
 logger = get_logger(__name__)
 
-# 台账 Excel 表头定义
+# 台账标准表头定义（6 列）
 LEDGER_COLUMNS = [
+    "设备名称",
     "设备编号",
+    "公司",
     "标准设备名称",
-    "设备类型",
-    "设备型号",
-    "额定装载量",
-    "所属公司",
-    "备注",
-    "别名1",
-    "别名2",
-    "别名3",
-    "全称",
-    "旧名称",
+    "标准设备编号",
+    "标准公司",
 ]
 
 # 模糊匹配阈值（相似度 >= 此值视为匹配）
@@ -46,62 +40,79 @@ class EquipmentLedger:
         if ledger_path and Path(ledger_path).exists():
             self.load(ledger_path)
 
-    def load(self, ledger_path: str) -> pd.DataFrame:
-        """从 Excel 文件加载设备台账"""
+    def load(self, ledger_path: str, column_mapping: dict[str, str] | None = None, skip_header: bool = True) -> pd.DataFrame:
+        """
+        从 Excel 文件加载设备台账
+
+        Args:
+            ledger_path: Excel 文件路径
+            column_mapping: 列映射 {标准列名: Excel列名}，None 时使用原始列名
+            skip_header: 是否将第一行视为标题行（True 时第一行作为列名，False 时使用默认列名 Col0/Col1/...）
+        """
         self.ledger_path = ledger_path
-        self._df = pd.read_excel(ledger_path)
 
-        # 验证表头
-        missing_cols = set(LEDGER_COLUMNS) - set(self._df.columns)
-        if missing_cols:
-            raise ValueError(f"台账缺少必需列: {missing_cols}")
+        if skip_header:
+            self._df = pd.read_excel(ledger_path)
+        else:
+            self._df = pd.read_excel(ledger_path, header=None)
+            self._df.columns = [f"Col{i}" for i in range(len(self._df.columns))]
 
-        # 构建搜索缓存
+        # 应用列映射
+        if column_mapping:
+            rename_map = {}
+            for standard_col, excel_col in column_mapping.items():
+                if excel_col and excel_col in self._df.columns:
+                    rename_map[excel_col] = standard_col
+            if rename_map:
+                self._df = self._df.rename(columns=rename_map)
+
+        # 构建搜索缓存（不强制要求所有列都存在）
         self._build_search_cache()
         return self._df
 
     def _build_search_cache(self) -> None:
-        """构建搜索缓存，包含所有可匹配字段"""
+        """构建搜索缓存，索引设备名称和标准设备名称"""
         self._search_cache = {}
         if self._df is None:
             return
 
         for _, row in self._df.iterrows():
-            standard_name = str(row["标准设备名称"]).strip()
-            if not standard_name:
+            standard_name = str(row.get("标准设备名称", "")).strip()
+            raw_name = str(row.get("设备名称", "")).strip()
+
+            # 跳过标准名称和原始名称都为空的行
+            if not standard_name and not raw_name:
                 continue
 
-            # 收集所有可能的匹配关键词
-            keywords = [standard_name]
-            for alias_col in ["别名1", "别名2", "别名3", "全称", "旧名称"]:
-                if alias_col in self._df.columns:
-                    val = str(row[alias_col]).strip()
-                    if val and val != "nan":
-                        keywords.append(val)
+            # 使用标准名称作为主匹配键，若为空则用原始名称
+            primary = standard_name if standard_name else raw_name
 
-            # 缓存：每条记录的匹配关键词
+            # 收集匹配关键词
+            keywords = []
+            if raw_name:
+                keywords.append(raw_name)
+            if standard_name and standard_name != raw_name:
+                keywords.append(standard_name)
+
+            if not keywords:
+                continue
+
             for kw in keywords:
                 if kw not in self._search_cache:
                     self._search_cache[kw] = []
-                self._search_cache[kw].append(standard_name)
+                self._search_cache[kw].append(primary)
 
     def export_template(self, output_path: str) -> None:
         """导出设备台账模板 Excel"""
         df = pd.DataFrame(columns=LEDGER_COLUMNS)
         # 添加示例行
         df.loc[0] = [
+            "NTE240 #1101",  # 设备名称
             "1101",  # 设备编号
+            "XX公司",  # 公司
             "NTE240 #1101",  # 标准设备名称
-            "矿卡",  # 设备类型
-            "NTE240",  # 设备型号
-            85,  # 额定装载量
-            "XX公司",  # 所属公司
-            "",  # 备注
-            "NTE",  # 别名1
-            "NTE240#1101",  # 别名2
-            "NTE240 #1101",  # 别名3
-            "XX公司-NTE240 #1101",  # 全称
-            "",  # 旧名称
+            "1101",  # 标准设备编号
+            "XX公司",  # 标准公司
         ]
         df.to_excel(output_path, index=False)
         logger.info(f"台账模板已导出: {output_path}")
@@ -156,29 +167,8 @@ class EquipmentLedger:
         # 4. 无匹配
         return None
 
-    def get_load_capacity(self, standard_name: str) -> int:
-        """根据标准设备名称获取额定装载量"""
-        if self._df is None:
-            return 0
-
-        row = self._df[self._df["标准设备名称"] == standard_name]
-        if not row.empty:
-            capacity = row.iloc[0]["额定装载量"]
-            try:
-                return int(capacity)
-            except (ValueError, TypeError):
-                return 0
-        return 0
-
     def to_dict(self) -> list[dict]:
         """转换为字典列表（用于 GUI 展示）"""
         if self._df is None:
             return []
         return self._df.to_dict("records")
-
-
-def load_or_create_ledger(ledger_path: Optional[str] = None) -> EquipmentLedger:
-    """加载或创建设备台账"""
-    if ledger_path and Path(ledger_path).exists():
-        return EquipmentLedger(ledger_path)
-    return EquipmentLedger()
