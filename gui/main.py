@@ -26,8 +26,6 @@ MIN_LOG_HEIGHT = 140
 MAX_LOG_HEIGHT = 520
 MIN_WINDOW_HEIGHT = 800
 MIN_WINDOW_WIDTH = 800
-HEADER_OVERHEAD = 76  # header height(48) + vertical padding(20) + margin(8)
-MIN_BODY_HEIGHT = 200
 INITIAL_WINDOW_WIDTH = 1000
 INITIAL_WINDOW_HEIGHT = 900
 
@@ -200,10 +198,8 @@ def main(page: ft.Page):
         nonlocal log_view_height
         log_view_height = _clamp_log_height(log_view_height - int(delta_y))
         log_height_container.height = log_view_height
-        unified_body.height = max(MIN_BODY_HEIGHT, page.window.height - HEADER_OVERHEAD - log_view_height)
         try:
             log_height_container.update()
-            unified_body.update()
         except RuntimeError:
             pass
 
@@ -219,10 +215,8 @@ def main(page: ft.Page):
         nonlocal log_view_height
         log_view_height = _clamp_log_height(log_view_height)
         log_height_container.height = log_view_height
-        unified_body.height = max(MIN_BODY_HEIGHT, page.window.height - HEADER_OVERHEAD - log_view_height)
         try:
             log_height_container.update()
-            unified_body.update()
         except RuntimeError:
             pass
 
@@ -398,6 +392,7 @@ def main(page: ft.Page):
             spacing=0,
             vertical_alignment=ft.CrossAxisAlignment.STRETCH,
         ),
+        expand=True,
         bgcolor=theme.SURFACE,
         border=ft.border.all(1, theme.BORDER),
         border_radius=theme.RADIUS_LG,
