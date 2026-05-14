@@ -74,6 +74,8 @@ def create_column_mapping_dialog(
 
     def on_cancel(e):
         dialog.open = False
+        if dialog in page.overlay:
+            page.overlay.remove(dialog)
         page.update()
 
     def on_ok(e):
@@ -92,6 +94,8 @@ def create_column_mapping_dialog(
             page.update()
             return
         dialog.open = False
+        if dialog in page.overlay:
+            page.overlay.remove(dialog)
         page.update()
         on_confirm(mapping, skip_header_checkbox.value)
 
@@ -160,9 +164,7 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
         ledger_prev_btn.disabled = cur <= 0
         ledger_next_btn.disabled = cur >= total - 1
 
-    def build_table(records=None):
-        if records is not None:
-            pass
+    def build_table():
         start = _ledger_page[0] * PAGE_SIZE
         end = start + PAGE_SIZE
         page_records = ledger_records[start:end]
@@ -174,10 +176,6 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
         ]
         _update_ledger_page_controls()
         page.update()
-
-    def _ledger_goto_page(e):
-        _ledger_page[0] = max(0, min(int(e.control.data), _ledger_total_pages() - 1))
-        build_table()
 
     def _ledger_prev(e):
         if _ledger_page[0] > 0:
