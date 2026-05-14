@@ -32,7 +32,7 @@ def create_column_mapping_dialog(
     # 标准列名及其中文提示
     STANDARD_COLS = [
         ("设备名称", "设备的原始名称（用于匹配）"),
-        ("设备编号", "设备的原始编号（用于匹配）"),
+        ("设备编号", "设备的原始编号"),
         ("公司", "设备所属公司"),
         ("标准设备名称", "标准化后的设备名称"),
         ("标准设备编号", "标准化后的设备编号"),
@@ -106,7 +106,7 @@ def create_column_mapping_dialog(
         ),
         actions=[
             ft.TextButton("取消", on_click=on_cancel),
-            ft.TextButton("确认导入", on_click=on_ok),
+            ft.TextButton("确认导入", on_click=on_ok, style=ft.ButtonStyle(bgcolor=ft.Colors.GREEN_700, color="#FFFFFF")),
         ],
         actions_alignment=ft.MainAxisAlignment.END,
     )
