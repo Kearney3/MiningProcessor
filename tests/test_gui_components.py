@@ -19,11 +19,11 @@ if "gui" not in sys.modules:
     sys.modules["gui"] = gui_pkg
 
 spec = importlib.util.spec_from_file_location(
-    "gui.components", ROOT / "gui" / "components.py",
-    submodule_search_locations=[],
+    "gui.components", ROOT / "gui" / "components" / "__init__.py",
+    submodule_search_locations=[str(ROOT / "gui" / "components")],
 )
 components = importlib.util.module_from_spec(spec)
-components.__package__ = "gui"
+components.__package__ = "gui.components"
 sys.modules["gui.components"] = components
 spec.loader.exec_module(components)
 
@@ -220,7 +220,8 @@ def test_modules_section_uses_consistent_vertical_spacing(monkeypatch):
 
 
 def test_work_module_exposes_year_month_refs_with_current_date_defaults(monkeypatch):
-    monkeypatch.setattr(components, "datetime", FrozenDateTime, raising=False)
+    import gui.components.modules as _cmp_modules
+    monkeypatch.setattr(_cmp_modules, "datetime", FrozenDateTime, raising=False)
 
     _, module_refs = components.create_modules_section(DummyPage())
 
@@ -489,7 +490,7 @@ def test_gui_main_log_helper_supports_custom_levels(monkeypatch):
     gui_main.main(page)
 
     captured["log"]("警告消息", level=logging.WARNING)
-    time.sleep(0.05)
+    time.sleep(0.3)
 
     log_view = page.controls[0].controls[-1]
     last_text = refs["log_list"].controls[-1]
@@ -509,7 +510,7 @@ def test_gui_main_log_helper_supports_custom_levels(monkeypatch):
     page = PageSpy()
 
     gui_main.main(page)
-    time.sleep(0.05)
+    time.sleep(0.3)
 
     assert page.thread_calls, "expected GUI log updates to be scheduled through run_thread"
 
@@ -590,7 +591,7 @@ def test_gui_main_filters_logs_by_level(monkeypatch):
 
     captured["log"]("信息消息", level=logging.INFO)
     captured["log"]("错误消息", level=logging.ERROR)
-    time.sleep(0.05)
+    time.sleep(0.3)
 
     refs["level_filter"].value = "ERROR"
     refs["level_filter"].on_select(DummyControlEvent(refs["level_filter"]))
@@ -630,7 +631,7 @@ def test_gui_main_exports_filtered_logs(monkeypatch, tmp_path):
 
     captured["log"]("普通日志", level=logging.INFO)
     captured["log"]("错误日志", level=logging.ERROR)
-    time.sleep(0.05)
+    time.sleep(0.3)
 
     refs["level_filter"].value = "ERROR"
     refs["level_filter"].on_select(DummyControlEvent(refs["level_filter"]))
