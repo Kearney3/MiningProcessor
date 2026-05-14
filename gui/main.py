@@ -379,7 +379,7 @@ def main(page: ft.Page):
     )
 
     # ---- Content area ----
-    content_col = ft.Column(
+    content_col = ft.ListView(
         [pages["modules"]],
         spacing=0,
         expand=True,
