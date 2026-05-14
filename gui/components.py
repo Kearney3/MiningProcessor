@@ -52,7 +52,7 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
             )
         ],
         scroll=ft.ScrollMode.AUTO,
-        height=220,
+        expand=True,
     )
 
     def build_table(records):
@@ -370,7 +370,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
                 theme.section_title("设备装载量配置"),
                 *action_button_rows,
                 ft.Container(
-                    content=ft.ListView([config_table], height=200, spacing=5),
+                    content=ft.ListView([config_table], expand=True, spacing=5),
                     border=ft.Border.all(1, theme.BORDER),
                     border_radius=theme.RADIUS_MD,
                     padding=4,
