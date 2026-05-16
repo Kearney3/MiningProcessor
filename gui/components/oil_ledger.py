@@ -1,4 +1,4 @@
-"""设备台账区域组件"""
+"""油品台账区域组件"""
 import logging
 import os
 from pathlib import Path
@@ -11,8 +11,8 @@ import flet as ft
 root = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(root))
 
-import func.equipment_ledger as equipment_ledger
-from func.equipment_ledger import LEDGER_COLUMNS
+import func.oil_ledger as oil_ledger
+from func.oil_ledger import OIL_LEDGER_COLUMNS
 
 from .common import _log_message
 
@@ -22,28 +22,22 @@ except ImportError:
     import gui.theme as theme
 
 
-def create_column_mapping_dialog(
+def create_oil_column_mapping_dialog(
     page: ft.Page,
     file_columns: list[str],
     on_confirm,
 ) -> ft.AlertDialog:
-    """创建列映射对话框，让用户将 Excel 列映射到标准列"""
+    """创建油品台账列映射对话框，让用户将 Excel 列映射到标准列"""
 
-    # 标准列名及其中文提示
     STANDARD_COLS = [
-        ("设备名称", "设备的原始名称（用于匹配）"),
-        ("设备编号", "设备的原始编号"),
-        ("公司", "设备所属公司"),
-        ("标准设备名称", "标准化后的设备名称"),
-        ("标准设备编号", "标准化后的设备编号"),
-        ("标准公司名称", "标准化后的公司名称"),
+        ("油品名称", "油品的原始名称（用于匹配）"),
+        ("标准油品名称", "标准化后的油品名称"),
     ]
 
     mapping_controls = []
     dropdowns = {}
 
     for col_name, hint in STANDARD_COLS:
-        # 自动匹配：如果 Excel 中有同名列，预选它
         default_value = col_name if col_name in file_columns else None
         dd = ft.Dropdown(
             label=col_name,
@@ -91,7 +85,7 @@ def create_column_mapping_dialog(
                 scroll=ft.ScrollMode.AUTO,
             ),
             width=320,
-            height=400,
+            height=300,
         ),
         actions=[
             ft.TextButton("取消", on_click=on_cancel),
@@ -104,7 +98,7 @@ def create_column_mapping_dialog(
 
 
 # ---------------------------------------------------------------------------
-# 台账区域
+# 油品台账区域
 # ---------------------------------------------------------------------------
 def _cell_text(value) -> str:
     """将单元格值转为显示文本，NaN/None 显示为空字符串"""
@@ -119,72 +113,72 @@ def _cell_text(value) -> str:
     return str(value)
 
 
-def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
-    """创建设备台账区域，返回 (container, refs)"""
+def create_oil_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
+    """创建油品台账区域，返回 (container, refs)"""
     PAGE_SIZE = 20
-    ledger_records = []
-    _ledger_page = [0]
-    _ledger_instance = [None]  # 当前加载的 EquipmentLedger 实例
-    ledger_path_label = ft.Text("未加载台账", size=12, color=ft.Colors.GREY)
-    ledger_table = ft.DataTable(
+    oil_records = []
+    _oil_page = [0]
+    _oil_instance = [None]  # 当前加载的 OilLedger 实例
+    oil_path_label = ft.Text("未加载油品台账", size=12, color=ft.Colors.GREY)
+    oil_table = ft.DataTable(
         columns=[
-            ft.DataColumn(ft.Text(c)) for c in LEDGER_COLUMNS
+            ft.DataColumn(ft.Text(c)) for c in OIL_LEDGER_COLUMNS
         ],
         rows=[],
     )
 
-    ledger_page_label = ft.Text("0 / 0", size=12, color=theme.TEXT_SECONDARY)
-    ledger_prev_btn = ft.IconButton(
+    oil_page_label = ft.Text("0 / 0", size=12, color=theme.TEXT_SECONDARY)
+    oil_prev_btn = ft.IconButton(
         icon=ft.icons.Icons.CHEVRON_LEFT, tooltip="上一页", icon_size=18, disabled=True,
     )
-    ledger_next_btn = ft.IconButton(
+    oil_next_btn = ft.IconButton(
         icon=ft.icons.Icons.CHEVRON_RIGHT, tooltip="下一页", icon_size=18, disabled=True,
     )
-    ledger_pagination = ft.Row(
-        [ledger_prev_btn, ledger_page_label, ledger_next_btn],
+    oil_pagination = ft.Row(
+        [oil_prev_btn, oil_page_label, oil_next_btn],
         spacing=4, alignment=ft.MainAxisAlignment.CENTER,
     )
 
-    def _ledger_total_pages():
-        return max(1, (len(ledger_records) + PAGE_SIZE - 1) // PAGE_SIZE)
+    def _oil_total_pages():
+        return max(1, (len(oil_records) + PAGE_SIZE - 1) // PAGE_SIZE)
 
-    def _update_ledger_page_controls():
-        total = _ledger_total_pages()
-        cur = _ledger_page[0]
-        ledger_page_label.value = f"{cur + 1} / {total}"
-        ledger_prev_btn.disabled = cur <= 0
-        ledger_next_btn.disabled = cur >= total - 1
+    def _update_oil_page_controls():
+        total = _oil_total_pages()
+        cur = _oil_page[0]
+        oil_page_label.value = f"{cur + 1} / {total}"
+        oil_prev_btn.disabled = cur <= 0
+        oil_next_btn.disabled = cur >= total - 1
 
     def build_table():
-        start = _ledger_page[0] * PAGE_SIZE
+        start = _oil_page[0] * PAGE_SIZE
         end = start + PAGE_SIZE
-        page_records = ledger_records[start:end]
-        ledger_table.rows = [
+        page_records = oil_records[start:end]
+        oil_table.rows = [
             ft.DataRow(
-                cells=[ft.DataCell(ft.Text(_cell_text(r.get(c)))) for c in LEDGER_COLUMNS]
+                cells=[ft.DataCell(ft.Text(_cell_text(r.get(c)))) for c in OIL_LEDGER_COLUMNS]
             )
             for r in page_records
         ]
-        _update_ledger_page_controls()
+        _update_oil_page_controls()
         page.update()
 
-    def _ledger_prev(e):
-        if _ledger_page[0] > 0:
-            _ledger_page[0] -= 1
+    def _oil_prev(e):
+        if _oil_page[0] > 0:
+            _oil_page[0] -= 1
             build_table()
 
-    def _ledger_next(e):
-        if _ledger_page[0] < _ledger_total_pages() - 1:
-            _ledger_page[0] += 1
+    def _oil_next(e):
+        if _oil_page[0] < _oil_total_pages() - 1:
+            _oil_page[0] += 1
             build_table()
 
-    ledger_prev_btn.on_click = _ledger_prev
-    ledger_next_btn.on_click = _ledger_next
+    oil_prev_btn.on_click = _oil_prev
+    oil_next_btn.on_click = _oil_next
 
-    ledger_table_wrapper = ft.Column(
+    oil_table_wrapper = ft.Column(
         controls=[
             ft.Row(
-                controls=[ledger_table],
+                controls=[oil_table],
                 scroll=ft.ScrollMode.AUTO,
             )
         ],
@@ -196,7 +190,7 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
     async def on_load(e: ft.ControlEvent):
         picker = ft.FilePicker()
         files = await picker.pick_files(
-            dialog_title="导入设备台账",
+            dialog_title="导入油品台账",
             allowed_extensions=["xlsx", "xls"],
         )
         if not files:
@@ -204,36 +198,34 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
         path = files[0].path
 
         try:
-            # 先读取文件的列名用于映射对话框
             preview_df = pd.read_excel(path, nrows=0)
             file_columns = list(preview_df.columns)
         except Exception as ex:
-            ledger_path_label.value = f"读取文件失败: {ex}"
-            ledger_path_label.color = ft.Colors.RED
-            _log_message(log, f"读取台账文件失败: {ex}", level=logging.ERROR)
+            oil_path_label.value = f"读取文件失败: {ex}"
+            oil_path_label.color = ft.Colors.RED
+            _log_message(log, f"读取油品台账文件失败: {ex}", level=logging.ERROR)
             page.update()
             return
 
         def _do_import(column_mapping, skip_header):
             try:
-                ledger = equipment_ledger.EquipmentLedger()
+                ledger = oil_ledger.OilLedger()
                 ledger.load(path, column_mapping=column_mapping, skip_header=skip_header)
-                nonlocal ledger_records
-                ledger_records = ledger.to_dict()
-                _ledger_page[0] = 0
-                _ledger_instance[0] = ledger
-                ledger_path_label.value = os.path.basename(path)
-                ledger_path_label.color = ft.Colors.GREEN
+                nonlocal oil_records
+                oil_records = ledger.to_dict()
+                _oil_page[0] = 0
+                _oil_instance[0] = ledger
+                oil_path_label.value = os.path.basename(path)
+                oil_path_label.color = ft.Colors.GREEN
                 build_table()
-                _log_message(log, f"已加载台账: {path} ({len(ledger_records)} 条记录)")
+                _log_message(log, f"已加载油品台账: {path} ({len(oil_records)} 条记录)")
             except Exception as ex:
-                ledger_path_label.value = f"加载失败: {ex}"
-                ledger_path_label.color = ft.Colors.RED
-                _log_message(log, f"加载台账失败: {ex}", level=logging.ERROR)
+                oil_path_label.value = f"加载失败: {ex}"
+                oil_path_label.color = ft.Colors.RED
+                _log_message(log, f"加载油品台账失败: {ex}", level=logging.ERROR)
             page.update()
 
-        # 弹出列映射对话框
-        dialog = create_column_mapping_dialog(page, file_columns, _do_import)
+        dialog = create_oil_column_mapping_dialog(page, file_columns, _do_import)
         page.overlay.append(dialog)
         dialog.open = True
         page.update()
@@ -242,51 +234,51 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
         picker = ft.FilePicker()
         path = await picker.save_file(
             dialog_title="导出模板",
-            file_name="设备台账模板.xlsx",
+            file_name="油品台账模板.xlsx",
             allowed_extensions=["xlsx"],
         )
         if not path:
             return
         try:
-            ledger = equipment_ledger.EquipmentLedger()
+            ledger = oil_ledger.OilLedger()
             ledger.export_template(path)
-            _log_message(log, f"已导出模板: {path}")
+            _log_message(log, f"已导出油品台账模板: {path}")
         except Exception as ex:
             _log_message(log, f"导出模板失败: {ex}", level=logging.ERROR)
         page.update()
 
     def on_clear(e):
-        nonlocal ledger_records
-        ledger_records = []
-        _ledger_instance[0] = None
-        _ledger_page[0] = 0
-        ledger_path_label.value = "未加载台账"
-        ledger_path_label.color = ft.Colors.GREY
+        nonlocal oil_records
+        oil_records = []
+        _oil_instance[0] = None
+        _oil_page[0] = 0
+        oil_path_label.value = "未加载油品台账"
+        oil_path_label.color = ft.Colors.GREY
         build_table()
-        _log_message(log, "台账已清空")
+        _log_message(log, "油品台账已清空")
 
     container = ft.Container(
         content=ft.Column(
             [
-                theme.section_title("设备台账"),
+                theme.section_title("油品台账"),
                 ft.Row(
                     [
                         theme.secondary_btn("导入台账", icon=ft.icons.Icons.UPLOAD, on_click=on_load),
                         theme.secondary_btn("清空台账", icon=ft.icons.Icons.DELETE_SWEEP, on_click=on_clear),
                         theme.secondary_btn("导出模板", icon=ft.icons.Icons.DOWNLOAD, on_click=on_export_template),
-                        ledger_path_label,
+                        oil_path_label,
                     ],
                     spacing=8,
                 ),
                 ft.Container(
-                    content=ledger_table_wrapper,
+                    content=oil_table_wrapper,
                     border=ft.Border.all(1, theme.BORDER),
                     border_radius=theme.RADIUS_MD,
                     padding=4,
                     bgcolor=theme.SURFACE_HIGH,
                     expand=True,
                 ),
-                ledger_pagination,
+                oil_pagination,
             ],
             spacing=8,
             expand=True,
@@ -299,9 +291,9 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
     )
 
     refs = {
-        "ledger_table": ledger_table,
-        "ledger_path_label": ledger_path_label,
-        "ledger_records": ledger_records,
-        "get_ledger": lambda: _ledger_instance[0],
+        "oil_table": oil_table,
+        "oil_path_label": oil_path_label,
+        "oil_records": oil_records,
+        "get_oil_ledger": lambda: _oil_instance[0],
     }
     return container, refs

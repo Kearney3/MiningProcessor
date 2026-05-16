@@ -463,7 +463,7 @@ def create_ledger_match_section(
         oil_col = oil_dropdown.value
 
         if not name_col and not id_col and not oil_col:
-            _log_message(log, "请至少选择一个匹配列", level=logging.WARNING)
+            _log_message(log, "未选择任何匹配列，跳过匹配")
             return
 
         result_df = df.copy()
