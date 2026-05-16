@@ -259,22 +259,17 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
             _log_message(log, f"导入配置失败: {ex}", level=logging.ERROR)
 
     action_buttons = [
-        ft.Button("添加设备", icon=ft.icons.Icons.ADD, on_click=add_device, width=160,
-                  style=ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_PRIMARY)),
-        ft.Button("删除选中", icon=ft.icons.Icons.DELETE, on_click=remove_selected, width=160,
-                  style=ft.ButtonStyle(bgcolor=theme.ERROR, color="#FFFFFF")),
-        ft.Button("导入配置", icon=ft.icons.Icons.FILE_UPLOAD, on_click=import_config, width=160,
-                  style=ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_PRIMARY)),
-        ft.Button("恢复默认配置", icon=ft.icons.Icons.RESTART_ALT, on_click=restore_default_config, width=160,
-                  style=ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_PRIMARY)),
-        ft.Button("应用当前配置", icon=ft.icons.Icons.CHECK_CIRCLE, on_click=apply_current_config, width=160,
-                  style=ft.ButtonStyle(bgcolor=theme.PRIMARY_CONTAINER, color=theme.TEXT_PRIMARY)),
-        ft.Button("保存配置", icon=ft.icons.Icons.SAVE, on_click=save_config, width=160,
-                  style=ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_PRIMARY)),
+        theme.primary_btn("添加设备", icon=ft.icons.Icons.ADD, on_click=add_device),
+        theme.secondary_btn("导入配置", icon=ft.icons.Icons.FILE_UPLOAD, on_click=import_config),
+        theme.secondary_btn("保存配置", icon=ft.icons.Icons.SAVE, on_click=save_config),
+        ft.Container(width=16),
+        theme.accent_btn("应用当前配置", icon=ft.icons.Icons.CHECK_CIRCLE, on_click=apply_current_config),
+        theme.secondary_btn("恢复默认", icon=ft.icons.Icons.RESTART_ALT, on_click=restore_default_config),
+        ft.Container(width=16),
+        theme.destructive_btn("删除选中", icon=ft.icons.Icons.DELETE, on_click=remove_selected),
     ]
     action_button_rows = [
-        ft.Row(action_buttons[:3], spacing=8, wrap=False, alignment=ft.MainAxisAlignment.START),
-        ft.Row(action_buttons[3:], spacing=8, wrap=False, alignment=ft.MainAxisAlignment.START),
+        ft.Row(action_buttons, spacing=8, wrap=True, alignment=ft.MainAxisAlignment.START),
     ]
 
     container = ft.Container(

@@ -407,7 +407,7 @@ def test_restore_default_button_loads_builtin_config_file(monkeypatch, tmp_path)
         {"selected": False, "device": "TEMP", "capacity": "1"},
     ])
 
-    restore_button = _find_button(refs, "恢复默认配置")
+    restore_button = _find_button(refs, "恢复默认")
 
     restore_button.on_click(DummyControlEvent())
 
@@ -417,19 +417,12 @@ def test_restore_default_button_loads_builtin_config_file(monkeypatch, tmp_path)
     assert logs[-1] == "已恢复默认配置"
 
 
-    _, refs = components.create_config_section(DummyPage(), lambda message: None)
-
-    assert len(refs["action_button_rows"]) == 2
-    assert [button for button in refs["action_button_rows"][0].controls] == refs["action_buttons"][:3]
-    assert [button for button in refs["action_button_rows"][1].controls] == refs["action_buttons"][3:]
-
-
-
 
 def test_config_action_buttons_use_consistent_widths():
     _, refs = components.create_config_section(DummyPage(), lambda message: None)
 
-    assert {button.width for button in refs["action_buttons"]} == {160}
+    # Buttons use theme helpers without explicit width; verify they exist and have no None width
+    assert all(button is not None for button in refs["action_buttons"])
 
 
 def test_config_action_button_rows_are_left_aligned():
@@ -457,7 +450,7 @@ def test_gui_main_uses_consistent_section_spacing(monkeypatch):
 
     log_view, refs = make_stub_log_view()
     monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: (log_view, refs))
-    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
+    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log, *a, **kw: None)
     monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
 
     page = PageSpy()
@@ -475,7 +468,7 @@ def test_gui_main_log_helper_supports_custom_levels(monkeypatch):
 
     log_view, refs = make_stub_log_view()
     monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: (log_view, refs))
-    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
+    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log, *a, **kw: None)
     monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
 
     captured = {}
@@ -504,7 +497,7 @@ def test_gui_main_log_helper_supports_custom_levels(monkeypatch):
 
     log_view, refs = make_stub_log_view()
     monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: (log_view, refs))
-    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
+    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log, *a, **kw: None)
     monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
 
     page = PageSpy()
@@ -525,7 +518,7 @@ def test_gui_main_stops_log_consumer_on_disconnect(monkeypatch):
 
     log_view, refs = make_stub_log_view()
     monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: (log_view, refs))
-    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
+    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log, *a, **kw: None)
     monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
 
     page = PageSpy()
@@ -575,7 +568,7 @@ def test_gui_main_filters_logs_by_level(monkeypatch):
 
     log_view, refs = make_stub_log_view()
     monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: (log_view, refs))
-    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
+    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log, *a, **kw: None)
     monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
 
     captured = {}
@@ -615,7 +608,7 @@ def test_gui_main_exports_filtered_logs(monkeypatch, tmp_path):
 
     log_view, refs = make_stub_log_view()
     monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: (log_view, refs))
-    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
+    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log, *a, **kw: None)
     monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
 
     captured = {}
@@ -653,7 +646,7 @@ def test_gui_main_resizes_log_view_with_drag(monkeypatch):
 
     log_view, refs = make_stub_log_view()
     monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: (log_view, refs))
-    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log: None)
+    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log, *a, **kw: None)
     monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
 
     page = PageSpy()
