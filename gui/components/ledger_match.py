@@ -84,8 +84,11 @@ def create_ledger_match_section(
         disabled=True,
     )
 
-    equip_match_switch = ft.Switch(
-        label="设备匹配", value=False,
+    name_match_switch = ft.Switch(
+        label="名称匹配", value=False,
+    )
+    id_match_switch = ft.Switch(
+        label="编号匹配", value=False,
     )
     oil_match_switch = ft.Switch(
         label="油品匹配", value=False,
@@ -216,11 +219,12 @@ def create_ledger_match_section(
 
     _cancel_btn.on_click = _on_cancel_import
 
-    def _on_equip_toggle(e):
-        enabled = equip_match_switch.value
-        name_dropdown.disabled = not enabled
-        id_dropdown.disabled = not enabled
+    def _on_name_toggle(e):
+        name_dropdown.disabled = not name_match_switch.value
         name_dropdown.update()
+
+    def _on_id_toggle(e):
+        id_dropdown.disabled = not id_match_switch.value
         id_dropdown.update()
 
     def _on_oil_toggle(e):
@@ -234,7 +238,8 @@ def create_ledger_match_section(
         _page[0] = 0
         build_table()
 
-    equip_match_switch.on_change = _on_equip_toggle
+    name_match_switch.on_change = _on_name_toggle
+    id_match_switch.on_change = _on_id_toggle
     oil_match_switch.on_change = _on_oil_toggle
 
     def _sort_indicator(col_name: str) -> str:
@@ -517,8 +522,8 @@ def create_ledger_match_section(
             _log_message(log, "请先在设备台账或油品台账页导入台账", level=logging.WARNING)
             return
 
-        name_col = name_dropdown.value if equip_match_switch.value else None
-        id_col = id_dropdown.value if equip_match_switch.value else None
+        name_col = name_dropdown.value if name_match_switch.value else None
+        id_col = id_dropdown.value if id_match_switch.value else None
         oil_col = oil_dropdown.value if oil_match_switch.value else None
 
         if not name_col and not id_col and not oil_col:
@@ -662,8 +667,9 @@ def create_ledger_match_section(
                 ),
                 ft.Row(
                     [
-                        equip_match_switch,
+                        name_match_switch,
                         name_dropdown,
+                        id_match_switch,
                         id_dropdown,
                         ft.Container(width=16),
                         oil_match_switch,
