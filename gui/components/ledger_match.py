@@ -44,10 +44,10 @@ def create_ledger_match_section(
     _columns: list[str] = []
     _sort_column: list[str] = [None]  # 当前排序列
     _sort_ascending: list[bool] = [True]  # 排序方向
-    _col_width: list[int] = [120]  # 列宽
-    _matched_df: list[pd.DataFrame] = [None]   # 匹配成功的行
-    _unmatched_df: list[pd.DataFrame] = [None]  # 匹配失败的行
+    _matched_sheets: dict[str, pd.DataFrame] = {}   # sheet_name -> 匹配成功的行
+    _unmatched_sheets: dict[str, pd.DataFrame] = {}  # sheet_name -> 匹配失败的行
     _view_mode: list[str] = ["all"]  # "all" | "matched" | "unmatched"
+    _import_dir: list[str] = [""]  # 导入文件所在目录
 
     # --- 控件 ---
     file_label = ft.Text("未导入文件", size=12, color=ft.Colors.GREY)
@@ -119,15 +119,7 @@ def create_ledger_match_section(
     )
 
     status_label = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
-
-    col_width_field = ft.TextField(
-        label="列宽",
-        hint_text="像素 (如 120)",
-        width=100,
-        dense=True,
-        value="120",
-    )
-    col_width_apply_btn = theme.secondary_btn("应用列宽", icon=ft.Icons.FIT_SCREEN, disabled=True)
+    match_count_label = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
 
     _import_progress_bar = ft.ProgressBar(
         value=0, height=6, visible=False, expand=True,
@@ -184,7 +176,7 @@ def create_ledger_match_section(
         _filtered_df[0] = result
 
     def _total_pages():
-        df = _filtered_df[0]
+        df = _get_view_df()
         if df is None or df.empty:
             return 1
         return max(1, (len(df) + PAGE_SIZE - 1) // PAGE_SIZE)
@@ -254,7 +246,6 @@ def create_ledger_match_section(
     def _rebuild_columns(cols: list[str]):
         nonlocal _columns
         _columns = cols
-        w = _col_width[0]
 
         def on_sort_handler(col_name):
             def handler(e):
@@ -271,10 +262,7 @@ def create_ledger_match_section(
         if cols:
             data_table.columns = [
                 ft.DataColumn(
-                    ft.Container(
-                        ft.Text(c + _sort_indicator(c), size=13, no_wrap=True),
-                        width=w,
-                    ),
+                    ft.Text(c + _sort_indicator(c), size=13, no_wrap=True),
                     on_sort=on_sort_handler(c),
                 )
                 for c in cols
@@ -285,10 +273,11 @@ def create_ledger_match_section(
     def _get_view_df() -> pd.DataFrame | None:
         """根据当前视图模式返回对应的 DataFrame"""
         mode = _view_mode[0]
+        sheet = _current_sheet[0]
         if mode == "matched":
-            return _matched_df[0]
+            return _matched_sheets.get(sheet)
         elif mode == "unmatched":
-            return _unmatched_df[0]
+            return _unmatched_sheets.get(sheet)
         return _filtered_df[0]
 
     def build_table():
@@ -333,23 +322,21 @@ def create_ledger_match_section(
     prev_btn.on_click = _prev
     next_btn.on_click = _next
 
-    def _on_col_width_apply(e):
-        try:
-            w = int(col_width_field.value)
-            if w < 30:
-                w = 30
-            if w > 600:
-                w = 600
-        except (ValueError, TypeError):
-            w = 120
-        _col_width[0] = w
-        build_table()
-
-    col_width_apply_btn.on_click = _on_col_width_apply
-
     # ========================================================================
     # Sheet 切换 & 列名自动匹配
     # ========================================================================
+    def _update_match_status(sheet_name: str = None):
+        """更新匹配计数显示"""
+        sheet = sheet_name or _current_sheet[0]
+        matched = _matched_sheets.get(sheet)
+        unmatched = _unmatched_sheets.get(sheet)
+        if matched is not None and unmatched is not None:
+            m = len(matched)
+            u = len(unmatched)
+            match_count_label.value = f"已匹配: {m}  |  未匹配: {u}"
+        else:
+            match_count_label.value = ""
+
     def _update_column_dropdowns(cols: list[str]):
         options = [ft.dropdown.Option(c) for c in cols]
         for dd in [name_dropdown, id_dropdown, oil_dropdown]:
@@ -384,6 +371,7 @@ def create_ledger_match_section(
         _sort_ascending[0] = True
         df = _all_sheets[sheet_name]
         _update_column_dropdowns(list(df.columns))
+        _update_match_status(sheet_name)
         build_table()
 
     sheet_dropdown.on_change = lambda e: _on_sheet_change(e.control.value)
@@ -396,6 +384,7 @@ def create_ledger_match_section(
         files = await picker.pick_files(
             dialog_title="导入 Excel 文件",
             allowed_extensions=["xlsx", "xls"],
+            initial_directory=_import_dir[0] or None,
         )
         if not files:
             return
@@ -461,6 +450,7 @@ def create_ledger_match_section(
         _all_sheets.clear()
         _all_sheets.update(parsed_sheets)
 
+        _import_dir[0] = str(Path(path).parent)
         file_label.value = Path(path).name
         file_label.color = ft.Colors.GREEN
 
@@ -476,7 +466,6 @@ def create_ledger_match_section(
             _current_sheet[0] = ""
 
         match_btn.disabled = False
-        col_width_apply_btn.disabled = False
         build_table()
         loaded = len(parsed_sheets)
         _log_message(log, f"已导入: {path} ({loaded}/{total} 个 sheet)")
@@ -484,8 +473,8 @@ def create_ledger_match_section(
 
     def on_clear(e):
         _hide_import_progress()
-        _matched_df[0] = None
-        _unmatched_df[0] = None
+        _matched_sheets.clear()
+        _unmatched_sheets.clear()
         _view_mode[0] = "all"
         view_segment.selected_index = 0
         _all_sheets.clear()
@@ -506,7 +495,6 @@ def create_ledger_match_section(
         oil_dropdown.value = None
         match_btn.disabled = True
         export_btn.disabled = True
-        col_width_apply_btn.disabled = True
         status_label.value = ""
         data_table.columns = [ft.DataColumn(ft.Text("等待导入数据..."))]
         data_table.rows = []
@@ -580,14 +568,15 @@ def create_ledger_match_section(
         build_table()
 
         # 拆分匹配成功/失败的行
+        sheet = _current_sheet[0]
         if eq_ledger and (name_col or id_col):
             mask = result_df["标准设备名称"].astype(str).str.len() > 0
-            _matched_df[0] = result_df[mask].copy()
-            _unmatched_df[0] = result_df[~mask].copy()
+            _matched_sheets[sheet] = result_df[mask].copy()
+            _unmatched_sheets[sheet] = result_df[~mask].copy()
         elif oil_ledger and oil_col:
             mask = result_df["标准油品名称"].astype(str).str.len() > 0
-            _matched_df[0] = result_df[mask].copy()
-            _unmatched_df[0] = result_df[~mask].copy()
+            _matched_sheets[sheet] = result_df[mask].copy()
+            _unmatched_sheets[sheet] = result_df[~mask].copy()
 
         parts = []
         if eq_ledger and (name_col or id_col):
@@ -597,6 +586,7 @@ def create_ledger_match_section(
             total = len(result_df)
             parts.append(f"油品匹配: {oil_matched}/{total}")
         status_label.value = "  |  ".join(parts)
+        _update_match_status()
         _log_message(log, f"匹配完成: {status_label.value}")
         page.update()
 
@@ -612,16 +602,19 @@ def create_ledger_match_section(
             dialog_title="导出匹配结果",
             file_name="匹配结果.xlsx",
             allowed_extensions=["xlsx"],
+            initial_directory=_import_dir[0] or None,
         )
         if not path:
             return
         try:
             mode = _view_mode[0]
             with pd.ExcelWriter(path, engine="openpyxl") as writer:
-                if mode == "matched" and _matched_df[0] is not None:
-                    _matched_df[0].to_excel(writer, sheet_name="已匹配", index=False)
-                elif mode == "unmatched" and _unmatched_df[0] is not None:
-                    _unmatched_df[0].to_excel(writer, sheet_name="未匹配", index=False)
+                if mode == "matched" and _matched_sheets:
+                    combined = pd.concat(_matched_sheets.values(), ignore_index=True)
+                    combined.to_excel(writer, sheet_name="已匹配", index=False)
+                elif mode == "unmatched" and _unmatched_sheets:
+                    combined = pd.concat(_unmatched_sheets.values(), ignore_index=True)
+                    combined.to_excel(writer, sheet_name="未匹配", index=False)
                 else:
                     for sname, sdf in _all_sheets.items():
                         sdf.to_excel(writer, sheet_name=sname, index=False)
@@ -657,9 +650,6 @@ def create_ledger_match_section(
                         theme.secondary_btn("导入文件", icon=ft.icons.Icons.UPLOAD, on_click=on_import),
                         theme.secondary_btn("清空", icon=ft.icons.Icons.DELETE_SWEEP, on_click=on_clear),
                         file_label,
-                        ft.Container(width=16),
-                        col_width_field,
-                        col_width_apply_btn,
                     ],
                     spacing=8,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -683,7 +673,7 @@ def create_ledger_match_section(
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
                 ft.Row(
-                    [match_btn, export_btn, status_label, ft.Container(width=16), view_segment],
+                    [match_btn, export_btn, status_label, match_count_label, ft.Container(width=16), view_segment],
                     spacing=8,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
