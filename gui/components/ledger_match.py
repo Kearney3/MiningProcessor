@@ -45,6 +45,9 @@ def create_ledger_match_section(
     _sort_column: list[str] = [None]  # 当前排序列
     _sort_ascending: list[bool] = [True]  # 排序方向
     _col_width: list[int] = [120]  # 列宽
+    _matched_df: list[pd.DataFrame] = [None]   # 匹配成功的行
+    _unmatched_df: list[pd.DataFrame] = [None]  # 匹配失败的行
+    _view_mode: list[str] = ["all"]  # "all" | "matched" | "unmatched"
 
     # --- 控件 ---
     file_label = ft.Text("未导入文件", size=12, color=ft.Colors.GREY)
@@ -62,6 +65,7 @@ def create_ledger_match_section(
         width=180,
         dense=True,
         options=[],
+        disabled=True,
     )
     id_dropdown = ft.Dropdown(
         label="设备编号列",
@@ -69,6 +73,7 @@ def create_ledger_match_section(
         width=180,
         dense=True,
         options=[],
+        disabled=True,
     )
     oil_dropdown = ft.Dropdown(
         label="油品列",
@@ -76,10 +81,42 @@ def create_ledger_match_section(
         width=180,
         dense=True,
         options=[],
+        disabled=True,
+    )
+
+    equip_match_switch = ft.Switch(
+        label="设备匹配", value=False,
+    )
+    oil_match_switch = ft.Switch(
+        label="油品匹配", value=False,
     )
 
     match_btn = theme.primary_btn("执行匹配", icon=ft.Icons.SEARCH, disabled=True)
     export_btn = theme.secondary_btn("导出结果", icon=ft.Icons.DOWNLOAD, disabled=True)
+
+    _VIEW_LABELS = ["全部", "已匹配", "未匹配"]
+    _VIEW_MODES = ["all", "matched", "unmatched"]
+
+    def _on_view_segment_change(e):
+        sel = e.control.selected  # set of selected values
+        if not sel:
+            return
+        val = next(iter(sel))
+        idx = _VIEW_MODES.index(val) if val in _VIEW_MODES else 0
+        _on_view_change(idx)
+
+    from flet.controls.material.segmented_button import Segment
+
+    view_segment = ft.SegmentedButton(
+        selected={"all"},
+        allow_empty_selection=False,
+        segments=[
+            Segment(label=ft.Text("全部"), value="all"),
+            Segment(label=ft.Text("已匹配"), value="matched"),
+            Segment(label=ft.Text("未匹配"), value="unmatched"),
+        ],
+        on_change=_on_view_segment_change,
+    )
 
     status_label = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
 
@@ -187,6 +224,27 @@ def create_ledger_match_section(
 
     _cancel_btn.on_click = _on_cancel_import
 
+    def _on_equip_toggle(e):
+        enabled = equip_match_switch.value
+        name_dropdown.disabled = not enabled
+        id_dropdown.disabled = not enabled
+        name_dropdown.update()
+        id_dropdown.update()
+
+    def _on_oil_toggle(e):
+        enabled = oil_match_switch.value
+        oil_dropdown.disabled = not enabled
+        oil_dropdown.update()
+
+    def _on_view_change(tab_index: int):
+        modes = ["all", "matched", "unmatched"]
+        _view_mode[0] = modes[tab_index]
+        _page[0] = 0
+        build_table()
+
+    equip_match_switch.on_change = _on_equip_toggle
+    oil_match_switch.on_change = _on_oil_toggle
+
     def _sort_indicator(col_name: str) -> str:
         """返回排序指示箭头"""
         if col_name == _sort_column[0]:
@@ -224,9 +282,18 @@ def create_ledger_match_section(
         else:
             data_table.columns = [ft.DataColumn(ft.Text("等待导入数据..."))]
 
+    def _get_view_df() -> pd.DataFrame | None:
+        """根据当前视图模式返回对应的 DataFrame"""
+        mode = _view_mode[0]
+        if mode == "matched":
+            return _matched_df[0]
+        elif mode == "unmatched":
+            return _unmatched_df[0]
+        return _filtered_df[0]
+
     def build_table():
         _apply_filter_and_sort()
-        df = _filtered_df[0]
+        df = _get_view_df()
         if df is None or df.empty:
             data_table.rows = []
             data_table.columns = [ft.DataColumn(ft.Text("等待导入数据..."))]
@@ -417,6 +484,10 @@ def create_ledger_match_section(
 
     def on_clear(e):
         _hide_import_progress()
+        _matched_df[0] = None
+        _unmatched_df[0] = None
+        _view_mode[0] = "all"
+        view_segment.selected_index = 0
         _all_sheets.clear()
         _filtered_df[0] = None
         _current_sheet[0] = ""
@@ -458,12 +529,12 @@ def create_ledger_match_section(
             _log_message(log, "请先在设备台账或油品台账页导入台账", level=logging.WARNING)
             return
 
-        name_col = name_dropdown.value
-        id_col = id_dropdown.value
-        oil_col = oil_dropdown.value
+        name_col = name_dropdown.value if equip_match_switch.value else None
+        id_col = id_dropdown.value if equip_match_switch.value else None
+        oil_col = oil_dropdown.value if oil_match_switch.value else None
 
         if not name_col and not id_col and not oil_col:
-            _log_message(log, "未选择任何匹配列，跳过匹配")
+            _log_message(log, "未启用任何匹配，跳过匹配")
             return
 
         result_df = df.copy()
@@ -508,6 +579,16 @@ def create_ledger_match_section(
         export_btn.disabled = False
         build_table()
 
+        # 拆分匹配成功/失败的行
+        if eq_ledger and (name_col or id_col):
+            mask = result_df["标准设备名称"].astype(str).str.len() > 0
+            _matched_df[0] = result_df[mask].copy()
+            _unmatched_df[0] = result_df[~mask].copy()
+        elif oil_ledger and oil_col:
+            mask = result_df["标准油品名称"].astype(str).str.len() > 0
+            _matched_df[0] = result_df[mask].copy()
+            _unmatched_df[0] = result_df[~mask].copy()
+
         parts = []
         if eq_ledger and (name_col or id_col):
             total = len(result_df)
@@ -535,9 +616,15 @@ def create_ledger_match_section(
         if not path:
             return
         try:
+            mode = _view_mode[0]
             with pd.ExcelWriter(path, engine="openpyxl") as writer:
-                for sname, sdf in _all_sheets.items():
-                    sdf.to_excel(writer, sheet_name=sname, index=False)
+                if mode == "matched" and _matched_df[0] is not None:
+                    _matched_df[0].to_excel(writer, sheet_name="已匹配", index=False)
+                elif mode == "unmatched" and _unmatched_df[0] is not None:
+                    _unmatched_df[0].to_excel(writer, sheet_name="未匹配", index=False)
+                else:
+                    for sname, sdf in _all_sheets.items():
+                        sdf.to_excel(writer, sheet_name=sname, index=False)
             _log_message(log, f"已导出: {path}")
         except Exception as ex:
             _log_message(log, f"导出失败: {ex}", level=logging.ERROR)
@@ -585,17 +672,18 @@ def create_ledger_match_section(
                 ),
                 ft.Row(
                     [
-                        ft.Text("设备匹配:", size=13, color=theme.TEXT_SECONDARY),
+                        equip_match_switch,
                         name_dropdown,
                         id_dropdown,
-                        ft.Text("油品匹配:", size=13, color=theme.TEXT_SECONDARY),
+                        ft.Container(width=16),
+                        oil_match_switch,
                         oil_dropdown,
                     ],
                     spacing=8,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
                 ft.Row(
-                    [match_btn, export_btn, status_label],
+                    [match_btn, export_btn, status_label, ft.Container(width=16), view_segment],
                     spacing=8,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
