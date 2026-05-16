@@ -6,6 +6,7 @@ import asyncio
 import logging
 import flet as ft
 import os
+import pandas as pd
 from func import config_loader
 from func.excel_fuel import process_diesel_data
 from func.excel_production_enhanced import MiningDataProcessor as ProdProcessor
@@ -33,11 +34,116 @@ def set_btn_state(btn: ft.Button, enabled: bool, label: str = "处理"):
 
 
 # ---------------------------------------------------------------------------
+# 台账匹配后处理
+# ---------------------------------------------------------------------------
+def _find_col(columns, candidates):
+    """在列名列表中查找第一个匹配的候选列名"""
+    for c in candidates:
+        if c in columns:
+            return c
+    return None
+
+
+def _apply_ledger_matching(output_file: str, equipment_ledger=None, oil_ledger=None):
+    """
+    对已写入的 Excel 文件进行台账匹配后处理。
+    读取每个 sheet，检测列名，追加匹配字段，重新写回。
+    """
+    if not equipment_ledger and not oil_ledger:
+        return
+
+    try:
+        xl = pd.ExcelFile(output_file)
+    except Exception as ex:
+        logging.warning(f"无法读取输出文件进行台账匹配: {ex}")
+        return
+
+    sheet_data = {}
+    matched_any = False
+
+    for sheet_name in xl.sheet_names:
+        df = xl.parse(sheet_name)
+        cols = set(df.columns)
+
+        # 设备匹配
+        if equipment_ledger:
+            name_col = _find_col(cols, ["设备名称", "矿卡名称"])
+            id_col = "设备编号" if "设备编号" in cols else None
+            if name_col:
+                std_names, std_ids, std_companies = [], [], []
+                for _, row in df.iterrows():
+                    name_val = row.get(name_col)
+                    id_val = row.get(id_col) if id_col else None
+                    name_str = str(name_val) if not pd.isna(name_val) else None
+                    id_str = str(id_val) if id_val is not None and not pd.isna(id_val) else None
+                    result = equipment_ledger.match_device(name=name_str, device_id=id_str)
+                    if result:
+                        std_names.append(result.get("标准设备名称", ""))
+                        std_ids.append(result.get("标准设备编号", ""))
+                        std_companies.append(result.get("标准公司名称", ""))
+                    else:
+                        std_names.append("")
+                        std_ids.append("")
+                        std_companies.append("")
+                df["标准设备名称"] = std_names
+                df["标准设备编号"] = std_ids
+                df["标准公司名称"] = std_companies
+                matched_any = True
+
+        # 油品匹配
+        if oil_ledger:
+            oil_col = _find_col(cols, ["油品种类", "油品名称"])
+            if oil_col:
+                std_oils = []
+                for _, row in df.iterrows():
+                    oil_val = row[oil_col]
+                    if pd.isna(oil_val):
+                        std_oils.append("")
+                    else:
+                        result = oil_ledger.match(str(oil_val))
+                        std_oils.append(result["标准名称"] if result else "")
+                df["标准油品名称"] = std_oils
+                matched_any = True
+
+        sheet_data[sheet_name] = df
+
+    if not matched_any:
+        return
+
+    # 重写 Excel
+    with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
+        for sheet_name, df in sheet_data.items():
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+    logging.info(f"台账匹配完成，已更新: {output_file}")
+
+
+def _get_output_file(module_type: str, path: str, **kwargs) -> str | None:
+    """根据模块类型和输入路径，推断输出文件路径"""
+    if module_type == "fuel":
+        return os.path.join(os.path.dirname(path), "Fuel.xlsx")
+    elif module_type == "production":
+        base = path if os.path.isdir(path) else os.path.dirname(path)
+        return os.path.join(base, "合并产量.xlsx")
+    elif module_type == "electrical":
+        return os.path.join(os.path.dirname(path), "电力消耗统计.xlsx")
+    elif module_type == "worktime":
+        year = kwargs.get("year", 2025)
+        month = kwargs.get("month", 1)
+        return os.path.join(os.path.dirname(path), f"{year}{month:02d}_工作效率表.xlsx")
+    elif module_type == "merge":
+        keyword = kwargs.get("keyword", "")
+        return os.path.join(path, f"{keyword}_合并.xlsx")
+    return None
+
+
+# ---------------------------------------------------------------------------
 # 任务执行
 # ---------------------------------------------------------------------------
 def _execute_task(module_type: str, path: str, **kwargs) -> str | None:
     """在后台线程中执行处理任务"""
     error_message = None
+    equipment_ledger = kwargs.pop("equipment_ledger", None)
+    oil_ledger = kwargs.pop("oil_ledger", None)
 
     try:
         if module_type == "fuel":
@@ -66,6 +172,12 @@ def _execute_task(module_type: str, path: str, **kwargs) -> str | None:
             strip_time = kwargs.get("strip_time", False)
             sort_configs = kwargs.get("sort_configs", None)
             merge_excel_files(path, keyword, strip_time=strip_time, sort_configs=sort_configs)
+
+        # 台账匹配后处理
+        if equipment_ledger or oil_ledger:
+            output_file = _get_output_file(module_type, path, **kwargs)
+            if output_file and os.path.exists(output_file):
+                _apply_ledger_matching(output_file, equipment_ledger, oil_ledger)
     except Exception as ex:
         error_message = str(ex)
 
@@ -91,7 +203,7 @@ async def run_task(page: ft.Page, module_type: str, path: str, btn: ft.Button, l
 # ---------------------------------------------------------------------------
 # 按钮点击处理
 # ---------------------------------------------------------------------------
-async def on_fuel_process(page: ft.Page, fuel_refs: dict, log):
+async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=None, oil_ledger=None):
     """燃油处理按钮回调"""
     path = fuel_refs["path"].value
     if not path:
@@ -100,11 +212,11 @@ async def on_fuel_process(page: ft.Page, fuel_refs: dict, log):
     btn = fuel_refs["btn"]
     year = int(fuel_refs["year"].value)
     set_btn_state(btn, False, "处理中...")
-    await run_task(page, "fuel", path, btn, log, year=year)
+    await run_task(page, "fuel", path, btn, log, year=year, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
     set_btn_state(btn, True, "处理")
 
 
-async def on_prod_process(page: ft.Page, prod_refs: dict, log):
+async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=None, oil_ledger=None):
     """生产处理按钮回调"""
     path = prod_refs["path"].value
     if not path:
@@ -122,11 +234,11 @@ async def on_prod_process(page: ft.Page, prod_refs: dict, log):
 
     btn = prod_refs["btn"]
     set_btn_state(btn, False, "处理中...")
-    await run_task(page, "production", path, btn, log, raw_start=raw_start)
+    await run_task(page, "production", path, btn, log, raw_start=raw_start, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
     set_btn_state(btn, True, "处理")
 
 
-async def on_elec_process(page: ft.Page, elec_refs: dict, log):
+async def on_elec_process(page: ft.Page, elec_refs: dict, log, equipment_ledger=None, oil_ledger=None):
     """电力处理按钮回调"""
     path = elec_refs["path"].value
     if not path:
@@ -142,11 +254,11 @@ async def on_elec_process(page: ft.Page, elec_refs: dict, log):
 
     btn = elec_refs["btn"]
     set_btn_state(btn, False, "处理中...")
-    await run_task(page, "electrical", path, btn, log, year=year)
+    await run_task(page, "electrical", path, btn, log, year=year, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
     set_btn_state(btn, True, "处理")
 
 
-async def on_work_process(page: ft.Page, work_refs: dict, log):
+async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=None, oil_ledger=None):
     """工时处理按钮回调"""
     path = work_refs["path"].value
     if not path:
@@ -156,11 +268,11 @@ async def on_work_process(page: ft.Page, work_refs: dict, log):
     year = int(work_refs["year"].value)
     month = int(work_refs["month"].value)
     set_btn_state(btn, False, "处理中...")
-    await run_task(page, "worktime", path, btn, log, year=year, month=month)
+    await run_task(page, "worktime", path, btn, log, year=year, month=month, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
     set_btn_state(btn, True, "处理")
 
 
-async def on_merge_process(page: ft.Page, merge_refs: dict, log):
+async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledger=None, oil_ledger=None):
     """Excel 合并按钮回调"""
     path = merge_refs["path"].value
     if not path:
@@ -179,33 +291,49 @@ async def on_merge_process(page: ft.Page, merge_refs: dict, log):
             sort_configs.append({"column": col, "ascending": bool(cfg.get("ascending", True))})
     btn = merge_refs["btn"]
     set_btn_state(btn, False, "合并中...")
-    await run_task(page, "merge", path, btn, log, keyword=keyword, strip_time=strip_time, sort_configs=sort_configs)
+    await run_task(page, "merge", path, btn, log, keyword=keyword, strip_time=strip_time, sort_configs=sort_configs, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
     set_btn_state(btn, True, "合并")
 
 
 # ---------------------------------------------------------------------------
 # 初始化 & 绑定
 # ---------------------------------------------------------------------------
-def wire_processing_buttons(module_refs: dict, page: ft.Page, log):
+def wire_processing_buttons(module_refs: dict, page: ft.Page, log, ledger_refs: dict = None, oil_ledger_refs: dict = None):
     """
     将模块 refs 中的按钮绑定到处理回调
     必须在模块区域创建完成后调用
     """
+    ledger_refs = ledger_refs or {}
+    oil_ledger_refs = oil_ledger_refs or {}
+
+    def _get_ledgers():
+        """根据开关状态获取台账实例"""
+        toggle = module_refs.get("_match_toggle")
+        if not toggle or not toggle.value:
+            return None, None
+        eq = ledger_refs.get("get_ledger", lambda: None)()
+        oil = oil_ledger_refs.get("get_oil_ledger", lambda: None)()
+        return eq, oil
 
     async def handle_fuel_click(e: ft.ControlEvent):
-        await on_fuel_process(page, module_refs["fuel"], log)
+        eq, oil = _get_ledgers()
+        await on_fuel_process(page, module_refs["fuel"], log, equipment_ledger=eq, oil_ledger=oil)
 
     async def handle_prod_click(e: ft.ControlEvent):
-        await on_prod_process(page, module_refs["prod"], log)
+        eq, oil = _get_ledgers()
+        await on_prod_process(page, module_refs["prod"], log, equipment_ledger=eq, oil_ledger=oil)
 
     async def handle_elec_click(e: ft.ControlEvent):
-        await on_elec_process(page, module_refs["elec"], log)
+        eq, oil = _get_ledgers()
+        await on_elec_process(page, module_refs["elec"], log, equipment_ledger=eq, oil_ledger=oil)
 
     async def handle_work_click(e: ft.ControlEvent):
-        await on_work_process(page, module_refs["work"], log)
+        eq, oil = _get_ledgers()
+        await on_work_process(page, module_refs["work"], log, equipment_ledger=eq, oil_ledger=oil)
 
     async def handle_merge_click(e: ft.ControlEvent):
-        await on_merge_process(page, module_refs["merge"], log)
+        eq, oil = _get_ledgers()
+        await on_merge_process(page, module_refs["merge"], log, equipment_ledger=eq, oil_ledger=oil)
 
     module_refs["fuel"]["btn"].on_click = handle_fuel_click
     module_refs["prod"]["btn"].on_click = handle_prod_click
