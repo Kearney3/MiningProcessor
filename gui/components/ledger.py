@@ -155,16 +155,33 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
         ledger_prev_btn.disabled = cur <= 0
         ledger_next_btn.disabled = cur >= total - 1
 
+    _empty_state = ft.Column(
+        [
+            ft.Icon(ft.Icons.INVENTORY_2_OUTLINED, size=48, color=ft.Colors.GREY_300),
+            ft.Text("暂无设备台账数据", size=14, color=theme.TEXT_SECONDARY, weight=ft.FontWeight.W_500),
+            ft.Text("点击上方「导入台账」开始", size=12, color=ft.Colors.GREY_400),
+        ],
+        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        alignment=ft.MainAxisAlignment.CENTER,
+        spacing=8,
+    )
+
     def build_table():
         start = _ledger_page[0] * PAGE_SIZE
         end = start + PAGE_SIZE
         page_records = ledger_records[start:end]
-        ledger_table.rows = [
-            ft.DataRow(
-                cells=[ft.DataCell(ft.Text(_cell_text(r.get(c)))) for c in LEDGER_COLUMNS]
-            )
-            for r in page_records
-        ]
+        if not ledger_records:
+            ledger_table.rows = []
+            ledger_table.columns = []
+            _empty_state.visible = True
+        else:
+            _empty_state.visible = False
+            ledger_table.rows = [
+                ft.DataRow(
+                    cells=[ft.DataCell(ft.Text(_cell_text(r.get(c)))) for c in LEDGER_COLUMNS]
+                )
+                for r in page_records
+            ]
         _update_ledger_page_controls()
         page.update()
 
@@ -186,11 +203,13 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
             ft.Row(
                 controls=[ledger_table],
                 scroll=ft.ScrollMode.AUTO,
-            )
+            ),
+            _empty_state,
         ],
         scroll=ft.ScrollMode.AUTO,
-        height=450,
         expand=True,
+        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        alignment=ft.MainAxisAlignment.CENTER,
     )
 
     async def on_load(e: ft.ControlEvent):

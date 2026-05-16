@@ -19,7 +19,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
     # --- Fuel ---
     fuel_path = ft.TextField(
         label="燃油数据处理",
-        hint_text="选择 Excel 文件...",
+        hint_text="输入路径或点击按钮选择...",
         expand=2,
         read_only=False,
         suffix=ft.IconButton(
@@ -43,7 +43,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
     # --- Production ---
     prod_path = ft.TextField(
         label="生产数据处理",
-        hint_text="选择 Excel 文件或文件夹...",
+        hint_text="输入路径或点击按钮选择...",
         expand=2,
         read_only=False,
     )
@@ -73,7 +73,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
     # --- Electrical ---
     elec_path = ft.TextField(
         label="电力数据处理",
-        hint_text="选择 Excel 文件...",
+        hint_text="输入路径或点击按钮选择...",
         expand=2,
         read_only=False,
         suffix=ft.IconButton(
@@ -97,7 +97,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
     # --- Work time ---
     work_path = ft.TextField(
         label="工时数据处理",
-        hint_text="选择 Excel 文件...",
+        hint_text="输入路径或点击按钮选择...",
         expand=2,
         read_only=False,
         suffix=ft.IconButton(
@@ -127,7 +127,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
     # --- Excel Merger ---
     merge_path = ft.TextField(
         label="Excel 合并",
-        hint_text="选择包含 Excel 文件的文件夹...",
+        hint_text="输入路径或点击按钮选择...",
         expand=2,
         read_only=False,
         suffix=ft.IconButton(
@@ -330,6 +330,12 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
     work_path.suffix.on_click = on_work_browse
     merge_path.suffix.on_click = on_merge_browse
 
+    # --- 台账匹配开关 ---
+    match_toggle = ft.Checkbox(
+        label="启用台账匹配（设备+油品）",
+        value=False,
+    )
+
     container = ft.Container(
         content=ft.Column(
             [
@@ -337,6 +343,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
                 ft.Container(
                     content=ft.Column(
                         [
+                            ft.Row([match_toggle], spacing=8),
                             ft.Row([fuel_path, fuel_year, fuel_btn], spacing=8),
                             ft.Row([prod_path, prod_file_btn, prod_folder_btn, prod_raw_start, prod_btn], spacing=8),
                             ft.Row([elec_path, elec_year, elec_btn], spacing=8),
@@ -373,6 +380,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
     )
 
     module_refs = {
+        "_match_toggle": match_toggle,
         "fuel": {"path": fuel_path, "year": fuel_year, "btn": fuel_btn},
         "prod": {"path": prod_path, "raw_start": prod_raw_start, "btn": prod_btn},
         "elec": {"path": elec_path, "year": elec_year, "btn": elec_btn},

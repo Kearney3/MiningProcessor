@@ -128,9 +128,12 @@ def create_ledger_match_section(
         value=0, height=6, visible=False, expand=True,
     )
     _import_progress_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY, visible=False)
-    _cancel_btn = ft.IconButton(
-        icon=ft.Icons.CANCEL, tooltip="取消导入", icon_size=18,
+    _cancel_btn = ft.Button(
+        "取消导入",
+        icon=ft.Icons.CANCEL,
         visible=False,
+        style=ft.ButtonStyle(bgcolor=theme.ERROR, color="#FFFFFF"),
+        height=36,
     )
     _import_cancelled = threading.Event()
 
@@ -285,15 +288,28 @@ def create_ledger_match_section(
             return _unmatched_sheets.get(sheet)
         return _filtered_df[0]
 
+    _empty_state = ft.Column(
+        [
+            ft.Icon(ft.Icons.TABLE_CHART_OUTLINED, size=48, color=ft.Colors.GREY_300),
+            ft.Text("暂无数据", size=14, color=theme.TEXT_SECONDARY, weight=ft.FontWeight.W_500),
+            ft.Text("点击上方「导入文件」开始", size=12, color=ft.Colors.GREY_400),
+        ],
+        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        alignment=ft.MainAxisAlignment.CENTER,
+        spacing=8,
+    )
+
     def build_table():
         _apply_filter_and_sort()
         df = _get_view_df()
         if df is None or df.empty:
             data_table.rows = []
-            data_table.columns = [ft.DataColumn(ft.Text("等待导入数据..."))]
+            data_table.columns = []
+            _empty_state.visible = True
             _update_page_controls()
             page.update()
             return
+        _empty_state.visible = False
 
         cols = list(df.columns)
         _rebuild_columns(cols)
@@ -530,70 +546,82 @@ def create_ledger_match_section(
             _log_message(log, "未启用任何匹配，跳过匹配")
             return
 
-        result_df = df.copy()
-        matched_count = 0
-
-        # 设备匹配
-        if eq_ledger and (name_col or id_col):
-            std_names, std_ids, std_companies = [], [], []
-            for _, row in result_df.iterrows():
-                n = str(row[name_col]) if name_col and name_col in result_df.columns and not pd.isna(row.get(name_col)) else None
-                i = str(row[id_col]) if id_col and id_col in result_df.columns and not pd.isna(row.get(id_col)) else None
-                r = eq_ledger.match_device(name=n, device_id=i)
-                if r:
-                    std_names.append(r.get("标准设备名称", ""))
-                    std_ids.append(r.get("标准设备编号", ""))
-                    std_companies.append(r.get("标准公司名称", ""))
-                    matched_count += 1
-                else:
-                    std_names.append("")
-                    std_ids.append("")
-                    std_companies.append("")
-            result_df["标准设备名称"] = std_names
-            result_df["标准设备编号"] = std_ids
-            result_df["标准公司名称"] = std_companies
-
-        # 油品匹配
-        oil_matched = 0
-        if oil_ledger and oil_col and oil_col in result_df.columns:
-            std_oils = []
-            for _, row in result_df.iterrows():
-                v = row[oil_col]
-                r = oil_ledger.match(str(v)) if not pd.isna(v) else None
-                if r:
-                    std_oils.append(r["标准名称"])
-                    oil_matched += 1
-                else:
-                    std_oils.append("")
-            result_df["标准油品名称"] = std_oils
-
-        _all_sheets[_current_sheet[0]] = result_df
-        _page[0] = 0
-        export_btn.disabled = False
-        build_table()
-
-        # 拆分匹配成功/失败的行
-        sheet = _current_sheet[0]
-        if eq_ledger and (name_col or id_col):
-            mask = result_df["标准设备名称"].astype(str).str.len() > 0
-            _matched_sheets[sheet] = result_df[mask].copy()
-            _unmatched_sheets[sheet] = result_df[~mask].copy()
-        elif oil_ledger and oil_col:
-            mask = result_df["标准油品名称"].astype(str).str.len() > 0
-            _matched_sheets[sheet] = result_df[mask].copy()
-            _unmatched_sheets[sheet] = result_df[~mask].copy()
-
-        parts = []
-        if eq_ledger and (name_col or id_col):
-            total = len(result_df)
-            parts.append(f"设备匹配: {matched_count}/{total}")
-        if oil_ledger and oil_col:
-            total = len(result_df)
-            parts.append(f"油品匹配: {oil_matched}/{total}")
-        status_label.value = "  |  ".join(parts)
-        _update_match_status()
-        _log_message(log, f"匹配完成: {status_label.value}")
+        # Loading 状态
+        match_btn.disabled = True
+        match_btn.text = "匹配中..."
+        match_btn.icon = ft.Icons.HOURGLASS_TOP
+        export_btn.disabled = True
         page.update()
+
+        try:
+            result_df = df.copy()
+            matched_count = 0
+
+            # 设备匹配
+            if eq_ledger and (name_col or id_col):
+                std_names, std_ids, std_companies = [], [], []
+                for _, row in result_df.iterrows():
+                    n = str(row[name_col]) if name_col and name_col in result_df.columns and not pd.isna(row.get(name_col)) else None
+                    i = str(row[id_col]) if id_col and id_col in result_df.columns and not pd.isna(row.get(id_col)) else None
+                    r = eq_ledger.match_device(name=n, device_id=i)
+                    if r:
+                        std_names.append(r.get("标准设备名称", ""))
+                        std_ids.append(r.get("标准设备编号", ""))
+                        std_companies.append(r.get("标准公司名称", ""))
+                        matched_count += 1
+                    else:
+                        std_names.append("")
+                        std_ids.append("")
+                        std_companies.append("")
+                result_df["标准设备名称"] = std_names
+                result_df["标准设备编号"] = std_ids
+                result_df["标准公司名称"] = std_companies
+
+            # 油品匹配
+            oil_matched = 0
+            if oil_ledger and oil_col and oil_col in result_df.columns:
+                std_oils = []
+                for _, row in result_df.iterrows():
+                    v = row[oil_col]
+                    r = oil_ledger.match(str(v)) if not pd.isna(v) else None
+                    if r:
+                        std_oils.append(r["标准名称"])
+                        oil_matched += 1
+                    else:
+                        std_oils.append("")
+                result_df["标准油品名称"] = std_oils
+
+            _all_sheets[_current_sheet[0]] = result_df
+            _page[0] = 0
+            build_table()
+
+            # 拆分匹配成功/失败的行
+            sheet = _current_sheet[0]
+            if eq_ledger and (name_col or id_col):
+                mask = result_df["标准设备名称"].astype(str).str.len() > 0
+                _matched_sheets[sheet] = result_df[mask].copy()
+                _unmatched_sheets[sheet] = result_df[~mask].copy()
+            elif oil_ledger and oil_col:
+                mask = result_df["标准油品名称"].astype(str).str.len() > 0
+                _matched_sheets[sheet] = result_df[mask].copy()
+                _unmatched_sheets[sheet] = result_df[~mask].copy()
+
+            parts = []
+            if eq_ledger and (name_col or id_col):
+                total = len(result_df)
+                parts.append(f"设备匹配: {matched_count}/{total}")
+            if oil_ledger and oil_col:
+                total = len(result_df)
+                parts.append(f"油品匹配: {oil_matched}/{total}")
+            status_label.value = "  |  ".join(parts)
+            _update_match_status()
+            _log_message(log, f"匹配完成: {status_label.value}")
+        finally:
+            match_btn.disabled = False
+            match_btn.text = "执行匹配"
+            match_btn.icon = ft.Icons.SEARCH
+            export_btn.disabled = not bool(_all_sheets)
+            page.update()
 
     # ========================================================================
     # 导出
@@ -639,11 +667,13 @@ def create_ledger_match_section(
             ft.Row(
                 controls=[data_table],
                 scroll=ft.ScrollMode.AUTO,
-            )
+            ),
+            _empty_state,
         ],
         scroll=ft.ScrollMode.AUTO,
-        height=450,
         expand=True,
+        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        alignment=ft.MainAxisAlignment.CENTER,
     )
 
     container = ft.Container(
@@ -665,24 +695,41 @@ def create_ledger_match_section(
                     spacing=8,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
+                ft.Container(
+                    content=ft.Column(
+                        [
+                            ft.Row(
+                                [
+                                    ft.Text("设备匹配", size=12, color=theme.TEXT_SECONDARY, weight=ft.FontWeight.W_500),
+                                    name_match_switch,
+                                    name_dropdown,
+                                    ft.Container(width=8),
+                                    id_match_switch,
+                                    id_dropdown,
+                                ],
+                                spacing=8,
+                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                            ft.Row(
+                                [
+                                    ft.Text("油品匹配", size=12, color=theme.TEXT_SECONDARY, weight=ft.FontWeight.W_500),
+                                    oil_match_switch,
+                                    oil_dropdown,
+                                ],
+                                spacing=8,
+                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                        ],
+                        spacing=4,
+                    ),
+                    padding=ft.padding.symmetric(vertical=4),
+                ),
                 ft.Row(
-                    [
-                        name_match_switch,
-                        name_dropdown,
-                        id_match_switch,
-                        id_dropdown,
-                        ft.Container(width=16),
-                        oil_match_switch,
-                        oil_dropdown,
-                    ],
+                    [match_btn, export_btn, status_label, match_count_label],
                     spacing=8,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
-                ft.Row(
-                    [match_btn, export_btn, status_label, match_count_label, ft.Container(width=16), view_segment],
-                    spacing=8,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                ),
+                view_segment,
                 ft.Container(
                     content=table_wrapper,
                     border=ft.Border.all(1, theme.BORDER),
