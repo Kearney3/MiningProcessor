@@ -108,7 +108,7 @@ def create_ledger_match_section(
     from flet.controls.material.segmented_button import Segment
 
     view_segment = ft.SegmentedButton(
-        selected={"all"},
+        selected=["all"],
         allow_empty_selection=False,
         segments=[
             Segment(label=ft.Text("全部"), value="all"),
