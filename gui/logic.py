@@ -185,19 +185,15 @@ def _execute_task(module_type: str, path: str, **kwargs) -> str | None:
 
 
 async def run_task(page: ft.Page, module_type: str, path: str, btn: ft.Button, log, **kwargs):
-    """异步执行处理任务，并在 UI 线程中恢复界面状态"""
-    del page  # 保留现有调用签名，避免影响其他调用方
+    """异步执行处理任务，按钮状态由调用方自行恢复"""
+    del page, btn  # 保留现有调用签名，避免影响其他调用方
 
     _log_message(log, f"[{module_type}] 开始处理...")
-    try:
-        error_message = await asyncio.to_thread(_execute_task, module_type, path, **kwargs)
-        if error_message:
-            _log_message(log, f"[{module_type}] 处理失败: {error_message}", level=logging.ERROR)
-        else:
-            _log_message(log, f"[{module_type}] 处理成功")
-    finally:
-        set_btn_state(btn, True, "处理")
-        set_btn_state(btn, True, "合并")
+    error_message = await asyncio.to_thread(_execute_task, module_type, path, **kwargs)
+    if error_message:
+        _log_message(log, f"[{module_type}] 处理失败: {error_message}", level=logging.ERROR)
+    else:
+        _log_message(log, f"[{module_type}] 处理成功")
 
 
 # ---------------------------------------------------------------------------

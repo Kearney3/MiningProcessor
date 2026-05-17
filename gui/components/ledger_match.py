@@ -177,7 +177,7 @@ def create_ledger_match_section(
             try:
                 result = result.sort_values(by=col, ascending=ascending, kind="stable")
             except Exception:
-                pass
+                logging.getLogger(__name__).debug("排序失败: col=%s", col)
 
         _filtered_df[0] = result
 
@@ -441,12 +441,13 @@ def create_ledger_match_section(
                 try:
                     df = xl.parse(sname)
                 except Exception:
+                    logging.getLogger(__name__).warning("解析 sheet 失败: %s", sname, exc_info=True)
                     df = pd.DataFrame()
                 parsed_sheets[sname] = df
                 try:
                     page.run_thread(lambda _i=i, _s=sname: _update_and_refresh(_i + 1, total, _s))
                 except Exception:
-                    pass
+                    logging.getLogger(__name__).debug("page.run_thread 失败（页面可能已关闭）")
 
         def _update_and_refresh(current, total_val, sname):
             _update_import_progress(current, total_val, sname)
@@ -722,7 +723,7 @@ def create_ledger_match_section(
                         ],
                         spacing=4,
                     ),
-                    padding=ft.padding.symmetric(vertical=4),
+                    padding=ft.Padding.symmetric(vertical=4),
                 ),
                 ft.Row(
                     [match_btn, export_btn, status_label, match_count_label],

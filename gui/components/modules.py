@@ -233,8 +233,8 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
                     spacing=8,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
-                padding=ft.padding.symmetric(horizontal=8, vertical=4),
-                border=ft.border.all(1, theme.BORDER),
+                padding=ft.Padding.symmetric(horizontal=8, vertical=4),
+                border=ft.Border.all(1, theme.BORDER),
                 border_radius=theme.RADIUS_SM,
                 bgcolor=theme.SURFACE_HIGH,
             )

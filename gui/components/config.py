@@ -153,6 +153,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
         try:
             device_map = config_loader.get_device_load_map()
         except Exception:
+            logging.getLogger(__name__).warning("加载配置失败，使用空配置", exc_info=True)
             device_map = {}
         set_config_state(
             [

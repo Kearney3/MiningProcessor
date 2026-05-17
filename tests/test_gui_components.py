@@ -23,7 +23,6 @@ spec = importlib.util.spec_from_file_location(
     submodule_search_locations=[str(ROOT / "gui" / "components")],
 )
 components = importlib.util.module_from_spec(spec)
-components.__package__ = "gui.components"
 sys.modules["gui.components"] = components
 spec.loader.exec_module(components)
 
@@ -32,7 +31,6 @@ main_spec = importlib.util.spec_from_file_location(
     submodule_search_locations=[],
 )
 gui_main = importlib.util.module_from_spec(main_spec)
-gui_main.__package__ = "gui"
 sys.modules["gui.main"] = gui_main
 main_spec.loader.exec_module(gui_main)
 

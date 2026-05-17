@@ -80,7 +80,7 @@ def card_container(content, **kwargs) -> ft.Container:
     """卡片容器样式"""
     defaults = dict(
         bgcolor=SURFACE,
-        border=ft.border.all(1, BORDER),
+        border=ft.Border.all(1, BORDER),
         border_radius=RADIUS_LG,
         padding=SPACING_LG,
     )
@@ -108,7 +108,7 @@ def sidebar_item(label: str, icon: str, selected: bool = False) -> ft.Container:
         ),
         bgcolor=bg,
         border_radius=RADIUS_SM,
-        padding=ft.padding.symmetric(horizontal=SPACING_MD, vertical=10),
+        padding=ft.Padding.symmetric(horizontal=SPACING_MD, vertical=10),
         on_click=None,  # 由外部绑定
         ink=True,
     )

@@ -61,7 +61,7 @@ def parse_excel_data(file_path, target_year=None):
                     dt = dt.replace(year=int(target_year))
 
                 date_mapping[col_idx] = dt
-            except:
+            except Exception:
                 continue  # 无法识别则跳过
 
         # 4. 寻找数据行并提取设备名称
