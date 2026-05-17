@@ -50,7 +50,7 @@ def create_log_view(height: int = 300) -> tuple[ft.Container, dict]:
                 alignment=ft.MainAxisAlignment.CENTER,
             ),
             bgcolor=theme.SURFACE,
-            border=ft.border.only(top=ft.BorderSide(1, theme.BORDER)),
+            border=ft.Border.only(top=ft.BorderSide(1, theme.BORDER)),
             tooltip="上下拖拽调整日志区域高度",
         ),
         mouse_cursor=ft.MouseCursor.RESIZE_UP_DOWN,

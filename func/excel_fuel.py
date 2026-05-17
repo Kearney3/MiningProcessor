@@ -54,16 +54,6 @@ def process_diesel_data(file_path, target_year=None):
             elif "夜班" in h4_val or "шөнө" in h4_val.lower():
                 col_to_shift[col_idx] = "Night"
 
-        # 3. 预解析班次位置
-        # 建立一个列索引到班次的映射
-        col_to_shift = {}
-        for col_idx in range(header_rows.shape[1]):
-            h4_val = str(header_rows.iloc[2, col_idx]).strip()
-            if "白班" in h4_val or "өдөр" in h4_val.lower():
-                col_to_shift[col_idx] = "Day"
-            elif "夜班" in h4_val or "шөнө" in h4_val.lower():
-                col_to_shift[col_idx] = "Night"
-
         # 4. 识别列属性
         col_mapping = []
         stop_signal = False
@@ -90,7 +80,7 @@ def process_diesel_data(file_path, target_year=None):
             try:
                 dt = pd.to_datetime(h2)
                 if target_year: dt = dt.replace(year=target_year)
-            except:
+            except Exception:
                 col_mapping.append({"type": "ignore"})
                 continue
 

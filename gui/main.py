@@ -145,7 +145,7 @@ def main(page: ft.Page):
         try:
             page.run_thread(_flush_pending_to_ui)
         except Exception:
-            pass
+            logging.getLogger(__name__).debug("page.run_thread 失败（页面可能已关闭）")
 
     def _update_log_view():
         """消费线程调用：安排刷新"""
@@ -366,7 +366,7 @@ def main(page: ft.Page):
         ),
         width=theme.SIDEBAR_WIDTH,
         bgcolor=theme.SIDEBAR_BG,
-        padding=ft.padding.symmetric(horizontal=8, vertical=12),
+        padding=ft.Padding.symmetric(horizontal=8, vertical=12),
     )
 
     # ---- Header ----
@@ -380,8 +380,8 @@ def main(page: ft.Page):
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         ),
         bgcolor=theme.SURFACE,
-        padding=ft.padding.symmetric(horizontal=theme.SPACING_LG, vertical=10),
-        border=ft.border.only(bottom=ft.BorderSide(1, theme.BORDER)),
+        padding=ft.Padding.symmetric(horizontal=theme.SPACING_LG, vertical=10),
+        border=ft.Border.only(bottom=ft.BorderSide(1, theme.BORDER)),
     )
 
     # ---- Content area ----
@@ -400,7 +400,7 @@ def main(page: ft.Page):
         ),
         expand=True,
         bgcolor=theme.SURFACE,
-        border=ft.border.all(1, theme.BORDER),
+        border=ft.Border.all(1, theme.BORDER),
         border_radius=theme.RADIUS_LG,
         clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
     )
@@ -415,7 +415,7 @@ def main(page: ft.Page):
             spacing=4,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         ),
-        padding=ft.padding.only(left=8, top=4, bottom=2),
+        padding=ft.Padding.only(left=8, top=4, bottom=2),
     )
 
     page.add(
@@ -425,7 +425,7 @@ def main(page: ft.Page):
                 unified_body,
                 ft.Container(
                     content=ft.Column([log_header, log_view], spacing=0),
-                    border=ft.border.only(top=ft.BorderSide(1, theme.BORDER)),
+                    border=ft.Border.only(top=ft.BorderSide(1, theme.BORDER)),
                 ),
             ],
             expand=True,

@@ -95,13 +95,13 @@ def process_excel_data(file_path, year, month, output_file):
         # 去掉第二列(索引为1的列)为空的行 (保留你原有的清理逻辑)
         if len(combined_day_df.columns) > 1:
             check_idx = -1
-            # 找到包含“Техникийн”的列索引
+            # 找到包含”Техникийн”的列索引
             for idx, col in enumerate(combined_day_df.columns):
                 if 'Техникийн' in col:
                     check_idx = idx
                     break
-            check_col = combined_day_df.columns[check_idx]
             if check_idx != -1:
+                check_col = combined_day_df.columns[check_idx]
                 combined_day_df.dropna(subset=[check_col], inplace=True)
 
         # 去掉除了“日期”和“班次”之外全部为空的行

@@ -3,7 +3,6 @@ import json
 import os
 import sys
 from typing import List, Tuple
-import sys
 from pathlib import Path
 
 # 定位到当前项目的根目录
@@ -134,9 +133,6 @@ def merge_excel_files(
                     )
 
             # 去掉空行/全空行（可选，保留原样更稳妥，只在非首表时去掉表头）
-            if sheet_dataframes:
-                # 已经有数据，当前 df 作为后续，跳过表头行
-                pass
             sheet_dataframes.append(df)
 
         if not sheet_dataframes:
@@ -243,7 +239,7 @@ def main():
 
 
 if __name__ == "__main__":
-    from logger import setup_logging
+    from func.logger import setup_logging
 
     setup_logging()
     main()
