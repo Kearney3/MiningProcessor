@@ -1,15 +1,11 @@
 """设备台账区域组件"""
 import logging
 import os
-from pathlib import Path
-import sys
 
 import pandas as pd
 import flet as ft
 
 # 定位到当前项目的根目录
-root = Path(__file__).resolve().parent.parent.parent
-sys.path.append(str(root))
 
 import func.equipment_ledger as equipment_ledger
 from func.equipment_ledger import LEDGER_COLUMNS

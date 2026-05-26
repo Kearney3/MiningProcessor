@@ -2,15 +2,12 @@
 import asyncio
 import logging
 import math
-import sys
 import threading
 from pathlib import Path
 
 import pandas as pd
 import flet as ft
 
-root = Path(__file__).resolve().parent.parent.parent
-sys.path.append(str(root))
 
 from .common import _log_message
 
