@@ -5,7 +5,6 @@ import sys
 from typing import List, Tuple
 
 import pandas as pd
-import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from func.logger import get_logger
 
 logger = get_logger(__name__)
