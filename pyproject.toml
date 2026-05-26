@@ -1,7 +1,7 @@
 [project]
 name = "MiningProcessor"
 version = "0.1.0"
-description = "Add your description here"
+description = "矿山运营 Excel 报表批量处理工具"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
