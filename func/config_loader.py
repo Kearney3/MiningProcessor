@@ -8,8 +8,33 @@ from pathlib import Path
 from typing import Any
 
 _CONFIG_FILE = Path(__file__).parent.parent / "config.json"
+# 默认设备装载量映射（当 config.json 读取失败时使用）
+DEFAULT_LOAD_MAP_NEW = {
+    "NTE240": 85, "EH4000": 85, "LIEBHERR T264": 80,
+    "HITACHI 4000": 85, "MT4400": 85, "MT4400AC": 85,
+    "TR100": 35, "TEREX 60": 22, "Terex 60": 22, "TR60": 22,
+    "XDM100": 35, "XDE120": 43, "XDEM120": 43,
+    "XDE130": 43, "XDM130": 43, "T-264": 80,
+    "SANY SET150S": 52, "CAT773": 20,
+}
+
+DEFAULT_LOAD_MAP_OLD = {
+    "NTE240": 80, "LIEBHERR T264": 80, "EH4000": 80,
+    "HITACHI 4000": 80, "MT4400": 80, "TR100": 32,
+    "TEREX 60": 20, "Terex 60": 20, "TR60": 20, "MT-10": 20,
+    "XDM100": 32, "XDE120": 40, "XDEM120": 40,
+    "XDE130": 45, "XDM130": 45, "T-264": 80,
+    "SANY SET150S": 52, "CAT773": 20, "KOMATSU 785": 37,
+    "MT 4400": 80, "CAT 773D": 20,
+}
+
 _runtime_config: dict[str, Any] | None = None
 
+
+
+def get_default_load_map(version: str = "new") -> dict[str, int]:
+    """获取默认设备装载量映射（当 config.json 读取失败时的 fallback）"""
+    return dict(DEFAULT_LOAD_MAP_OLD if version == "old" else DEFAULT_LOAD_MAP_NEW)
 
 def get_config_file_path() -> Path:
     """获取内置配置文件路径"""

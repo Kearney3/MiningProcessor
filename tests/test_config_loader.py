@@ -194,3 +194,29 @@ class TestGetConfigFilePath:
     def test_returns_path_object(self, temp_config):
         result = config_loader.get_config_file_path()
         assert isinstance(result, Path)
+
+
+class TestDefaultLoadMaps:
+    def test_new_map_not_empty(self):
+        assert len(config_loader.DEFAULT_LOAD_MAP_NEW) > 0
+
+    def test_old_map_not_empty(self):
+        assert len(config_loader.DEFAULT_LOAD_MAP_OLD) > 0
+
+    def test_new_map_has_expected_devices(self):
+        assert "NTE240" in config_loader.DEFAULT_LOAD_MAP_NEW
+        assert "TR100" in config_loader.DEFAULT_LOAD_MAP_NEW
+
+    def test_get_default_load_map_new(self):
+        result = config_loader.get_default_load_map("new")
+        assert result == config_loader.DEFAULT_LOAD_MAP_NEW
+        assert result is not config_loader.DEFAULT_LOAD_MAP_NEW  # 返回副本
+
+    def test_get_default_load_map_old(self):
+        result = config_loader.get_default_load_map("old")
+        assert result == config_loader.DEFAULT_LOAD_MAP_OLD
+
+    def test_get_default_load_map_returns_copy(self):
+        result = config_loader.get_default_load_map()
+        result["TEST"] = 99
+        assert "TEST" not in config_loader.DEFAULT_LOAD_MAP_NEW
