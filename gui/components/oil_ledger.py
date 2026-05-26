@@ -11,6 +11,7 @@ import func.oil_ledger as oil_ledger
 from func.oil_ledger import OIL_LEDGER_COLUMNS
 
 from .common import _log_message
+from .types import OilLedgerRefs
 
 try:
     from . import theme
@@ -109,7 +110,7 @@ def _cell_text(value) -> str:
     return str(value)
 
 
-def create_oil_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
+def create_oil_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "OilLedgerRefs"]:
     """创建油品台账区域，返回 (container, refs)"""
     PAGE_SIZE = 20
     oil_records = []

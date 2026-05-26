@@ -19,7 +19,7 @@ def process_excel_data(file_path, year, month, output_file):
     try:
         # 读取所有的 sheet
         xls = pd.ExcelFile(file_path)
-    except Exception as e:
+    except (FileNotFoundError, PermissionError, ValueError) as e:
         raise RuntimeError(f"读取 Excel 文件失败: {e}") from e
 
     all_data = []

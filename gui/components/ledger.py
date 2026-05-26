@@ -11,6 +11,7 @@ import func.equipment_ledger as equipment_ledger
 from func.equipment_ledger import LEDGER_COLUMNS
 
 from .common import _log_message
+from .types import LedgerRefs
 
 try:
     from . import theme
@@ -115,7 +116,7 @@ def _cell_text(value) -> str:
     return str(value)
 
 
-def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
+def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs"]:
     """创建设备台账区域，返回 (container, refs)"""
     PAGE_SIZE = 20
     ledger_records = []

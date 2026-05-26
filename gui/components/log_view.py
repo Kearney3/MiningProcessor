@@ -1,13 +1,15 @@
 """日志视图组件"""
 import flet as ft
 
+from .types import LogViewRefs
+
 try:
     from . import theme
 except ImportError:
     import gui.theme as theme
 
 
-def create_log_view(height: int = 300) -> tuple[ft.Container, dict]:
+def create_log_view(height: int = 300) -> tuple[ft.Container, "LogViewRefs"]:
     """创建适合实时追加的日志视图组件"""
     log_list = ft.ListView(
         controls=[],

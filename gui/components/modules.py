@@ -3,13 +3,15 @@ from datetime import datetime
 
 import flet as ft
 
+from .types import ModuleRefs
+
 try:
     from . import theme
 except ImportError:
     import gui.theme as theme
 
 
-def create_modules_section(page: ft.Page) -> tuple[ft.Container, dict]:
+def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     """创建数据处理模块区域，返回 (container, module_refs)"""
 
     current_date = datetime.now()

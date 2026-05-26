@@ -28,7 +28,7 @@ def find_first_datetime_column(df: pd.DataFrame) -> str | None:
             converted = pd.to_datetime(sample, errors="coerce")
             if converted.notna().sum() > 0:
                 return col
-        except Exception:
+        except (ValueError, TypeError):
             continue
     return None
 
@@ -74,39 +74,42 @@ def merge_excel_files(
     for f in matched_files:
         logger.info(f"  - {os.path.basename(f)}")
 
-    # 2. 读取所有文件的 sheet 结构
-    # file_sheets[file_path] = {sheet_name: DataFrame}
-    file_sheets: dict[str, dict[str, pd.DataFrame]] = {}
+    # 2. 第一遍扫描：只收集 sheet 名和表头（轻量，不加载数据）
     all_sheet_names: set[str] = set()
     header_dict: dict = {}
+    file_sheet_names: dict[str, list[str]] = {}  # file -> [sheet_names]
 
     for fpath in matched_files:
         xl = pd.ExcelFile(fpath)
-        sheets = {}
         header_dict[os.path.basename(fpath)] = {}
+        file_sheet_names[fpath] = []
         for sname in xl.sheet_names:
-            df = pd.read_excel(xl, sheet_name=sname)
-            sheets[sname] = df
             all_sheet_names.add(sname)
+            file_sheet_names[fpath].append(sname)
             try:
-                header_dict[os.path.basename(fpath)][sname] = tuple(str(h) for h in df.columns)
-            except Exception as e:
-                logger.error(f"读取文件 '{fpath}' 的 Sheet '{sname}' 失败: {e}")
+                df_head = pd.read_excel(xl, sheet_name=sname, nrows=0)
+                header_dict[os.path.basename(fpath)][sname] = tuple(str(h) for h in df_head.columns)
+            except (ValueError, KeyError) as e:
+                logger.error(f"读取文件 '{fpath}' 的 Sheet '{sname}' 表头失败: {e}")
                 header_dict[os.path.basename(fpath)][sname] = ()
-        file_sheets[fpath] = sheets
 
-    # 3. 按 sheet_name 逐组合并
+    # 3. 按 sheet_name 逐组合并（逐文件读取，避免同时缓存所有文件数据）
     merged_sheets: dict[str, pd.DataFrame] = {}
     for sname in sorted(all_sheet_names):
         sheet_dataframes: List[pd.DataFrame] = []
         expected_headers: Tuple | None = None
 
         for fpath in matched_files:
-            if sname not in file_sheets[fpath]:
+            if sname not in file_sheet_names.get(fpath, []):
                 logger.warning(f"  警告: {os.path.basename(fpath)} 缺少 Sheet '{sname}'，已跳过")
                 continue
 
-            df = file_sheets[fpath][sname].copy()
+            # 逐文件读取，用完即弃，不缓存
+            try:
+                df = pd.read_excel(fpath, sheet_name=sname)
+            except (ValueError, KeyError, FileNotFoundError) as e:
+                logger.error(f"读取文件 '{fpath}' 的 Sheet '{sname}' 失败: {e}")
+                continue
 
             if df.empty:
                 logger.warning(f"  警告: {os.path.basename(fpath)} 的 Sheet '{sname}' 为空，已跳过")
@@ -167,7 +170,7 @@ def merge_excel_files(
                 try:
                     merged_df = merged_df.sort_values(by=sort_columns, ascending=sort_ascending,
                                                       na_position="last").reset_index(drop=True)
-                except Exception as e:
+                except (TypeError, ValueError) as e:
                     logger.error(f"Sheet '{sname}' 排序时出错: {e}")
             else:
                 logger.warning(f"Sheet '{sname}' 无可用的排序条件，跳过排序")

@@ -75,7 +75,7 @@ def process_diesel_data(file_path, target_year=None):
             try:
                 dt = pd.to_datetime(h2)
                 if target_year: dt = dt.replace(year=target_year)
-            except Exception:
+            except (ValueError, TypeError):
                 col_mapping.append({"type": "ignore"})
                 continue
 

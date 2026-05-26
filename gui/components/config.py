@@ -6,6 +6,7 @@ from pathlib import Path
 import flet as ft
 
 from .common import _log_message
+from .types import ConfigRefs
 
 try:
     from . import theme
@@ -13,7 +14,7 @@ except ImportError:
     import gui.theme as theme
 
 
-def create_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
+def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs"]:
     """创建设备装载量配置区域，返回 (container, refs)"""
     from func import config_loader
 
