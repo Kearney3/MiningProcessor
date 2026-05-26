@@ -17,12 +17,19 @@ logger = get_logger(__name__)
 def find_first_datetime_column(df: pd.DataFrame) -> str | None:
     """找到 DataFrame 中第一个可解析为日期时间的列，返回列名或 None"""
     for col in df.columns:
-        # 尝试转换该列，排除完全为空的列
-        if df[col].notna().sum() == 0:
+        series = df[col]
+        # 跳过完全为空的列
+        if series.notna().sum() == 0:
+            continue
+        # 跳过纯数值列（整数/浮点），避免小整数被误判为纳秒时间戳
+        if pd.api.types.is_numeric_dtype(series):
+            continue
+        # 采样前 5 个非空值做检测，避免全列转换的性能开销
+        sample = series.dropna().head(5)
+        if sample.empty:
             continue
         try:
-            converted = pd.to_datetime(df[col], errors="coerce")
-            # 如果至少有一半非空值成功转换为日期，则认为是时间列
+            converted = pd.to_datetime(sample, errors="coerce")
             if converted.notna().sum() > 0:
                 return col
         except Exception:

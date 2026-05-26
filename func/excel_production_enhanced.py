@@ -522,7 +522,7 @@ class MiningDataProcessor:
 
 
 if __name__ == "__main__":
-    from logger import setup_logging
+    from func.logger import setup_logging
 
     setup_logging()
     parser = argparse.ArgumentParser(description="处理矿卡数据")

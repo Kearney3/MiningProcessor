@@ -8,6 +8,7 @@ import flet as ft
 import logging
 import queue
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -74,7 +75,9 @@ def main(page: ft.Page):
     _pending_records: list[dict[str, object]] = []
     _pending_lock = threading.Lock()
     _flush_timer: threading.Timer | None = None
+    _last_flush_time: float = time.monotonic()  # 上次成功 flush 的时间戳
     FLUSH_INTERVAL = 0.15  # 150ms 合并窗口
+    FALLBACK_FLUSH_TIMEOUT = 1.0  # pending 超过此秒数未被 flush 时，从 consumer 线程直接 flush
 
     def _level_color(levelno: int):
         if levelno >= logging.ERROR:
@@ -103,12 +106,14 @@ def main(page: ft.Page):
             return filtered
 
     def _flush_pending_to_ui():
-        """将待显示记录追加到 ListView，由定时器触发"""
+        """将待显示记录追加到 ListView，由定时器触发或 fallback 直接调用"""
+        nonlocal _last_flush_time
         with _pending_lock:
             batch = _pending_records[:]
             _pending_records.clear()
         if not batch or shutdown_event.is_set():
             return
+        batch.sort(key=lambda r: r.get("seq", 0))
         selected_level = _get_selected_level()
         for record in batch:
             if selected_level != "ALL" and record.get("levelname") != selected_level:
@@ -127,6 +132,7 @@ def main(page: ft.Page):
             log_list.update()
         except (RuntimeError, AttributeError):
             pass
+        _last_flush_time = time.monotonic()
 
     def _schedule_flush():
         """安排一次 UI 刷新（150ms 内合并多批）"""
@@ -146,6 +152,8 @@ def main(page: ft.Page):
             page.run_thread(_flush_pending_to_ui)
         except Exception:
             logging.getLogger(__name__).debug("page.run_thread 失败（页面可能已关闭）")
+            # 异常时也更新时间戳，避免 fallback 立即触发
+            # 下次 _schedule_flush 会重新创建 timer
 
     def _update_log_view():
         """消费线程调用：安排刷新"""
@@ -190,6 +198,7 @@ def main(page: ft.Page):
             log_list.update()
         except (RuntimeError, AttributeError):
             pass
+        _last_flush_time = time.monotonic()
 
     def _clamp_log_height(next_height: int) -> int:
         return max(MIN_LOG_HEIGHT, min(MAX_LOG_HEIGHT, next_height))
@@ -247,7 +256,16 @@ def main(page: ft.Page):
     def _consume_logs():
         while True:
             try:
-                log_item = log_queue.get()
+                log_item = log_queue.get(timeout=max(FLUSH_INTERVAL * 4, 0.5))
+            except queue.Empty:
+                # 定期检查：pending 记录是否长时间未被 flush
+                with _pending_lock:
+                    pending_count = len(_pending_records)
+                if pending_count > 0:
+                    elapsed = time.monotonic() - _last_flush_time
+                    if elapsed > FALLBACK_FLUSH_TIMEOUT:
+                        _flush_pending_to_ui()
+                continue
             except Exception:
                 continue
             if log_item is None:
@@ -266,6 +284,19 @@ def main(page: ft.Page):
                     if not shutdown_event.is_set():
                         _append_log_record(log_item)
                 _update_log_view()
+                # Fallback：如果 pending 记录长时间未被 page.run_thread flush，
+                # 从 consumer 线程直接 flush（绕过 page.run_thread）。
+                # 不检查 _flush_timer 状态，因为即使 timer 存在，
+                # page.run_thread 也可能静默失败导致回调不执行。
+                with _pending_lock:
+                    pending_count = len(_pending_records)
+                if pending_count > 0:
+                    elapsed = time.monotonic() - _last_flush_time
+                    if elapsed > FALLBACK_FLUSH_TIMEOUT:
+                        logging.getLogger(__name__).debug(
+                            "fallback flush: %d pending records stuck for %.1fs", pending_count, elapsed
+                        )
+                        _flush_pending_to_ui()
             except Exception as ex:
                 import sys
                 print(f"[日志消费线程异常] {ex}", file=sys.stderr)

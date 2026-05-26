@@ -15,12 +15,7 @@ from func.excel_worktime import process_excel_data
 from func.excel_merger import merge_excel_files
 
 
-def _log_message(log, message: str, level: int = logging.INFO):
-    """兼容仅接收 message 的旧回调，也支持显式日志级别。"""
-    try:
-        log(message, level=level)
-    except TypeError:
-        log(message)
+from gui.components.common import _log_message
 
 
 # ---------------------------------------------------------------------------
