@@ -114,11 +114,12 @@ class DummyDragEvent:
 
 class StubLogView:
     def __init__(self):
-        self.log_list = types.SimpleNamespace(controls=[], auto_scroll=True, spacing=4)
+        self.log_list = types.SimpleNamespace(controls=[], auto_scroll=True, spacing=4, update=lambda: None)
         self.level_filter = types.SimpleNamespace(value="ALL", on_select=None)
         self.export_button = types.SimpleNamespace(on_click=None)
         self.resize_handle = types.SimpleNamespace(on_vertical_drag_update=None)
         self.list_container = types.SimpleNamespace(height=200, update=lambda: None)
+        self._is_at_bottom = [True]
         self.content = types.SimpleNamespace(
             controls=[
                 types.SimpleNamespace(),
@@ -139,6 +140,7 @@ def make_stub_log_view():
         "resize_handle": view.resize_handle,
         "list_container": view.list_container,
         "log_list": view.log_list,
+        "_is_at_bottom": view._is_at_bottom,
     }
     return view, refs
 
@@ -536,7 +538,7 @@ def test_gui_main_stops_log_consumer_on_disconnect(monkeypatch):
     log_view, refs = real_create_log_view()
 
     assert isinstance(log_view, components.ft.Container)
-    assert refs["log_list"].auto_scroll is True
+    assert refs["log_list"].auto_scroll is False
     assert refs["log_list"].spacing == 4
     assert refs["list_container"].height == 300
     assert getattr(refs["export_button"], "tooltip", None) == "导出日志"
