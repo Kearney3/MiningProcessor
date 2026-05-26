@@ -8,7 +8,6 @@ import pandas as pd
 import os
 import re
 
-import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from func.logger import get_logger
 
 logger = get_logger(__name__)
@@ -345,31 +344,24 @@ class MiningDataProcessor:
             f"统计信息：共处理 {total_files} 个文件，成功 {success_files} 个，失败 {total_files - success_files} 个")
 
 
-if __name__ == "__main__":
-    try:
-        from func.logger import setup_logging
-        setup_logging()
-    except ImportError:
-        pass
-
-    # 改造成cli参数输入
+def main():
+    from func.logger import setup_logging
+    setup_logging()
     parser = argparse.ArgumentParser(description="处理矿卡数据")
     parser.add_argument("input_file", help="输入Excel文件路径")
-
     args = parser.parse_args()
     input_file = args.input_file
-    # input_file = r"01生产数据/2025/2025.01/01/2025.01.01 Өдөр Б ээлж 白班.xlsx"
-    # input_file = r"01生产数据/2025/2025.01"
-    # 结果输出在输入文件夹下
     output_file = r"合并产量.xlsx"
     processor = MiningDataProcessor()
-    # 判断是否是文件夹
     if os.path.isdir(input_file):
         logger.info(f"正在处理文件夹: {input_file}")
-        # 存放在输入的文件夹下
         output_file = os.path.join(input_file, os.path.basename(output_file))
         processor.process_folder(input_file, output_file)
     else:
         parent_folder = os.path.dirname(input_file)
         output_file = os.path.join(parent_folder, os.path.basename(output_file))
         processor.process_single_file(input_file, output_file)
+
+
+if __name__ == "__main__":
+    main()

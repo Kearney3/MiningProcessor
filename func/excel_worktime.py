@@ -3,7 +3,6 @@ import os
 import argparse
 
 # 假设 func.logger 已经正确配置
-import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from func.logger import get_logger
 
 logger = get_logger(__name__)
@@ -134,27 +133,21 @@ def process_excel_data(file_path, year, month, output_file):
 
 
 # --- 参数配置 ---
-if __name__ == "__main__":
-    try:
-        from func.logger import setup_logging
-
-        setup_logging()
-    except ImportError:
-        pass  # 若没有此初始化函数则跳过
-
-    parser = argparse.ArgumentParser(description="处理并合并Excel排班表。")
+def main():
+    from func.logger import setup_logging
+    setup_logging()
+    parser = argparse.ArgumentParser(description="处理并合并Excel排班表")
     parser.add_argument("input_file", help="输入Excel文件路径")
     parser.add_argument("--year", type=int, default=2025, help="目标年份")
     parser.add_argument("--month", type=int, default=1, help="目标月份")
     args = parser.parse_args()
-
-    # 输出文件名构造
-    file_dir = os.path.dirname(args.input_file)
-    if not file_dir:
-        file_dir = "."
+    file_dir = os.path.dirname(args.input_file) or "."
     output_xlsx = os.path.join(file_dir, f"{args.year}{args.month:02d}_工作效率表.xlsx")
-
     if os.path.exists(args.input_file):
         process_excel_data(args.input_file, args.year, args.month, output_xlsx)
     else:
         logger.error(f"错误：找不到输入文件 '{args.input_file}'！")
+
+
+if __name__ == "__main__":
+    main()

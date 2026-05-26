@@ -9,7 +9,6 @@ import pandas as pd
 import os
 import re
 
-import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from func import config_loader
 from func.logger import get_logger
 
@@ -471,9 +470,8 @@ class MiningDataProcessor:
             f"统计信息：共处理 {total_files} 个文件，成功 {success_files} 个，失败 {total_files - success_files} 个")
 
 
-if __name__ == "__main__":
+def main():
     from func.logger import setup_logging
-
     setup_logging()
     parser = argparse.ArgumentParser(description="处理矿卡数据")
     parser.add_argument("input_file", help="输入Excel文件路径")
@@ -484,23 +482,22 @@ if __name__ == "__main__":
     parser.add_argument("--raw_start", type=int, default=6, help="复合表头起始行，默认 6, 使用-1自动检测")
     parser.add_argument("--target_text", type=str, default="Мото цагийн заалт",
                         help="目标文本，默认'Мото цагийн заалт'，当raw_start为-1时，根据此文本自动检测复合表头行号")
-
     args = parser.parse_args()
     input_file = args.input_file
-    workers = args.workers
-    version = args.version
-    raw_start = args.raw_start
-    target_text = args.target_text
-
     output_file = r"合并产量.xlsx"
-    processor = MiningDataProcessor(version=version, raw_start=raw_start, target_text=target_text)
-
+    processor = MiningDataProcessor(
+        version=args.version, raw_start=args.raw_start, target_text=args.target_text,
+    )
     if os.path.isdir(input_file):
         logger.info(f"正在处理文件夹: {input_file}")
         output_file = os.path.join(input_file, os.path.basename(output_file))
-        processor.process_folder(input_file, output_file, max_workers=workers)
+        processor.process_folder(input_file, output_file, max_workers=args.workers)
     else:
         parent_folder = os.path.dirname(input_file)
         output_file = os.path.join(parent_folder, os.path.basename(output_file))
         processor.process_single_file(input_file, output_file)
         logger.info(f"单文件处理完成，输出文件：{output_file}")
+
+
+if __name__ == "__main__":
+    main()

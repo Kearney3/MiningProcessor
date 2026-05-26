@@ -8,7 +8,6 @@ import re
 from datetime import datetime
 import argparse
 
-import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from func.logger import get_logger
 
 logger = get_logger(__name__)
@@ -103,15 +102,15 @@ def parse_excel_data(file_path, target_year=None):
 
 
 # --- 使用示例 ---
-if __name__ == "__main__":
-    try:
-        from func.logger import setup_logging
-        setup_logging()
-    except ImportError:
-        pass
-    # 使用cli
+def main():
+    from func.logger import setup_logging
+    setup_logging()
     parser = argparse.ArgumentParser(description="解析电力消耗报表")
     parser.add_argument("input_file", type=str, help="输入Excel文件路径")
     parser.add_argument("--year", type=int, help="如果指定，则将所有日期的年份修改为此年份")
     args = parser.parse_args()
     parse_excel_data(args.input_file, target_year=args.year)
+
+
+if __name__ == "__main__":
+    main()

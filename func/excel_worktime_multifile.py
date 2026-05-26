@@ -4,7 +4,6 @@ import os
 import re
 import argparse
 
-import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from func.logger import get_logger
 logger = get_logger(__name__)
 
@@ -200,21 +199,18 @@ def process_directory(base_dir, year, month, output_file):
     logger.info(f"数据处理并合并完成，已保存至: {output_file}")
 
 
-if __name__ == "__main__":
-    try:
-        from func.logger import setup_logging
-        setup_logging()
-    except ImportError:
-        pass
-
-    parser = argparse.ArgumentParser(description="按目录结构合并多个排班Excel文件。")
+def main():
+    from func.logger import setup_logging
+    setup_logging()
+    parser = argparse.ArgumentParser(description="按目录结构合并多个排班Excel文件")
     parser.add_argument("input_dir", help="包含按日期命名的文件夹的根目录")
     parser.add_argument("--year", type=int, default=2025, help="目标年份")
     parser.add_argument("--month", type=int, default=1, help="目标月份")
     args = parser.parse_args()
-
-    # 构造输出路径：保存在根目录下
     base_dir = args.input_dir
     output_xlsx = os.path.join(base_dir, f"{args.year}{args.month:02d}_多文件合并_工作效率表.xlsx")
-
     process_directory(base_dir, args.year, args.month, output_xlsx)
+
+
+if __name__ == "__main__":
+    main()

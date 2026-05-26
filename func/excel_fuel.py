@@ -4,7 +4,6 @@ import os
 import pandas as pd
 import numpy as np
 
-import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from func.logger import get_logger
 
 logger = get_logger(__name__)
@@ -213,14 +212,15 @@ def process_diesel_data(file_path, target_year=None):
     logger.info(f"处理完成！文件已保存: {output_file}")
 
 
-if __name__ == "__main__":
-    try:
-        from func.logger import setup_logging
-        setup_logging()
-    except ImportError:
-        pass
-    parser = argparse.ArgumentParser()
-    parser.add_argument("input_file")
-    parser.add_argument("--year", type=int)
+def main():
+    from func.logger import setup_logging
+    setup_logging()
+    parser = argparse.ArgumentParser(description="处理设备柴油消耗报表")
+    parser.add_argument("input_file", help="输入Excel文件路径")
+    parser.add_argument("--year", type=int, help="目标年份")
     args = parser.parse_args()
     process_diesel_data(args.input_file, args.year)
+
+
+if __name__ == "__main__":
+    main()
