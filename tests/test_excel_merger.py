@@ -48,16 +48,11 @@ class TestFindFirstDatetimeColumn:
         result = find_first_datetime_column(df)
         assert result == "日期"
 
-    def test_integer_column_may_be_parsed_as_datetime(self):
-        """注意：纯整数列会被 pd.to_datetime 当作纳秒时间戳解析。
-        这是当前实现的行为，因为 pd.to_datetime(errors="coerce") 对小整数不返回 NaT。
-        在实际使用中，工作表的列通常包含文本标题，所以影响有限。
-        """
+    def test_integer_column_not_parsed_as_datetime(self):
+        """纯整数列不应被误判为日期列"""
         df = pd.DataFrame({"数值": [1, 2, 3]})
         result = find_first_datetime_column(df)
-        # pandas 会把小整数解析为纳秒时间戳，所以可能返回 "数值"
-        # 这里记录实际行为（不一定理想，但目前如此）
-        assert result is not None  # 小整数被误判为 datetime
+        assert result is None
 
 
 def _make_excel(path, data_dict, sheet_name="Sheet1"):
