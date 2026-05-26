@@ -55,6 +55,7 @@ def main(page: ft.Page):
     level_filter = log_refs["level_filter"]
     export_button = log_refs["export_button"]
     resize_handle = log_refs["resize_handle"]
+    _is_at_bottom = log_refs["_is_at_bottom"]
 
     # ---- 全局日志队列与 Handler ----
     log_queue = queue.Queue()
@@ -129,6 +130,7 @@ def main(page: ft.Page):
         if len(log_list.controls) > MAX_LOG_RECORDS:
             log_list.controls = log_list.controls[-MAX_LOG_RECORDS:]
         try:
+            log_list.auto_scroll = _is_at_bottom[0]
             log_list.update()
         except (RuntimeError, AttributeError):
             pass
@@ -204,6 +206,7 @@ def main(page: ft.Page):
             for r in filtered
         ]
         try:
+            log_list.auto_scroll = _is_at_bottom[0]
             log_list.update()
         except (RuntimeError, AttributeError):
             pass

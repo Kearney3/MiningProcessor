@@ -8,14 +8,28 @@ try:
 except ImportError:
     import gui.theme as theme
 
+# 滚动到底部的判定阈值（像素）
+_SCROLL_BOTTOM_THRESHOLD = 50
+
 
 def create_log_view(height: int = 300) -> tuple[ft.Container, "LogViewRefs"]:
-    """创建适合实时追加的日志视图组件"""
+    """创建适合实时追加的日志视图组件
+
+    auto_scroll 由调用方在每次 flush 时根据 _is_at_bottom 动态设置，
+    从而实现"视图在底部时自动跟随，手动上翻后不被打扰"的效果。
+    """
+    # 用 list 包装以便 on_scroll 回调和 flush 函数共享可变状态
+    _is_at_bottom: list[bool] = [True]
+
+    def _on_scroll(e: ft.OnScrollEvent):
+        _is_at_bottom[0] = e.extent_after < _SCROLL_BOTTOM_THRESHOLD
+
     log_list = ft.ListView(
         controls=[],
         spacing=4,
-        auto_scroll=True,
+        auto_scroll=False,
         expand=True,
+        on_scroll=_on_scroll,
     )
     level_filter = ft.Dropdown(
         label="级别",
@@ -86,5 +100,6 @@ def create_log_view(height: int = 300) -> tuple[ft.Container, "LogViewRefs"]:
         "resize_handle": resize_handle,
         "list_container": list_container,
         "log_list": log_list,
+        "_is_at_bottom": _is_at_bottom,
     }
     return root, refs
