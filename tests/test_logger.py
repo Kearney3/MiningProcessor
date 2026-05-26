@@ -16,11 +16,14 @@ from func.logger import QueueHandler, setup_logging, get_logger, _next_seq
 @pytest.fixture(autouse=True)
 def _clean_root_logger():
     """每个测试前后清理 root logger 的非 QueueHandler handler"""
+    from func.logger import _setup_done as _orig
+    import func.logger
+    func.logger._setup_done = False  # 重置 sentinel
     root = logging.getLogger()
     original_handlers = list(root.handlers)
     yield
-    # 恢复原始 handlers
     root.handlers = original_handlers
+    func.logger._setup_done = _orig
 
 
 class TestNextSeq:

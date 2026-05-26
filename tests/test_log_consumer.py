@@ -83,7 +83,7 @@ class LogPipeline:
         )
 
     def start(self):
-        setup_logging()
+        setup_logging(force=True)
         root = logging.getLogger()
         for h in list(root.handlers):
             if isinstance(h, QueueHandler):

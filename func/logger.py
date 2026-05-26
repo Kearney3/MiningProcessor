@@ -48,12 +48,20 @@ class QueueHandler(logging.Handler):
             self.handleError(record)
 
 
-def setup_logging(level=logging.INFO):
-    """设置默认的控制台日志输出（命令行直接运行脚本时使用）"""
+_setup_done = False
+
+
+def setup_logging(level=logging.INFO, force: bool = False):
+    """设置默认的控制台日志输出（命令行直接运行脚本时使用）。
+    默认幂等：重复调用不会重复添加 handler。传 force=True 可强制重建。"""
+    global _setup_done
     root = logging.getLogger()
     root.setLevel(level)
 
-    # 避免重复添加（例如 GUI 和脚本同时初始化时）
+    if _setup_done and not force:
+        return
+
+    # 清除已有的非 QueueHandler StreamHandler
     for h in list(root.handlers):
         if isinstance(h, logging.StreamHandler) and not isinstance(h, QueueHandler):
             root.removeHandler(h)
@@ -62,6 +70,7 @@ def setup_logging(level=logging.INFO):
     handler.setLevel(level)
     handler.setFormatter(logging.Formatter(DEFAULT_FORMAT, datefmt="%Y-%m-%d %H:%M:%S"))
     root.addHandler(handler)
+    _setup_done = True
 
 
 def get_logger(name: str | None = None) -> logging.Logger:
