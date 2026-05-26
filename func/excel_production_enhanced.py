@@ -8,12 +8,8 @@ from typing import Any
 import pandas as pd
 import os
 import re
-import sys
-from pathlib import Path
 
-# 定位到当前项目的根目录
-root = Path(__file__).resolve().parent.parent
-sys.path.append(str(root))
+import sys; sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent))
 from func import config_loader
 from func.logger import get_logger
 

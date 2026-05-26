@@ -2,16 +2,12 @@
 油品台账模块
 用于导入和管理油品台账表，提供油品名称模糊匹配功能
 """
-import sys
 
 import pandas as pd
 from pathlib import Path
 from typing import Optional
 from rapidfuzz import fuzz, process
 
-# 定位到当前项目的根目录
-root = Path(__file__).resolve().parent.parent
-sys.path.append(str(root))
 
 from func.logger import get_logger
 

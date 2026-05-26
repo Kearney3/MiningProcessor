@@ -1,15 +1,11 @@
 """油品台账区域组件"""
 import logging
 import os
-from pathlib import Path
-import sys
 
 import pandas as pd
 import flet as ft
 
 # 定位到当前项目的根目录
-root = Path(__file__).resolve().parent.parent.parent
-sys.path.append(str(root))
 
 import func.oil_ledger as oil_ledger
 from func.oil_ledger import OIL_LEDGER_COLUMNS
