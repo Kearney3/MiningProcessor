@@ -171,9 +171,14 @@ def main(page: ft.Page):
             "message": str(log_item["message"]),
         }
         with log_records_lock:
-            keys = [r["seq"] for r in log_records]
-            idx = bisect.bisect_right(keys, record["seq"])
-            log_records.insert(idx, record)
+            # 快路径：consumer 线程基本按 seq 递增处理，直接追加 O(1)
+            if not log_records or record["seq"] >= log_records[-1]["seq"]:
+                log_records.append(record)
+            else:
+                # 慢路径：乱序时用 bisect 插入
+                keys = [r["seq"] for r in log_records]
+                idx = bisect.bisect_right(keys, record["seq"])
+                log_records.insert(idx, record)
             if len(log_records) > MAX_LOG_RECORDS:
                 del log_records[:-MAX_LOG_RECORDS]
         with _pending_lock:
@@ -184,6 +189,11 @@ def main(page: ft.Page):
         with log_records_lock:
             records = list(log_records)
         selected_level = _get_selected_level()
+        # 先筛选出匹配的记录（轻量操作），再在锁外构建 Text 控件
+        filtered = [
+            r for r in records
+            if selected_level == "ALL" or r.get("levelname") == selected_level
+        ]
         log_list.controls = [
             ft.Text(
                 str(r["message"]),
@@ -191,8 +201,7 @@ def main(page: ft.Page):
                 selectable=True,
                 color=_level_color(int(r["levelno"])),
             )
-            for r in records
-            if selected_level == "ALL" or r.get("levelname") == selected_level
+            for r in filtered
         ]
         try:
             log_list.update()
