@@ -1,27 +1,42 @@
-# Python-generated files
+# Python
 __pycache__/
 *.py[oc]
 build/
 dist/
 wheels/
 *.egg-info
+__pypackages__/
 
 # Virtual environments
-.venv
+.venv/
+
+# macOS
+.DS_Store
 
 # IDE
 .idea/
 
+# Agent configs
+.claude/
+.codex/
+
+# Test / cache
+.pytest_cache/
+.ruff_cache/
+
+# Agent-generated docs (plans, specs)
+docs/superpowers/
+
+# Exploration notebooks & generated output
+Notebook/
+
 # Worktrees
 .worktrees/
 
-# Lock files (use uv.lock if using uv)
-# uv.lock
-
-# Exclude specific types of files
+# Data files
+*.xlsx
 *.xls
 *.csv
 *.txt
 *.log
 *.db
-*.xlsx
