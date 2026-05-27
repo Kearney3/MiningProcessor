@@ -169,6 +169,7 @@ def create_oil_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "OilLed
             _empty_state.visible = True
         else:
             _empty_state.visible = False
+            oil_table.columns = [ft.DataColumn(ft.Text(c)) for c in OIL_LEDGER_COLUMNS]
             oil_table.rows = [
                 ft.DataRow(
                     cells=[ft.DataCell(ft.Text(_cell_text(r.get(c)))) for c in OIL_LEDGER_COLUMNS]

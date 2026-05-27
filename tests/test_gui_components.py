@@ -860,3 +860,51 @@ def test_config_save_picker_remembers_initial_directory(monkeypatch, tmp_path):
     asyncio.run(save_button.on_click(DummyControlEvent()))
     assert len(SavePickerSpy.calls) == 2
     assert SavePickerSpy.calls[1].get("initial_directory") == str(output_path.parent)
+
+
+def test_oil_ledger_build_table_restores_columns_after_clear():
+    """After clear→import, build_table must restore proper columns."""
+    from func.oil_ledger import OIL_LEDGER_COLUMNS
+
+    _, refs = components.create_oil_ledger_section(DummyPage(), lambda m: None)
+    table = refs["oil_table"]
+
+    # Clear: sets columns to placeholder
+    refs["oil_records"].clear()
+    refs["build_table"]()
+    assert len(table.columns) == 1  # placeholder
+
+    # Simulate import: add records and rebuild
+    refs["oil_records"].extend([{"油品名称": "0# 柴油", "标准油品名称": "0号柴油"}])
+    refs["build_table"]()
+
+    col_labels = [c.label.value for c in table.columns]
+    assert col_labels == OIL_LEDGER_COLUMNS, (
+        f"Expected columns {OIL_LEDGER_COLUMNS}, got {col_labels}"
+    )
+    assert len(table.rows) == 1
+    table.before_update()
+
+
+def test_ledger_build_table_restores_columns_after_clear():
+    """After clear→import, build_table must restore proper columns."""
+    from func.equipment_ledger import LEDGER_COLUMNS
+
+    _, refs = components.create_ledger_section(DummyPage(), lambda m: None)
+    table = refs["ledger_table"]
+
+    # Clear
+    refs["ledger_records"].clear()
+    refs["build_table"]()
+    assert len(table.columns) == 1  # placeholder
+
+    # Simulate import
+    refs["ledger_records"].extend([{"设备名称": "TR100", "设备编号": "1001"}])
+    refs["build_table"]()
+
+    col_labels = [c.label.value for c in table.columns]
+    assert col_labels == LEDGER_COLUMNS, (
+        f"Expected columns {LEDGER_COLUMNS}, got {col_labels}"
+    )
+    assert len(table.rows) == 1
+    table.before_update()
