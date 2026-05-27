@@ -60,9 +60,7 @@ def create_column_mapping_dialog(
     )
 
     def on_cancel(e):
-        dialog.open = False
-        if dialog in page.overlay:
-            page.overlay.remove(dialog)
+        page.pop_dialog()
         page.update()
 
     def on_ok(e):
@@ -71,8 +69,8 @@ def create_column_mapping_dialog(
             val = dd.value
             if val:
                 mapping[std_col] = val
-        dialog.open = False
-        dialog.update()
+        page.pop_dialog()
+        page.update()
         on_confirm(mapping, skip_header_checkbox.value)
 
     dialog = ft.AlertDialog(
@@ -255,8 +253,7 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs
 
         # 弹出列映射对话框
         dialog = create_column_mapping_dialog(page, file_columns, _do_import)
-        page.overlay.append(dialog)
-        dialog.open = True
+        page.show_dialog(dialog)
         page.update()
 
     async def on_export_template(e: ft.ControlEvent):
