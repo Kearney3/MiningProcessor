@@ -77,6 +77,7 @@ def main(page: ft.Page):
     _pending_lock = threading.Lock()
     _flush_timer: threading.Timer | None = None
     _last_flush_time: float = time.monotonic()  # 上次成功 flush 的时间戳
+    _last_directory = [""]  # 记住上次文件选择器的目录
     FLUSH_INTERVAL = 0.15  # 150ms 合并窗口
     FALLBACK_FLUSH_TIMEOUT = 1.0  # pending 超过此秒数未被 flush 时，从 consumer 线程直接 flush
 
@@ -257,7 +258,10 @@ def main(page: ft.Page):
             dialog_title="导出日志",
             file_name=f"logs-{datetime.now().strftime('%Y-%m-%d')}.txt",
             allowed_extensions=["txt", "log"],
+            initial_directory=_last_directory[0] or None,
         )
+        if path:
+            _last_directory[0] = str(Path(path).parent)
         _export_logs_to_path(path)
 
     level_filter.on_select = _apply_filters

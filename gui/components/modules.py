@@ -1,5 +1,6 @@
 """数据处理模块区域组件"""
 from datetime import datetime
+from pathlib import Path
 
 import flet as ft
 
@@ -17,6 +18,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     current_date = datetime.now()
     current_year = str(current_date.year)
     current_month = str(current_date.month)
+    _last_directory = [""]  # 记住上次文件选择器的目录
 
     # --- Fuel ---
     fuel_path = ft.TextField(
@@ -263,9 +265,11 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         files = await picker.pick_files(
             dialog_title="选择燃油数据文件",
             allowed_extensions=["xlsx", "xls"],
+            initial_directory=_last_directory[0] or None,
         )
         if files:
             fuel_path.value = files[0].path
+            _last_directory[0] = str(Path(files[0].path).parent)
             fuel_path.update()
             fuel_btn.disabled = False
             fuel_btn.update()
@@ -275,18 +279,24 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         files = await picker.pick_files(
             dialog_title="选择生产数据文件",
             allowed_extensions=["xlsx", "xls"],
+            initial_directory=_last_directory[0] or None,
         )
         if files:
             prod_path.value = files[0].path
+            _last_directory[0] = str(Path(files[0].path).parent)
             prod_path.update()
             prod_btn.disabled = False
             prod_btn.update()
 
     async def on_prod_pick_folder(e: ft.ControlEvent):
         picker = ft.FilePicker()
-        path = await picker.get_directory_path(dialog_title="选择生产数据文件夹")
+        path = await picker.get_directory_path(
+            dialog_title="选择生产数据文件夹",
+            initial_directory=_last_directory[0] or None,
+        )
         if path:
             prod_path.value = path
+            _last_directory[0] = path
             prod_path.update()
             prod_btn.disabled = False
             prod_btn.update()
@@ -296,9 +306,11 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         files = await picker.pick_files(
             dialog_title="选择电力数据文件",
             allowed_extensions=["xlsx", "xls"],
+            initial_directory=_last_directory[0] or None,
         )
         if files:
             elec_path.value = files[0].path
+            _last_directory[0] = str(Path(files[0].path).parent)
             elec_path.update()
             elec_btn.disabled = False
             elec_btn.update()
@@ -308,18 +320,24 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         files = await picker.pick_files(
             dialog_title="选择工时数据文件",
             allowed_extensions=["xlsx", "xls"],
+            initial_directory=_last_directory[0] or None,
         )
         if files:
             work_path.value = files[0].path
+            _last_directory[0] = str(Path(files[0].path).parent)
             work_path.update()
             work_btn.disabled = False
             work_btn.update()
 
     async def on_merge_browse(e: ft.ControlEvent):
         picker = ft.FilePicker()
-        path = await picker.get_directory_path(dialog_title="选择包含 Excel 文件的文件夹")
+        path = await picker.get_directory_path(
+            dialog_title="选择包含 Excel 文件的文件夹",
+            initial_directory=_last_directory[0] or None,
+        )
         if path:
             merge_path.value = path
+            _last_directory[0] = path
             merge_path.update()
             merge_btn.disabled = False
             merge_btn.update()
