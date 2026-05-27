@@ -28,6 +28,24 @@ def _cell_text(value) -> str:
     return str(value)
 
 
+def _strip_date_only_times(df: pd.DataFrame) -> pd.DataFrame:
+    """对 datetime 列检测：若所有非空值的时间部分均为 00:00:00，
+    则转换为 date 对象，避免 Excel 导出时出现多余的 ' 00:00:00'。"""
+    for col in df.columns:
+        if not pd.api.types.is_datetime64_any_dtype(df[col]):
+            continue
+        times = df[col].dropna().dt.time
+        if times.empty:
+            continue
+        import datetime as _dt
+        midnight = _dt.time(0, 0, 0)
+        if (times == midnight).all():
+            df[col] = df[col].apply(
+                lambda v: v.date() if pd.notna(v) else v
+            )
+    return df
+
+
 def create_ledger_match_section(
     page: ft.Page, log, ledger_refs: dict, oil_ledger_refs: dict
 ) -> tuple[ft.Container, dict]:
@@ -437,6 +455,7 @@ def create_ledger_match_section(
                     break
                 try:
                     df = xl.parse(sname)
+                    df = _strip_date_only_times(df)
                 except Exception:
                     logging.getLogger(__name__).warning("解析 sheet 失败: %s", sname, exc_info=True)
                     df = pd.DataFrame()
