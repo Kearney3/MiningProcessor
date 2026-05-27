@@ -122,6 +122,7 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs
     ledger_records = []
     _ledger_page = [0]
     _ledger_instance = [None]  # 当前加载的 EquipmentLedger 实例
+    _last_directory = [""]  # 记住上次文件选择器的目录
     ledger_path_label = ft.Text("未加载台账", size=12, color=ft.Colors.GREY)
     ledger_table = ft.DataTable(
         columns=[
@@ -169,7 +170,7 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs
         page_records = ledger_records[start:end]
         if not ledger_records:
             ledger_table.rows = []
-            ledger_table.columns = []
+            ledger_table.columns = [ft.DataColumn(ft.Text("暂无数据"))]
             _empty_state.visible = True
         else:
             _empty_state.visible = False
@@ -214,10 +215,12 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs
         files = await picker.pick_files(
             dialog_title="导入设备台账",
             allowed_extensions=["xlsx", "xls"],
+            initial_directory=_last_directory[0] or None,
         )
         if not files:
             return
         path = files[0].path
+        _last_directory[0] = str(Path(path).parent)
 
         try:
             # 先读取文件的列名用于映射对话框
@@ -260,9 +263,11 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs
             dialog_title="导出模板",
             file_name="设备台账模板.xlsx",
             allowed_extensions=["xlsx"],
+            initial_directory=_last_directory[0] or None,
         )
         if not path:
             return
+        _last_directory[0] = str(Path(path).parent)
         try:
             ledger = equipment_ledger.EquipmentLedger()
             ledger.export_template(path)
@@ -319,5 +324,6 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs
         "ledger_path_label": ledger_path_label,
         "ledger_records": ledger_records,
         "get_ledger": lambda: _ledger_instance[0],
+        "build_table": build_table,
     }
     return container, refs

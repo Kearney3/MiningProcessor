@@ -301,7 +301,7 @@ def create_ledger_match_section(
         df = _get_view_df()
         if df is None or df.empty:
             data_table.rows = []
-            data_table.columns = []
+            data_table.columns = [ft.DataColumn(ft.Text("等待导入数据..."))]
             _empty_state.visible = True
             _update_page_controls()
             page.update()
@@ -752,5 +752,5 @@ def create_ledger_match_section(
         expand=True,
     )
 
-    refs = {}
+    refs = {"build_table": build_table}
     return container, refs

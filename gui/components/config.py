@@ -21,6 +21,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
     PAGE_SIZE = 20
     config_state: list[dict] = []
     _config_page = [0]
+    _last_directory = [""]  # 记住上次文件选择器的目录
     refs = {}
 
     def normalize_row(row: dict) -> dict:
@@ -204,9 +205,11 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
             dialog_title="保存配置文件",
             file_name="device-load-map.json",
             allowed_extensions=["json"],
+            initial_directory=_last_directory[0] or None,
         )
         if not path:
             return
+        _last_directory[0] = str(Path(path).parent)
         try:
             save_config_to_path(path)
             _log_message(log, f"配置已另存为: {path}")
@@ -238,10 +241,12 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
         files = await picker.pick_files(
             dialog_title="导入配置文件",
             allowed_extensions=["json"],
+            initial_directory=_last_directory[0] or None,
         )
         if not files:
             return
         path = files[0].path
+        _last_directory[0] = str(Path(path).parent)
         try:
             import json as _json
             with open(path, "r", encoding="utf-8") as f:

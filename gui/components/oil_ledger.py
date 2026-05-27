@@ -116,6 +116,7 @@ def create_oil_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "OilLed
     oil_records = []
     _oil_page = [0]
     _oil_instance = [None]  # 当前加载的 OilLedger 实例
+    _last_directory = [""]  # 记住上次文件选择器的目录
     oil_path_label = ft.Text("未加载油品台账", size=12, color=ft.Colors.GREY)
     oil_table = ft.DataTable(
         columns=[
@@ -163,7 +164,7 @@ def create_oil_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "OilLed
         page_records = oil_records[start:end]
         if not oil_records:
             oil_table.rows = []
-            oil_table.columns = []
+            oil_table.columns = [ft.DataColumn(ft.Text("暂无数据"))]
             _empty_state.visible = True
         else:
             _empty_state.visible = False
@@ -208,10 +209,12 @@ def create_oil_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "OilLed
         files = await picker.pick_files(
             dialog_title="导入油品台账",
             allowed_extensions=["xlsx", "xls"],
+            initial_directory=_last_directory[0] or None,
         )
         if not files:
             return
         path = files[0].path
+        _last_directory[0] = str(Path(path).parent)
 
         try:
             preview_df = pd.read_excel(path, nrows=0)
@@ -252,9 +255,11 @@ def create_oil_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "OilLed
             dialog_title="导出模板",
             file_name="油品台账模板.xlsx",
             allowed_extensions=["xlsx"],
+            initial_directory=_last_directory[0] or None,
         )
         if not path:
             return
+        _last_directory[0] = str(Path(path).parent)
         try:
             ledger = oil_ledger.OilLedger()
             ledger.export_template(path)
@@ -311,5 +316,6 @@ def create_oil_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "OilLed
         "oil_path_label": oil_path_label,
         "oil_records": oil_records,
         "get_oil_ledger": lambda: _oil_instance[0],
+        "build_table": build_table,
     }
     return container, refs

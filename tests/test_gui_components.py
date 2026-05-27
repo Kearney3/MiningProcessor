@@ -1,3 +1,4 @@
+import flet as ft
 import importlib.util
 import json
 import logging
@@ -680,3 +681,182 @@ def test_apply_button_uses_current_ui_config_without_saving(monkeypatch):
     assert apply_spy.calls == [{"TR100": 35, "EH4000": 85}]
     assert update_spy.calls == []
     assert logs[-1] == "当前配置已应用"
+
+
+# ---- DataTable column invariant tests ----
+# Flet's DataTable.before_update() raises ValueError when there are zero
+# visible DataColumn instances.  This surfaces as a crash during page.update()
+# (e.g. on window close / session garbage-collect).  These tests guard against
+# that invariant being violated in our component tables.
+
+
+def _find_datatables(control, found=None):
+    """Walk a Flet control tree and collect all DataTable instances."""
+    if found is None:
+        found = []
+    if isinstance(control, ft.DataTable):
+        found.append(control)
+    for attr in ("content", "controls", "rows"):
+        child = getattr(control, attr, None)
+        if isinstance(child, list):
+            for item in child:
+                _find_datatables(item, found)
+        elif child is not None:
+            _find_datatables(child, found)
+    return found
+
+
+def test_flet_datatable_raises_when_columns_empty():
+    """DataTable.before_update() rejects zero visible columns."""
+    import pytest
+    table = ft.DataTable(columns=[], rows=[])
+    with pytest.raises(ValueError, match="columns must contain at minimum one visible DataColumn"):
+        table.before_update()
+
+
+def test_ledger_table_has_placeholder_column_when_empty():
+    """Ledger table must always have >= 1 DataColumn, even with no records."""
+    _, refs = components.create_ledger_section(DummyPage(), lambda m: None)
+    table = refs["ledger_table"]
+    assert len(table.columns) >= 1, "DataTable must have at least one column"
+    # Verify it passes Flet validation
+    table.before_update()
+
+
+def test_oil_ledger_table_has_placeholder_column_when_empty():
+    """Oil ledger table must always have >= 1 DataColumn, even with no records."""
+    _, refs = components.create_oil_ledger_section(DummyPage(), lambda m: None)
+    table = refs["oil_table"]
+    assert len(table.columns) >= 1, "DataTable must have at least one column"
+    table.before_update()
+
+
+def test_ledger_match_table_has_placeholder_column_when_empty():
+    """Ledger match table must always have >= 1 DataColumn when no data imported."""
+    container, _ = components.create_ledger_match_section(
+        DummyPage(), lambda m: None, {}, {}
+    )
+    tables = _find_datatables(container)
+    assert len(tables) >= 1, "Expected at least one DataTable in ledger match section"
+    for table in tables:
+        assert len(table.columns) >= 1, "DataTable must have at least one column"
+        table.before_update()
+
+
+def test_ledger_build_table_keeps_columns_when_no_data():
+    """build_table() must not set columns=[] when there are no records."""
+    _, refs = components.create_ledger_section(DummyPage(), lambda m: None)
+    table = refs["ledger_table"]
+    initial_cols = len(table.columns)
+    assert initial_cols >= 1
+
+    # Simulate empty records and call build_table
+    refs["ledger_records"].clear()
+    refs["build_table"]()
+
+    assert len(table.columns) >= 1, (
+        "build_table() must keep at least 1 column when data is empty"
+    )
+    table.before_update()
+
+
+def test_oil_ledger_build_table_keeps_columns_when_no_data():
+    """build_table() must not set columns=[] when there are no oil records."""
+    _, refs = components.create_oil_ledger_section(DummyPage(), lambda m: None)
+    table = refs["oil_table"]
+    initial_cols = len(table.columns)
+    assert initial_cols >= 1
+
+    refs["oil_records"].clear()
+    refs["build_table"]()
+
+    assert len(table.columns) >= 1, (
+        "build_table() must keep at least 1 column when data is empty"
+    )
+    table.before_update()
+
+
+def test_ledger_match_build_table_keeps_columns_when_no_data():
+    """build_table() must not set columns=[] when no data is imported."""
+    container, refs = components.create_ledger_match_section(
+        DummyPage(), lambda m: None, {}, {}
+    )
+    tables = _find_datatables(container)
+    assert len(tables) >= 1
+    table = tables[0]
+    initial_cols = len(table.columns)
+    assert initial_cols >= 1
+
+    # build_table() with no imported data should keep columns
+    refs["build_table"]()
+
+    assert len(table.columns) >= 1, (
+        "build_table() must keep at least 1 column when data is empty"
+    )
+    table.before_update()
+
+
+# ---- initial_directory persistence tests ----
+# After selecting a file, the next file picker should open at the same directory.
+
+
+class SavePickerSpy:
+    """SavePicker that records kwargs for each call."""
+    next_path = None
+    calls = []
+
+    def __init__(self):
+        pass
+
+    async def save_file(self, **kwargs):
+        self.__class__.calls.append(kwargs)
+        return self.next_path
+
+    @classmethod
+    def reset(cls):
+        cls.next_path = None
+        cls.calls = []
+
+
+class ImportPickerSpy:
+    """ImportPicker that records kwargs for each call."""
+    next_files = None
+    calls = []
+
+    def __init__(self):
+        pass
+
+    async def pick_files(self, **kwargs):
+        self.__class__.calls.append(kwargs)
+        return self.next_files
+
+    @classmethod
+    def reset(cls):
+        cls.next_files = None
+        cls.calls = []
+
+
+def test_config_save_picker_remembers_initial_directory(monkeypatch, tmp_path):
+    """After saving config, next save_file call uses the same directory."""
+    SavePickerSpy.reset()
+    monkeypatch.setattr(components.ft, "FilePicker", SavePickerSpy)
+
+    output_path = tmp_path / "subdir" / "config.json"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    SavePickerSpy.next_path = str(output_path)
+
+    _, refs = components.create_config_section(DummyPage(), lambda m: None)
+    refs["set_config_state"]([
+        {"selected": False, "device": "TR100", "capacity": "35"},
+    ])
+    save_button = _find_button(refs, "保存配置")
+
+    import asyncio
+    # First save — no initial_directory yet
+    asyncio.run(save_button.on_click(DummyControlEvent()))
+    assert len(SavePickerSpy.calls) == 1
+
+    # Second save — initial_directory should be the parent of the first file
+    asyncio.run(save_button.on_click(DummyControlEvent()))
+    assert len(SavePickerSpy.calls) == 2
+    assert SavePickerSpy.calls[1].get("initial_directory") == str(output_path.parent)
