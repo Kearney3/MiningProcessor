@@ -59,12 +59,25 @@ class PageSpy:
         self.thread_calls = []
         self.on_close = None
         self.on_disconnect = None
+        self.overlay = []
+        self._dialogs = []
 
     def add(self, *controls):
         self.controls.extend(controls)
 
     def update(self):
         pass
+
+    def show_dialog(self, dialog):
+        dialog.open = True
+        self._dialogs.append(dialog)
+
+    def pop_dialog(self):
+        for dlg in reversed(self._dialogs):
+            if dlg.open:
+                dlg.open = False
+                return dlg
+        return None
 
     def run_task(self, coro):
         try:
@@ -908,3 +921,114 @@ def test_ledger_build_table_restores_columns_after_clear():
     )
     assert len(table.rows) == 1
     table.before_update()
+
+
+# ---- Column mapping dialog runtime behavior tests ----
+
+
+def test_column_mapping_confirm_works_via_show_dialog():
+    """on_ok must close dialog and call on_confirm when opened via show_dialog.
+
+    Previously, the overlay approach caused dialog.update() to crash because
+    the dialog had no page parent. Now we use page.show_dialog/pop_dialog.
+    """
+    page = PageSpy()
+    confirmed = []
+    dialog = components.create_column_mapping_dialog(
+        page, ["设备名称"], lambda m, s: confirmed.append((m, s))
+    )
+    page.show_dialog(dialog)
+    assert dialog.open is True
+
+    confirm_btn = [a for a in dialog.actions if str(a.content) == "确认导入"][0]
+    confirm_btn.on_click(None)
+
+    assert dialog.open is False
+    assert len(confirmed) == 1
+
+
+
+
+
+def test_column_mapping_cancel_closes_dialog():
+    """Clicking '取消' on the column mapping dialog must close it."""
+    page = PageSpy()
+    columns = ["设备名称", "设备编号", "公司"]
+    confirmed = []
+
+    dialog = components.create_column_mapping_dialog(
+        page, columns, lambda m, s: confirmed.append((m, s))
+    )
+
+    # Open the dialog via page API
+    page.show_dialog(dialog)
+    assert dialog.open is True
+
+    # Find the cancel button
+    cancel_btn = None
+    for action in dialog.actions:
+        if str(action.content) == "取消":
+            cancel_btn = action
+            break
+    assert cancel_btn is not None, "Dialog must have a '取消' button"
+
+    # Simulate clicking cancel (on_click is sync)
+    cancel_btn.on_click(None)
+
+    assert dialog.open is False, "Dialog must be closed after clicking '取消'"
+    assert len(confirmed) == 0, "on_confirm must NOT be called on cancel"
+
+
+def test_column_mapping_confirm_closes_dialog():
+    """Clicking '确认导入' on the column mapping dialog must close it and call on_confirm."""
+    page = PageSpy()
+    columns = ["设备名称", "设备编号", "公司"]
+    confirmed = []
+
+    dialog = components.create_column_mapping_dialog(
+        page, columns, lambda m, s: confirmed.append((m, s))
+    )
+
+    # Open the dialog via page API
+    page.show_dialog(dialog)
+    assert dialog.open is True
+
+    # Find the confirm button
+    confirm_btn = None
+    for action in dialog.actions:
+        if str(action.content) == "确认导入":
+            confirm_btn = action
+            break
+    assert confirm_btn is not None, "Dialog must have a '确认导入' button"
+
+    # Simulate clicking confirm (on_click is sync)
+    confirm_btn.on_click(None)
+
+    assert dialog.open is False, "Dialog must be closed after clicking '确认导入'"
+    assert len(confirmed) == 1, "on_confirm must be called once"
+
+
+def test_oil_column_mapping_cancel_closes_dialog():
+    """Clicking '取消' on the oil column mapping dialog must close it."""
+    page = PageSpy()
+    columns = ["油品名称", "标准油品名称"]
+    confirmed = []
+
+    dialog = components.create_oil_column_mapping_dialog(
+        page, columns, lambda m, s: confirmed.append((m, s))
+    )
+
+    page.show_dialog(dialog)
+    assert dialog.open is True
+
+    cancel_btn = None
+    for action in dialog.actions:
+        if str(action.content) == "取消":
+            cancel_btn = action
+            break
+    assert cancel_btn is not None
+
+    cancel_btn.on_click(None)
+
+    assert dialog.open is False, "Oil dialog must be closed after clicking '取消'"
+    assert len(confirmed) == 0
