@@ -175,6 +175,7 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs
             _empty_state.visible = True
         else:
             _empty_state.visible = False
+            ledger_table.columns = [ft.DataColumn(ft.Text(c)) for c in LEDGER_COLUMNS]
             ledger_table.rows = [
                 ft.DataRow(
                     cells=[ft.DataCell(ft.Text(_cell_text(r.get(c)))) for c in LEDGER_COLUMNS]
