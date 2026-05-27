@@ -25,13 +25,13 @@ build-backend = "hatchling.build"
 packages = ["func", "gui"]
 [project.scripts]
 MiningProcessor = "gui.main:main"
-mining-fuel = "func.excel_fuel:main"
-mining-electrical = "func.excel_electrical:main"
-mining-production = "func.excel_production_enhanced:main"
-mining-production-old = "func.excel_production:main"
-mining-worktime = "func.excel_worktime:main"
-mining-worktime-batch = "func.excel_worktime_multifile:main"
-mining-merge = "func.excel_merger:main"
+fuel = "func.excel_fuel:main"
+electrical = "func.excel_electrical:main"
+production = "func.excel_production_enhanced:main"
+production-old = "func.excel_production:main"
+worktime = "func.excel_worktime:main"
+worktime-batch = "func.excel_worktime_multifile:main"
+merge = "func.excel_merger:main"
 
 [dependency-groups]
 dev = [
