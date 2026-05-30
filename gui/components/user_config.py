@@ -326,7 +326,7 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
         # 表头行
         header_labels = ft.Row(
             [
-                ft.Text("行号", width=80, size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                ft.Text("列号", width=80, size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
                 ft.Text("原始列名", expand=True, size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
                 ft.Text("匹配列名", expand=True, size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
                 ft.Text("", width=40),
@@ -340,7 +340,7 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
 
             index_field = ft.TextField(
                 value=str(entry.get("index", "")) if entry.get("index") is not None else "",
-                hint_text="行号",
+                hint_text="从1起",
                 width=80,
                 text_size=13,
                 dense=True,

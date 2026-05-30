@@ -41,7 +41,9 @@ def _apply_header_mapping(df: pd.DataFrame, mapping_config: dict) -> pd.DataFram
                 idx = int(idx)
             except (TypeError, ValueError):
                 continue
-            if 0 <= idx < len(cols):
+            # 用户界面使用 1-based 索引，内部转换为 0-based
+            if 1 <= idx <= len(cols):
+                idx = idx - 1
                 old_name = str(cols[idx])
                 rename_map[old_name] = new_name
     else:
