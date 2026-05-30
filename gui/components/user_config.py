@@ -12,6 +12,7 @@ except ImportError:
     import gui.theme as theme
 
 from func import config_loader
+from func.config_loader import DEFAULT_FILE_KEYWORDS
 from .common import _log_message
 
 _DB_SECTION = "database"
@@ -159,6 +160,99 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
         theme.secondary_btn("恢复默认", icon=ft.icons.Icons.RESTART_ALT, on_click=reset_database_config),
     ]
 
+    # ── 文件关键字配置 ──────────────────────────────────────────
+    kw_fuel = ft.TextField(label="燃油数据", hint_text="例如: 设备柴油消耗,Техник", expand=True)
+    kw_electrical = ft.TextField(label="电力数据", hint_text="例如: Electrical", expand=True)
+    kw_production = ft.TextField(label="生产数据", hint_text="例如: 白班,夜班", expand=True)
+    kw_worktime = ft.TextField(label="工时数据", hint_text="例如: 工时", expand=True)
+    kw_status_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
+
+    def _kw_defaults() -> dict[str, str]:
+        return {k: ",".join(v) for k, v in DEFAULT_FILE_KEYWORDS.items()}
+
+    def _apply_kw_to_ui(kw: dict[str, list[str]]):
+        kw_fuel.value = ",".join(kw.get("fuel", []))
+        kw_electrical.value = ",".join(kw.get("electrical", []))
+        kw_production.value = ",".join(kw.get("production", []))
+        kw_worktime.value = ",".join(kw.get("worktime", []))
+        try:
+            page.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    def _collect_kw_from_ui() -> dict[str, list[str]]:
+        def _split(text: str) -> list[str]:
+            return [s.strip() for s in (text or "").split(",") if s.strip()]
+        return {
+            "fuel": _split(kw_fuel.value),
+            "electrical": _split(kw_electrical.value),
+            "production": _split(kw_production.value),
+            "worktime": _split(kw_worktime.value),
+        }
+
+    def _reload_keywords():
+        saved = config_loader.get_user_config("file_keywords", None)
+        if saved and isinstance(saved, dict):
+            merged = dict(DEFAULT_FILE_KEYWORDS)
+            for k, v in saved.items():
+                if isinstance(v, list):
+                    merged[k] = v
+            _apply_kw_to_ui(merged)
+        else:
+            _apply_kw_to_ui(DEFAULT_FILE_KEYWORDS)
+        kw_status_text.value = ""
+
+    def save_keywords(_e):
+        kw = _collect_kw_from_ui()
+        config_loader.update_user_config({"file_keywords": kw})
+        kw_status_text.value = "文件关键字配置已保存"
+        _log_message(log, "已保存文件关键字配置")
+        try:
+            page.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    def reset_keywords(_e):
+        config_loader.update_user_config({"file_keywords": dict(DEFAULT_FILE_KEYWORDS)})
+        _apply_kw_to_ui(DEFAULT_FILE_KEYWORDS)
+        kw_status_text.value = "已恢复默认关键字"
+        _log_message(log, "已恢复默认文件关键字配置")
+        try:
+            page.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    kw_action_buttons = [
+        theme.primary_btn("保存关键字", icon=ft.icons.Icons.SAVE, on_click=save_keywords),
+        theme.secondary_btn("重新加载", icon=ft.icons.Icons.REFRESH, on_click=lambda _: _reload_keywords()),
+        theme.secondary_btn("恢复默认", icon=ft.icons.Icons.RESTART_ALT, on_click=reset_keywords),
+    ]
+
+    keywords_card = ft.Container(
+        content=ft.Column(
+            [
+                ft.Text("文件关键字配置", size=15, weight=ft.FontWeight.W_600, color=theme.TEXT_PRIMARY),
+                ft.Text(
+                    "用于批量处理时自动识别文件夹中的数据文件。多个关键字用英文逗号分隔，匹配时为「包含任意一个即匹配」。",
+                    size=12,
+                    color=theme.TEXT_SECONDARY,
+                ),
+                ft.Text("所有类型均按文件名关键字匹配，Sheet 级别识别由各处理器内部完成。", size=12, color=theme.TEXT_SECONDARY),
+                kw_fuel,
+                kw_electrical,
+                kw_production,
+                kw_worktime,
+                ft.Row(kw_action_buttons, spacing=8, wrap=True, alignment=ft.MainAxisAlignment.START),
+                kw_status_text,
+            ],
+            spacing=8,
+        ),
+        border=ft.Border.all(1, theme.BORDER),
+        border_radius=theme.RADIUS_MD,
+        padding=12,
+        bgcolor=theme.SURFACE,
+    )
+
     action_button_rows = [
         ft.Row(action_buttons, spacing=8, wrap=True, alignment=ft.MainAxisAlignment.START),
     ]
@@ -209,6 +303,7 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
                 section_hint,
                 *action_button_rows,
                 database_card,
+                keywords_card,
             ],
             spacing=8,
             expand=True,
@@ -233,7 +328,9 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
         "reload_database_config": _reload_database_config,
         "save_database_config": save_database_config,
         "reset_database_config": reset_database_config,
+        "reload_keywords": _reload_keywords,
     }
 
     _reload_database_config()
+    _reload_keywords()
     return container, refs

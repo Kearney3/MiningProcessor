@@ -1,69 +1,78 @@
 {
-  "user_config": {},
-  "user_config_default": {
-    "database": {
-      "db_type": "",
-      "db_host": "localhost",
-      "db_port": 3306,
-      "db_name": "",
-      "db_user": "",
-      "db_password": ""
+    "user_config": {
+        "database": {
+            "db_type": "mysql",
+            "db_host": "localhost",
+            "db_port": 3306,
+            "db_name": "",
+            "db_user": "",
+            "db_password": ""
+        }
+    },
+    "user_config_default": {
+        "database": {
+            "db_type": "",
+            "db_host": "localhost",
+            "db_port": 3306,
+            "db_name": "",
+            "db_user": "",
+            "db_password": ""
+        }
+    },
+    "device_load_map": {
+        "NTE240": 85,
+        "EH4000": 85,
+        "LIEBHERR T264": 80,
+        "HITACHI 4000": 85,
+        "MT4400": 85,
+        "MT4400AC": 85,
+        "TR100": 35,
+        "TEREX 60": 22,
+        "Terex 60": 22,
+        "TR60": 22,
+        "XDM100": 35,
+        "XDE120": 43,
+        "XDEM120": 43,
+        "XDE130": 43,
+        "XDM130": 43,
+        "T-264": 80,
+        "SANY SET150S": 52,
+        "CAT773": 20
+    },
+    "device_load_map_old": {
+        "NTE240": 80,
+        "LIEBHERR T264": 80,
+        "EH4000": 80,
+        "HITACHI 4000": 80,
+        "MT4400": 80,
+        "MT4400AC": 80,
+        "TR100": 32,
+        "TEREX 60": 20,
+        "Terex 60": 20,
+        "TR60": 20,
+        "MT-10": 20,
+        "XDM100": 32,
+        "XDE120": 40,
+        "XDEM120": 40,
+        "XDE130": 45,
+        "XDM130": 45,
+        "T-264": 80,
+        "SANY SET150S": 52,
+        "CAT773": 20,
+        "KOMATSU 785": 37,
+        "MT 4400": 80,
+        "CAT 773D": 20
+    },
+    "default_year": 2025,
+    "default_month": 1,
+    "output_naming": {
+        "include_date": true,
+        "include_shift": true
+    },
+    "shift_mapping": {
+        "白班": "Day",
+        "夜班": "Night",
+        "Өдөр": "Day",
+        "шөнө": "Night"
     }
-  },
-  "device_load_map": {
-    "NTE240": 85,
-    "EH4000": 85,
-    "LIEBHERR T264": 80,
-    "HITACHI 4000": 85,
-    "MT4400": 85,
-    "MT4400AC": 85,
-    "TR100": 35,
-    "TEREX 60": 22,
-    "Terex 60": 22,
-    "TR60": 22,
-    "XDM100": 35,
-    "XDE120": 43,
-    "XDEM120": 43,
-    "XDE130": 43,
-    "XDM130": 43,
-    "T-264": 80,
-    "SANY SET150S": 52,
-    "CAT773": 20
-  },
-  "device_load_map_old": {
-    "NTE240": 80,
-    "LIEBHERR T264": 80,
-    "EH4000": 80,
-    "HITACHI 4000": 80,
-    "MT4400": 80,
-    "MT4400AC": 80,
-    "TR100": 32,
-    "TEREX 60": 20,
-    "Terex 60": 20,
-    "TR60": 20,
-    "MT-10": 20,
-    "XDM100": 32,
-    "XDE120": 40,
-    "XDEM120": 40,
-    "XDE130": 45,
-    "XDM130": 45,
-    "T-264": 80,
-    "SANY SET150S": 52,
-    "CAT773": 20,
-    "KOMATSU 785": 37,
-    "MT 4400": 80,
-    "CAT 773D": 20
-  },
-  "default_year": 2025,
-  "default_month": 1,
-  "output_naming": {
-    "include_date": true,
-    "include_shift": true
-  },
-  "shift_mapping": {
-    "白班": "Day",
-    "夜班": "Night",
-    "Өдөр": "Day",
-    "шөнө": "Night"
-  }
 }
