@@ -7,7 +7,7 @@
 import logging
 import os
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date as date_type
 
 from func.excel_fuel import process_diesel_data
 from func.excel_electrical import parse_excel_data
@@ -93,6 +93,7 @@ def process_files(
     merge_output: bool = True,
     equipment_ledger: EquipmentLedger = None,
     oil_ledger: OilLedger = None,
+    filter_date: date_type | None = None,
 ) -> dict[str, dict[str, pd.DataFrame]]:
     """
     根据已匹配的文件列表执行批量处理。
@@ -104,6 +105,7 @@ def process_files(
         raw_start: 生产数据表头起始行（-1 自动检测）
         merge_output: 是否合并输出
         equipment_ledger / oil_ledger: 台账实例
+        filter_date: 若指定，只保留该日期的数据
 
     Returns:
         {模块类型: {sheet名: DataFrame}}
@@ -174,6 +176,14 @@ def process_files(
         logger.error("所有模块均无数据")
         return {}
 
+    # ── 日期筛选 ──
+    if filter_date is not None:
+        all_results = _filter_by_date(all_results, filter_date)
+        remaining = sum(len(s) for s in all_results.values())
+        if remaining == 0:
+            logger.warning(f"日期筛选后无剩余数据 ({filter_date})")
+            return {}
+
     # ── 台账匹配 ──
     if equipment_ledger or oil_ledger:
         for module_type in list(all_results.keys()):
@@ -188,6 +198,35 @@ def process_files(
         _write_separate(all_results, folder_path, year, month)
 
     return all_results
+
+
+# ---------------------------------------------------------------------------
+# 日期筛选
+# ---------------------------------------------------------------------------
+
+def _filter_by_date(
+    all_results: dict[str, dict[str, pd.DataFrame]],
+    target_date: date_type,
+) -> dict[str, dict[str, pd.DataFrame]]:
+    """对所有结果按「日期」列筛选，只保留 target_date 当天的行。"""
+    filtered: dict[str, dict[str, pd.DataFrame]] = {}
+    for module_type, sheets in all_results.items():
+        kept: dict[str, pd.DataFrame] = {}
+        for sheet_name, df in sheets.items():
+            if "日期" not in df.columns:
+                kept[sheet_name] = df
+                continue
+            col = pd.to_datetime(df["日期"], errors="coerce")
+            mask = col.dt.date == target_date
+            sub = df.loc[mask].copy()
+            if not sub.empty:
+                kept[sheet_name] = sub
+                logger.info(f"[{module_type}] {sheet_name}: 筛选 {target_date} 保留 {len(sub)}/{len(df)} 行")
+            else:
+                logger.info(f"[{module_type}] {sheet_name}: 筛选 {target_date} 后无数据")
+        if kept:
+            filtered[module_type] = kept
+    return filtered
 
 
 # ---------------------------------------------------------------------------

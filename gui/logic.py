@@ -354,13 +354,18 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
             set_btn_state(btn, True, "批量处理")
             return
 
+    # 日期筛选参数
+    filter_date = None
+    if batch_refs.get("date_filter_toggle") and batch_refs["date_filter_toggle"].value:
+        filter_date = batch_refs["selected_date"][0]
+
     # ── 第三阶段：执行处理 ──
     set_btn_state(btn, False, "处理中...")
     try:
         await asyncio.to_thread(
             process_files,
             path, matched, year, month, raw_start, merge_output,
-            equipment_ledger, oil_ledger,
+            equipment_ledger, oil_ledger, filter_date,
         )
         _log_message(log, "批量处理完成")
     except Exception as ex:
