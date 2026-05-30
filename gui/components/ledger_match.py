@@ -576,23 +576,66 @@ def create_ledger_match_section(
 
             # 设备匹配
             if eq_ledger and (name_col or id_col):
-                std_names, std_ids, std_companies = [], [], []
-                for _, row in result_df.iterrows():
-                    n = str(row[name_col]) if name_col and name_col in result_df.columns and not pd.isna(row.get(name_col)) else None
-                    i = str(row[id_col]) if id_col and id_col in result_df.columns and not pd.isna(row.get(id_col)) else None
-                    r = eq_ledger.match_device(name=n, device_id=i)
-                    if r:
-                        std_names.append(r.get("标准设备名称", ""))
-                        std_ids.append(r.get("标准设备编号", ""))
-                        std_companies.append(r.get("标准公司名称", ""))
-                        matched_count += 1
-                    else:
-                        std_names.append("")
-                        std_ids.append("")
-                        std_companies.append("")
-                result_df["标准设备名称"] = std_names
-                result_df["标准设备编号"] = std_ids
-                result_df["标准公司名称"] = std_companies
+                # 检测是否同时存在矿卡名称和挖机名称（生产数据场景）
+                has_truck_col = "矿卡名称" in result_df.columns
+                has_excavator_col = "挖机名称" in result_df.columns
+                
+                if has_truck_col and has_excavator_col:
+                    # 生产数据场景：分别匹配矿卡和挖机，添加后缀
+                    # 匹配矿卡名称
+                    std_names, std_ids, std_companies = [], [], []
+                    for _, row in result_df.iterrows():
+                        n = str(row["矿卡名称"]) if "矿卡名称" in result_df.columns and not pd.isna(row.get("矿卡名称")) else None
+                        i = str(row[id_col]) if id_col and id_col in result_df.columns and not pd.isna(row.get(id_col)) else None
+                        r = eq_ledger.match_device(name=n, device_id=i)
+                        if r:
+                            std_names.append(r.get("标准设备名称", ""))
+                            std_ids.append(r.get("标准设备编号", ""))
+                            std_companies.append(r.get("标准公司名称", ""))
+                            matched_count += 1
+                        else:
+                            std_names.append("")
+                            std_ids.append("")
+                            std_companies.append("")
+                    result_df["标准设备名称（矿卡）"] = std_names
+                    result_df["标准设备编号（矿卡）"] = std_ids
+                    result_df["标准公司名称（矿卡）"] = std_companies
+                    
+                    # 匹配挖机名称
+                    std_names_ex, std_ids_ex, std_companies_ex = [], [], []
+                    for _, row in result_df.iterrows():
+                        n = str(row["挖机名称"]) if "挖机名称" in result_df.columns and not pd.isna(row.get("挖机名称")) else None
+                        r = eq_ledger.match_device(name=n, device_id=None)
+                        if r:
+                            std_names_ex.append(r.get("标准设备名称", ""))
+                            std_ids_ex.append(r.get("标准设备编号", ""))
+                            std_companies_ex.append(r.get("标准公司名称", ""))
+                        else:
+                            std_names_ex.append("")
+                            std_ids_ex.append("")
+                            std_companies_ex.append("")
+                    result_df["标准设备名称（挖机）"] = std_names_ex
+                    result_df["标准设备编号（挖机）"] = std_ids_ex
+                    result_df["标准公司名称（挖机）"] = std_companies_ex
+                else:
+                    # 原有逻辑：单列匹配（非生产数据场景）
+                    std_names, std_ids, std_companies = [], [], []
+                    for _, row in result_df.iterrows():
+                        n = str(row[name_col]) if name_col and name_col in result_df.columns and not pd.isna(row.get(name_col)) else None
+                        i = str(row[id_col]) if id_col and id_col in result_df.columns and not pd.isna(row.get(id_col)) else None
+                        r = eq_ledger.match_device(name=n, device_id=i)
+                        if r:
+                            std_names.append(r.get("标准设备名称", ""))
+                            std_ids.append(r.get("标准设备编号", ""))
+                            std_companies.append(r.get("标准公司名称", ""))
+                            matched_count += 1
+                        else:
+                            std_names.append("")
+                            std_ids.append("")
+                            std_companies.append("")
+                    result_df["标准设备名称"] = std_names
+                    result_df["标准设备编号"] = std_ids
+                    result_df["标准公司名称"] = std_companies
 
             # 油品匹配
             oil_matched = 0
@@ -615,7 +658,13 @@ def create_ledger_match_section(
             # 拆分匹配成功/失败的行
             sheet = _current_sheet[0]
             if eq_ledger and (name_col or id_col):
-                mask = result_df["标准设备名称"].astype(str).str.len() > 0
+                if has_truck_col and has_excavator_col:
+                    # 生产数据：合并两个匹配列的匹配状态
+                    mask_truck = result_df["标准设备名称（矿卡）"].astype(str).str.len() > 0
+                    mask_ex = result_df["标准设备名称（挖机）"].astype(str).str.len() > 0
+                    mask = mask_truck | mask_ex
+                else:
+                    mask = result_df["标准设备名称"].astype(str).str.len() > 0
                 _matched_sheets[sheet] = result_df[mask].copy()
                 _unmatched_sheets[sheet] = result_df[~mask].copy()
             elif oil_ledger and oil_col:
