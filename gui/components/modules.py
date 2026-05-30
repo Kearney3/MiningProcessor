@@ -26,6 +26,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         hint_text="输入路径或点击按钮选择...",
         expand=2,
         read_only=False,
+        color=theme.TEXT_PRIMARY,
         suffix=ft.IconButton(
             icon=ft.icons.Icons.FOLDER_OPEN,
             tooltip="浏览",
@@ -50,6 +51,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         hint_text="输入路径或点击按钮选择...",
         expand=2,
         read_only=False,
+        color=theme.TEXT_PRIMARY,
     )
     prod_file_btn = ft.Button(
         "选文件",
@@ -66,6 +68,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         width=100,
         value="6",
         hint_text="6",
+        color=theme.TEXT_PRIMARY,
     )
     prod_btn = ft.Button(
         "处理",
@@ -80,6 +83,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         hint_text="输入路径或点击按钮选择...",
         expand=2,
         read_only=False,
+        color=theme.TEXT_PRIMARY,
         suffix=ft.IconButton(
             icon=ft.icons.Icons.FOLDER_OPEN,
             tooltip="浏览",
@@ -104,6 +108,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         hint_text="输入路径或点击按钮选择...",
         expand=2,
         read_only=False,
+        color=theme.TEXT_PRIMARY,
         suffix=ft.IconButton(
             icon=ft.icons.Icons.FOLDER_OPEN,
             tooltip="浏览",
@@ -126,19 +131,45 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         value=True,
         tooltip="开启后按配置的映射关系重命名输出表头",
     )
-    work_header_mode = ft.Dropdown(
-        label="匹配模式",
-        width=110,
-        dense=True,
-        content_padding=ft.Padding.symmetric(horizontal=8, vertical=6),
-        value="position",
-        visible=work_header_toggle.value,
-        options=[
-            ft.dropdown.Option(key="position", text="按位置"),
-            ft.dropdown.Option(key="name", text="按列名"),
-        ],
-        tooltip="按位置: 按列序号匹配；按列名: 按列标题文本匹配",
+    # ── 匹配模式芯片切换 ──
+    _work_mode_state = ["position"]  # "position" | "name"
+
+    _work_chip_position = ft.Container(
+        content=ft.Text("按位置", size=12, weight=ft.FontWeight.W_500, color="#FFFFFF"),
+        bgcolor=theme.PRIMARY,
+        border_radius=theme.RADIUS_SM,
+        padding=ft.Padding.symmetric(horizontal=10, vertical=4),
+        on_click=None,
+        ink=True,
     )
+    _work_chip_name = ft.Container(
+        content=ft.Text("按列名", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+        bgcolor=theme.SURFACE_HIGH,
+        border_radius=theme.RADIUS_SM,
+        padding=ft.Padding.symmetric(horizontal=10, vertical=4),
+        on_click=None,
+        ink=True,
+    )
+    work_header_mode_row = ft.Row(
+        [_work_chip_position, _work_chip_name],
+        spacing=0,
+        tight=True,
+        visible=work_header_toggle.value,
+    )
+
+    class _ModeSelector:
+        """带 .value 属性的芯片切换控件组，兼容 logic.py 的 .value 读取。"""
+        def __init__(self, state: list, row: ft.Row):
+            self._state = state
+            self._row = row
+        @property
+        def value(self) -> str:
+            return self._state[0]
+        def update(self):
+            self._row.update()
+
+    work_header_mode = _ModeSelector(_work_mode_state, work_header_mode_row)
+
     work_header_fuzzy = ft.Checkbox(
         label="模糊匹配",
         value=False,
@@ -146,14 +177,29 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         tooltip="按列名匹配时启用模糊匹配（容错错别字）",
     )
 
-    def _on_work_mode_change(e):
-        work_header_fuzzy.visible = (work_header_mode.value == "name")
+    def _update_work_chips():
+        is_pos = _work_mode_state[0] == "position"
+        _work_chip_position.bgcolor = theme.PRIMARY if is_pos else theme.SURFACE_HIGH
+        _work_chip_position.content.color = "#FFFFFF" if is_pos else theme.TEXT_SECONDARY
+        _work_chip_name.bgcolor = theme.PRIMARY if not is_pos else theme.SURFACE_HIGH
+        _work_chip_name.content.color = "#FFFFFF" if not is_pos else theme.TEXT_SECONDARY
+        work_header_fuzzy.visible = not is_pos
         try:
+            work_header_mode_row.update()
             work_header_fuzzy.update()
         except (RuntimeError, AttributeError):
             pass
 
-    work_header_mode.on_change = _on_work_mode_change
+    def _on_work_chip_position(e):
+        _work_mode_state[0] = "position"
+        _update_work_chips()
+
+    def _on_work_chip_name(e):
+        _work_mode_state[0] = "name"
+        _update_work_chips()
+
+    _work_chip_position.on_click = _on_work_chip_position
+    _work_chip_name.on_click = _on_work_chip_name
     work_btn = ft.Button(
         "处理",
         icon=ft.icons.Icons.PLAY_ARROW,
@@ -167,6 +213,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         hint_text="输入路径或点击按钮选择...",
         expand=2,
         read_only=False,
+        color=theme.TEXT_PRIMARY,
         suffix=ft.IconButton(
             icon=ft.icons.Icons.FOLDER_OPEN,
             tooltip="浏览",
@@ -176,6 +223,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         label="关键字",
         hint_text="例如: Fuel",
         width=150,
+        color=theme.TEXT_PRIMARY,
     )
     merge_strip_time = ft.Checkbox(
         label="仅保留日期",
@@ -401,11 +449,16 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
 
     def _on_header_toggle_change(e):
         visible = work_header_toggle.value
-        work_header_mode.visible = visible
-        work_header_fuzzy.visible = visible and (work_header_mode.value == "name")
+        _work_chip_position.disabled = not visible
+        _work_chip_name.disabled = not visible
+        work_header_mode_row.visible = visible
+        if not visible:
+            work_header_fuzzy.visible = False
+        else:
+            work_header_fuzzy.visible = (_work_mode_state[0] == "name")
         header_hint.visible = visible
         try:
-            work_header_mode.update()
+            work_header_mode_row.update()
             work_header_fuzzy.update()
             header_hint.update()
         except (RuntimeError, AttributeError):
@@ -443,7 +496,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                 _module_card([
                     ft.Row([work_path, work_year, work_month, work_btn], spacing=6),
                     ft.Row(
-                        [work_header_toggle, work_header_mode, work_header_fuzzy],
+                        [work_header_toggle, work_header_mode_row, work_header_fuzzy],
                         spacing=theme.SPACING_SM,
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
