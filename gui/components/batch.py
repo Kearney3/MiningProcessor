@@ -58,6 +58,13 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         tooltip="将所有处理结果合并到单个 Excel 文件（Sheet 带前缀）",
     )
 
+    # --- 台账匹配开关 ---
+    batch_ledger_toggle = ft.Checkbox(
+        label="启用台账匹配",
+        value=True,
+        tooltip="批量处理时自动匹配设备台账和油品台账",
+    )
+
     # --- 处理按钮 ---
     batch_btn = ft.Button(
         "批量处理",
@@ -97,6 +104,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
                                     batch_month,
                                     batch_auto_detect,
                                     batch_merge,
+                                    batch_ledger_toggle,
                                     batch_btn,
                                 ],
                                 spacing=8,
@@ -122,6 +130,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "month": batch_month,
         "auto_detect": batch_auto_detect,
         "merge": batch_merge,
+        "ledger_toggle": batch_ledger_toggle,
         "btn": batch_btn,
     }
 
