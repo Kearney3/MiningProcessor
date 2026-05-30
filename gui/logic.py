@@ -304,11 +304,6 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
     raw_start = -1 if batch_refs["auto_detect"].value else 6
     merge_output = bool(batch_refs["merge"].value)
 
-    # 台账匹配开关
-    if not batch_refs.get("ledger_toggle", ft.Checkbox(value=False)).value:
-        equipment_ledger = None
-        oil_ledger = None
-
     btn = batch_refs["btn"]
     set_btn_state(btn, False, "扫描中...")
 
@@ -423,7 +418,12 @@ def wire_processing_buttons(module_refs: dict, page: ft.Page, log, ledger_refs: 
     # Batch
     if "batch" in module_refs:
         async def handle_batch_click(e: ft.ControlEvent):
-            eq, oil = _get_ledgers()
+            batch_toggle = module_refs["batch"].get("ledger_toggle")
+            if batch_toggle and batch_toggle.value:
+                eq = ledger_refs.get("get_ledger", lambda: None)()
+                oil = oil_ledger_refs.get("get_oil_ledger", lambda: None)()
+            else:
+                eq, oil = None, None
             await on_batch_process(page, module_refs["batch"], log, equipment_ledger=eq, oil_ledger=oil)
         module_refs["batch"]["btn"].on_click = handle_batch_click
 
