@@ -62,9 +62,9 @@ uv run main.py
 GUI 提供完整的处理流程入口，包括：
 - 各类报表处理触发
 - 配置编辑（设备装载量映射）
-- 用户配置菜单（当前已支持数据库连接常用配置）
+- 用户配置菜单（当前已支持数据库连接常用配置、工作效率表头映射配置）
 - 实时日志展示
-- 设备台账管理
+- 设备台账管理（支持设备名称模糊匹配、编号匹配）
 
 ### 命令行运行
 
@@ -96,7 +96,7 @@ uv run python func/excel_merger.py <输入文件夹> <关键字> [--strip-time] 
 - **`default_year` / `default_month`**：默认年月参数
 - **`shift_mapping`**：班次名称映射（中/蒙文 → 英文）
 - **`output_naming`**：输出文件命名规则
-- **`user_config`**：用户自定义配置（当前已支持数据库连接参数：`db_type/db_host/db_port/db_name/db_user/db_password`）
+- **`user_config`**：用户自定义配置（当前已支持数据库连接参数：`db_type/db_host/db_port/db_name/db_user/db_password`、工作效率表头映射配置）
 
 GUI 中"应用当前配置"仅更新运行时内存，"保存配置"才会写回文件。
 
@@ -119,6 +119,8 @@ uv run pytest tests/test_gui_components.py -k config
 **统一日志**：`func/logger.py` 提供 `logging` + `get_logger()`，CLI 直接输出控制台，GUI 通过 `QueueHandler` 推送到页面。新增处理逻辑请使用 `logging` 而非 `print()`。
 
 **设备台账**：`equipment_ledger.py` 支持标准名称、别名、前缀、rapidfuzz 相似度匹配，可用于跨报表设备名称归一化。
+
+**生产数据台账匹配**：处理生产数据时，若检测到同时存在"矿卡名称"和"挖机名称"列，匹配结果列名会自动添加后缀区分（如"标准设备名称（矿卡）"、"标准设备名称（挖机）"），便于区分不同类型设备的匹配结果。
 
 ## 许可证
 
