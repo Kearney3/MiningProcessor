@@ -198,3 +198,109 @@ class TestApplyLedgerMatching:
         assert "标准设备名称" in result.columns
         # 空字符串经过 Excel 写读后变成 NaN
         assert pd.isna(result["标准设备名称"].iloc[0])
+
+
+class TestApplyLedgerMatchingProductionData:
+    """测试生产数据场景：同时包含矿卡名称和挖机名称时，列名添加后缀"""
+
+    def test_production_data_adds_suffixes(self, tmp_path):
+        """生产数据（同时有矿卡名称和挖机名称）应添加（矿卡）和（挖机）后缀"""
+        df = pd.DataFrame({
+            "日期": ["2025-01-01", "2025-01-01"],
+            "矿卡名称": ["TR100 #1", "TR100 #2"],
+            "挖机名称": ["EX2000 #1", "EX2000 #2"],
+            "数量": [10, 20],
+        })
+        out = str(tmp_path / "test.xlsx")
+        df.to_excel(out, index=False)
+
+        class StubLedger:
+            def match_device(self, name=None, device_id=None):
+                if name and "TR100" in name:
+                    return {
+                        "标准设备名称": f"STD_{name}",
+                        "标准设备编号": "HT#1",
+                        "标准公司名称": "A公司",
+                    }
+                elif name and "EX2000" in name:
+                    return {
+                        "标准设备名称": f"STD_{name}",
+                        "标准设备编号": "EX#1",
+                        "标准公司名称": "B公司",
+                    }
+                return None
+
+        _apply_ledger_matching(out, equipment_ledger=StubLedger())
+
+        result = pd.read_excel(out)
+        # 验证添加了带后缀的列
+        assert "标准设备名称（矿卡）" in result.columns
+        assert "标准设备编号（矿卡）" in result.columns
+        assert "标准公司名称（矿卡）" in result.columns
+        assert "标准设备名称（挖机）" in result.columns
+        assert "标准设备编号（挖机）" in result.columns
+        assert "标准公司名称（挖机）" in result.columns
+        # 验证不添加无后缀的列
+        assert "标准设备名称" not in result.columns
+        # 验证数据正确
+        assert result["标准设备名称（矿卡）"].iloc[0] == "STD_TR100 #1"
+        assert result["标准设备名称（挖机）"].iloc[0] == "STD_EX2000 #1"
+
+    def test_non_production_data_no_suffix(self, tmp_path):
+        """非生产数据（只有设备名称）不应添加后缀"""
+        df = pd.DataFrame({
+            "日期": ["2025-01-01"],
+            "设备名称": ["TR100 #1"],
+            "值": [100],
+        })
+        out = str(tmp_path / "test.xlsx")
+        df.to_excel(out, index=False)
+
+        class StubLedger:
+            def match_device(self, name=None, device_id=None):
+                return {
+                    "标准设备名称": "STD_TR100",
+                    "标准设备编号": "HT#1",
+                    "标准公司名称": "A公司",
+                }
+
+        _apply_ledger_matching(out, equipment_ledger=StubLedger())
+
+        result = pd.read_excel(out)
+        # 验证不添加带后缀的列
+        assert "标准设备名称（矿卡）" not in result.columns
+        assert "标准设备名称（挖机）" not in result.columns
+        # 验证添加无后缀的列
+        assert "标准设备名称" in result.columns
+        assert result["标准设备名称"].iloc[0] == "STD_TR100"
+
+    def test_production_data_partial_match(self, tmp_path):
+        """生产数据中部分匹配失败时，对应列为空"""
+        df = pd.DataFrame({
+            "日期": ["2025-01-01"],
+            "矿卡名称": ["UNKNOWN_TRUCK"],
+            "挖机名称": ["EX2000 #1"],
+            "数量": [10],
+        })
+        out = str(tmp_path / "test.xlsx")
+        df.to_excel(out, index=False)
+
+        class StubLedger:
+            def match_device(self, name=None, device_id=None):
+                if name and "EX2000" in name:
+                    return {
+                        "标准设备名称": "STD_EX2000",
+                        "标准设备编号": "EX#1",
+                        "标准公司名称": "B公司",
+                    }
+                return None
+
+        _apply_ledger_matching(out, equipment_ledger=StubLedger())
+
+        result = pd.read_excel(out)
+        # 矿卡匹配失败
+        assert pd.isna(result["标准设备名称（矿卡）"].iloc[0])
+        # 挖机匹配成功
+        assert result["标准设备名称（挖机）"].iloc[0] == "STD_EX2000"
+
+

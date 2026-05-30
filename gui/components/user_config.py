@@ -134,7 +134,7 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
         options=DB_TYPE_OPTIONS,
         value="",
     )
-    db_host = ft.TextField(label="数据库位置", hint_text="例如 127.0.0.1", expand=True)
+    db_host = ft.TextField(label="数据库位置", hint_text="例如 127.0.0.1", expand=True, color=theme.TEXT_PRIMARY)
     db_port = ft.TextField(
         label="端口",
         value="3306",
@@ -143,8 +143,8 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
         counter="",
         input_filter=ft.InputFilter(allow=True, regex_string=r"^[0-9]*$"),
     )
-    db_name = ft.TextField(label="数据库名称", hint_text="例如 mining_data", expand=True)
-    db_user = ft.TextField(label="用户名", expand=True)
+    db_name = ft.TextField(label="数据库名称", hint_text="例如 mining_data", expand=True, color=theme.TEXT_PRIMARY)
+    db_user = ft.TextField(label="用户名", expand=True, color=theme.TEXT_PRIMARY)
     db_password = ft.TextField(
         label="密码",
         password=True,
@@ -223,10 +223,10 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
     ]
 
     # ── 文件关键字配置 ──────────────────────────────────────────
-    kw_fuel = ft.TextField(label="燃油数据", hint_text="例如: 设备柴油消耗,Техник", expand=True)
-    kw_electrical = ft.TextField(label="电力数据", hint_text="例如: Electrical", expand=True)
-    kw_production = ft.TextField(label="生产数据", hint_text="例如: 白班,夜班", expand=True)
-    kw_worktime = ft.TextField(label="工时数据", hint_text="例如: 工时", expand=True)
+    kw_fuel = ft.TextField(label="燃油数据", hint_text="例如: 设备柴油消耗,Техник", expand=True, color=theme.TEXT_PRIMARY)
+    kw_electrical = ft.TextField(label="电力数据", hint_text="例如: Electrical", expand=True, color=theme.TEXT_PRIMARY)
+    kw_production = ft.TextField(label="生产数据", hint_text="例如: 白班,夜班", expand=True, color=theme.TEXT_PRIMARY)
+    kw_worktime = ft.TextField(label="工时数据", hint_text="例如: 工时", expand=True, color=theme.TEXT_PRIMARY)
     kw_status_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
 
     def _kw_defaults() -> dict[str, str]:
@@ -344,6 +344,10 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
                 width=80,
                 text_size=13,
                 dense=True,
+                color=theme.TEXT_PRIMARY,
+                hint_style=ft.TextStyle(color=theme.TEXT_SECONDARY, size=12),
+                border_color=theme.BORDER,
+                focused_border_color=theme.PRIMARY,
                 input_filter=ft.InputFilter(allow=True, regex_string=r"^[0-9]*$"),
             )
             orig_field = ft.TextField(
@@ -352,6 +356,10 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
                 expand=True,
                 text_size=13,
                 dense=True,
+                color=theme.TEXT_PRIMARY,
+                hint_style=ft.TextStyle(color=theme.TEXT_SECONDARY, size=12),
+                border_color=theme.BORDER,
+                focused_border_color=theme.PRIMARY,
             )
             new_field = ft.TextField(
                 value=entry.get("new", ""),
@@ -359,6 +367,10 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
                 expand=True,
                 text_size=13,
                 dense=True,
+                color=theme.TEXT_PRIMARY,
+                hint_style=ft.TextStyle(color=theme.TEXT_SECONDARY, size=12),
+                border_color=theme.BORDER,
+                focused_border_color=theme.PRIMARY,
             )
             remove_btn = ft.IconButton(
                 icon=ft.icons.Icons.DELETE_OUTLINE,
@@ -507,6 +519,9 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
     def _reset_header_mapping(e=None):
         config_loader.save_worktime_header_mapping({"entries": config_loader.DEFAULT_WORKTIME_HEADER_MAPPING.get("entries", [])})
         _header_mapping_state.clear()
+        # 重新加载默认值到状态
+        for entry in config_loader.DEFAULT_WORKTIME_HEADER_MAPPING.get("entries", []):
+            _header_mapping_state.append(dict(entry))
         _build_header_rows()
         header_status_text.value = "已恢复默认配置"
         header_status_text.color = theme.TEXT_SECONDARY
@@ -516,10 +531,23 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
         except (RuntimeError, AttributeError):
             pass
 
+    def _clear_header_mapping(e=None):
+        config_loader.save_worktime_header_mapping({"entries": []})
+        _header_mapping_state.clear()
+        _build_header_rows()
+        header_status_text.value = "已清空配置"
+        header_status_text.color = theme.TEXT_SECONDARY
+        _log_message(log, "已清空工作效率表头映射配置")
+        try:
+            page.update()
+        except (RuntimeError, AttributeError):
+            pass
+
     header_action_buttons = [
         theme.primary_btn("保存映射", icon=ft.icons.Icons.SAVE, on_click=_save_header_mapping),
         theme.secondary_btn("重新加载", icon=ft.icons.Icons.REFRESH, on_click=lambda _: _reload_header_mapping()),
         theme.secondary_btn("恢复默认", icon=ft.icons.Icons.RESTART_ALT, on_click=_reset_header_mapping),
+        theme.secondary_btn("清空配置", icon=ft.icons.Icons.DELETE_SWEEP, on_click=_clear_header_mapping),
         theme.accent_btn("添加映射", icon=ft.icons.Icons.ADD, on_click=_add_header_row),
     ]
 
