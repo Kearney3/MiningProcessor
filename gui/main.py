@@ -363,6 +363,7 @@ def main(page: ft.Page):
     # ---- 侧边栏导航 ----
     nav_items_data = [
         ("数据处理", ft.Icons.PLAY_ARROW, "modules"),
+        ("批量处理", ft.Icons.BOLT, "batch"),
         ("台账匹配", ft.Icons.MANAGE_SEARCH, "ledger_match"),
         ("设备台账", ft.Icons.INVENTORY_2, "ledger"),
         ("油品台账", ft.Icons.OIL_BARREL, "oil_ledger"),
@@ -372,7 +373,8 @@ def main(page: ft.Page):
 
     # Content pages
     pages = {
-        "modules": ft.Column([modules_section, batch_section], expand=True, spacing=8),
+        "modules": ft.Column([modules_section], expand=True, spacing=8),
+        "batch": ft.Column([batch_section], expand=True, spacing=8),
         "ledger_match": ft.Column([ledger_match_section], expand=True, spacing=8),
         "ledger": ft.Column([ledger_section], expand=True, spacing=8),
         "oil_ledger": ft.Column([oil_ledger_section], expand=True, spacing=8),

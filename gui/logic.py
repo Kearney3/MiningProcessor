@@ -13,7 +13,7 @@ from func.excel_production_enhanced import MiningDataProcessor as ProdProcessor
 from func.excel_electrical import parse_excel_data
 from func.excel_worktime import process_excel_data
 from func.excel_merger import merge_excel_files
-from func.excel_batch import batch_process
+from func.excel_batch import scan_files, process_files, MODULE_LABELS
 
 
 from gui.components.common import _log_message
@@ -170,23 +170,7 @@ def _execute_task(module_type: str, path: str, **kwargs) -> str | None:
             strip_time = kwargs.get("strip_time", False)
             sort_configs = kwargs.get("sort_configs", None)
             merge_excel_files(path, keyword, strip_time=strip_time, sort_configs=sort_configs)
-        elif module_type == "batch":
-            year = kwargs.get("year")
-            month = kwargs.get("month")
-            raw_start = kwargs.get("raw_start", -1)
-            merge_output = kwargs.get("merge_output", True)
-            batch_process(
-                path,
-                year=year,
-                month=month,
-                raw_start=raw_start,
-                merge_output=merge_output,
-                equipment_ledger=equipment_ledger,
-                oil_ledger=oil_ledger,
-            )
-            # 台账匹配已在 batch_process 内部处理，无需再次匹配
-            equipment_ledger = None
-            oil_ledger = None
+        # batch 模块由 _execute_batch_task 单独处理
 
         # 台账匹配后处理
         if equipment_ledger or oil_ledger:
@@ -307,7 +291,9 @@ async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledge
 
 
 async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledger=None, oil_ledger=None):
-    """批量处理按钮回调"""
+    """批量处理按钮回调（带文件扫描 + 缺失确认弹窗）"""
+    import threading
+
     path = batch_refs["path"].value
     if not path:
         _log_message(log, "请先选择文件夹", level=logging.WARNING)
@@ -319,17 +305,68 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
     merge_output = bool(batch_refs["merge"].value)
 
     btn = batch_refs["btn"]
+    set_btn_state(btn, False, "扫描中...")
+
+    # ── 第一阶段：扫描文件 ──
+    try:
+        matched, missing = await asyncio.to_thread(scan_files, path)
+    except Exception as ex:
+        _log_message(log, f"文件扫描失败: {ex}", level=logging.ERROR)
+        set_btn_state(btn, True, "批量处理")
+        return
+
+    found_labels = [MODULE_LABELS.get(k, k) for k in matched]
+    missing_labels = [MODULE_LABELS.get(k, k) for k in missing]
+    _log_message(log, f"扫描完成 — 已找到: {', '.join(found_labels) or '无'}; 未找到: {', '.join(missing_labels) or '无'}")
+
+    # ── 第二阶段：缺失确认弹窗 ──
+    if missing:
+        event = threading.Event()
+        should_continue = [True]
+
+        def _on_confirm(e):
+            page.close(dialog)
+            should_continue[0] = True
+            event.set()
+
+        def _on_cancel(e):
+            page.close(dialog)
+            should_continue[0] = False
+            event.set()
+
+        missing_text = "、".join(missing_labels)
+        dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("部分数据文件未找到"),
+            content=ft.Text(f"以下类型的数据文件未在文件夹中检测到：\n\n{missing_text}\n\n是否继续处理已找到的数据？"),
+            actions=[
+                ft.TextButton("继续处理", on_click=_on_confirm),
+                ft.TextButton("取消", on_click=_on_cancel),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        page.open(dialog)
+
+        # 等待用户操作（带超时防死锁）
+        confirmed = await asyncio.to_thread(event.wait, 300)
+        if not confirmed or not should_continue[0]:
+            _log_message(log, "用户取消了批量处理", level=logging.WARNING)
+            set_btn_state(btn, True, "批量处理")
+            return
+
+    # ── 第三阶段：执行处理 ──
     set_btn_state(btn, False, "处理中...")
-    await run_task(
-        page, "batch", path, btn, log,
-        year=year,
-        month=month,
-        raw_start=raw_start,
-        merge_output=merge_output,
-        equipment_ledger=equipment_ledger,
-        oil_ledger=oil_ledger,
-    )
-    set_btn_state(btn, True, "批量处理")
+    try:
+        await asyncio.to_thread(
+            process_files,
+            path, matched, year, month, raw_start, merge_output,
+            equipment_ledger, oil_ledger,
+        )
+        _log_message(log, "批量处理完成")
+    except Exception as ex:
+        _log_message(log, f"批量处理失败: {ex}", level=logging.ERROR)
+    finally:
+        set_btn_state(btn, True, "批量处理")
 
 
 # ---------------------------------------------------------------------------

@@ -31,6 +31,14 @@ DEFAULT_LOAD_MAP_OLD = {
     "MT 4400": 80, "CAT 773D": 20,
 }
 
+# 默认文件关键字配置（用于批量处理时识别文件类型）
+DEFAULT_FILE_KEYWORDS: dict[str, list[str]] = {
+    "fuel": ["Fuel report "],
+    "electrical": ["Цахилгааны хэлтэс"],
+    "production": ["白班", "夜班"],
+    "worktime": ["工作效率表"],
+}
+
 _runtime_config: dict[str, Any] | None = None
 
 
@@ -162,3 +170,15 @@ def get_user_config_default(section: str | None = None, default: Any = None) -> 
     if section is None:
         return defaults if defaults else default
     return defaults.get(section, default) if isinstance(defaults, dict) else default
+
+
+def get_file_keywords() -> dict[str, list[str]]:
+    """获取批量处理的文件关键字配置，未配置时返回默认值。"""
+    user_cfg = get_user_config("file_keywords", None)
+    if user_cfg and isinstance(user_cfg, dict):
+        merged = dict(DEFAULT_FILE_KEYWORDS)
+        for k, v in user_cfg.items():
+            if isinstance(v, list):
+                merged[k] = v
+        return merged
+    return dict(DEFAULT_FILE_KEYWORDS)

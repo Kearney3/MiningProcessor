@@ -1,12 +1,11 @@
 """
 批量处理模块
 在一个文件夹中同时进行燃油、电力、生产、工时数据处理
-支持合并输出（带 sheet 前缀）或分别输出
+支持关键字配置、合并输出（带 sheet 前缀）或分别输出
 """
 
 import logging
 import os
-import pandas as pd
 from datetime import datetime
 
 from func.excel_fuel import process_diesel_data
@@ -15,10 +14,184 @@ from func.excel_production_enhanced import MiningDataProcessor
 from func.excel_worktime import process_excel_data
 from func.equipment_ledger import EquipmentLedger
 from func.oil_ledger import OilLedger
+from func import config_loader
 from func.logger import get_logger
 
 logger = get_logger(__name__)
 
+MODULE_LABELS = {
+    "fuel": "燃油数据",
+    "electrical": "电力数据",
+    "production": "生产数据",
+    "worktime": "工时数据",
+}
+
+MODULE_PREFIXES = {
+    "fuel": "燃油数据_",
+    "electrical": "电力数据_",
+    "production": "生产数据_",
+    "worktime": "工时数据_",
+}
+
+
+# ---------------------------------------------------------------------------
+# 文件匹配
+# ---------------------------------------------------------------------------
+
+def scan_files(folder_path: str, keywords: dict[str, list[str]] | None = None) -> tuple[dict[str, list[str]], list[str]]:
+    """
+    按文件名关键字扫描文件夹，返回各模块匹配到的文件路径列表和缺失模块列表。
+    Sheet 级别的匹配由各处理器内部完成，此处仅做文件名筛选。
+
+    Args:
+        folder_path: 文件夹路径
+        keywords: {模块类型: [关键字]}，默认从用户配置读取
+
+    Returns:
+        (matched, missing)
+        matched: {"fuel": [path, ...], "electrical": [...], ...}
+        missing: ["fuel", "electrical", ...]  未找到文件的模块类型
+    """
+    if keywords is None:
+        keywords = config_loader.get_file_keywords()
+
+    excel_files = sorted([
+        f for f in os.listdir(folder_path)
+        if f.lower().endswith((".xlsx", ".xls")) and not f.startswith("~$")
+    ])
+
+    matched: dict[str, list[str]] = {}
+    all_types = ["fuel", "electrical", "production", "worktime"]
+
+    for module_type in all_types:
+        kw_list = keywords.get(module_type, [])
+        if not kw_list:
+            continue
+        found = [
+            os.path.join(folder_path, fname)
+            for fname in excel_files
+            if any(k in fname for k in kw_list)
+        ]
+        if found:
+            matched[module_type] = found
+
+    missing = [t for t in all_types if t not in matched]
+    return matched, missing
+
+
+# ---------------------------------------------------------------------------
+# 处理
+# ---------------------------------------------------------------------------
+
+def process_files(
+    folder_path: str,
+    matched: dict[str, list[str]],
+    year: int | None = None,
+    month: int | None = None,
+    raw_start: int = -1,
+    merge_output: bool = True,
+    equipment_ledger: EquipmentLedger = None,
+    oil_ledger: OilLedger = None,
+) -> dict[str, dict[str, pd.DataFrame]]:
+    """
+    根据已匹配的文件列表执行批量处理。
+
+    Args:
+        folder_path: 文件夹路径
+        matched: scan_files 返回的 matched 字典
+        year/month: 年份/月份
+        raw_start: 生产数据表头起始行（-1 自动检测）
+        merge_output: 是否合并输出
+        equipment_ledger / oil_ledger: 台账实例
+
+    Returns:
+        {模块类型: {sheet名: DataFrame}}
+    """
+    now = datetime.now()
+    if year is None:
+        year = now.year
+    if month is None:
+        month = now.month
+
+    all_results: dict[str, dict[str, pd.DataFrame]] = {}
+
+    # ── 燃油数据 ──
+    if "fuel" in matched:
+        for fpath in matched["fuel"]:
+            try:
+                logger.info(f"燃油数据源: {os.path.basename(fpath)}")
+                sheets = process_diesel_data(fpath, target_year=year, return_sheets=True)
+                if sheets:
+                    all_results["fuel"] = sheets
+                    break
+            except Exception as e:
+                logger.error(f"燃油处理失败: {os.path.basename(fpath)} -> {e}")
+
+    # ── 电力数据 ──
+    if "electrical" in matched:
+        for fpath in matched["electrical"]:
+            try:
+                logger.info(f"电力数据源: {os.path.basename(fpath)}")
+                sheets = parse_excel_data(fpath, target_year=year, return_sheets=True)
+                if sheets:
+                    all_results["electrical"] = sheets
+                    break
+            except Exception as e:
+                logger.error(f"电力处理失败: {os.path.basename(fpath)} -> {e}")
+
+    # ── 生产数据 ──
+    if "production" in matched:
+        try:
+            processor = MiningDataProcessor(version="new", raw_start=raw_start)
+            sheets = processor.process_folder(folder_path, return_sheets=True)
+            if sheets:
+                all_results["production"] = sheets
+            else:
+                logger.warning("生产数据处理无结果")
+        except Exception as e:
+            logger.error(f"生产数据处理失败: {e}")
+
+    # ── 工时数据 ──
+    if "worktime" in matched:
+        for fpath in matched["worktime"]:
+            try:
+                logger.info(f"工时数据源: {os.path.basename(fpath)}")
+                sheets = process_excel_data(fpath, year, month, return_sheets=True)
+                if sheets:
+                    all_results["worktime"] = sheets
+                    break
+            except Exception as e:
+                logger.error(f"工时处理失败: {os.path.basename(fpath)} -> {e}")
+
+    # ── 日志摘要 ──
+    success_labels = [MODULE_LABELS.get(k, k) for k in all_results]
+    all_types = ["fuel", "electrical", "production", "worktime"]
+    failed_labels = [MODULE_LABELS.get(k, k) for k in all_types if k not in all_results]
+    logger.info(f"处理完成 — 成功: {', '.join(success_labels) or '无'}; 失败: {', '.join(failed_labels) or '无'}")
+
+    if not all_results:
+        logger.error("所有模块均无数据")
+        return {}
+
+    # ── 台账匹配 ──
+    if equipment_ledger or oil_ledger:
+        for module_type in list(all_results.keys()):
+            all_results[module_type] = _apply_ledger_to_sheets(
+                all_results[module_type], equipment_ledger, oil_ledger
+            )
+
+    # ── 输出 ──
+    if merge_output:
+        _write_merged(all_results, folder_path, year, month)
+    else:
+        _write_separate(all_results, folder_path, year, month)
+
+    return all_results
+
+
+# ---------------------------------------------------------------------------
+# 台账匹配
+# ---------------------------------------------------------------------------
 
 def _find_col(columns, candidates):
     """在列名列表中查找第一个匹配的候选列名"""
@@ -34,8 +207,7 @@ def _apply_ledger_to_sheets(
     oil_ledger: OilLedger = None,
 ) -> dict[str, pd.DataFrame]:
     """
-    对合并后的 sheets 字典进行台账匹配后处理。
-    返回更新后的 sheets 字典。
+    对 sheets 字典进行台账匹配后处理，返回更新后的 sheets。
     """
     if not equipment_ledger and not oil_ledger:
         return sheets
@@ -85,151 +257,13 @@ def _apply_ledger_to_sheets(
         sheets[sheet_name] = df
 
     if matched_any:
-        logging.info("台账匹配完成")
+        logger.info("台账匹配完成")
     return sheets
-
-
-def batch_process(
-    folder_path: str,
-    year: int | None = None,
-    month: int | None = None,
-    raw_start: int = -1,
-    merge_output: bool = True,
-    equipment_ledger: EquipmentLedger = None,
-    oil_ledger: OilLedger = None,
-) -> dict[str, dict[str, pd.DataFrame]]:
-    """
-    批量处理文件夹中的所有数据。
-
-    Args:
-        folder_path: 输入文件夹路径
-        year: 目标年份（默认当前年）
-        month: 目标月份（默认当前月）
-        raw_start: 生产数据表头起始行（-1 为自动检测）
-        merge_output: 是否合并输出到单个 Excel
-        equipment_ledger: 设备台账实例
-        oil_ledger: 油品台账实例
-
-    Returns:
-        {模块类型: {sheet名称: DataFrame}}
-    """
-    now = datetime.now()
-    if year is None:
-        year = now.year
-    if month is None:
-        month = now.month
-
-    all_results: dict[str, dict[str, pd.DataFrame]] = {}
-
-    excel_files = [
-        f for f in os.listdir(folder_path)
-        if f.lower().endswith((".xlsx", ".xls")) and not f.startswith("~$")
-    ]
-
-    # ── 燃油数据 ──
-    fuel_found = False
-    for fname in excel_files:
-        fpath = os.path.join(folder_path, fname)
-        try:
-            xl = pd.ExcelFile(fpath)
-            fuel_sheets = [s for s in xl.sheet_names if "设备柴油消耗" in s or "Техник" in s]
-            if fuel_sheets:
-                logger.info(f"燃油数据源: {fname}")
-                sheets = process_diesel_data(fpath, target_year=year, return_sheets=True)
-                if sheets:
-                    all_results["fuel"] = sheets
-                    fuel_found = True
-                    break
-        except Exception:
-            continue
-    if not fuel_found:
-        logger.warning("未找到燃油数据文件")
-
-    # ── 电力数据 ──
-    elec_found = False
-    for fname in excel_files:
-        fpath = os.path.join(folder_path, fname)
-        try:
-            xl = pd.ExcelFile(fpath)
-            elec_sheets = [s for s in xl.sheet_names if "Electrical" in s]
-            if elec_sheets:
-                logger.info(f"电力数据源: {fname}")
-                sheets = parse_excel_data(fpath, target_year=year, return_sheets=True)
-                if sheets:
-                    all_results["electrical"] = sheets
-                    elec_found = True
-                    break
-        except Exception:
-            continue
-    if not elec_found:
-        logger.warning("未找到电力数据文件")
-
-    # ── 生产数据 ──
-    try:
-        processor = MiningDataProcessor(version="new", raw_start=raw_start)
-        sheets = processor.process_folder(folder_path, return_sheets=True)
-        if sheets:
-            all_results["production"] = sheets
-        else:
-            logger.warning("生产数据处理无结果")
-    except Exception as e:
-        logger.error(f"生产数据处理失败: {e}")
-
-    # ── 工时数据 ──
-    work_found = False
-    for fname in excel_files:
-        fpath = os.path.join(folder_path, fname)
-        try:
-            xl = pd.ExcelFile(fpath)
-            if any(s.strip().isdigit() for s in xl.sheet_names):
-                logger.info(f"工时数据源: {fname}")
-                sheets = process_excel_data(fpath, year, month, return_sheets=True)
-                if sheets:
-                    all_results["worktime"] = sheets
-                    work_found = True
-                    break
-        except Exception:
-            continue
-    if not work_found:
-        logger.warning("未找到工时数据文件")
-
-    # ── 日志摘要 ──
-    module_names = {"fuel": "燃油", "electrical": "电力", "production": "生产", "worktime": "工时"}
-    success = [module_names[k] for k in all_results]
-    failed = [module_names[k] for k in module_names if k not in all_results]
-    logger.info(f"处理完成 — 成功: {', '.join(success) or '无'}; 失败: {', '.join(failed) or '无'}")
-
-    if not all_results:
-        logger.error("所有模块均无数据")
-        return {}
-
-    # ── 台账匹配 ──
-    if equipment_ledger or oil_ledger:
-        for module_type in all_results:
-            all_results[module_type] = _apply_ledger_to_sheets(
-                all_results[module_type], equipment_ledger, oil_ledger
-            )
-
-    # ── 输出 ──
-    if merge_output:
-        _write_merged(all_results, folder_path, year, month)
-    else:
-        _write_separate(all_results, folder_path, year, month)
-
-    return all_results
 
 
 # ---------------------------------------------------------------------------
 # 输出
 # ---------------------------------------------------------------------------
-
-MODULE_PREFIXES = {
-    "fuel": "燃油数据_",
-    "electrical": "电力数据_",
-    "production": "生产数据_",
-    "worktime": "工时数据_",
-}
-
 
 def _write_merged(
     all_results: dict[str, dict[str, pd.DataFrame]],
@@ -246,7 +280,6 @@ def _write_merged(
             prefix = MODULE_PREFIXES.get(module_type, f"{module_type}_")
             for sheet_name, df in sheets.items():
                 prefixed_name = f"{prefix}{sheet_name}"
-                # Excel sheet 名称最长 31 字符
                 if len(prefixed_name) > 31:
                     prefixed_name = prefixed_name[:31]
                 df.to_excel(writer, sheet_name=prefixed_name, index=False)
