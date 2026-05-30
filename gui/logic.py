@@ -162,9 +162,10 @@ def _execute_task(module_type: str, path: str, **kwargs) -> str | None:
         elif module_type == "worktime":
             year = kwargs.get("year", 2025)
             month = kwargs.get("month", 1)
+            header_mapping = kwargs.get("header_mapping", None)
             file_dir = os.path.dirname(path) or "."
             output_file = os.path.join(file_dir, f"{year}{month:02d}_工作效率表.xlsx")
-            process_excel_data(path, year, month, output_file)
+            process_excel_data(path, year, month, output_file, header_mapping=header_mapping)
         elif module_type == "merge":
             keyword = kwargs.get("keyword", "")
             strip_time = kwargs.get("strip_time", False)
@@ -262,8 +263,20 @@ async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=
     btn = work_refs["btn"]
     year = int(work_refs["year"].value)
     month = int(work_refs["month"].value)
+    # 表头映射：根据开关状态决定是否传入
+    header_mapping = None
+    header_toggle = work_refs.get("header_toggle")
+    if header_toggle and header_toggle.value:
+        mapping_config = config_loader.get_worktime_header_mapping()
+        header_mode = work_refs.get("header_mode")
+        header_fuzzy = work_refs.get("header_fuzzy")
+        mapping_config["mode"] = header_mode.value if header_mode else "position"
+        mapping_config["fuzzy"] = header_fuzzy.value if header_fuzzy else False
+        header_mapping = mapping_config
     set_btn_state(btn, False, "处理中...")
-    await run_task(page, "worktime", path, btn, log, year=year, month=month, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
+    await run_task(page, "worktime", path, btn, log, year=year, month=month,
+                   equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
+                   header_mapping=header_mapping)
     set_btn_state(btn, True, "处理")
 
 
@@ -359,6 +372,17 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
     if batch_refs.get("date_filter_toggle") and batch_refs["date_filter_toggle"].value:
         filter_date = batch_refs["selected_date"][0]
 
+    # 表头映射：根据开关状态决定是否传入
+    worktime_header_mapping = None
+    header_toggle = batch_refs.get("header_toggle")
+    if header_toggle and header_toggle.value:
+        mapping_config = config_loader.get_worktime_header_mapping()
+        header_mode = batch_refs.get("header_mode")
+        header_fuzzy = batch_refs.get("header_fuzzy")
+        mapping_config["mode"] = header_mode.value if header_mode else "position"
+        mapping_config["fuzzy"] = header_fuzzy.value if header_fuzzy else False
+        worktime_header_mapping = mapping_config
+
     # ── 第三阶段：执行处理 ──
     set_btn_state(btn, False, "处理中...")
     try:
@@ -366,6 +390,7 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
             process_files,
             path, matched, year, month, raw_start, merge_output,
             equipment_ledger, oil_ledger, filter_date,
+            worktime_header_mapping,
         )
         _log_message(log, "批量处理完成")
     except Exception as ex:

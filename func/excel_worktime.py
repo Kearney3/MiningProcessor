@@ -8,9 +8,94 @@ from func.logger import get_logger
 logger = get_logger(__name__)
 
 
-def process_excel_data(file_path, year, month, output_file=None, return_sheets=False):
+def _apply_header_mapping(df: pd.DataFrame, mapping_config: dict) -> pd.DataFrame:
+    """根据映射配置重命名 DataFrame 列。
+
+    mapping_config 格式::
+
+        {
+            "mode": "position" | "name",
+            "fuzzy": False,
+            "entries": [{"index": int|None, "original": str, "new": str}, ...]
+        }
+
+    - position 模式: 按列索引（行号）匹配并重命名
+    - name 模式:   按原始列名匹配，可选模糊匹配（rapidfuzz）
+    """
+    if not mapping_config or not mapping_config.get("entries"):
+        return df
+
+    mode = mapping_config.get("mode", "position")
+    fuzzy = mapping_config.get("fuzzy", False)
+    entries = mapping_config["entries"]
+    cols = list(df.columns)
+    rename_map: dict[str, str] = {}
+
+    if mode == "position":
+        for entry in entries:
+            idx = entry.get("index")
+            new_name = (entry.get("new") or "").strip()
+            if idx is None or not new_name:
+                continue
+            try:
+                idx = int(idx)
+            except (TypeError, ValueError):
+                continue
+            if 0 <= idx < len(cols):
+                old_name = str(cols[idx])
+                rename_map[old_name] = new_name
+    else:
+        # name 模式
+        orig_to_new: dict[str, str] = {}
+        for entry in entries:
+            orig = (entry.get("original") or "").strip()
+            new_name = (entry.get("new") or "").strip()
+            if orig and new_name:
+                orig_to_new[orig] = new_name
+
+        if fuzzy:
+            try:
+                from rapidfuzz import fuzz
+                for col in cols:
+                    col_str = str(col).strip()
+                    best_score = 0
+                    best_target = None
+                    for orig, new_name in orig_to_new.items():
+                        score = fuzz.ratio(col_str, orig)
+                        if score > best_score:
+                            best_score = score
+                            best_target = new_name
+                    if best_score >= 70 and best_target:
+                        rename_map[col] = best_target
+            except ImportError:
+                logger.warning("rapidfuzz 未安装，回退到精确匹配")
+                for col in cols:
+                    col_str = str(col).strip()
+                    if col_str in orig_to_new:
+                        rename_map[col] = orig_to_new[col_str]
+        else:
+            for col in cols:
+                col_str = str(col).strip()
+                if col_str in orig_to_new:
+                    rename_map[col] = orig_to_new[col_str]
+
+    if rename_map:
+        logger.info(f"表头映射生效（模式: {mode}），重命名 {len(rename_map)} 列: {rename_map}")
+    return df.rename(columns=rename_map)
+
+
+def process_excel_data(file_path, year, month, output_file=None, return_sheets=False,
+                       header_mapping=None):
     """
     解析非标准结构的Excel文件并合并数据
+
+    Args:
+        file_path: 输入文件路径
+        year: 目标年份
+        month: 目标月份
+        output_file: 输出文件路径（可选）
+        return_sheets: 是否返回 sheets 字典（供批量处理用）
+        header_mapping: 表头映射字典 {原始列名: 新列名}，为 None 或空时不映射
     """
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"找不到输入文件 '{file_path}'")
@@ -90,7 +175,7 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
         # 去掉第二列(索引为1的列)为空的行 (保留你原有的清理逻辑)
         if len(combined_day_df.columns) > 1:
             check_idx = -1
-            # 找到包含”Техникийн”的列索引
+            # 找到包含"Техникийн"的列索引
             for idx, col in enumerate(combined_day_df.columns):
                 if 'Техникийн' in col:
                     check_idx = idx
@@ -99,7 +184,7 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
                 check_col = combined_day_df.columns[check_idx]
                 combined_day_df.dropna(subset=[check_col], inplace=True)
 
-        # 去掉除了“日期”和“班次”之外全部为空的行
+        # 去掉除了"日期"和"班次"之外全部为空的行
         subset_cols = [c for c in combined_day_df.columns if c not in ['日期', '班次']]
         combined_day_df.dropna(how='all', subset=subset_cols, inplace=True)
 
@@ -127,10 +212,14 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
     other_cols = [col for col in final_df.columns if col not in ['日期', '班次']]
     final_df = final_df[['日期', '班次'] + other_cols]
 
+    # 6. 应用表头映射
+    if header_mapping and header_mapping.get("entries"):
+        final_df = _apply_header_mapping(final_df, header_mapping)
+
     if return_sheets:
         return {"工时数据": final_df}
 
-    # 6. 输出到Excel
+    # 7. 输出到Excel
     if output_file is None:
         file_dir = os.path.dirname(file_path) or "."
         output_file = os.path.join(file_dir, f"{year}{month:02d}_工作效率表.xlsx")

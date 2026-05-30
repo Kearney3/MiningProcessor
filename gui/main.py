@@ -131,8 +131,9 @@ def main(page: ft.Page):
         if len(log_list.controls) > MAX_LOG_RECORDS:
             log_list.controls = log_list.controls[-MAX_LOG_RECORDS:]
         try:
-            log_list.auto_scroll = _is_at_bottom[0]
             log_list.update()
+            if _is_at_bottom[0]:
+                page.run_task(log_list.scroll_to, offset=-1)
         except (RuntimeError, AttributeError):
             pass
         _last_flush_time = time.monotonic()
@@ -207,8 +208,9 @@ def main(page: ft.Page):
             for r in filtered
         ]
         try:
-            log_list.auto_scroll = _is_at_bottom[0]
             log_list.update()
+            if _is_at_bottom[0]:
+                page.run_task(log_list.scroll_to, offset=-1)
         except (RuntimeError, AttributeError):
             pass
         _last_flush_time = time.monotonic()

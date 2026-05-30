@@ -7,6 +7,11 @@
             "db_name": "",
             "db_user": "",
             "db_password": ""
+        },
+        "worktime_header_mapping": {
+            "mode": "position",
+            "fuzzy": false,
+            "entries": []
         }
     },
     "user_config_default": {
@@ -17,6 +22,11 @@
             "db_name": "",
             "db_user": "",
             "db_password": ""
+        },
+        "worktime_header_mapping": {
+            "mode": "position",
+            "fuzzy": false,
+            "entries": []
         }
     },
     "device_load_map": {
@@ -74,5 +84,6 @@
         "夜班": "Night",
         "Өдөр": "Day",
         "шөнө": "Night"
-    }
+    },
+    "worktime_header_apply": true
 }
