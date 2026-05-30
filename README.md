@@ -62,6 +62,7 @@ uv run main.py
 GUI 提供完整的处理流程入口，包括：
 - 各类报表处理触发
 - 配置编辑（设备装载量映射）
+- 用户配置菜单（当前已支持数据库连接常用配置）
 - 实时日志展示
 - 设备台账管理
 
@@ -95,6 +96,7 @@ uv run python func/excel_merger.py <输入文件夹> <关键字> [--strip-time] 
 - **`default_year` / `default_month`**：默认年月参数
 - **`shift_mapping`**：班次名称映射（中/蒙文 → 英文）
 - **`output_naming`**：输出文件命名规则
+- **`user_config`**：用户自定义配置（当前已支持数据库连接参数：`db_type/db_host/db_port/db_name/db_user/db_password`）
 
 GUI 中"应用当前配置"仅更新运行时内存，"保存配置"才会写回文件。
 

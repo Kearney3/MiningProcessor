@@ -13,6 +13,7 @@ from func.excel_production_enhanced import MiningDataProcessor as ProdProcessor
 from func.excel_electrical import parse_excel_data
 from func.excel_worktime import process_excel_data
 from func.excel_merger import merge_excel_files
+from func.excel_batch import batch_process
 
 
 from gui.components.common import _log_message
@@ -128,6 +129,8 @@ def _get_output_file(module_type: str, path: str, **kwargs) -> str | None:
     elif module_type == "merge":
         keyword = kwargs.get("keyword", "")
         return os.path.join(path, f"{keyword}_合并.xlsx")
+    elif module_type == "batch":
+        return None  # 台账匹配已在 batch_process 内部处理
     return None
 
 
@@ -167,6 +170,23 @@ def _execute_task(module_type: str, path: str, **kwargs) -> str | None:
             strip_time = kwargs.get("strip_time", False)
             sort_configs = kwargs.get("sort_configs", None)
             merge_excel_files(path, keyword, strip_time=strip_time, sort_configs=sort_configs)
+        elif module_type == "batch":
+            year = kwargs.get("year")
+            month = kwargs.get("month")
+            raw_start = kwargs.get("raw_start", -1)
+            merge_output = kwargs.get("merge_output", True)
+            batch_process(
+                path,
+                year=year,
+                month=month,
+                raw_start=raw_start,
+                merge_output=merge_output,
+                equipment_ledger=equipment_ledger,
+                oil_ledger=oil_ledger,
+            )
+            # 台账匹配已在 batch_process 内部处理，无需再次匹配
+            equipment_ledger = None
+            oil_ledger = None
 
         # 台账匹配后处理
         if equipment_ledger or oil_ledger:
@@ -286,6 +306,32 @@ async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledge
     set_btn_state(btn, True, "合并")
 
 
+async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledger=None, oil_ledger=None):
+    """批量处理按钮回调"""
+    path = batch_refs["path"].value
+    if not path:
+        _log_message(log, "请先选择文件夹", level=logging.WARNING)
+        return
+
+    year = int(batch_refs["year"].value)
+    month = int(batch_refs["month"].value)
+    raw_start = -1 if batch_refs["auto_detect"].value else 6
+    merge_output = bool(batch_refs["merge"].value)
+
+    btn = batch_refs["btn"]
+    set_btn_state(btn, False, "处理中...")
+    await run_task(
+        page, "batch", path, btn, log,
+        year=year,
+        month=month,
+        raw_start=raw_start,
+        merge_output=merge_output,
+        equipment_ledger=equipment_ledger,
+        oil_ledger=oil_ledger,
+    )
+    set_btn_state(btn, True, "批量处理")
+
+
 # ---------------------------------------------------------------------------
 # 初始化 & 绑定
 # ---------------------------------------------------------------------------
@@ -331,6 +377,13 @@ def wire_processing_buttons(module_refs: dict, page: ft.Page, log, ledger_refs: 
     module_refs["elec"]["btn"].on_click = handle_elec_click
     module_refs["work"]["btn"].on_click = handle_work_click
     module_refs["merge"]["btn"].on_click = handle_merge_click
+
+    # Batch
+    if "batch" in module_refs:
+        async def handle_batch_click(e: ft.ControlEvent):
+            eq, oil = _get_ledgers()
+            await on_batch_process(page, module_refs["batch"], log, equipment_ledger=eq, oil_ledger=oil)
+        module_refs["batch"]["btn"].on_click = handle_batch_click
 
 
 def init(config_section_refs: dict):

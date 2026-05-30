@@ -13,7 +13,7 @@ from func.logger import get_logger
 logger = get_logger(__name__)
 
 
-def parse_excel_data(file_path, target_year=None):
+def parse_excel_data(file_path, target_year=None, return_sheets=False):
     """
     解析复杂的Excel电力消耗报表
     :param file_path: 输入文件路径
@@ -94,6 +94,9 @@ def parse_excel_data(file_path, target_year=None):
 
     # 按日期排序
     result_df = result_df.sort_values(by="日期").reset_index(drop=True)
+
+    if return_sheets:
+        return {"电力消耗": result_df}
 
     # 导出
     output_file = os.path.join(os.path.dirname(file_path), "电力消耗统计.xlsx")

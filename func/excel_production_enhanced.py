@@ -413,7 +413,7 @@ class MiningDataProcessor:
     # ---------------------------
     # 文件夹处理（多线程）
     # ---------------------------
-    def process_folder(self, folder_path, output_file, max_workers=4):
+    def process_folder(self, folder_path, output_file=None, max_workers=4, return_sheets=False):
         all_running = []
         all_production = []
         success_files = 0
@@ -460,6 +460,19 @@ class MiningDataProcessor:
             final_running = final_running.sort_values(by=["日期", "班次"], kind="stable")
         if not final_production.empty:
             final_production = final_production.sort_values(by=["日期", "班次"], kind="stable")
+
+        if return_sheets:
+            sheets = {}
+            if not final_running.empty:
+                sheets["运行数据"] = final_running
+            if not final_production.empty:
+                sheets["生产数据"] = final_production
+            logger.info(
+                f"统计信息：共处理 {total_files} 个文件，成功 {success_files} 个，失败 {total_files - success_files} 个")
+            return sheets if sheets else None
+
+        if output_file is None:
+            output_file = os.path.join(folder_path, "合并产量.xlsx")
 
         with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
             final_running.to_excel(writer, sheet_name='运行数据', index=False)

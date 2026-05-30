@@ -87,3 +87,18 @@ class LogViewRefs(TypedDict):
     list_container: ft.Container
     log_list: ft.ListView
     _is_at_bottom: list[bool]
+
+
+class UserConfigRefs(TypedDict):
+    action_buttons: list[ft.Button]
+    action_button_rows: list[ft.Row]
+    db_type: ft.Dropdown
+    db_host: ft.TextField
+    db_port: ft.TextField
+    db_name: ft.TextField
+    db_user: ft.TextField
+    db_password: ft.TextField
+    status_text: ft.Text
+    reload_database_config: Callable[[], None]
+    save_database_config: Callable[[Any], None]
+    reset_database_config: Callable[[Any], None]

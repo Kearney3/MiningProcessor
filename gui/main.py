@@ -351,7 +351,10 @@ def main(page: ft.Page):
     ledger_section, ledger_refs = cmp.create_ledger_section(page, log)
     oil_ledger_section, oil_ledger_refs = cmp.create_oil_ledger_section(page, log)
     config_section, config_refs = cmp.create_config_section(page, log)
+    user_config_section, user_config_refs = cmp.create_user_config_section(page, log)
     modules_section, module_refs = cmp.create_modules_section(page)
+    batch_section, batch_refs = cmp.create_batch_section(page)
+    module_refs["batch"] = batch_refs
     ledger_match_section, ledger_match_refs = cmp.create_ledger_match_section(page, log, ledger_refs, oil_ledger_refs)
 
     # ---- 绑定处理按钮 ----
@@ -364,15 +367,17 @@ def main(page: ft.Page):
         ("设备台账", ft.Icons.INVENTORY_2, "ledger"),
         ("油品台账", ft.Icons.OIL_BARREL, "oil_ledger"),
         ("装载量配置", ft.Icons.TUNE, "config"),
+        ("用户配置", ft.Icons.SETTINGS, "user_config"),
     ]
 
     # Content pages
     pages = {
-        "modules": ft.Column([modules_section], expand=True, spacing=8),
+        "modules": ft.Column([modules_section, batch_section], expand=True, spacing=8),
         "ledger_match": ft.Column([ledger_match_section], expand=True, spacing=8),
         "ledger": ft.Column([ledger_section], expand=True, spacing=8),
         "oil_ledger": ft.Column([oil_ledger_section], expand=True, spacing=8),
         "config": ft.Column([config_section], expand=True, spacing=8),
+        "user_config": ft.Column([user_config_section], expand=True, spacing=8),
     }
 
     current_nav = {"key": "modules"}

@@ -9,7 +9,7 @@ from func.logger import get_logger
 logger = get_logger(__name__)
 
 
-def process_diesel_data(file_path, target_year=None):
+def process_diesel_data(file_path, target_year=None, return_sheets=False):
     xl = pd.ExcelFile(file_path)
     sheet_names = [s for s in xl.sheet_names if "设备柴油消耗" in s or "Техник" in s]
 
@@ -193,21 +193,29 @@ def process_diesel_data(file_path, target_year=None):
     else:
         logger.warning("没有找到任何油耗数据")
 
-    output_file = os.path.join(os.path.dirname(file_path), "Fuel.xlsx")
     # 如果数据都为空，那么不导出
     if df_engine.shape[0] == 0 and df_fuel.shape[0] == 0:
         logger.error("没有找到任何发动机数据和油耗数据，导出失败")
         return None
 
-    with pd.ExcelWriter(output_file) as writer:
+    # 清理辅助列
+    if not df_engine.empty and 'shift_rank' in df_engine.columns:
+        df_engine = df_engine.drop(columns=['shift_rank'])
+    if not df_fuel.empty and 'shift_rank' in df_fuel.columns:
+        df_fuel = df_fuel.drop(columns=['shift_rank'])
+
+    if return_sheets:
+        sheets = {}
         if df_engine.shape[0] > 0:
-            df_engine.drop(columns=['shift_rank']).to_excel(writer, sheet_name="设备信息", index=False)
-        else:
-            df_engine.to_excel(writer, sheet_name="设备信息", index=False)
+            sheets["设备信息"] = df_engine
         if df_fuel.shape[0] > 0:
-            df_fuel.drop(columns=['shift_rank']).to_excel(writer, sheet_name="油耗信息", index=False)
-        else:
-            df_fuel.to_excel(writer, sheet_name="油耗信息", index=False)
+            sheets["油耗信息"] = df_fuel
+        return sheets if sheets else None
+
+    output_file = os.path.join(os.path.dirname(file_path), "Fuel.xlsx")
+    with pd.ExcelWriter(output_file) as writer:
+        df_engine.to_excel(writer, sheet_name="设备信息", index=False)
+        df_fuel.to_excel(writer, sheet_name="油耗信息", index=False)
 
     logger.info(f"处理完成！文件已保存: {output_file}")
 

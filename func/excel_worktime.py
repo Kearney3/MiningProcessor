@@ -8,7 +8,7 @@ from func.logger import get_logger
 logger = get_logger(__name__)
 
 
-def process_excel_data(file_path, year, month, output_file):
+def process_excel_data(file_path, year, month, output_file=None, return_sheets=False):
     """
     解析非标准结构的Excel文件并合并数据
     """
@@ -127,7 +127,13 @@ def process_excel_data(file_path, year, month, output_file):
     other_cols = [col for col in final_df.columns if col not in ['日期', '班次']]
     final_df = final_df[['日期', '班次'] + other_cols]
 
+    if return_sheets:
+        return {"工时数据": final_df}
+
     # 6. 输出到Excel
+    if output_file is None:
+        file_dir = os.path.dirname(file_path) or "."
+        output_file = os.path.join(file_dir, f"{year}{month:02d}_工作效率表.xlsx")
     final_df.to_excel(output_file, index=False)
     logger.info(f"数据处理完成，已保存至: {output_file}")
 
