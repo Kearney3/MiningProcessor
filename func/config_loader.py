@@ -182,3 +182,56 @@ def get_file_keywords() -> dict[str, list[str]]:
                 merged[k] = v
         return merged
     return dict(DEFAULT_FILE_KEYWORDS)
+
+
+# ---------------------------------------------------------------------------
+# 工作效率表头映射
+# ---------------------------------------------------------------------------
+
+DEFAULT_WORKTIME_HEADER_MAPPING: dict = {
+    "mode": "position",
+    "fuzzy": False,
+    "entries": [],
+}
+
+
+def get_worktime_header_mapping() -> dict:
+    """获取工作效率表头映射配置。
+
+    返回格式::
+
+        {
+            "mode": "position" | "name",
+            "fuzzy": False,
+            "entries": [
+                {"index": 0, "original": "原始列名", "new": "新列名"},
+                ...
+            ]
+        }
+    """
+    saved = get_user_config("worktime_header_mapping", None)
+    if saved and isinstance(saved, dict):
+        merged = dict(DEFAULT_WORKTIME_HEADER_MAPPING)
+        merged.update({k: v for k, v in saved.items() if k in DEFAULT_WORKTIME_HEADER_MAPPING})
+        if not isinstance(merged.get("entries"), list):
+            merged["entries"] = []
+        return merged
+    return dict(DEFAULT_WORKTIME_HEADER_MAPPING)
+
+
+def save_worktime_header_mapping(mapping: dict) -> None:
+    """持久化工作效率表头映射配置。"""
+    update_user_config({"worktime_header_mapping": mapping})
+
+
+def is_worktime_header_apply() -> bool:
+    """获取工作效率表头修改开关状态（默认 True）。"""
+    config = load_config()
+    return config.get("worktime_header_apply", True)
+
+
+def set_worktime_header_apply(enabled: bool) -> None:
+    """设置工作效率表头修改开关状态并持久化。"""
+    config = load_config()
+    config["worktime_header_apply"] = bool(enabled)
+    save_config(config)

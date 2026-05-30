@@ -121,6 +121,39 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         options=[ft.dropdown.Option(str(month)) for month in range(1, 13)],
         value=current_month,
     )
+    work_header_toggle = ft.Checkbox(
+        label="表头修改",
+        value=True,
+        tooltip="开启后按配置的映射关系重命名输出表头",
+    )
+    work_header_mode = ft.Dropdown(
+        label="匹配模式",
+        width=110,
+        dense=True,
+        content_padding=ft.Padding.symmetric(horizontal=8, vertical=6),
+        value="position",
+        visible=work_header_toggle.value,
+        options=[
+            ft.dropdown.Option(key="position", text="按位置"),
+            ft.dropdown.Option(key="name", text="按列名"),
+        ],
+        tooltip="按位置: 按列序号匹配；按列名: 按列标题文本匹配",
+    )
+    work_header_fuzzy = ft.Checkbox(
+        label="模糊匹配",
+        value=False,
+        visible=False,
+        tooltip="按列名匹配时启用模糊匹配（容错错别字）",
+    )
+
+    def _on_work_mode_change(e):
+        work_header_fuzzy.visible = (work_header_mode.value == "name")
+        try:
+            work_header_fuzzy.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    work_header_mode.on_change = _on_work_mode_change
     work_btn = ft.Button(
         "处理",
         icon=ft.icons.Icons.PLAY_ARROW,
@@ -356,38 +389,74 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         value=False,
     )
 
+    header_hint = ft.Row(
+        [
+            ft.Icon(ft.Icons.INFO_OUTLINE, size=14, color=theme.TEXT_SECONDARY),
+            ft.Text("映射规则可在「用户配置 → 工作效率表头映射配置」中编辑", size=11, color=theme.TEXT_SECONDARY),
+        ],
+        spacing=4,
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        visible=work_header_toggle.value,
+    )
+
+    def _on_header_toggle_change(e):
+        visible = work_header_toggle.value
+        work_header_mode.visible = visible
+        work_header_fuzzy.visible = visible and (work_header_mode.value == "name")
+        header_hint.visible = visible
+        try:
+            work_header_mode.update()
+            work_header_fuzzy.update()
+            header_hint.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    work_header_toggle.on_change = _on_header_toggle_change
+
+    def _module_card(content_controls: list, spacing: int = 6) -> ft.Container:
+        return ft.Container(
+            content=ft.Column(content_controls, spacing=spacing),
+            padding=10,
+            border=ft.Border.all(1, theme.BORDER),
+            border_radius=theme.RADIUS_SM,
+            bgcolor=theme.SURFACE,
+        )
+
     container = ft.Container(
         content=ft.Column(
             [
                 theme.section_title("数据处理模块"),
-                ft.Container(
-                    content=ft.Column(
-                        [
-                            ft.Row([match_toggle], spacing=8),
-                            ft.Row([fuel_path, fuel_year, fuel_btn], spacing=8),
-                            ft.Row([prod_path, prod_file_btn, prod_folder_btn, prod_raw_start, prod_btn], spacing=8),
-                            ft.Row([elec_path, elec_year, elec_btn], spacing=8),
-                            ft.Row([work_path, work_year, work_month, work_btn], spacing=8),
-                            ft.Column(
-                                [
-                                    ft.Row([merge_path, merge_keyword, merge_strip_time, merge_btn], spacing=8),
-                                    ft.Column(
-                                        [
-                                            ft.Text("排序配置（可选，留空则自动按第一个时间列排序）", size=12,
-                                                    color=theme.TEXT_SECONDARY),
-                                            ft.Row([sort_rules_column, add_sort_btn], spacing=8,
-                                                   alignment=ft.MainAxisAlignment.START),
-                                        ],
-                                        spacing=4,
-                                    ),
-                                ],
-                                spacing=4,
-                            ),
-                        ],
-                        spacing=8,
-                    ),
-                    padding=12,
+                ft.Text(
+                    "选择数据文件或文件夹后点击处理按钮，各模块独立运行。",
+                    size=13,
+                    color=theme.TEXT_SECONDARY,
                 ),
+                _module_card([
+                    ft.Row([fuel_path, fuel_year, fuel_btn], spacing=8),
+                ]),
+                _module_card([
+                    ft.Row([prod_path, prod_file_btn, prod_folder_btn, prod_raw_start, prod_btn], spacing=8),
+                ]),
+                _module_card([
+                    ft.Row([elec_path, elec_year, elec_btn], spacing=8),
+                ]),
+                _module_card([
+                    ft.Row([work_path, work_year, work_month, work_btn], spacing=6),
+                    ft.Row(
+                        [work_header_toggle, work_header_mode, work_header_fuzzy],
+                        spacing=theme.SPACING_SM,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                    header_hint,
+                ]),
+                _module_card([
+                    ft.Row([merge_path, merge_keyword, merge_strip_time, merge_btn], spacing=8),
+                    ft.Text("排序配置（可选，留空则自动按第一个时间列排序）", size=12,
+                            color=theme.TEXT_SECONDARY),
+                    ft.Row([sort_rules_column, add_sort_btn], spacing=8,
+                           alignment=ft.MainAxisAlignment.START),
+                ], spacing=4),
+                ft.Row([match_toggle], spacing=8),
             ],
             spacing=8,
             expand=True,
@@ -404,7 +473,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         "fuel": {"path": fuel_path, "year": fuel_year, "btn": fuel_btn},
         "prod": {"path": prod_path, "raw_start": prod_raw_start, "btn": prod_btn},
         "elec": {"path": elec_path, "year": elec_year, "btn": elec_btn},
-        "work": {"path": work_path, "year": work_year, "month": work_month, "btn": work_btn},
+        "work": {"path": work_path, "year": work_year, "month": work_month, "header_toggle": work_header_toggle, "header_mode": work_header_mode, "header_fuzzy": work_header_fuzzy, "btn": work_btn},
         "merge": {
             "path": merge_path,
             "keyword": merge_keyword,

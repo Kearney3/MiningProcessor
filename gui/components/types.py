@@ -32,6 +32,9 @@ class WorkRefs(TypedDict):
     path: ft.TextField
     year: ft.Dropdown
     month: ft.Dropdown
+    header_toggle: ft.Checkbox
+    header_mode: ft.Dropdown
+    header_fuzzy: ft.Checkbox
     btn: ft.Button
 
 

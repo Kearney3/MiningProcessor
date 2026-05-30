@@ -94,6 +94,7 @@ def process_files(
     equipment_ledger: EquipmentLedger = None,
     oil_ledger: OilLedger = None,
     filter_date: date_type | None = None,
+    worktime_header_mapping: dict | None = None,
 ) -> dict[str, dict[str, pd.DataFrame]]:
     """
     根据已匹配的文件列表执行批量处理。
@@ -106,6 +107,7 @@ def process_files(
         merge_output: 是否合并输出
         equipment_ledger / oil_ledger: 台账实例
         filter_date: 若指定，只保留该日期的数据
+        worktime_header_mapping: 工作效率表头映射配置（含 mode/fuzzy/entries）
 
     Returns:
         {模块类型: {sheet名: DataFrame}}
@@ -159,7 +161,8 @@ def process_files(
         for fpath in matched["worktime"]:
             try:
                 logger.info(f"工时数据源: {os.path.basename(fpath)}")
-                sheets = process_excel_data(fpath, year, month, return_sheets=True)
+                sheets = process_excel_data(fpath, year, month, return_sheets=True,
+                                                header_mapping=worktime_header_mapping)
                 if sheets:
                     all_results["worktime"] = sheets
                     break

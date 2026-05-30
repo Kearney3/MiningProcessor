@@ -24,9 +24,10 @@ def create_log_view(height: int = 300) -> tuple[ft.Container, "LogViewRefs"]:
     def _on_scroll(e: ft.OnScrollEvent):
         _is_at_bottom[0] = e.extent_after < _SCROLL_BOTTOM_THRESHOLD
 
-    log_list = ft.ListView(
+    log_list = ft.Column(
         controls=[],
         spacing=4,
+        scroll=ft.ScrollMode.AUTO,
         auto_scroll=False,
         expand=True,
         on_scroll=_on_scroll,
@@ -79,7 +80,7 @@ def create_log_view(height: int = 300) -> tuple[ft.Container, "LogViewRefs"]:
         vertical_alignment=ft.CrossAxisAlignment.CENTER,
     )
     list_container = ft.Container(
-        content=ft.Column([toolbar, log_list], spacing=4),
+        content=ft.Column([toolbar, log_list], spacing=4, expand=True, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
         height=height,
         border=ft.Border.all(1, theme.BORDER),
         border_radius=theme.RADIUS_MD,
