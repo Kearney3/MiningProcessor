@@ -304,6 +304,11 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
     raw_start = -1 if batch_refs["auto_detect"].value else 6
     merge_output = bool(batch_refs["merge"].value)
 
+    # 台账匹配开关
+    if not batch_refs.get("ledger_toggle", ft.Checkbox(value=False)).value:
+        equipment_ledger = None
+        oil_ledger = None
+
     btn = batch_refs["btn"]
     set_btn_state(btn, False, "扫描中...")
 
