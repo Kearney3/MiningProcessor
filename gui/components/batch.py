@@ -162,23 +162,23 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
                                 [
                                     date_filter_toggle,
                                     date_display,
-                                    ft.IconButton(
+                                    ft.Button(
+                                        "上一天",
                                         icon=ft.Icons.ARROW_BACK_IOS,
-                                        tooltip="上一天",
-                                        icon_size=16,
                                         on_click=_on_prev_day,
+                                        style=ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_PRIMARY),
                                     ),
-                                    ft.IconButton(
+                                    ft.Button(
+                                        "今天",
                                         icon=ft.Icons.CALENDAR_TODAY,
-                                        tooltip="今天",
-                                        icon_size=16,
                                         on_click=_on_today,
+                                        style=ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_PRIMARY),
                                     ),
-                                    ft.IconButton(
+                                    ft.Button(
+                                        "选择日期",
                                         icon=ft.Icons.CALENDAR_MONTH,
-                                        tooltip="选择日期",
-                                        icon_size=16,
                                         on_click=_on_pick_date,
+                                        style=ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_PRIMARY),
                                     ),
                                 ],
                                 spacing=4,
