@@ -7,6 +7,9 @@ import os
 from pathlib import Path
 from typing import Any
 
+_USER_CONFIG_SECTION = "user_config"
+_USER_CONFIG_DEFAULT_SECTION = "user_config_default"
+
 _CONFIG_FILE = Path(__file__).parent.parent / "config.json"
 # 默认设备装载量映射（当 config.json 读取失败时使用）
 DEFAULT_LOAD_MAP_NEW = {
@@ -100,3 +103,62 @@ def get_default_month() -> int:
     """获取默认月份"""
     config = load_config()
     return config.get("default_month", 1)
+
+
+def get_user_config(section: str | None = None, default: Any = None) -> Any:
+    """读取用户自定义配置。
+
+    当 `section` 为 None 时返回完整的 user_config 字典；
+    否则返回对应小节；找不到时返回 `default`。
+    """
+    config = load_config()
+    user_config = config.get(_USER_CONFIG_SECTION, {})
+    if section is None:
+        return user_config
+    return user_config.get(section, default)
+
+
+def save_user_config(user_config: dict[str, Any]) -> None:
+    """整体替换并持久化 user_config 段落。"""
+    config = load_config()
+    config[_USER_CONFIG_SECTION] = dict(user_config)
+    save_config(config)
+
+
+def update_user_config(updates: dict[str, Any]) -> dict[str, Any]:
+    """合并更新 user_config（只覆盖传入的 key，其余保留）。"""
+    config = load_config()
+    current = config.get(_USER_CONFIG_SECTION, {})
+    if not isinstance(current, dict):
+        current = {}
+    current.update(updates)
+    config[_USER_CONFIG_SECTION] = current
+    save_config(config)
+    return current
+
+
+def reset_user_config(section: str | None = None) -> None:
+    """重置用户配置。
+
+    - 当 `section` 为 None 时清空整个 user_config。
+    - 当指定了某个小节时，仅清空该小节。
+    """
+    config = load_config()
+    if section is None:
+        config[_USER_CONFIG_SECTION] = {}
+    else:
+        user_config = config.get(_USER_CONFIG_SECTION, {})
+        if not isinstance(user_config, dict):
+            user_config = {}
+        user_config.pop(section, None)
+        config[_USER_CONFIG_SECTION] = user_config
+    save_config(config)
+
+
+def get_user_config_default(section: str | None = None, default: Any = None) -> Any:
+    """读取 user_config_default 中的默认配置骨架。"""
+    config = load_config()
+    defaults = config.get(_USER_CONFIG_DEFAULT_SECTION, {})
+    if section is None:
+        return defaults if defaults else default
+    return defaults.get(section, default) if isinstance(defaults, dict) else default

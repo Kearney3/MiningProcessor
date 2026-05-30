@@ -1,0 +1,128 @@
+"""批量处理模块区域组件"""
+from datetime import datetime
+from pathlib import Path
+
+import flet as ft
+
+try:
+    from . import theme
+except ImportError:
+    import gui.theme as theme
+
+
+def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
+    """创建批量处理模块区域，返回 (container, batch_refs)"""
+
+    current_date = datetime.now()
+    current_year = str(current_date.year)
+    current_month = str(current_date.month)
+    _last_directory = [""]
+
+    # --- 文件夹选择 ---
+    batch_path = ft.TextField(
+        label="批量处理文件夹",
+        hint_text="选择包含待处理 Excel 文件的文件夹...",
+        expand=True,
+        read_only=False,
+        suffix=ft.IconButton(
+            icon=ft.Icons.FOLDER_OPEN,
+            tooltip="浏览",
+        ),
+    )
+
+    # --- 年份/月份 ---
+    batch_year = ft.Dropdown(
+        label="年份",
+        width=125,
+        options=[ft.dropdown.Option(str(y)) for y in range(2015, 2040)],
+        value=current_year,
+    )
+    batch_month = ft.Dropdown(
+        label="月份",
+        width=125,
+        options=[ft.dropdown.Option(str(m)) for m in range(1, 13)],
+        value=current_month,
+    )
+
+    # --- 生产数据表头自动检测 ---
+    batch_auto_detect = ft.Checkbox(
+        label="表头自动检测",
+        value=True,
+        tooltip="生产数据表头起始行使用自动检测",
+    )
+
+    # --- 合并输出 ---
+    batch_merge = ft.Checkbox(
+        label="合并输出",
+        value=True,
+        tooltip="将所有处理结果合并到单个 Excel 文件（Sheet 带前缀）",
+    )
+
+    # --- 处理按钮 ---
+    batch_btn = ft.Button(
+        "批量处理",
+        icon=ft.Icons.BOLT,
+        disabled=False,
+        style=ft.ButtonStyle(bgcolor=theme.PRIMARY, color="#FFFFFF"),
+    )
+
+    # --- 浏览按钮 ---
+    async def on_batch_browse(e: ft.ControlEvent):
+        picker = ft.FilePicker()
+        path = await picker.get_directory_path(
+            dialog_title="选择批量处理文件夹",
+            initial_directory=_last_directory[0] or None,
+        )
+        if path:
+            batch_path.value = path
+            _last_directory[0] = path
+            batch_path.update()
+            batch_btn.disabled = False
+            batch_btn.update()
+
+    batch_path.suffix.on_click = on_batch_browse
+
+    # --- 布局 ---
+    container = ft.Container(
+        content=ft.Column(
+            [
+                theme.section_title("批量处理"),
+                ft.Container(
+                    content=ft.Column(
+                        [
+                            ft.Row([batch_path], spacing=8),
+                            ft.Row(
+                                [
+                                    batch_year,
+                                    batch_month,
+                                    batch_auto_detect,
+                                    batch_merge,
+                                    batch_btn,
+                                ],
+                                spacing=8,
+                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
+                        ],
+                        spacing=8,
+                    ),
+                    padding=12,
+                ),
+            ],
+            spacing=8,
+        ),
+        padding=12,
+        border=ft.Border.all(1, theme.BORDER),
+        border_radius=theme.RADIUS_LG,
+        bgcolor=theme.SURFACE,
+    )
+
+    batch_refs = {
+        "path": batch_path,
+        "year": batch_year,
+        "month": batch_month,
+        "auto_detect": batch_auto_detect,
+        "merge": batch_merge,
+        "btn": batch_btn,
+    }
+
+    return container, batch_refs

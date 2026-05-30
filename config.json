@@ -1,4 +1,15 @@
 {
+  "user_config": {},
+  "user_config_default": {
+    "database": {
+      "db_type": "",
+      "db_host": "localhost",
+      "db_port": 3306,
+      "db_name": "",
+      "db_user": "",
+      "db_password": ""
+    }
+  },
   "device_load_map": {
     "NTE240": 85,
     "EH4000": 85,
