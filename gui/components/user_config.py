@@ -479,8 +479,25 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
             "entries": entries,
         }
         config_loader.save_worktime_header_mapping(mapping_config)
-        header_status_text.value = f"已保存 {len(entries)} 条表头映射"
-        header_status_text.color = theme.TEXT_SECONDARY
+
+        # 宽松提示：统计各条目适用模式
+        pos_only = sum(1 for e in entries if e["index"] is not None and not e["original"])
+        name_only = sum(1 for e in entries if e["index"] is None and e["original"])
+        both = sum(1 for e in entries if e["index"] is not None and e["original"])
+        hints = []
+        if pos_only:
+            hints.append(f"{pos_only} 条仅按位置有效")
+        if name_only:
+            hints.append(f"{name_only} 条仅按列名有效")
+        if both:
+            hints.append(f"{both} 条两种模式均有效")
+
+        hint_text = "；".join(hints) if hints else ""
+        status_msg = f"已保存 {len(entries)} 条表头映射"
+        if hint_text:
+            status_msg += f"（{hint_text}）"
+        header_status_text.value = status_msg
+        header_status_text.color = theme.WARNING if (pos_only or name_only) and not both else theme.TEXT_SECONDARY
         _log_message(log, f"已保存工作效率表头映射（{len(entries)} 条）")
         try:
             page.update()
