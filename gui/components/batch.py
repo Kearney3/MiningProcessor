@@ -66,6 +66,75 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         tooltip="批量处理时自动匹配设备台账和油品台账",
     )
 
+    # --- 表内合并 ---
+    batch_table_merge = ft.Checkbox(
+        label="表内合并",
+        value=False,
+        tooltip="将所有数据通过左合并聚合到单个 Sheet（需先开启台账匹配）",
+        disabled=not batch_ledger_toggle.value,
+    )
+
+    # ── 基准表芯片切换（表内合并专用） ──
+    _base_table_state = ["fuel"]  # "fuel" | "worktime"
+
+    _chip_fuel = ft.Container(
+        content=ft.Text("燃油数据", size=12, weight=ft.FontWeight.W_500, color="#FFFFFF"),
+        bgcolor=theme.PRIMARY,
+        border_radius=theme.RADIUS_SM,
+        padding=ft.Padding.symmetric(horizontal=10, vertical=4),
+        on_click=None,
+        ink=True,
+    )
+    _chip_worktime = ft.Container(
+        content=ft.Text("工时数据", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+        bgcolor=theme.SURFACE_HIGH,
+        border_radius=theme.RADIUS_SM,
+        padding=ft.Padding.symmetric(horizontal=10, vertical=4),
+        on_click=None,
+        ink=True,
+    )
+
+    class _BaseTableSelector:
+        """带 .value 属性的芯片切换控件组，兼容 logic.py 的 .value 读取。"""
+        def __init__(self, state: list, row: ft.Row):
+            self._state = state
+            self._row = row
+        @property
+        def value(self) -> str:
+            return self._state[0]
+        def update(self):
+            self._row.update()
+
+    batch_base_table_row = ft.Row(
+        [_chip_fuel, _chip_worktime],
+        spacing=0,
+        tight=True,
+        visible=batch_table_merge.value,
+    )
+    batch_base_table = _BaseTableSelector(_base_table_state, batch_base_table_row)
+
+    def _update_base_table_chips():
+        is_fuel = _base_table_state[0] == "fuel"
+        _chip_fuel.bgcolor = theme.PRIMARY if is_fuel else theme.SURFACE_HIGH
+        _chip_fuel.content.color = "#FFFFFF" if is_fuel else theme.TEXT_SECONDARY
+        _chip_worktime.bgcolor = theme.PRIMARY if not is_fuel else theme.SURFACE_HIGH
+        _chip_worktime.content.color = "#FFFFFF" if not is_fuel else theme.TEXT_SECONDARY
+        try:
+            batch_base_table_row.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    def _on_chip_fuel(e):
+        _base_table_state[0] = "fuel"
+        _update_base_table_chips()
+
+    def _on_chip_worktime(e):
+        _base_table_state[0] = "worktime"
+        _update_base_table_chips()
+
+    _chip_fuel.on_click = _on_chip_fuel
+    _chip_worktime.on_click = _on_chip_worktime
+
     # --- 工作效率表头修改开关 ---
     batch_header_toggle = ft.Checkbox(
         label="工作效率表头修改",
@@ -153,6 +222,53 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
             batch_header_fuzzy.update()
         except (RuntimeError, AttributeError):
             pass
+
+
+    # ── 表内合并 / 合并输出 互斥 & 台账依赖 ──
+    def _on_table_merge_change(e):
+        if batch_table_merge.value:
+            batch_merge.value = False
+            batch_merge.disabled = True
+        else:
+            batch_merge.disabled = False
+        batch_base_table_row.visible = batch_table_merge.value
+        try:
+            batch_merge.update()
+            batch_base_table_row.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    batch_table_merge.on_change = _on_table_merge_change
+
+    def _on_merge_change(e):
+        if batch_merge.value:
+            batch_table_merge.value = False
+            batch_table_merge.disabled = True
+            batch_base_table_row.visible = False
+        else:
+            batch_table_merge.disabled = not batch_ledger_toggle.value
+        try:
+            batch_table_merge.update()
+            batch_base_table_row.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    batch_merge.on_change = _on_merge_change
+
+    def _on_ledger_toggle_for_merge(e):
+        if not batch_ledger_toggle.value:
+            batch_table_merge.value = False
+            batch_table_merge.disabled = True
+            batch_base_table_row.visible = False
+        else:
+            batch_table_merge.disabled = batch_merge.value
+        try:
+            batch_table_merge.update()
+            batch_base_table_row.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    batch_ledger_toggle.on_change = _on_ledger_toggle_for_merge
 
     batch_header_toggle.on_change = _on_batch_header_toggle
 
@@ -328,15 +444,15 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
                 # ── 处理选项（3列紧凑布局） ──
                 _module_card([
                     ft.Row(
-                        [batch_auto_detect, batch_merge, batch_ledger_toggle],
+                        [batch_auto_detect, batch_header_toggle, batch_header_mode_row, batch_header_fuzzy],
+                        spacing=theme.SPACING_SM,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                    ft.Row(
+                        [batch_ledger_toggle, batch_merge, batch_table_merge, batch_base_table_row],
                         spacing=theme.SPACING_LG,
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                         wrap=True,
-                    ),
-                    ft.Row(
-                        [batch_header_toggle, batch_header_mode_row, batch_header_fuzzy],
-                        spacing=theme.SPACING_SM,
-                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
                 ], label="处理选项", spacing=4),
 
@@ -362,6 +478,8 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "month": batch_month,
         "auto_detect": batch_auto_detect,
         "merge": batch_merge,
+        "table_merge": batch_table_merge,
+        "base_table": batch_base_table,
         "ledger_toggle": batch_ledger_toggle,
         "header_toggle": batch_header_toggle,
         "header_mode": batch_header_mode,

@@ -197,7 +197,7 @@ def _execute_task(module_type: str, path: str, **kwargs) -> str | None:
         if module_type == "fuel":
             process_diesel_data(path, kwargs.get("year"))
         elif module_type == "production":
-            raw_start = kwargs.get("raw_start", 6)
+            raw_start = kwargs.get("raw_start", -1)
             device_load_map = config_loader.get_device_load_map()
             processor = ProdProcessor(raw_start=raw_start, device_load_map=device_load_map)
             logging.info(f"装载量参数：{device_load_map}")
@@ -367,6 +367,14 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
     raw_start = -1 if batch_refs["auto_detect"].value else 6
     merge_output = bool(batch_refs["merge"].value)
 
+    # 表内合并选项
+    table_merge_config = None
+    table_merge_toggle = batch_refs.get("table_merge")
+    if table_merge_toggle and table_merge_toggle.value:
+        base_table_type = batch_refs.get("base_table")
+        base_type = base_table_type.value if base_table_type else "fuel"
+        table_merge_config = {"base_type": base_type}
+
     btn = batch_refs["btn"]
     set_btn_state(btn, False, "扫描中...")
 
@@ -382,8 +390,19 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
     missing_labels = [MODULE_LABELS.get(k, k) for k in missing]
     _log_message(log, f"扫描完成 — 已找到: {', '.join(found_labels) or '无'}; 未找到: {', '.join(missing_labels) or '无'}")
 
-    # ── 第二阶段：缺失确认弹窗 ──
+    # ── 第二阶段：表内合并基准表验证 & 缺失确认弹窗 ──
+    if table_merge_config:
+        base_type = table_merge_config["base_type"]
+        # 燃油基准需要 fuel，工时基准需要 worktime
+        required_for_base = "fuel" if base_type == "fuel" else "worktime"
+        if required_for_base not in matched:
+            base_label = MODULE_LABELS.get(required_for_base, required_for_base)
+            _log_message(log, f"表内合并需要{base_label}数据，但未找到对应文件", level=logging.ERROR)
+            set_btn_state(btn, True, "批量处理")
+            return
+
     if missing:
+        # 表内合并模式下，只警告非基准表缺失；否则沿用原逻辑
         event = threading.Event()
         should_continue = [True]
 
@@ -398,10 +417,14 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
             event.set()
 
         missing_text = "、".join(missing_labels)
+        if table_merge_config:
+            msg = f"以下类型的数据文件未在文件夹中检测到：\n\n{missing_text}\n\n表内合并将跳过缺失部分，是否继续？"
+        else:
+            msg = f"以下类型的数据文件未在文件夹中检测到：\n\n{missing_text}\n\n是否继续处理已找到的数据？"
         dialog = ft.AlertDialog(
             modal=True,
             title=ft.Text("部分数据文件未找到"),
-            content=ft.Text(f"以下类型的数据文件未在文件夹中检测到：\n\n{missing_text}\n\n是否继续处理已找到的数据？"),
+            content=ft.Text(msg),
             actions=[
                 ft.TextButton("继续处理", on_click=_on_confirm),
                 ft.TextButton("取消", on_click=_on_cancel),
@@ -441,6 +464,7 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
             path, matched, year, month, raw_start, merge_output,
             equipment_ledger, oil_ledger, filter_date,
             worktime_header_mapping,
+            table_merge_config,
         )
         _log_message(log, "批量处理完成")
     except Exception as ex:

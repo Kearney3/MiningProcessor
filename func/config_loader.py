@@ -101,6 +101,19 @@ def get_shift_mapping() -> dict[str, str]:
     return config.get("shift_mapping", {})
 
 
+def get_default_shift() -> str:
+    """Get default shift value when shift column is missing (e.g. "Night")"""
+    config = load_config()
+    return config.get("default_shift", "Night")
+
+
+def set_default_shift(shift: str) -> None:
+    """Set default shift value when shift column is missing"""
+    config = load_config()
+    config["default_shift"] = shift
+    save_config(config)
+
+
 def get_default_year() -> int:
     """获取默认年份"""
     config = load_config()
@@ -195,7 +208,7 @@ DEFAULT_WORKTIME_HEADER_MAPPING: dict = {
         {"index": 1, "original": "", "new": "日期"},
         {"index": 2, "original": "", "new": "班次"},
         {"index": 3, "original": "", "new": "序号"},
-        {"index": 4, "original": "", "new": "设备种类"},
+        {"index": 4, "original": "", "new": "设备名称"},
         {"index": 5, "original": "", "new": "公司"},
         {"index": 6, "original": "", "new": "应运行分钟"},
         {"index": 7, "original": "", "new": "应运行小时数"},

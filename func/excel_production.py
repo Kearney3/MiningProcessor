@@ -202,7 +202,7 @@ class MiningDataProcessor:
                         "矿卡名称": truck_name,
                         "挖机名称": excavator_name,
                         "矿石类型": ore_type,
-                        "数量": trips,
+                        "运次": trips,
                         "产量": production
                     })
                     total_trips += trips
