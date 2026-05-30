@@ -6,6 +6,7 @@
 
 import logging
 import os
+import pandas as pd
 from datetime import datetime
 
 from func.excel_fuel import process_diesel_data
