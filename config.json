@@ -28,7 +28,7 @@
                 {
                     "index": 4,
                     "original": "",
-                    "new": "设备种类"
+                    "new": "设备名称"
                 },
                 {
                     "index": 5,
@@ -184,7 +184,7 @@
                 {
                     "index": 4,
                     "original": "",
-                    "new": "设备种类"
+                    "new": "设备名称"
                 },
                 {
                     "index": 5,

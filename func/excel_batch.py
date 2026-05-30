@@ -95,6 +95,7 @@ def process_files(
     oil_ledger: OilLedger = None,
     filter_date: date_type | None = None,
     worktime_header_mapping: dict | None = None,
+    table_merge_config: dict | None = None,
 ) -> dict[str, dict[str, pd.DataFrame]]:
     """
     根据已匹配的文件列表执行批量处理。
@@ -108,6 +109,7 @@ def process_files(
         equipment_ledger / oil_ledger: 台账实例
         filter_date: 若指定，只保留该日期的数据
         worktime_header_mapping: 工作效率表头映射配置（含 mode/fuzzy/entries）
+        table_merge_config: 表内合并配置，如 {"base_type": "fuel"}。None 表示不启用。
 
     Returns:
         {模块类型: {sheet名: DataFrame}}
@@ -195,7 +197,9 @@ def process_files(
             )
 
     # ── 输出 ──
-    if merge_output:
+    if table_merge_config:
+        _table_merge_and_write(all_results, folder_path, year, month, table_merge_config)
+    elif merge_output:
         _write_merged(all_results, folder_path, year, month)
     else:
         _write_separate(all_results, folder_path, year, month)
@@ -353,6 +357,338 @@ def _apply_ledger_to_sheets(
         logger.info("台账匹配完成")
     return sheets
 
+
+
+# ---------------------------------------------------------------------------
+# 表内合并：生产数据聚合 + 左合并流水线
+# ---------------------------------------------------------------------------
+
+def _add_default_shift(sheets: dict[str, pd.DataFrame], default_shift: str = "Night") -> dict[str, pd.DataFrame]:
+    """对没有「班次」列的 sheet 新增一列，默认值为 default_shift。"""
+    for sheet_name, df in sheets.items():
+        if "班次" not in df.columns:
+            df["班次"] = default_shift
+            logger.info(f"Sheet '{sheet_name}' 缺少班次列，已新增默认值: {default_shift}")
+    return sheets
+
+
+def _aggregate_production_data(
+    production_sheets: dict[str, pd.DataFrame],
+) -> pd.DataFrame | None:
+    """
+    将生产数据的「生产数据」sheet 按矿卡/挖机分别聚合，再 concat。
+    要求台账匹配已完成（标准设备名称列已存在）。
+    
+    Returns:
+        聚合后的 DataFrame，或 None（无数据时）
+    """
+    prod_df = production_sheets.get("生产数据")
+    if prod_df is None or prod_df.empty:
+        logger.warning("生产数据 sheet 不存在或为空，跳过聚合")
+        return None
+
+    required_cols = {"日期", "班次", "矿石类型", "产量", "运次"}
+    missing_cols = required_cols - set(prod_df.columns)
+    if missing_cols:
+        logger.error(f"生产数据缺少必要列: {missing_cols}")
+        return None
+
+    df = prod_df.copy()
+
+    # ── df1: 按矿卡聚合 ──
+    truck_name_col = "标准设备名称（矿卡）"
+    if truck_name_col not in df.columns:
+        # 回退到原始列
+        truck_name_col = "矿卡名称"
+        if truck_name_col not in df.columns:
+            logger.warning("生产数据缺少矿卡名称列，跳过矿卡聚合")
+            df1 = pd.DataFrame()
+        else:
+            df1 = pd.DataFrame()
+    
+    if truck_name_col in df.columns:
+        # pivot: 矿石类型 → 列，值 = 产量之和
+        truck_group_keys = ["日期", "班次", truck_name_col]
+        # 先聚合产量
+        pivot_df = df.pivot_table(
+            index=truck_group_keys,
+            columns="矿石类型",
+            values="产量",
+            aggfunc="sum",
+            fill_value=0,
+        ).reset_index()
+        # 聚合运次
+        trips_df = df.groupby(truck_group_keys, sort=False)["运次"].sum().reset_index()
+        # 合并
+        df1 = pivot_df.merge(trips_df, on=truck_group_keys, how="left")
+        # 统一列名
+        df1 = df1.rename(columns={truck_name_col: "标准设备名称"})
+        logger.info(f"矿卡聚合完成: {len(df1)} 行")
+
+    # ── df2: 按挖机聚合 ──
+    excavator_name_col = "标准设备名称（挖机）"
+    if excavator_name_col not in df.columns:
+        excavator_name_col = "挖机名称"
+    
+    df2 = pd.DataFrame()
+    if excavator_name_col in df.columns:
+        excavator_group_keys = ["日期", "班次", excavator_name_col]
+        pivot_df2 = df.pivot_table(
+            index=excavator_group_keys,
+            columns="矿石类型",
+            values="产量",
+            aggfunc="sum",
+            fill_value=0,
+        ).reset_index()
+        trips_df2 = df.groupby(excavator_group_keys, sort=False)["运次"].sum().reset_index()
+        df2 = pivot_df2.merge(trips_df2, on=excavator_group_keys, how="left")
+        df2 = df2.rename(columns={excavator_name_col: "标准设备名称"})
+        logger.info(f"挖机聚合完成: {len(df2)} 行")
+
+    # ── concat ──
+    if df1.empty and df2.empty:
+        return None
+    if df1.empty:
+        return df2
+    if df2.empty:
+        return df1
+
+    result = pd.concat([df1, df2], ignore_index=True)
+    logger.info(f"生产数据聚合完成: {len(result)} 行（矿卡 {len(df1)} + 挖机 {len(df2)}）")
+    return result
+
+
+
+def _aggregate_fuel_data(
+    fuel_sheets: dict[str, pd.DataFrame],
+) -> pd.DataFrame | None:
+    """
+    将燃油数据的「油耗信息」sheet 按 (日期, 班次, 标准设备名称) 聚合。
+    油品消耗求和，设备名称/设备编号取第一个值。
+    
+    Returns:
+        聚合后的 DataFrame，或 None
+    """
+    fuel_df = fuel_sheets.get("油耗信息")
+    if fuel_df is None or fuel_df.empty:
+        logger.warning("油耗信息 sheet 不存在或为空，跳过聚合")
+        return None
+
+    if "标准设备名称" not in fuel_df.columns:
+        logger.warning("油耗信息缺少标准设备名称列，跳过聚合")
+        return None
+
+    group_keys = ["日期", "班次", "标准设备名称"]
+    missing = [k for k in group_keys if k not in fuel_df.columns]
+    if missing:
+        logger.warning(f"油耗信息缺少聚合 key: {missing}")
+        return None
+
+    df = fuel_df.copy()
+    # 删除内部排序列
+    if "shift_rank" in df.columns:
+        df = df.drop(columns=["shift_rank"])
+
+    # 构建聚合规则
+    agg_dict = {}
+    # 油品消耗求和
+    if "油品消耗" in df.columns:
+        agg_dict["油品消耗"] = "sum"
+    # 设备名称/编号取第一个
+    if "设备名称" in df.columns:
+        agg_dict["设备名称"] = "first"
+    if "设备编号" in df.columns:
+        agg_dict["设备编号"] = "first"
+
+    if not agg_dict:
+        logger.warning("油耗信息无可聚合字段")
+        return None
+
+    result = df.groupby(group_keys, sort=False).agg(agg_dict).reset_index()
+    logger.info(f"油耗信息聚合完成: {len(result)} 行（原 {len(df)} 行）")
+    return result
+
+
+# 各模块的语义化后缀
+_MODULE_SUFFIXES = {
+    "fuel": "燃油",
+    "electrical": "电力",
+    "production": "生产",
+    "worktime": "工时",
+}
+
+
+# 固定列顺序：这些列排在最前面
+_PRIORITY_COLS = ["日期", "班次", "标准设备名称", "标准设备编号", "标准公司名称"]
+
+
+def _reorder_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """将优先列排在最前，其余列保持原序。"""
+    priority = [c for c in _PRIORITY_COLS if c in df.columns]
+    rest = [c for c in df.columns if c not in priority]
+    return df[priority + rest]
+
+
+# 左合并时需要从后续 sheet 中删除的重复列（只保留基准表的一份）
+_LEDGER_DUPLICATE_COLS = ["标准设备编号", "标准公司名称"]
+
+
+def _left_merge(
+    base: pd.DataFrame,
+    right: pd.DataFrame,
+    right_label: str,
+    join_keys: list[str],
+) -> pd.DataFrame:
+    """
+    将 right 按 join_keys 左合并到 base 上。
+    列名冲突时使用语义化后缀，标准设备编号/标准公司名称只保留一份。
+    """
+    # 从 right 中删除基准表已有的 ledger 重复列
+    right = right.copy()
+    for col in _LEDGER_DUPLICATE_COLS:
+        if col in right.columns and col in base.columns:
+            right = right.drop(columns=[col])
+
+    # 显式验证 join keys 存在
+    for k in join_keys:
+        if k not in base.columns:
+            raise KeyError(f"基准表缺少 join key '{k}'")
+        if k not in right.columns:
+            raise KeyError(f"表 '{right_label}' 缺少 join key '{k}'")
+
+    # 找出冲突列（排除 join keys 和 ledger 重复列，这些已处理过）
+    base_cols = set(base.columns)
+    skip_cols = set(join_keys) | set(_LEDGER_DUPLICATE_COLS)
+    right_non_key_cols = [c for c in right.columns if c not in skip_cols]
+    conflicts = [c for c in right_non_key_cols if c in base_cols]
+
+    suffix = f"_{right_label}"
+    if conflicts:
+        rename_map = {c: f"{c}{suffix}" for c in conflicts}
+        right = right.rename(columns=rename_map)
+        logger.info(f"左合并 '{right_label}': 列名冲突已处理 {list(rename_map.values())}")
+
+    merged = base.merge(right, on=join_keys, how="left", suffixes=("", suffix))
+    logger.info(f"左合并 '{right_label}' 完成: {len(merged)} 行")
+    return merged
+
+
+def _table_merge_and_write(
+    all_results: dict[str, dict[str, pd.DataFrame]],
+    folder_path: str,
+    year: int,
+    month: int,
+    table_merge_config: dict,
+):
+    """
+    执行表内合并流程：聚合生产数据 → 左合并所有模块 → 输出单 sheet Excel。
+    """
+    base_type = table_merge_config.get("base_type", "fuel")
+    join_keys = ["日期", "班次", "标准设备名称"]
+    default_shift = config_loader.get_default_shift() if hasattr(config_loader, 'get_default_shift') else "Night"
+
+    # 1. 对所有 sheets 添加默认班次（如果没有）
+    for module_type in all_results:
+        all_results[module_type] = _add_default_shift(all_results[module_type], default_shift)
+
+    # 2. 聚合生产数据
+    production_agg = None
+    if "production" in all_results:
+        production_agg = _aggregate_production_data(all_results["production"])
+
+    # 3. 聚合油耗信息
+    fuel_agg = None
+    if "fuel" in all_results:
+        fuel_agg = _aggregate_fuel_data(all_results["fuel"])
+
+    # 4. 确保生产数据聚合结果有标准设备名称列
+    if production_agg is not None and "标准设备名称" not in production_agg.columns:
+        # 尝试从矿卡/挖机列回退
+        for fallback in ["矿卡名称", "挖机名称", "设备名称"]:
+            if fallback in production_agg.columns:
+                production_agg = production_agg.rename(columns={fallback: "标准设备名称"})
+                logger.info(f"聚合数据回退列名 '{fallback}' -> '标准设备名称'")
+                break
+        if "标准设备名称" not in production_agg.columns:
+            logger.warning(f"聚合数据缺少标准设备名称列，列: {list(production_agg.columns)}")
+
+    # 4. 确定基准表
+    if base_type == "fuel":
+        base_df = fuel_agg
+        base_label = "油耗信息（聚合）"
+    else:
+        base_sheets = all_results.get("worktime", {})
+        base_df = base_sheets.get("工时数据")
+        base_label = "工时数据"
+
+    if base_df is None or base_df.empty:
+        logger.error(f"基准表 '{base_label}' 不存在或为空，无法进行表内合并")
+        return
+
+    merged = base_df.copy()
+    logger.info(f"表内合并基准表: {base_label} ({len(merged)} 行)")
+
+    # 5. 按顺序左合并其他 sheet
+    if base_type == "fuel":
+        # 顺序: 设备信息 → 工时 → 电力 → 运行数据 → 产量数据
+        merge_queue = []
+        # 设备信息
+        if "fuel" in all_results and "设备信息" in all_results["fuel"]:
+            merge_queue.append(("设备信息", all_results["fuel"]["设备信息"]))
+        # 工时数据
+        if "worktime" in all_results and "工时数据" in all_results["worktime"]:
+            merge_queue.append(("工时数据", all_results["worktime"]["工时数据"]))
+        # 油耗信息已在基准表中，无需重复合并
+    else:
+        # base_type == "worktime"
+        # 顺序: 设备信息 → 油耗信息 → 电力 → 运行数据 → 产量数据
+        merge_queue = []
+        if "fuel" in all_results and "设备信息" in all_results["fuel"]:
+            merge_queue.append(("设备信息", all_results["fuel"]["设备信息"]))
+        if fuel_agg is not None:
+            merge_queue.append(("油耗信息", fuel_agg))
+
+    # 电力数据
+    if "electrical" in all_results and "电力消耗" in all_results["electrical"]:
+        merge_queue.append(("电力消耗", all_results["electrical"]["电力消耗"]))
+
+    # 运行数据
+    if "production" in all_results and "运行数据" in all_results["production"]:
+        merge_queue.append(("运行数据", all_results["production"]["运行数据"]))
+
+    # 产量数据（聚合后）
+    if production_agg is not None:
+        merge_queue.append(("产量数据", production_agg))
+
+    # 执行左合并
+    for label, right_df in merge_queue:
+        if right_df is None or right_df.empty:
+            logger.warning(f"跳过空表: {label}")
+            continue
+        # 确保 join_keys 同时存在于 base 和 right
+        base_keys_ok = [k for k in join_keys if k in merged.columns]
+        right_keys_ok = [k for k in join_keys if k in right_df.columns]
+        available_keys = [k for k in join_keys if k in merged.columns and k in right_df.columns]
+        missing_in_right = [k for k in join_keys if k not in right_df.columns]
+        missing_in_base = [k for k in join_keys if k not in merged.columns]
+        if missing_in_right:
+            logger.info(f"表 '{label}' 缺少 join key {missing_in_right}，将使用 {available_keys}")
+        if missing_in_base:
+            logger.warning(f"基准表缺少 join key {missing_in_base}，将使用 {available_keys}")
+        if not available_keys:
+            logger.warning(f"表 '{label}' 无可用 join key，跳过合并")
+            continue
+        try:
+            merged = _left_merge(merged, right_df, label, available_keys)
+        except Exception as e:
+            logger.error(f"合并 '{label}' 失败: {e}")
+
+    # 6. 列排序 & 输出
+    merged = _reorder_columns(merged)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_file = os.path.join(folder_path, f"表内合并结果_{year}{month:02d}_{timestamp}.xlsx")
+    merged.to_excel(output_file, index=False, sheet_name="合并数据")
+    logger.info(f"表内合并完成: {output_file} ({len(merged)} 行)")
 
 # ---------------------------------------------------------------------------
 # 输出
