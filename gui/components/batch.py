@@ -1,5 +1,5 @@
 """批量处理模块区域组件"""
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import flet as ft
@@ -65,6 +65,54 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         tooltip="批量处理时自动匹配设备台账和油品台账",
     )
 
+    # --- 日期筛选 ---
+    _selected_date = [current_date.date()]  # 用列表包裹以便闭包修改
+
+    date_display = ft.Text(
+        value=current_date.strftime("%Y-%m-%d"),
+        size=14,
+        weight=ft.FontWeight.W_500,
+        color=theme.TEXT_PRIMARY,
+    )
+
+    date_filter_toggle = ft.Checkbox(
+        label="按日期筛选",
+        value=False,
+        tooltip="开启后只保留所选日期的数据",
+    )
+
+    def _update_date_display():
+        date_display.value = _selected_date[0].strftime("%Y-%m-%d")
+        try:
+            date_display.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    def _on_prev_day(e):
+        _selected_date[0] = _selected_date[0] - timedelta(days=1)
+        _update_date_display()
+
+    def _on_today(e):
+        _selected_date[0] = datetime.now().date()
+        _update_date_display()
+
+    async def _on_pick_date(e):
+        dp = ft.DatePicker(
+            first_date=datetime(2015, 1, 1),
+            last_date=datetime(2040, 12, 31),
+            current_date=datetime.combine(_selected_date[0], datetime.min.time()),
+        )
+
+        def _on_date_picked(ev):
+            if dp.value:
+                _selected_date[0] = dp.value.date()
+                _update_date_display()
+            page.close(dp)
+
+        dp.on_change = _on_date_picked
+        dp.on_dismiss = lambda ev: page.close(dp)
+        page.open(dp)
+
     # --- 处理按钮 ---
     batch_btn = ft.Button(
         "批量处理",
@@ -110,6 +158,32 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
                                 spacing=8,
                                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
                             ),
+                            ft.Row(
+                                [
+                                    date_filter_toggle,
+                                    date_display,
+                                    ft.IconButton(
+                                        icon=ft.Icons.ARROW_BACK_IOS,
+                                        tooltip="上一天",
+                                        icon_size=16,
+                                        on_click=_on_prev_day,
+                                    ),
+                                    ft.IconButton(
+                                        icon=ft.Icons.CALENDAR_TODAY,
+                                        tooltip="今天",
+                                        icon_size=16,
+                                        on_click=_on_today,
+                                    ),
+                                    ft.IconButton(
+                                        icon=ft.Icons.CALENDAR_MONTH,
+                                        tooltip="选择日期",
+                                        icon_size=16,
+                                        on_click=_on_pick_date,
+                                    ),
+                                ],
+                                spacing=4,
+                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            ),
                         ],
                         spacing=8,
                     ),
@@ -131,6 +205,8 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "auto_detect": batch_auto_detect,
         "merge": batch_merge,
         "ledger_toggle": batch_ledger_toggle,
+        "date_filter_toggle": date_filter_toggle,
+        "selected_date": _selected_date,
         "btn": batch_btn,
     }
 
