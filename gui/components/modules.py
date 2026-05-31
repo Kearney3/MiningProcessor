@@ -4,6 +4,7 @@ from pathlib import Path
 
 import flet as ft
 
+from .common import _last_directory, _update_last_directory
 from .types import ModuleRefs
 
 try:
@@ -18,7 +19,6 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     current_date = datetime.now()
     current_year = str(current_date.year)
     current_month = str(current_date.month)
-    _last_directory = [""]  # 记住上次文件选择器的目录
 
     # --- Fuel ---
     fuel_path = ft.TextField(
@@ -350,7 +350,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         )
         if files:
             fuel_path.value = files[0].path
-            _last_directory[0] = str(Path(files[0].path).parent)
+            _update_last_directory(files[0].path)
             fuel_path.update()
             fuel_btn.disabled = False
             fuel_btn.update()
@@ -364,7 +364,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         )
         if files:
             prod_path.value = files[0].path
-            _last_directory[0] = str(Path(files[0].path).parent)
+            _update_last_directory(files[0].path)
             prod_path.update()
             prod_btn.disabled = False
             prod_btn.update()
@@ -391,7 +391,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         )
         if files:
             elec_path.value = files[0].path
-            _last_directory[0] = str(Path(files[0].path).parent)
+            _update_last_directory(files[0].path)
             elec_path.update()
             elec_btn.disabled = False
             elec_btn.update()
@@ -405,7 +405,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         )
         if files:
             work_path.value = files[0].path
-            _last_directory[0] = str(Path(files[0].path).parent)
+            _update_last_directory(files[0].path)
             work_path.update()
             work_btn.disabled = False
             work_btn.update()

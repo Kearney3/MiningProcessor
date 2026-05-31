@@ -14,6 +14,7 @@ from pathlib import Path
 
 from . import components as cmp
 from . import logic as logic
+from .components.common import _last_directory, _update_last_directory
 
 try:
     from . import theme
@@ -77,7 +78,6 @@ def main(page: ft.Page):
     _pending_lock = threading.Lock()
     _flush_timer: threading.Timer | None = None
     _last_flush_time: float = time.monotonic()  # 上次成功 flush 的时间戳
-    _last_directory = [""]  # 记住上次文件选择器的目录
     FLUSH_INTERVAL = 0.15  # 150ms 合并窗口
     FALLBACK_FLUSH_TIMEOUT = 1.0  # pending 超过此秒数未被 flush 时，从 consumer 线程直接 flush
 
@@ -263,7 +263,7 @@ def main(page: ft.Page):
             initial_directory=_last_directory[0] or None,
         )
         if path:
-            _last_directory[0] = str(Path(path).parent)
+            _update_last_directory(path)
         _export_logs_to_path(path)
 
     level_filter.on_select = _apply_filters
@@ -361,6 +361,12 @@ def main(page: ft.Page):
 
     # ---- 绑定处理按钮 ----
     logic.wire_processing_buttons(module_refs, page, log, ledger_refs, oil_ledger_refs)
+
+    # ---- 自动加载默认台账缓存 ----
+    if ledger_refs.get("load_from_cache"):
+        ledger_refs["load_from_cache"]()
+    if oil_ledger_refs.get("load_from_cache"):
+        oil_ledger_refs["load_from_cache"]()
 
     # ---- 侧边栏导航 ----
     nav_items_data = [

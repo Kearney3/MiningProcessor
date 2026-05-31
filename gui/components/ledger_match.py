@@ -9,7 +9,7 @@ import pandas as pd
 import flet as ft
 
 
-from .common import _log_message
+from .common import _log_message, _last_directory as _import_dir, _update_last_directory
 
 try:
     from . import theme
@@ -62,7 +62,6 @@ def create_ledger_match_section(
     _matched_sheets: dict[str, pd.DataFrame] = {}   # sheet_name -> 匹配成功的行
     _unmatched_sheets: dict[str, pd.DataFrame] = {}  # sheet_name -> 匹配失败的行
     _view_mode: list[str] = ["all"]  # "all" | "matched" | "unmatched"
-    _import_dir: list[str] = [""]  # 导入文件所在目录
 
     # --- 控件 ---
     file_label = ft.Text("未导入文件", size=12, color=ft.Colors.GREY)
@@ -488,7 +487,7 @@ def create_ledger_match_section(
         _all_sheets.clear()
         _all_sheets.update(parsed_sheets)
 
-        _import_dir[0] = str(Path(path).parent)
+        _update_last_directory(path)
         file_label.value = Path(path).name
         file_label.color = ft.Colors.GREEN
 
