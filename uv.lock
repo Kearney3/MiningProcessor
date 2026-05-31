@@ -638,40 +638,40 @@ source = { editable = "." }
 dependencies = [
     { name = "flet" },
     { name = "flet-datatable2" },
-    { name = "ipykernel" },
-    { name = "matplotlib" },
     { name = "openpyxl" },
     { name = "pandas" },
-    { name = "pandas-stubs" },
     { name = "rapidfuzz" },
-    { name = "seaborn" },
     { name = "xlrd" },
 ]
 
 [package.dev-dependencies]
 dev = [
+    { name = "ipykernel" },
+    { name = "matplotlib" },
+    { name = "pandas-stubs" },
     { name = "pytest" },
     { name = "scikit-learn" },
+    { name = "seaborn" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "flet", specifier = ">=0.21.0" },
     { name = "flet-datatable2", specifier = ">=0.85.0" },
-    { name = "ipykernel", specifier = ">=7.2.0" },
-    { name = "matplotlib", specifier = ">=3.10.9" },
     { name = "openpyxl", specifier = ">=3.1.2" },
     { name = "pandas", specifier = ">=3.0.2" },
-    { name = "pandas-stubs", specifier = "~=3.0.2" },
     { name = "rapidfuzz", specifier = ">=3.0.0" },
-    { name = "seaborn", specifier = ">=0.13.2" },
     { name = "xlrd", specifier = ">=2.0.2" },
 ]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "ipykernel", specifier = ">=7.2.0" },
+    { name = "matplotlib", specifier = ">=3.10.9" },
+    { name = "pandas-stubs", specifier = "~=3.0.2" },
     { name = "pytest", specifier = ">=9.0.3" },
     { name = "scikit-learn", specifier = ">=1.8.0" },
+    { name = "seaborn", specifier = ">=0.13.2" },
 ]
 
 [[package]]
