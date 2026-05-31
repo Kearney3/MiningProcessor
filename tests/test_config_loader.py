@@ -22,7 +22,7 @@ def _reset_runtime_config():
 
 @pytest.fixture
 def temp_config(tmp_path, monkeypatch):
-    """创建临时 config.json 并替换模块级路径"""
+    """创建临时 config.json + config.user.json 并替换模块级路径"""
     config_data = {
         "device_load_map": {"TR100": 35, "EH4000": 85},
         "device_load_map_old": {"TR100": 32, "EH4000": 80},
@@ -34,6 +34,9 @@ def temp_config(tmp_path, monkeypatch):
     config_file = tmp_path / "config.json"
     config_file.write_text(json.dumps(config_data, ensure_ascii=False), encoding="utf-8")
     monkeypatch.setattr(config_loader, "_CONFIG_FILE", config_file)
+    # 确保测试不会读取真实的 config.user.json
+    user_file = tmp_path / "config.user.json"
+    monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", user_file)
     return config_data, config_file
 
 
@@ -47,10 +50,35 @@ class TestLoadConfig:
         assert "device_load_map" in result
         assert result["device_load_map"]["TR100"] == 35
 
-    def test_load_missing_file_raises(self, tmp_path, monkeypatch):
+    def test_load_missing_files_returns_empty(self, tmp_path, monkeypatch):
+        """两个配置文件都不存在时返回空 dict（不再抛异常）"""
         monkeypatch.setattr(config_loader, "_CONFIG_FILE", tmp_path / "nonexistent.json")
-        with pytest.raises(FileNotFoundError):
-            config_loader.load_config()
+        monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", tmp_path / "nonexistent_user.json")
+        result = config_loader.load_config()
+        assert result == {}
+
+    def test_load_merges_user_over_default(self, tmp_path, monkeypatch):
+        """config.user.json 中的值覆盖 config.json"""
+        config_file = tmp_path / "config.json"
+        config_file.write_text(json.dumps({"default_year": 2024, "shift_mapping": {"白班": "Day"}}), encoding="utf-8")
+        user_file = tmp_path / "config.user.json"
+        user_file.write_text(json.dumps({"default_year": 2026}), encoding="utf-8")
+        monkeypatch.setattr(config_loader, "_CONFIG_FILE", config_file)
+        monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", user_file)
+
+        result = config_loader.load_config()
+        assert result["default_year"] == 2026          # user 覆盖
+        assert result["shift_mapping"]["白班"] == "Day"  # 保留 default
+
+    def test_load_user_config_missing_uses_default(self, tmp_path, monkeypatch):
+        """config.user.json 不存在时只返回 config.json 内容"""
+        config_file = tmp_path / "config.json"
+        config_file.write_text(json.dumps({"default_year": 2025}), encoding="utf-8")
+        monkeypatch.setattr(config_loader, "_CONFIG_FILE", config_file)
+        monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", tmp_path / "nope.json")
+
+        result = config_loader.load_config()
+        assert result == {"default_year": 2025}
 
 
 class TestSaveConfig:
@@ -87,6 +115,7 @@ class TestGetDeviceLoadMap:
         config_file = tmp_path / "config.json"
         config_file.write_text(json.dumps({}), encoding="utf-8")
         monkeypatch.setattr(config_loader, "_CONFIG_FILE", config_file)
+        monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", tmp_path / "nope.json")
         result = config_loader.get_device_load_map()
         assert result == {}
 
@@ -167,6 +196,7 @@ class TestGetShiftMapping:
         config_file = tmp_path / "config.json"
         config_file.write_text(json.dumps({}), encoding="utf-8")
         monkeypatch.setattr(config_loader, "_CONFIG_FILE", config_file)
+        monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", tmp_path / "nope.json")
         assert config_loader.get_shift_mapping() == {}
 
 
@@ -181,12 +211,14 @@ class TestGetDefaultYearMonth:
         config_file = tmp_path / "config.json"
         config_file.write_text(json.dumps({}), encoding="utf-8")
         monkeypatch.setattr(config_loader, "_CONFIG_FILE", config_file)
+        monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", tmp_path / "nope.json")
         assert config_loader.get_default_year() == 2025
 
     def test_fallback_month(self, tmp_path, monkeypatch):
         config_file = tmp_path / "config.json"
         config_file.write_text(json.dumps({}), encoding="utf-8")
         monkeypatch.setattr(config_loader, "_CONFIG_FILE", config_file)
+        monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", tmp_path / "nope.json")
         assert config_loader.get_default_month() == 1
 
 
@@ -194,6 +226,64 @@ class TestGetConfigFilePath:
     def test_returns_path_object(self, temp_config):
         result = config_loader.get_config_file_path()
         assert isinstance(result, Path)
+
+
+class TestUserConfigReadWrite:
+    """验证 user_config 读写走 config.user.json"""
+
+    def test_save_user_config_writes_to_user_file(self, tmp_path, monkeypatch):
+        config_file = tmp_path / "config.json"
+        config_file.write_text(json.dumps({}), encoding="utf-8")
+        user_file = tmp_path / "config.user.json"
+        monkeypatch.setattr(config_loader, "_CONFIG_FILE", config_file)
+        monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", user_file)
+
+        config_loader.save_user_config({"database": {"db_host": "10.0.0.1"}})
+
+        saved = json.loads(user_file.read_text(encoding="utf-8"))
+        assert saved["user_config"]["database"]["db_host"] == "10.0.0.1"
+        # config.json 不应包含 user_config
+        default = json.loads(config_file.read_text(encoding="utf-8"))
+        assert "user_config" not in default
+
+    def test_update_user_config_merges_into_user_file(self, tmp_path, monkeypatch):
+        config_file = tmp_path / "config.json"
+        config_file.write_text(json.dumps({}), encoding="utf-8")
+        user_file = tmp_path / "config.user.json"
+        user_file.write_text(json.dumps({"user_config": {"database": {"db_host": "old"}}}), encoding="utf-8")
+        monkeypatch.setattr(config_loader, "_CONFIG_FILE", config_file)
+        monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", user_file)
+
+        config_loader.update_user_config({"database": {"db_host": "new"}})
+
+        saved = json.loads(user_file.read_text(encoding="utf-8"))
+        assert saved["user_config"]["database"]["db_host"] == "new"
+
+    def test_reset_user_config_clears_user_file(self, tmp_path, monkeypatch):
+        config_file = tmp_path / "config.json"
+        config_file.write_text(json.dumps({}), encoding="utf-8")
+        user_file = tmp_path / "config.user.json"
+        user_file.write_text(json.dumps({"user_config": {"database": {"db_host": "x"}}}), encoding="utf-8")
+        monkeypatch.setattr(config_loader, "_CONFIG_FILE", config_file)
+        monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", user_file)
+
+        config_loader.reset_user_config()
+
+        saved = json.loads(user_file.read_text(encoding="utf-8"))
+        assert saved["user_config"] == {}
+
+    def test_get_user_config_reads_merged(self, tmp_path, monkeypatch):
+        """get_user_config 从合并后的配置读取"""
+        config_file = tmp_path / "config.json"
+        config_file.write_text(json.dumps({"user_config": {"database": {"db_host": "default_host"}}}), encoding="utf-8")
+        user_file = tmp_path / "config.user.json"
+        user_file.write_text(json.dumps({"user_config": {"database": {"db_host": "user_host", "db_port": 5432}}}), encoding="utf-8")
+        monkeypatch.setattr(config_loader, "_CONFIG_FILE", config_file)
+        monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", user_file)
+
+        result = config_loader.get_user_config("database")
+        assert result["db_host"] == "user_host"  # user 覆盖
+        assert result["db_port"] == 5432          # user 新增
 
 
 class TestDefaultLoadMaps:

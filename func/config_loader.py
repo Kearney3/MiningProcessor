@@ -1,7 +1,13 @@
 """
 配置加载模块
-用于加载和保存 config.json 配置文件
+
+配置分为两个文件：
+- config.json        : 系统默认配置（提交到 Git）
+- config.user.json   : 用户覆盖配置（gitignore，含敏感信息如数据库凭据）
+
+load_config() 合并两者返回（user 覆盖 default），save 时按目标分别写入。
 """
+import copy
 import json
 import os
 from pathlib import Path
@@ -29,11 +35,22 @@ class _LedgerEncoder(json.JSONEncoder):
             return None
         return super().default(obj)
 
+
+# ---------------------------------------------------------------------------
+# 路径
+# ---------------------------------------------------------------------------
+
+_CONFIG_FILE = Path(__file__).parent.parent / "config.json"
+_USER_CONFIG_FILE = Path(__file__).parent.parent / "config.user.json"
+
 _USER_CONFIG_SECTION = "user_config"
 _USER_CONFIG_DEFAULT_SECTION = "user_config_default"
 
-_CONFIG_FILE = Path(__file__).parent.parent / "config.json"
-# 默认设备装载量映射（当 config.json 读取失败时使用）
+
+# ---------------------------------------------------------------------------
+# 默认值（当 config.json 读取失败时的 fallback）
+# ---------------------------------------------------------------------------
+
 DEFAULT_LOAD_MAP_NEW = {
     "NTE240": 85, "EH4000": 85, "LIEBHERR T264": 80,
     "HITACHI 4000": 85, "MT4400": 85, "MT4400AC": 85,
@@ -53,175 +70,12 @@ DEFAULT_LOAD_MAP_OLD = {
     "MT 4400": 80, "CAT 773D": 20,
 }
 
-# 默认文件关键字配置（用于批量处理时识别文件类型）
 DEFAULT_FILE_KEYWORDS: dict[str, list[str]] = {
     "fuel": ["Fuel report "],
     "electrical": ["Цахилгааны хэлтэс"],
     "production": ["白班", "夜班"],
     "worktime": ["工作效率表"],
 }
-
-_runtime_config: dict[str, Any] | None = None
-
-
-
-def get_default_load_map(version: str = "new") -> dict[str, int]:
-    """获取默认设备装载量映射（当 config.json 读取失败时的 fallback）"""
-    return dict(DEFAULT_LOAD_MAP_OLD if version == "old" else DEFAULT_LOAD_MAP_NEW)
-
-def get_config_file_path() -> Path:
-    """获取内置配置文件路径"""
-    return _CONFIG_FILE
-
-
-def load_config() -> dict[str, Any]:
-    """加载配置文件"""
-    if not _CONFIG_FILE.exists():
-        raise FileNotFoundError(f"配置文件不存在: {_CONFIG_FILE}")
-    with open(_CONFIG_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
-def save_config(config: dict[str, Any]) -> None:
-    """保存配置文件"""
-    with open(_CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(config, f, ensure_ascii=False, indent=4)
-
-
-def get_device_load_map(version: str = "new") -> dict[str, int]:
-    """
-    获取设备装载量映射
-    version: "new" (默认) 或 "old"
-    """
-    config = _runtime_config if _runtime_config is not None else load_config()
-    key = f"device_load_map_{version}" if version != "new" else "device_load_map"
-    return config.get(key, {})
-
-
-def apply_device_load_map(device_load_map: dict[str, int]) -> dict[str, int]:
-    """仅在当前运行时应用设备装载量映射，不持久化到文件"""
-    global _runtime_config
-    config = load_config()
-    config["device_load_map"] = dict(device_load_map)
-    _runtime_config = config
-    return _runtime_config["device_load_map"]
-
-
-def update_device_load_map(updates: dict[str, int]) -> dict[str, int]:
-    """更新设备装载量映射"""
-    config = load_config()
-    if "device_load_map" not in config:
-        config["device_load_map"] = {}
-    config["device_load_map"].update(updates)
-    save_config(config)
-    return config["device_load_map"]
-
-
-def get_shift_mapping() -> dict[str, str]:
-    """获取班次名称映射"""
-    config = load_config()
-    return config.get("shift_mapping", {})
-
-
-def get_default_shift() -> str:
-    """Get default shift value when shift column is missing (e.g. "Night")"""
-    config = load_config()
-    return config.get("default_shift", "Night")
-
-
-def set_default_shift(shift: str) -> None:
-    """Set default shift value when shift column is missing"""
-    config = load_config()
-    config["default_shift"] = shift
-    save_config(config)
-
-
-def get_default_year() -> int:
-    """获取默认年份"""
-    config = load_config()
-    return config.get("default_year", 2025)
-
-
-def get_default_month() -> int:
-    """获取默认月份"""
-    config = load_config()
-    return config.get("default_month", 1)
-
-
-def get_user_config(section: str | None = None, default: Any = None) -> Any:
-    """读取用户自定义配置。
-
-    当 `section` 为 None 时返回完整的 user_config 字典；
-    否则返回对应小节；找不到时返回 `default`。
-    """
-    config = load_config()
-    user_config = config.get(_USER_CONFIG_SECTION, {})
-    if section is None:
-        return user_config
-    return user_config.get(section, default)
-
-
-def save_user_config(user_config: dict[str, Any]) -> None:
-    """整体替换并持久化 user_config 段落。"""
-    config = load_config()
-    config[_USER_CONFIG_SECTION] = dict(user_config)
-    save_config(config)
-
-
-def update_user_config(updates: dict[str, Any]) -> dict[str, Any]:
-    """合并更新 user_config（只覆盖传入的 key，其余保留）。"""
-    config = load_config()
-    current = config.get(_USER_CONFIG_SECTION, {})
-    if not isinstance(current, dict):
-        current = {}
-    current.update(updates)
-    config[_USER_CONFIG_SECTION] = current
-    save_config(config)
-    return current
-
-
-def reset_user_config(section: str | None = None) -> None:
-    """重置用户配置。
-
-    - 当 `section` 为 None 时清空整个 user_config。
-    - 当指定了某个小节时，仅清空该小节。
-    """
-    config = load_config()
-    if section is None:
-        config[_USER_CONFIG_SECTION] = {}
-    else:
-        user_config = config.get(_USER_CONFIG_SECTION, {})
-        if not isinstance(user_config, dict):
-            user_config = {}
-        user_config.pop(section, None)
-        config[_USER_CONFIG_SECTION] = user_config
-    save_config(config)
-
-
-def get_user_config_default(section: str | None = None, default: Any = None) -> Any:
-    """读取 user_config_default 中的默认配置骨架。"""
-    config = load_config()
-    defaults = config.get(_USER_CONFIG_DEFAULT_SECTION, {})
-    if section is None:
-        return defaults if defaults else default
-    return defaults.get(section, default) if isinstance(defaults, dict) else default
-
-
-def get_file_keywords() -> dict[str, list[str]]:
-    """获取批量处理的文件关键字配置，未配置时返回默认值。"""
-    user_cfg = get_user_config("file_keywords", None)
-    if user_cfg and isinstance(user_cfg, dict):
-        merged = dict(DEFAULT_FILE_KEYWORDS)
-        for k, v in user_cfg.items():
-            if isinstance(v, list):
-                merged[k] = v
-        return merged
-    return dict(DEFAULT_FILE_KEYWORDS)
-
-
-# ---------------------------------------------------------------------------
-# 工作效率表头映射
-# ---------------------------------------------------------------------------
 
 DEFAULT_WORKTIME_HEADER_MAPPING: dict = {
     "mode": "position",
@@ -255,6 +109,239 @@ DEFAULT_WORKTIME_HEADER_MAPPING: dict = {
     ],
 }
 
+_runtime_config: dict[str, Any] | None = None
+
+
+# ---------------------------------------------------------------------------
+# 内部工具
+# ---------------------------------------------------------------------------
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    """深合并：override 中的键覆盖 base，dict 值递归合并。"""
+    result = dict(base)
+    for k, v in override.items():
+        if k in result and isinstance(result[k], dict) and isinstance(v, dict):
+            result[k] = _deep_merge(result[k], v)
+        else:
+            result[k] = copy.deepcopy(v)
+    return result
+
+
+def _load_json(path: Path) -> dict[str, Any]:
+    """读取 JSON 文件，不存在时返回空 dict。"""
+    if not path.exists():
+        return {}
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _save_json(path: Path, data: dict[str, Any]) -> None:
+    """写入 JSON 文件。"""
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+
+# ---------------------------------------------------------------------------
+# 路径访问（供 GUI 测试 monkeypatch 用）
+# ---------------------------------------------------------------------------
+
+def get_config_file_path() -> Path:
+    """获取系统默认配置文件路径"""
+    return _CONFIG_FILE
+
+
+def get_user_config_file_path() -> Path:
+    """获取用户配置文件路径"""
+    return _USER_CONFIG_FILE
+
+
+# ---------------------------------------------------------------------------
+# 加载与保存
+# ---------------------------------------------------------------------------
+
+def load_config() -> dict[str, Any]:
+    """加载合并后的配置（系统默认 + 用户覆盖）。
+
+    先读 config.json，再用 config.user.json 深合并覆盖。
+    任何一侧文件不存在都不报错，返回另一侧的内容。
+    """
+    base = _load_json(_CONFIG_FILE)
+    user = _load_json(_USER_CONFIG_FILE)
+    if user:
+        return _deep_merge(base, user)
+    return base
+
+
+def save_config(config: dict[str, Any]) -> None:
+    """保存系统默认配置到 config.json（不含用户敏感数据）。"""
+    _save_json(_CONFIG_FILE, config)
+
+
+def save_user_config_file(data: dict[str, Any]) -> None:
+    """保存用户配置到 config.user.json。"""
+    _save_json(_USER_CONFIG_FILE, data)
+
+
+def load_user_config_file() -> dict[str, Any]:
+    """仅加载 config.user.json（不合并默认值）。"""
+    return _load_json(_USER_CONFIG_FILE)
+
+
+# ---------------------------------------------------------------------------
+# 设备装载量
+# ---------------------------------------------------------------------------
+
+def get_default_load_map(version: str = "new") -> dict[str, int]:
+    """获取默认设备装载量映射（当 config.json 读取失败时的 fallback）"""
+    return dict(DEFAULT_LOAD_MAP_OLD if version == "old" else DEFAULT_LOAD_MAP_NEW)
+
+
+def get_device_load_map(version: str = "new") -> dict[str, int]:
+    """
+    获取设备装载量映射
+    version: "new" (默认) 或 "old"
+    """
+    config = _runtime_config if _runtime_config is not None else load_config()
+    key = f"device_load_map_{version}" if version != "new" else "device_load_map"
+    return config.get(key, {})
+
+
+def apply_device_load_map(device_load_map: dict[str, int]) -> dict[str, int]:
+    """仅在当前运行时应用设备装载量映射，不持久化到文件"""
+    global _runtime_config
+    config = load_config()
+    config["device_load_map"] = dict(device_load_map)
+    _runtime_config = config
+    return _runtime_config["device_load_map"]
+
+
+def update_device_load_map(updates: dict[str, int]) -> dict[str, int]:
+    """更新设备装载量映射（写入 config.json）"""
+    config = _load_json(_CONFIG_FILE)
+    if "device_load_map" not in config:
+        config["device_load_map"] = {}
+    config["device_load_map"].update(updates)
+    _save_json(_CONFIG_FILE, config)
+    return config["device_load_map"]
+
+
+# ---------------------------------------------------------------------------
+# 班次 / 年月
+# ---------------------------------------------------------------------------
+
+def get_shift_mapping() -> dict[str, str]:
+    """获取班次名称映射"""
+    config = load_config()
+    return config.get("shift_mapping", {})
+
+
+def get_default_shift() -> str:
+    """Get default shift value when shift column is missing (e.g. "Night")"""
+    config = load_config()
+    return config.get("default_shift", "Night")
+
+
+def set_default_shift(shift: str) -> None:
+    """Set default shift value when shift column is missing"""
+    config = _load_json(_CONFIG_FILE)
+    config["default_shift"] = shift
+    _save_json(_CONFIG_FILE, config)
+
+
+def get_default_year() -> int:
+    """获取默认年份"""
+    config = load_config()
+    return config.get("default_year", 2025)
+
+
+def get_default_month() -> int:
+    """获取默认月份"""
+    config = load_config()
+    return config.get("default_month", 1)
+
+
+# ---------------------------------------------------------------------------
+# 用户配置读写（写入 config.user.json）
+# ---------------------------------------------------------------------------
+
+def get_user_config(section: str | None = None, default: Any = None) -> Any:
+    """读取用户自定义配置。
+
+    当 `section` 为 None 时返回完整的 user_config 字典；
+    否则返回对应小节；找不到时返回 `default`。
+    """
+    config = load_config()
+    user_config = config.get(_USER_CONFIG_SECTION, {})
+    if section is None:
+        return user_config
+    return user_config.get(section, default)
+
+
+def save_user_config(user_config: dict[str, Any]) -> None:
+    """整体替换并持久化 user_config 段落（写入 config.user.json）。"""
+    user_file = _load_json(_USER_CONFIG_FILE)
+    user_file[_USER_CONFIG_SECTION] = dict(user_config)
+    _save_json(_USER_CONFIG_FILE, user_file)
+
+
+def update_user_config(updates: dict[str, Any]) -> dict[str, Any]:
+    """合并更新 user_config（只覆盖传入的 key，其余保留，写入 config.user.json）。"""
+    user_file = _load_json(_USER_CONFIG_FILE)
+    current = user_file.get(_USER_CONFIG_SECTION, {})
+    if not isinstance(current, dict):
+        current = {}
+    current.update(updates)
+    user_file[_USER_CONFIG_SECTION] = current
+    _save_json(_USER_CONFIG_FILE, user_file)
+    return current
+
+
+def reset_user_config(section: str | None = None) -> None:
+    """重置用户配置。
+
+    - 当 `section` 为 None 时清空 config.user.json 中的 user_config。
+    - 当指定了某个小节时，仅清空该小节。
+    """
+    user_file = _load_json(_USER_CONFIG_FILE)
+    if section is None:
+        user_file[_USER_CONFIG_SECTION] = {}
+    else:
+        user_config = user_file.get(_USER_CONFIG_SECTION, {})
+        if not isinstance(user_config, dict):
+            user_config = {}
+        user_config.pop(section, None)
+        user_file[_USER_CONFIG_SECTION] = user_config
+    _save_json(_USER_CONFIG_FILE, user_file)
+
+
+def get_user_config_default(section: str | None = None, default: Any = None) -> Any:
+    """读取 user_config_default 中的默认配置骨架（来自 config.json）。"""
+    config = _load_json(_CONFIG_FILE)
+    defaults = config.get(_USER_CONFIG_DEFAULT_SECTION, {})
+    if section is None:
+        return defaults if defaults else default
+    return defaults.get(section, default) if isinstance(defaults, dict) else default
+
+
+# ---------------------------------------------------------------------------
+# 文件关键字
+# ---------------------------------------------------------------------------
+
+def get_file_keywords() -> dict[str, list[str]]:
+    """获取批量处理的文件关键字配置，未配置时返回默认值。"""
+    user_cfg = get_user_config("file_keywords", None)
+    if user_cfg and isinstance(user_cfg, dict):
+        merged = dict(DEFAULT_FILE_KEYWORDS)
+        for k, v in user_cfg.items():
+            if isinstance(v, list):
+                merged[k] = v
+        return merged
+    return dict(DEFAULT_FILE_KEYWORDS)
+
+
+# ---------------------------------------------------------------------------
+# 工作效率表头映射
+# ---------------------------------------------------------------------------
 
 def get_worktime_header_mapping() -> dict:
     """获取工作效率表头映射配置。
@@ -293,9 +380,9 @@ def is_worktime_header_apply() -> bool:
 
 def set_worktime_header_apply(enabled: bool) -> None:
     """设置工作效率表头修改开关状态并持久化。"""
-    config = load_config()
+    config = _load_json(_CONFIG_FILE)
     config["worktime_header_apply"] = bool(enabled)
-    save_config(config)
+    _save_json(_CONFIG_FILE, config)
 
 
 # ---------------------------------------------------------------------------
