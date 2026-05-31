@@ -8,11 +8,13 @@ dependencies = [
     "openpyxl>=3.1.2",
     "pandas>=3.0.2",
     "flet>=0.21.0",
+    "flet-datatable2>=0.85.0",
     "rapidfuzz>=3.0.0",
     "matplotlib>=3.10.9",
     "ipykernel>=7.2.0",
     "xlrd>=2.0.2",
     "seaborn>=0.13.2",
+    "pandas-stubs~=3.0.2",
 ]
 
 
