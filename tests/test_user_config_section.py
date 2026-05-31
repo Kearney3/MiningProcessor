@@ -72,7 +72,9 @@ def test_user_config_save_persists_database_section(monkeypatch, tmp_path):
     logs = []
     config_file = tmp_path / "config.json"
     config_file.write_text(json.dumps({}), encoding="utf-8")
+    user_file = tmp_path / "config.user.json"
     monkeypatch.setattr(config_loader, "_CONFIG_FILE", config_file)
+    monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", user_file)
 
     page = PageSpy()
     _, refs = components.create_user_config_section(page, logs.append)
@@ -86,7 +88,7 @@ def test_user_config_save_persists_database_section(monkeypatch, tmp_path):
 
     refs["save_database_config"](DummyControlEvent())
 
-    saved = json.loads(config_file.read_text(encoding="utf-8"))
+    saved = json.loads(user_file.read_text(encoding="utf-8"))
     assert saved["user_config"]["database"]["db_port"] == 5432
     assert saved["user_config"]["database"]["db_host"] == "127.0.0.1"
     assert logs[-1] == "已保存数据库连接配置"
@@ -96,7 +98,9 @@ def test_user_config_invalid_port_shows_error(monkeypatch, tmp_path):
     logs = []
     config_file = tmp_path / "config.json"
     config_file.write_text(json.dumps({}), encoding="utf-8")
+    user_file = tmp_path / "config.user.json"
     monkeypatch.setattr(config_loader, "_CONFIG_FILE", config_file)
+    monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", user_file)
 
     _, refs = components.create_user_config_section(PageSpy(), logs.append)
     refs["db_port"].value = "99999"
