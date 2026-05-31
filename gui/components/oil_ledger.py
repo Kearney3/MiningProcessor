@@ -10,8 +10,9 @@ import flet as ft
 
 import func.oil_ledger as oil_ledger
 from func.oil_ledger import OIL_LEDGER_COLUMNS
+from func import config_loader
 
-from .common import _log_message
+from .common import _log_message, _last_directory, _update_last_directory
 from .types import OilLedgerRefs
 
 try:
@@ -115,7 +116,6 @@ def create_oil_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "OilLed
     oil_records = []
     _oil_page = [0]
     _oil_instance = [None]  # 当前加载的 OilLedger 实例
-    _last_directory = [""]  # 记住上次文件选择器的目录
     oil_path_label = ft.Text("未加载油品台账", size=12, color=ft.Colors.GREY)
     oil_table = ft.DataTable(
         columns=[
@@ -214,7 +214,7 @@ def create_oil_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "OilLed
         if not files:
             return
         path = files[0].path
-        _last_directory[0] = str(Path(path).parent)
+        _update_last_directory(path)
 
         try:
             preview_df = pd.read_excel(path, nrows=0)
@@ -238,6 +238,7 @@ def create_oil_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "OilLed
                 oil_path_label.color = ft.Colors.GREEN
                 build_table()
                 _log_message(log, f"已加载油品台账: {path} ({len(oil_records)} 条记录)")
+                _update_default_btn_state()
             except Exception as ex:
                 oil_path_label.value = f"加载失败: {ex}"
                 oil_path_label.color = ft.Colors.RED
@@ -258,7 +259,7 @@ def create_oil_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "OilLed
         )
         if not path:
             return
-        _last_directory[0] = str(Path(path).parent)
+        _update_last_directory(path)
         try:
             ledger = oil_ledger.OilLedger()
             ledger.export_template(path)
@@ -276,6 +277,51 @@ def create_oil_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "OilLed
         oil_path_label.color = ft.Colors.GREY
         build_table()
         _log_message(log, "油品台账已清空")
+        _update_default_btn_state()
+
+    def on_save_default(e):
+        if not oil_records:
+            _log_message(log, "没有油品台账数据可保存", level=logging.WARNING)
+            return
+        try:
+            config_loader.save_oil_ledger_cache(oil_records)
+            _log_message(log, f"已保存为默认油品台账 ({len(oil_records)} 条记录)")
+        except Exception as ex:
+            _log_message(log, f"保存默认油品台账失败: {ex}", level=logging.ERROR)
+
+    def on_cancel_default(e):
+        try:
+            config_loader.clear_oil_ledger_cache()
+            _log_message(log, "已取消默认油品台账")
+        except Exception as ex:
+            _log_message(log, f"取消默认油品台账失败: {ex}", level=logging.ERROR)
+
+
+
+    def _update_default_btn_state():
+        """更新保存/取消默认按钮的可用性。"""
+        save_default_btn.disabled = not oil_records
+        cancel_default_btn.disabled = not config_loader.has_oil_ledger_cache()
+        try:
+            save_default_btn.update()
+            cancel_default_btn.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    def load_from_cache():
+        """从缓存加载默认油品台账，启动时调用。"""
+        cached = config_loader.load_oil_ledger_cache()
+        if not cached:
+            return False
+        nonlocal oil_records
+        oil_records = cached
+        _oil_page[0] = 0
+        oil_path_label.value = "默认油品台账 (缓存)"
+        oil_path_label.color = ft.Colors.GREEN
+        build_table()
+        _log_message(log, f"已自动加载默认油品台账 ({len(oil_records)} 条记录)")
+        _update_default_btn_state()
+        return True
 
     container = ft.Container(
         content=ft.Column(
@@ -286,6 +332,8 @@ def create_oil_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "OilLed
                         theme.secondary_btn("导入台账", icon=ft.icons.Icons.UPLOAD, on_click=on_load),
                         theme.secondary_btn("清空台账", icon=ft.icons.Icons.DELETE_SWEEP, on_click=on_clear),
                         theme.secondary_btn("导出模板", icon=ft.icons.Icons.DOWNLOAD, on_click=on_export_template),
+                        save_default_btn := theme.primary_btn("保存为默认", icon=ft.icons.Icons.BOOKMARK, on_click=on_save_default, disabled=True),
+                        cancel_default_btn := theme.secondary_btn("取消默认", icon=ft.icons.Icons.BOOKMARK_REMOVE, on_click=on_cancel_default, disabled=not config_loader.has_oil_ledger_cache()),
                         oil_path_label,
                     ],
                     spacing=8,
@@ -316,5 +364,6 @@ def create_oil_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "OilLed
         "oil_records": oil_records,
         "get_oil_ledger": lambda: _oil_instance[0],
         "build_table": build_table,
+        "load_from_cache": load_from_cache,
     }
     return container, refs

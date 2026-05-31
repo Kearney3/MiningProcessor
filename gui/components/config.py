@@ -5,7 +5,7 @@ from pathlib import Path
 
 import flet as ft
 
-from .common import _log_message
+from .common import _log_message, _last_directory, _update_last_directory
 from .types import ConfigRefs
 
 try:
@@ -21,7 +21,6 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
     PAGE_SIZE = 20
     config_state: list[dict] = []
     _config_page = [0]
-    _last_directory = [""]  # 记住上次文件选择器的目录
     refs = {}
 
     def normalize_row(row: dict) -> dict:
@@ -209,7 +208,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
         )
         if not path:
             return
-        _last_directory[0] = str(Path(path).parent)
+        _update_last_directory(path)
         try:
             save_config_to_path(path)
             _log_message(log, f"配置已另存为: {path}")
@@ -246,7 +245,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
         if not files:
             return
         path = files[0].path
-        _last_directory[0] = str(Path(path).parent)
+        _update_last_directory(path)
         try:
             import json as _json
             with open(path, "r", encoding="utf-8") as f:

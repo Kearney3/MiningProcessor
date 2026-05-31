@@ -10,8 +10,9 @@ import flet as ft
 
 import func.equipment_ledger as equipment_ledger
 from func.equipment_ledger import LEDGER_COLUMNS
+from func import config_loader
 
-from .common import _log_message
+from .common import _log_message, _last_directory, _update_last_directory
 from .types import LedgerRefs
 
 try:
@@ -121,7 +122,6 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs
     ledger_records = []
     _ledger_page = [0]
     _ledger_instance = [None]  # 当前加载的 EquipmentLedger 实例
-    _last_directory = [""]  # 记住上次文件选择器的目录
     ledger_path_label = ft.Text("未加载台账", size=12, color=ft.Colors.GREY)
     ledger_table = ft.DataTable(
         columns=[
@@ -220,7 +220,7 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs
         if not files:
             return
         path = files[0].path
-        _last_directory[0] = str(Path(path).parent)
+        _update_last_directory(path)
 
         try:
             # 先读取文件的列名用于映射对话框
@@ -245,6 +245,7 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs
                 ledger_path_label.color = ft.Colors.GREEN
                 build_table()
                 _log_message(log, f"已加载台账: {path} ({len(ledger_records)} 条记录)")
+                _update_default_btn_state()
             except Exception as ex:
                 ledger_path_label.value = f"加载失败: {ex}"
                 ledger_path_label.color = ft.Colors.RED
@@ -266,7 +267,7 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs
         )
         if not path:
             return
-        _last_directory[0] = str(Path(path).parent)
+        _update_last_directory(path)
         try:
             ledger = equipment_ledger.EquipmentLedger()
             ledger.export_template(path)
@@ -284,6 +285,53 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs
         ledger_path_label.color = ft.Colors.GREY
         build_table()
         _log_message(log, "台账已清空")
+        _update_default_btn_state()
+
+    def on_save_default(e):
+        if not ledger_records:
+            _log_message(log, "没有台账数据可保存", level=logging.WARNING)
+            return
+        try:
+            config_loader.save_equipment_ledger_cache(ledger_records)
+            _log_message(log, f"已保存为默认设备台账 ({len(ledger_records)} 条记录)")
+            _update_default_btn_state()
+        except Exception as ex:
+            _log_message(log, f"保存默认台账失败: {ex}", level=logging.ERROR)
+
+    def on_cancel_default(e):
+        try:
+            config_loader.clear_equipment_ledger_cache()
+            _log_message(log, "已取消默认设备台账")
+            _update_default_btn_state()
+        except Exception as ex:
+            _log_message(log, f"取消默认台账失败: {ex}", level=logging.ERROR)
+
+
+
+    def _update_default_btn_state():
+        """更新保存/取消默认按钮的可用性。"""
+        save_default_btn.disabled = not ledger_records
+        cancel_default_btn.disabled = not config_loader.has_equipment_ledger_cache()
+        try:
+            save_default_btn.update()
+            cancel_default_btn.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    def load_from_cache():
+        """从缓存加载默认设备台账，启动时调用。"""
+        cached = config_loader.load_equipment_ledger_cache()
+        if not cached:
+            return False
+        nonlocal ledger_records
+        ledger_records = cached
+        _ledger_page[0] = 0
+        ledger_path_label.value = "默认台账 (缓存)"
+        ledger_path_label.color = ft.Colors.GREEN
+        build_table()
+        _log_message(log, f"已自动加载默认设备台账 ({len(ledger_records)} 条记录)")
+        _update_default_btn_state()
+        return True
 
     container = ft.Container(
         content=ft.Column(
@@ -294,6 +342,8 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs
                         theme.secondary_btn("导入台账", icon=ft.icons.Icons.UPLOAD, on_click=on_load),
                         theme.secondary_btn("清空台账", icon=ft.icons.Icons.DELETE_SWEEP, on_click=on_clear),
                         theme.secondary_btn("导出模板", icon=ft.icons.Icons.DOWNLOAD, on_click=on_export_template),
+                        save_default_btn := theme.primary_btn("保存为默认", icon=ft.icons.Icons.BOOKMARK, on_click=on_save_default, disabled=True),
+                        cancel_default_btn := theme.secondary_btn("取消默认", icon=ft.icons.Icons.BOOKMARK_REMOVE, on_click=on_cancel_default, disabled=not config_loader.has_equipment_ledger_cache()),
                         ledger_path_label,
                     ],
                     spacing=8,
@@ -324,5 +374,6 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs
         "ledger_records": ledger_records,
         "get_ledger": lambda: _ledger_instance[0],
         "build_table": build_table,
+        "load_from_cache": load_from_cache,
     }
     return container, refs

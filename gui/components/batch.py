@@ -4,6 +4,8 @@ from pathlib import Path
 
 import flet as ft
 
+from .common import _last_directory, _update_last_directory
+
 try:
     from . import theme
 except ImportError:
@@ -16,7 +18,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
     current_date = datetime.now()
     current_year = str(current_date.year)
     current_month = str(current_date.month)
-    _last_directory = [""]
+    # 使用 common.py 中的共享 _last_directory
 
     # --- 文件夹选择 ---
     batch_path = ft.TextField(
@@ -351,7 +353,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         )
         if path:
             batch_path.value = path
-            _last_directory[0] = path
+            _update_last_directory(path)
             batch_path.update()
             batch_btn.disabled = False
             batch_btn.update()

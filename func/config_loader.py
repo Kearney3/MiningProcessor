@@ -7,6 +7,28 @@ import os
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
+
+class _LedgerEncoder(json.JSONEncoder):
+    """处理 pandas Timestamp 等不可直接序列化的类型。"""
+    def default(self, obj):
+        import datetime
+        import numpy as np
+        if isinstance(obj, pd.Timestamp):
+            return obj.isoformat() if not pd.isna(obj) else None
+        if isinstance(obj, (datetime.datetime, datetime.date)):
+            return obj.isoformat()
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj) if not np.isnan(obj) else None
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if pd.isna(obj):
+            return None
+        return super().default(obj)
+
 _USER_CONFIG_SECTION = "user_config"
 _USER_CONFIG_DEFAULT_SECTION = "user_config_default"
 
@@ -274,3 +296,72 @@ def set_worktime_header_apply(enabled: bool) -> None:
     config = load_config()
     config["worktime_header_apply"] = bool(enabled)
     save_config(config)
+
+
+# ---------------------------------------------------------------------------
+# 台账缓存（JSON 格式持久化）
+# ---------------------------------------------------------------------------
+
+_DATA_DIR = Path(__file__).parent.parent / "data"
+_EQUIPMENT_LEDGER_CACHE = _DATA_DIR / "equipment_ledger_cache.json"
+_OIL_LEDGER_CACHE = _DATA_DIR / "oil_ledger_cache.json"
+
+
+def _ensure_data_dir() -> None:
+    _DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def save_equipment_ledger_cache(records: list[dict]) -> None:
+    """将设备台账记录缓存为 JSON 文件。"""
+    _ensure_data_dir()
+    with open(_EQUIPMENT_LEDGER_CACHE, "w", encoding="utf-8") as f:
+        json.dump({"data": records}, f, ensure_ascii=False, indent=2, cls=_LedgerEncoder)
+
+
+def load_equipment_ledger_cache() -> list[dict] | None:
+    """加载设备台账缓存，不存在时返回 None。"""
+    if not _EQUIPMENT_LEDGER_CACHE.exists():
+        return None
+    try:
+        with open(_EQUIPMENT_LEDGER_CACHE, "r", encoding="utf-8") as f:
+            return json.load(f).get("data")
+    except Exception:
+        return None
+
+
+def clear_equipment_ledger_cache() -> None:
+    """删除设备台账缓存文件。"""
+    if _EQUIPMENT_LEDGER_CACHE.exists():
+        _EQUIPMENT_LEDGER_CACHE.unlink()
+
+
+def has_equipment_ledger_cache() -> bool:
+    return _EQUIPMENT_LEDGER_CACHE.exists()
+
+
+def save_oil_ledger_cache(records: list[dict]) -> None:
+    """将油品台账记录缓存为 JSON 文件。"""
+    _ensure_data_dir()
+    with open(_OIL_LEDGER_CACHE, "w", encoding="utf-8") as f:
+        json.dump({"data": records}, f, ensure_ascii=False, indent=2, cls=_LedgerEncoder)
+
+
+def load_oil_ledger_cache() -> list[dict] | None:
+    """加载油品台账缓存，不存在时返回 None。"""
+    if not _OIL_LEDGER_CACHE.exists():
+        return None
+    try:
+        with open(_OIL_LEDGER_CACHE, "r", encoding="utf-8") as f:
+            return json.load(f).get("data")
+    except Exception:
+        return None
+
+
+def clear_oil_ledger_cache() -> None:
+    """删除油品台账缓存文件。"""
+    if _OIL_LEDGER_CACHE.exists():
+        _OIL_LEDGER_CACHE.unlink()
+
+
+def has_oil_ledger_cache() -> bool:
+    return _OIL_LEDGER_CACHE.exists()

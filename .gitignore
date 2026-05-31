@@ -40,3 +40,4 @@ Notebook/
 *.txt
 *.log
 *.db
+data/
