@@ -543,7 +543,7 @@ def create_ledger_match_section(
     # ========================================================================
     # 执行匹配
     # ========================================================================
-    def on_match(e):
+    async def on_match(e):
         df = _get_current_df()
         if df is None or df.empty:
             _log_message(log, "没有数据可匹配", level=logging.WARNING)
@@ -564,12 +564,22 @@ def create_ledger_match_section(
             _log_message(log, "未启用任何匹配，跳过匹配")
             return
 
+        # 初始化进度条
+        _import_progress_bar.visible = True
+        _import_progress_text.visible = True
+        _cancel_btn.visible = True
+        _import_cancelled.clear()
+        
         # Loading 状态
         match_btn.disabled = True
         match_btn.text = "匹配中..."
         match_btn.icon = ft.Icons.HOURGLASS_TOP
         export_btn.disabled = True
         page.update()
+
+        batch_size = 100
+        total_rows = len(df)
+        processed = 0
 
         try:
             result_df = df.copy()
@@ -585,55 +595,109 @@ def create_ledger_match_section(
                     # 生产数据场景：分别匹配矿卡和挖机，添加后缀
                     # 匹配矿卡名称
                     std_names, std_ids, std_companies = [], [], []
-                    for _, row in result_df.iterrows():
-                        n = str(row["矿卡名称"]) if "矿卡名称" in result_df.columns and not pd.isna(row.get("矿卡名称")) else None
-                        i = str(row[id_col]) if id_col and id_col in result_df.columns and not pd.isna(row.get(id_col)) else None
-                        r = eq_ledger.match_device(name=n, device_id=i)
-                        if r:
-                            std_names.append(r.get("标准设备名称", ""))
-                            std_ids.append(r.get("标准设备编号", ""))
-                            std_companies.append(r.get("标准公司名称", ""))
-                            matched_count += 1
-                        else:
-                            std_names.append("")
-                            std_ids.append("")
-                            std_companies.append("")
+                    for i in range(0, total_rows, batch_size):
+                        if _import_cancelled.is_set():
+                            _log_message(log, "匹配已取消")
+                            break
+                        
+                        batch = df.iloc[i:i+batch_size]
+                        for _, row in batch.iterrows():
+                            n = str(row["矿卡名称"]) if "矿卡名称" in result_df.columns and not pd.isna(row.get("矿卡名称")) else None
+                            i_val = str(row[id_col]) if id_col and id_col in result_df.columns and not pd.isna(row.get(id_col)) else None
+                            r = eq_ledger.match_device(name=n, device_id=i_val)
+                            if r:
+                                std_names.append(r.get("标准设备名称", ""))
+                                std_ids.append(r.get("标准设备编号", ""))
+                                std_companies.append(r.get("标准公司名称", ""))
+                                matched_count += 1
+                            else:
+                                std_names.append("")
+                                std_ids.append("")
+                                std_companies.append("")
+                        
+                        # 更新进度
+                        processed += len(batch)
+                        progress = processed / total_rows
+                        _import_progress_bar.value = progress
+                        _import_progress_text.value = f"正在匹配第 {processed}/{total_rows} 行..."
+                        _log_message(log, f"正在匹配第 {processed}/{total_rows} 行...")
+                        page.update()
+                        
+                        # 让出控制权，避免 UI 冻结
+                        await asyncio.sleep(0)
+                    
                     result_df["标准设备名称（矿卡）"] = std_names
                     result_df["标准设备编号（矿卡）"] = std_ids
                     result_df["标准公司名称（矿卡）"] = std_companies
                     
                     # 匹配挖机名称
                     std_names_ex, std_ids_ex, std_companies_ex = [], [], []
-                    for _, row in result_df.iterrows():
-                        n = str(row["挖机名称"]) if "挖机名称" in result_df.columns and not pd.isna(row.get("挖机名称")) else None
-                        r = eq_ledger.match_device(name=n, device_id=None)
-                        if r:
-                            std_names_ex.append(r.get("标准设备名称", ""))
-                            std_ids_ex.append(r.get("标准设备编号", ""))
-                            std_companies_ex.append(r.get("标准公司名称", ""))
-                        else:
-                            std_names_ex.append("")
-                            std_ids_ex.append("")
-                            std_companies_ex.append("")
+                    for i in range(0, total_rows, batch_size):
+                        if _import_cancelled.is_set():
+                            _log_message(log, "匹配已取消")
+                            break
+                        
+                        batch = df.iloc[i:i+batch_size]
+                        for _, row in batch.iterrows():
+                            n = str(row["挖机名称"]) if "挖机名称" in result_df.columns and not pd.isna(row.get("挖机名称")) else None
+                            r = eq_ledger.match_device(name=n, device_id=None)
+                            if r:
+                                std_names_ex.append(r.get("标准设备名称", ""))
+                                std_ids_ex.append(r.get("标准设备编号", ""))
+                                std_companies_ex.append(r.get("标准公司名称", ""))
+                            else:
+                                std_names_ex.append("")
+                                std_ids_ex.append("")
+                                std_companies_ex.append("")
+                        
+                        # 更新进度
+                        processed += len(batch)
+                        progress = processed / total_rows
+                        _import_progress_bar.value = progress
+                        _import_progress_text.value = f"正在匹配第 {processed}/{total_rows} 行..."
+                        _log_message(log, f"正在匹配第 {processed}/{total_rows} 行...")
+                        page.update()
+                        
+                        # 让出控制权，避免 UI 冻结
+                        await asyncio.sleep(0)
+                    
                     result_df["标准设备名称（挖机）"] = std_names_ex
                     result_df["标准设备编号（挖机）"] = std_ids_ex
                     result_df["标准公司名称（挖机）"] = std_companies_ex
                 else:
                     # 原有逻辑：单列匹配（非生产数据场景）
                     std_names, std_ids, std_companies = [], [], []
-                    for _, row in result_df.iterrows():
-                        n = str(row[name_col]) if name_col and name_col in result_df.columns and not pd.isna(row.get(name_col)) else None
-                        i = str(row[id_col]) if id_col and id_col in result_df.columns and not pd.isna(row.get(id_col)) else None
-                        r = eq_ledger.match_device(name=n, device_id=i)
-                        if r:
-                            std_names.append(r.get("标准设备名称", ""))
-                            std_ids.append(r.get("标准设备编号", ""))
-                            std_companies.append(r.get("标准公司名称", ""))
-                            matched_count += 1
-                        else:
-                            std_names.append("")
-                            std_ids.append("")
-                            std_companies.append("")
+                    for i in range(0, total_rows, batch_size):
+                        if _import_cancelled.is_set():
+                            _log_message(log, "匹配已取消")
+                            break
+                        
+                        batch = df.iloc[i:i+batch_size]
+                        for _, row in batch.iterrows():
+                            n = str(row[name_col]) if name_col and name_col in result_df.columns and not pd.isna(row.get(name_col)) else None
+                            i_val = str(row[id_col]) if id_col and id_col in result_df.columns and not pd.isna(row.get(id_col)) else None
+                            r = eq_ledger.match_device(name=n, device_id=i_val)
+                            if r:
+                                std_names.append(r.get("标准设备名称", ""))
+                                std_ids.append(r.get("标准设备编号", ""))
+                                std_companies.append(r.get("标准公司名称", ""))
+                                matched_count += 1
+                            else:
+                                std_names.append("")
+                                std_ids.append("")
+                                std_companies.append("")
+                        
+                        # 更新进度
+                        processed += len(batch)
+                        progress = processed / total_rows
+                        _import_progress_bar.value = progress
+                        _import_progress_text.value = f"正在匹配第 {processed}/{total_rows} 行..."
+                        _log_message(log, f"正在匹配第 {processed}/{total_rows} 行...")
+                        page.update()
+                        
+                        # 让出控制权，避免 UI 冻结
+                        await asyncio.sleep(0)
+                    
                     result_df["标准设备名称"] = std_names
                     result_df["标准设备编号"] = std_ids
                     result_df["标准公司名称"] = std_companies
@@ -642,14 +706,32 @@ def create_ledger_match_section(
             oil_matched = 0
             if oil_ledger and oil_col and oil_col in result_df.columns:
                 std_oils = []
-                for _, row in result_df.iterrows():
-                    v = row[oil_col]
-                    r = oil_ledger.match(str(v)) if not pd.isna(v) else None
-                    if r:
-                        std_oils.append(r["标准名称"])
-                        oil_matched += 1
-                    else:
-                        std_oils.append("")
+                for i in range(0, total_rows, batch_size):
+                    if _import_cancelled.is_set():
+                        _log_message(log, "匹配已取消")
+                        break
+                    
+                    batch = df.iloc[i:i+batch_size]
+                    for _, row in batch.iterrows():
+                        v = row[oil_col]
+                        r = oil_ledger.match(str(v)) if not pd.isna(v) else None
+                        if r:
+                            std_oils.append(r["标准名称"])
+                            oil_matched += 1
+                        else:
+                            std_oils.append("")
+                    
+                    # 更新进度
+                    processed += len(batch)
+                    progress = processed / total_rows
+                    _import_progress_bar.value = progress
+                    _import_progress_text.value = f"正在匹配第 {processed}/{total_rows} 行..."
+                    _log_message(log, f"正在匹配第 {processed}/{total_rows} 行...")
+                    page.update()
+                    
+                    # 让出控制权，避免 UI 冻结
+                    await asyncio.sleep(0)
+                
                 result_df["标准油品名称"] = std_oils
 
             _all_sheets[_current_sheet[0]] = result_df
@@ -683,13 +765,18 @@ def create_ledger_match_section(
             status_label.value = "  |  ".join(parts)
             _update_match_status()
             _log_message(log, f"匹配完成: {status_label.value}")
+        except Exception as ex:
+            _log_message(log, f"匹配失败: {ex}", level=logging.ERROR)
         finally:
+            # 恢复 UI
+            _import_progress_bar.visible = False
+            _import_progress_text.visible = False
+            _cancel_btn.visible = False
             match_btn.disabled = False
             match_btn.text = "执行匹配"
             match_btn.icon = ft.Icons.SEARCH
             export_btn.disabled = not bool(_all_sheets)
             page.update()
-
     # ========================================================================
     # 导出
     # ========================================================================
