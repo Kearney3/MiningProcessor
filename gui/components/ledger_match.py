@@ -426,60 +426,93 @@ def create_ledger_match_section(
             return
         path = files[0].path
 
-        # 快速读取 sheet 名（不解析数据）
+        # 显示进度条
+        _import_progress_bar.visible = True
+        _import_progress_text.visible = True
+        _cancel_btn.visible = True
+        _import_cancelled.clear()
+        match_btn.disabled = True
+        page.update()
+
+        parsed_sheets: dict[str, pd.DataFrame] = {}
+
         try:
-            xl = pd.ExcelFile(path)
+            from openpyxl import load_workbook
+
+            # 使用 read_only 模式打开，可以获取行数
+            wb = load_workbook(path, read_only=True, data_only=True)
+            sheet_names = wb.sheetnames
+            total_sheets = len(sheet_names)
+
+            if total_sheets == 0:
+                _log_message(log, "文件中没有 sheet", level=logging.WARNING)
+                _hide_import_progress()
+                page.update()
+                return
+
+            for sheet_idx, sname in enumerate(sheet_names):
+                if _import_cancelled.is_set():
+                    break
+
+                ws = wb[sname]
+                # 获取行数（read_only 模式下 max_row 可用）
+                total_rows = ws.max_row or 0
+                total_cols = ws.max_column or 0
+
+                if total_rows == 0 or total_cols == 0:
+                    parsed_sheets[sname] = pd.DataFrame()
+                    continue
+
+                # 读取表头（第一行）
+                headers = []
+                for cell in next(ws.iter_rows(min_row=1, max_row=1)):
+                    headers.append(cell.value if cell.value is not None else f"Col{cell.column - 1}")
+
+                # 分批读取数据行
+                rows_data = []
+                batch_size = 500
+                rows_read = 0
+
+                for row in ws.iter_rows(min_row=2, values_only=True):
+                    if _import_cancelled.is_set():
+                        break
+
+                    rows_data.append(list(row))
+                    rows_read += 1
+
+                    # 每 batch_size 行更新一次进度
+                    if rows_read % batch_size == 0:
+                        progress = rows_read / total_rows if total_rows > 0 else 0
+                        _import_progress_bar.value = progress
+                        _import_progress_text.value = f"正在导入 {sname}: {rows_read}/{total_rows} 行"
+                        _log_message(log, f"正在导入 {sname}: {rows_read}/{total_rows} 行")
+                        page.update()
+                        await asyncio.sleep(0)
+
+                # 构建 DataFrame
+                if rows_data:
+                    df = pd.DataFrame(rows_data, columns=headers)
+                    df = _strip_date_only_times(df)
+                else:
+                    df = pd.DataFrame(columns=headers)
+
+                parsed_sheets[sname] = df
+                _log_message(log, f"已导入 {sname}: {len(df)} 行")
+
+            wb.close()
+
         except Exception as ex:
             file_label.value = f"读取失败: {ex}"
             file_label.color = ft.Colors.RED
             _log_message(log, f"读取文件失败: {ex}", level=logging.ERROR)
+            _hide_import_progress()
             page.update()
             return
-
-        sheet_names = xl.sheet_names
-        total = len(sheet_names)
-        if total == 0:
-            _log_message(log, "文件中没有 sheet", level=logging.WARNING)
-            return
-
-        # 显示进度条
-        _show_import_progress(total)
-        page.update()
-
-        # 后台线程逐 sheet 解析
-        parsed_sheets: dict[str, pd.DataFrame] = {}
-
-        def _parse_in_background():
-            for i, sname in enumerate(sheet_names):
-                if _import_cancelled.is_set():
-                    break
-                try:
-                    df = xl.parse(sname)
-                    df = _strip_date_only_times(df)
-                except Exception:
-                    logging.getLogger(__name__).warning("解析 sheet 失败: %s", sname, exc_info=True)
-                    df = pd.DataFrame()
-                parsed_sheets[sname] = df
-                try:
-                    page.run_thread(lambda _i=i, _s=sname: _update_and_refresh(_i + 1, total, _s))
-                except Exception:
-                    logging.getLogger(__name__).debug("page.run_thread 失败（页面可能已关闭）")
-
-        def _update_and_refresh(current, total_val, sname):
-            _update_import_progress(current, total_val, sname)
-            page.update()
-
-        worker = threading.Thread(target=_parse_in_background, daemon=True)
-        worker.start()
-
-        # 等待后台线程完成
-        while worker.is_alive():
-            await asyncio.sleep(0.1)
 
         _hide_import_progress()
 
         if _import_cancelled.is_set():
-            _log_message(log, f"导入已取消（已解析 {len(parsed_sheets)}/{total} 个 sheet）")
+            _log_message(log, f"导入已取消（已解析 {len(parsed_sheets)}/{total_sheets} 个 sheet）")
             if not parsed_sheets:
                 page.update()
                 return
@@ -504,17 +537,20 @@ def create_ledger_match_section(
             _current_sheet[0] = ""
 
         match_btn.disabled = False
+        view_segment.disabled = False
         build_table()
         loaded = len(parsed_sheets)
-        _log_message(log, f"已导入: {path} ({loaded}/{total} 个 sheet)")
+        _log_message(log, f"已导入: {path} ({loaded}/{total_sheets} 个 sheet)")
         page.update()
+    # ========================================================================
 
     def on_clear(e):
         _hide_import_progress()
         _matched_sheets.clear()
         _unmatched_sheets.clear()
         _view_mode[0] = "all"
-        view_segment.selected_index = 0
+        view_segment.selected = ["all"]
+        view_segment.disabled = True
         _all_sheets.clear()
         _filtered_df[0] = None
         _current_sheet[0] = ""
@@ -539,8 +575,6 @@ def create_ledger_match_section(
         data_table.rows = []
         _log_message(log, "已清空")
         page.update()
-
-    # ========================================================================
     # 执行匹配
     # ========================================================================
     async def on_match(e):
