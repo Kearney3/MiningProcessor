@@ -12,7 +12,7 @@ import func.oil_ledger as oil_ledger
 from func.oil_ledger import OIL_LEDGER_COLUMNS
 from func import config_loader
 
-from .common import _log_message, _last_directory, _update_last_directory
+from .common import _log_message, _last_directory, _update_last_directory, SortState, create_sortable_columns
 from .types import OilLedgerRefs
 
 try:
@@ -116,6 +116,7 @@ def create_oil_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "OilLed
     oil_records = []
     _oil_page = [0]
     _oil_instance = [None]  # 当前加载的 OilLedger 实例
+    _sort_state = SortState()  # 排序状态
     oil_path_label = ft.Text("未加载油品台账", size=12, color=ft.Colors.GREY)
     oil_table = ft.DataTable(
         columns=[
@@ -158,23 +159,50 @@ def create_oil_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "OilLed
     )
 
     def build_table():
-        start = _oil_page[0] * PAGE_SIZE
-        end = start + PAGE_SIZE
-        page_records = oil_records[start:end]
         if not oil_records:
             oil_table.rows = []
             oil_table.columns = [ft.DataColumn(ft.Text("暂无数据"))]
             _empty_state.visible = True
+            _update_oil_page_controls()
+            page.update()
+            return
+
+        _empty_state.visible = False
+
+        # 应用排序
+        df = pd.DataFrame(oil_records)
+        df = _sort_state.apply_to_dataframe(df)
+        sorted_records = df.to_dict("records")
+
+        start = _oil_page[0] * PAGE_SIZE
+        end = start + PAGE_SIZE
+        page_records = sorted_records[start:end]
+
+        # 创建可排序的列
+        def on_sort_callback():
+            _oil_page[0] = 0
+            build_table()
+
+        oil_table.columns = create_sortable_columns(
+            OIL_LEDGER_COLUMNS, _sort_state, on_sort_callback
+        )
+
+        # 设置当前排序列的显示状态
+        sort_col_idx = _sort_state.get_column_index(OIL_LEDGER_COLUMNS)
+        if sort_col_idx is not None:
+            oil_table.sort_column_index = sort_col_idx
+            oil_table.sort_ascending = _sort_state.ascending
         else:
-            _empty_state.visible = False
-            oil_table.columns = [ft.DataColumn(ft.Text(c)) for c in OIL_LEDGER_COLUMNS]
-            oil_table.rows = [
-                ft.DataRow(
-                    cells=[ft.DataCell(ft.Text(_cell_text(r.get(c)))) for c in OIL_LEDGER_COLUMNS]
-                )
-                for r in page_records
-            ]
+            oil_table.sort_column_index = None
+
+        oil_table.rows = [
+            ft.DataRow(
+                cells=[ft.DataCell(ft.Text(_cell_text(r.get(c)))) for c in OIL_LEDGER_COLUMNS]
+            )
+            for r in page_records
+        ]
         _update_oil_page_controls()
+        page.update()
         page.update()
 
     def _oil_prev(e):

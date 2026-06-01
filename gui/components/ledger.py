@@ -12,7 +12,7 @@ import func.equipment_ledger as equipment_ledger
 from func.equipment_ledger import LEDGER_COLUMNS
 from func import config_loader
 
-from .common import _log_message, _last_directory, _update_last_directory
+from .common import _log_message, _last_directory, _update_last_directory, SortState, create_sortable_columns
 from .types import LedgerRefs
 
 try:
@@ -122,6 +122,7 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs
     ledger_records = []
     _ledger_page = [0]
     _ledger_instance = [None]  # 当前加载的 EquipmentLedger 实例
+    _sort_state = SortState()  # 排序状态
     ledger_path_label = ft.Text("未加载台账", size=12, color=ft.Colors.GREY)
     ledger_table = ft.DataTable(
         columns=[
@@ -164,23 +165,50 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs
     )
 
     def build_table():
-        start = _ledger_page[0] * PAGE_SIZE
-        end = start + PAGE_SIZE
-        page_records = ledger_records[start:end]
         if not ledger_records:
             ledger_table.rows = []
             ledger_table.columns = [ft.DataColumn(ft.Text("暂无数据"))]
             _empty_state.visible = True
+            _update_ledger_page_controls()
+            page.update()
+            return
+
+        _empty_state.visible = False
+
+        # 应用排序
+        df = pd.DataFrame(ledger_records)
+        df = _sort_state.apply_to_dataframe(df)
+        sorted_records = df.to_dict("records")
+
+        start = _ledger_page[0] * PAGE_SIZE
+        end = start + PAGE_SIZE
+        page_records = sorted_records[start:end]
+
+        # 创建可排序的列
+        def on_sort_callback():
+            _ledger_page[0] = 0
+            build_table()
+
+        ledger_table.columns = create_sortable_columns(
+            LEDGER_COLUMNS, _sort_state, on_sort_callback
+        )
+
+        # 设置当前排序列的显示状态
+        sort_col_idx = _sort_state.get_column_index(LEDGER_COLUMNS)
+        if sort_col_idx is not None:
+            ledger_table.sort_column_index = sort_col_idx
+            ledger_table.sort_ascending = _sort_state.ascending
         else:
-            _empty_state.visible = False
-            ledger_table.columns = [ft.DataColumn(ft.Text(c)) for c in LEDGER_COLUMNS]
-            ledger_table.rows = [
-                ft.DataRow(
-                    cells=[ft.DataCell(ft.Text(_cell_text(r.get(c)))) for c in LEDGER_COLUMNS]
-                )
-                for r in page_records
-            ]
+            ledger_table.sort_column_index = None
+
+        ledger_table.rows = [
+            ft.DataRow(
+                cells=[ft.DataCell(ft.Text(_cell_text(r.get(c)))) for c in LEDGER_COLUMNS]
+            )
+            for r in page_records
+        ]
         _update_ledger_page_controls()
+        page.update()
         page.update()
 
     def _ledger_prev(e):
