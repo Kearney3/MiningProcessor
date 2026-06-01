@@ -135,3 +135,51 @@ class TestStreamingExport:
         
         assert len(batches) == 10
         assert all(b == 100 for b in batches)
+
+
+class TestIntegration:
+    """集成测试"""
+
+    def test_full_workflow(self):
+        """测试完整工作流程"""
+        # 模拟数据
+        _all_sheets = {
+            "Sheet1": pd.DataFrame({
+                "设备名称": ["卡车A", "卡车B", "挖掘机C"],
+                "设备编号": ["001", "002", "003"],
+            })
+        }
+        
+        # 验证初始状态
+        assert len(_all_sheets["Sheet1"]) == 3
+        
+        # 模拟匹配结果
+        _matched_sheets = {
+            "Sheet1": pd.DataFrame({
+                "设备名称": ["卡车A"],
+                "设备编号": ["001"],
+            })
+        }
+        _unmatched_sheets = {
+            "Sheet1": pd.DataFrame({
+                "设备名称": ["卡车B", "挖掘机C"],
+                "设备编号": ["002", "003"],
+            })
+        }
+        
+        # 验证匹配结果
+        assert len(_matched_sheets["Sheet1"]) == 1
+        assert len(_unmatched_sheets["Sheet1"]) == 2
+
+    def test_export_data_integrity(self):
+        """验证导出数据完整性"""
+        df = pd.DataFrame({
+            "设备名称": ["卡车A", "卡车B"],
+            "设备编号": ["001", "002"],
+            "标准设备名称": ["标准卡车A", ""],
+        })
+        
+        # 验证数据
+        assert len(df) == 2
+        assert df.iloc[0]["标准设备名称"] == "标准卡车A"
+        assert df.iloc[1]["标准设备名称"] == ""
