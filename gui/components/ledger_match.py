@@ -1,4 +1,5 @@
 """台账匹配工具区域组件"""
+import datetime
 import asyncio
 import logging
 import math
@@ -855,10 +856,20 @@ def create_ledger_match_section(
             workbook = xlsxwriter.Workbook(path)
             worksheet = workbook.add_worksheet(sheet_name)
 
+            # 定义日期格式
+            date_fmt = workbook.add_format({'num_format': 'yyyy-mm-dd'})
+            datetime_fmt = workbook.add_format({'num_format': 'yyyy-mm-dd hh:mm:ss'})
+
             # 写入表头
             headers = list(df_to_export.columns)
             for col, header in enumerate(headers):
                 worksheet.write(0, col, header)
+
+            # 识别日期列
+            date_columns = set()
+            for col in headers:
+                if pd.api.types.is_datetime64_any_dtype(df_to_export[col]):
+                    date_columns.add(col)
 
             # 分批写入数据
             batch_size = 1000
@@ -871,10 +882,22 @@ def create_ledger_match_section(
 
                 batch = df_to_export.iloc[i:i+batch_size]
                 for row_idx, (_, row) in enumerate(batch.iterrows(), start=i+1):
-                    for col_idx, value in enumerate(row):
+                    for col_idx, col_name in enumerate(headers):
+                        value = row[col_name]
                         # 处理 NaN 值
                         if pd.isna(value):
                             worksheet.write(row_idx, col_idx, "")
+                        elif col_name in date_columns:
+                            # 日期列使用日期格式
+                            try:
+                                if isinstance(value, pd.Timestamp):
+                                    worksheet.write_datetime(row_idx, col_idx, value.to_pydatetime(), date_fmt)
+                                elif isinstance(value, (datetime.date, datetime.datetime)):
+                                    worksheet.write_datetime(row_idx, col_idx, value, date_fmt)
+                                else:
+                                    worksheet.write(row_idx, col_idx, value)
+                            except Exception:
+                                worksheet.write(row_idx, col_idx, str(value))
                         else:
                             worksheet.write(row_idx, col_idx, value)
 
@@ -886,7 +909,6 @@ def create_ledger_match_section(
                 page.update()
 
                 await asyncio.sleep(0)
-
             # 完成
             if not _import_cancelled.is_set():
                 workbook.close()
