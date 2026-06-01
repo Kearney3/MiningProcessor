@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 import flet as ft
-from flet_datatable2 import DataTable2, DataColumn2, DataRow2
+
 
 
 from .common import _log_message, _last_directory as _import_dir, _update_last_directory
@@ -153,14 +153,12 @@ def create_ledger_match_section(
     _import_cancelled = threading.Event()
 
     # --- 表格 ---
-    data_table = DataTable2(
-        columns=[DataColumn2(ft.Text("等待导入数据..."))],
+    data_table = ft.DataTable(
+        columns=[ft.DataColumn(ft.Text("等待导入数据..."))],
         rows=[],
         expand=True,
         sort_column_index=None,
         sort_ascending=True,
-        fixed_top_rows=1,
-        visible_vertical_scroll_bar=True,
     )
 
     page_label = ft.Text("0 / 0", size=12, color=theme.TEXT_SECONDARY)
@@ -279,7 +277,7 @@ def create_ledger_match_section(
 
         if cols:
             data_table.columns = [
-                DataColumn2(
+                ft.DataColumn(
                     ft.Text(c, size=13, no_wrap=True),
                     on_sort=on_sort_handler(c),
                 )
@@ -291,7 +289,7 @@ def create_ledger_match_section(
             else:
                 data_table.sort_column_index = None
         else:
-            data_table.columns = [DataColumn2(ft.Text("等待导入数据..."))]
+            data_table.columns = [ft.DataColumn(ft.Text("等待导入数据..."))]
 
     def _get_view_df() -> pd.DataFrame | None:
         """根据当前视图模式返回对应的 DataFrame"""
@@ -319,7 +317,7 @@ def create_ledger_match_section(
         df = _get_view_df()
         if df is None or df.empty:
             data_table.rows = []
-            data_table.columns = [DataColumn2(ft.Text("等待导入数据..."))]
+            data_table.columns = [ft.DataColumn(ft.Text("等待导入数据..."))]
             _empty_state.visible = True
             _update_page_controls()
             page.update()
@@ -339,7 +337,7 @@ def create_ledger_match_section(
             for c in cols:
                 cell_value = _cell_text(row[c])
                 cells.append(ft.DataCell(ft.Text(cell_value, size=13, selectable=True)))
-            rows.append(DataRow2(cells=cells))
+            rows.append(ft.DataRow(cells=cells))
 
         data_table.rows = rows
         _update_page_controls()
@@ -536,7 +534,7 @@ def create_ledger_match_section(
         match_btn.disabled = True
         export_btn.disabled = True
         status_label.value = ""
-        data_table.columns = [DataColumn2(ft.Text("等待导入数据..."))]
+        data_table.columns = [ft.DataColumn(ft.Text("等待导入数据..."))]
         data_table.rows = []
         _log_message(log, "已清空")
         page.update()
