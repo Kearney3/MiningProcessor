@@ -134,6 +134,7 @@ def create_ledger_match_section(
             Segment(label=ft.Text("未匹配"), value="unmatched"),
         ],
         on_change=_on_view_segment_change,
+        disabled=True,  # 初始禁用，导入后启用
     )
 
     status_label = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
