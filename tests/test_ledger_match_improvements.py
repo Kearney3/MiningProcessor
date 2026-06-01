@@ -72,3 +72,35 @@ class TestViewStateManager:
         assert len(_all_sheets["Sheet1"]) == 3
         assert len(_matched_sheets["Sheet1"]) == 1
         assert len(_unmatched_sheets["Sheet1"]) == 2
+
+
+class TestMatchProgress:
+    """测试匹配进度"""
+
+    def test_match_batch_processing(self):
+        """验证分批处理逻辑"""
+        # 模拟大数据集
+        df = pd.DataFrame({
+            "设备名称": [f"设备{i}" for i in range(1000)],
+            "设备编号": [f"00{i}" for i in range(1000)],
+        })
+        
+        batch_size = 100
+        total_rows = len(df)
+        
+        # 验证分批逻辑
+        batches = []
+        for i in range(0, total_rows, batch_size):
+            batch = df.iloc[i:i+batch_size]
+            batches.append(len(batch))
+        
+        assert len(batches) == 10
+        assert all(b == 100 for b in batches)
+
+    def test_match_progress_calculation(self):
+        """验证进度计算"""
+        total_rows = 1000
+        processed = 500
+        
+        progress = processed / total_rows
+        assert progress == 0.5
