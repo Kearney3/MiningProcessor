@@ -626,6 +626,10 @@ def create_ledger_match_section(
                 
                 if has_truck_col and has_excavator_col:
                     # 生产数据场景：分别匹配矿卡和挖机，添加后缀
+                    # 计算总工作量（矿卡 + 挖机）
+                    total_work = total_rows * 2
+                    processed = 0
+                    
                     # 匹配矿卡名称
                     std_names, std_ids, std_companies = [], [], []
                     for i in range(0, total_rows, batch_size):
@@ -650,9 +654,9 @@ def create_ledger_match_section(
                         
                         # 更新进度
                         processed += len(batch)
-                        progress = processed / total_rows
+                        progress = processed / total_work
                         _import_progress_bar.value = progress
-                        _import_progress_text.value = f"正在匹配第 {processed}/{total_rows} 行..."
+                        _import_progress_text.value = f"正在匹配矿卡: {processed}/{total_work}"
                         page.update()
                         
                         # 让出控制权，避免 UI 冻结
@@ -684,9 +688,9 @@ def create_ledger_match_section(
                         
                         # 更新进度
                         processed += len(batch)
-                        progress = processed / total_rows
+                        progress = processed / total_work
                         _import_progress_bar.value = progress
-                        _import_progress_text.value = f"正在匹配第 {processed}/{total_rows} 行..."
+                        _import_progress_text.value = f"正在匹配挖机: {processed}/{total_work}"
                         page.update()
                         
                         # 让出控制权，避免 UI 冻结
@@ -755,14 +759,13 @@ def create_ledger_match_section(
                     processed += len(batch)
                     progress = processed / total_rows
                     _import_progress_bar.value = progress
-                    _import_progress_text.value = f"正在匹配第 {processed}/{total_rows} 行..."
+                    _import_progress_text.value = f"正在匹配油品: {processed}/{total_rows}"
                     page.update()
                     
                     # 让出控制权，避免 UI 冻结
                     await asyncio.sleep(0)
                 
                 result_df["标准油品名称"] = std_oils
-
             _all_sheets[_current_sheet[0]] = result_df
             _page[0] = 0
             build_table()
