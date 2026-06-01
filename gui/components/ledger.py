@@ -328,11 +328,20 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs
         _ledger_page[0] = 0
         ledger_path_label.value = "默认台账 (缓存)"
         ledger_path_label.color = ft.Colors.GREEN
+        
+        # 创建 EquipmentLedger 实例用于匹配
+        ledger = equipment_ledger.EquipmentLedger()
+        # 从缓存记录构建 DataFrame
+        import pandas as pd
+        df = pd.DataFrame(cached)
+        ledger._df = df
+        ledger._build_search_cache()
+        _ledger_instance[0] = ledger
+        
         build_table()
         _log_message(log, f"已自动加载默认设备台账 ({len(ledger_records)} 条记录)")
         _update_default_btn_state()
         return True
-
     container = ft.Container(
         content=ft.Column(
             [
