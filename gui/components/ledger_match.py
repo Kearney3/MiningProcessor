@@ -485,7 +485,6 @@ def create_ledger_match_section(
                         progress = rows_read / total_rows if total_rows > 0 else 0
                         _import_progress_bar.value = progress
                         _import_progress_text.value = f"正在导入 {sname}: {rows_read}/{total_rows} 行"
-                        _log_message(log, f"正在导入 {sname}: {rows_read}/{total_rows} 行")
                         page.update()
                         await asyncio.sleep(0)
 
@@ -654,7 +653,6 @@ def create_ledger_match_section(
                         progress = processed / total_rows
                         _import_progress_bar.value = progress
                         _import_progress_text.value = f"正在匹配第 {processed}/{total_rows} 行..."
-                        _log_message(log, f"正在匹配第 {processed}/{total_rows} 行...")
                         page.update()
                         
                         # 让出控制权，避免 UI 冻结
@@ -689,7 +687,6 @@ def create_ledger_match_section(
                         progress = processed / total_rows
                         _import_progress_bar.value = progress
                         _import_progress_text.value = f"正在匹配第 {processed}/{total_rows} 行..."
-                        _log_message(log, f"正在匹配第 {processed}/{total_rows} 行...")
                         page.update()
                         
                         # 让出控制权，避免 UI 冻结
@@ -726,7 +723,6 @@ def create_ledger_match_section(
                         progress = processed / total_rows
                         _import_progress_bar.value = progress
                         _import_progress_text.value = f"正在匹配第 {processed}/{total_rows} 行..."
-                        _log_message(log, f"正在匹配第 {processed}/{total_rows} 行...")
                         page.update()
                         
                         # 让出控制权，避免 UI 冻结
@@ -760,7 +756,6 @@ def create_ledger_match_section(
                     progress = processed / total_rows
                     _import_progress_bar.value = progress
                     _import_progress_text.value = f"正在匹配第 {processed}/{total_rows} 行..."
-                    _log_message(log, f"正在匹配第 {processed}/{total_rows} 行...")
                     page.update()
                     
                     # 让出控制权，避免 UI 冻结
@@ -885,7 +880,6 @@ def create_ledger_match_section(
                 progress = processed / total_rows
                 _import_progress_bar.value = progress
                 _import_progress_text.value = f"正在导出第 {processed}/{total_rows} 行..."
-                _log_message(log, f"正在导出第 {processed}/{total_rows} 行...")
                 page.update()
 
                 await asyncio.sleep(0)
