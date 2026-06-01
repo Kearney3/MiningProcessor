@@ -104,3 +104,34 @@ class TestMatchProgress:
         
         progress = processed / total_rows
         assert progress == 0.5
+
+
+class TestStreamingExport:
+    """测试流式导出"""
+
+    def test_xlsxwriter_availability(self):
+        """验证 xlsxwriter 可用"""
+        try:
+            import xlsxwriter
+            assert True
+        except ImportError:
+            pytest.fail("xlsxwriter not installed")
+
+    def test_export_batch_processing(self):
+        """验证导出分批处理逻辑"""
+        df = pd.DataFrame({
+            "设备名称": [f"设备{i}" for i in range(1000)],
+            "设备编号": [f"00{i}" for i in range(1000)],
+        })
+        
+        batch_size = 100
+        total_rows = len(df)
+        
+        # 验证分批逻辑
+        batches = []
+        for i in range(0, total_rows, batch_size):
+            batch = df.iloc[i:i+batch_size]
+            batches.append(len(batch))
+        
+        assert len(batches) == 10
+        assert all(b == 100 for b in batches)

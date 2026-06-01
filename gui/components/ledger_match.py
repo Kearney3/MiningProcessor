@@ -781,35 +781,96 @@ def create_ledger_match_section(
     # 导出
     # ========================================================================
     async def on_export(e):
-        if not _all_sheets:
+        if not _all_sheets and not _matched_sheets and not _unmatched_sheets:
             _log_message(log, "没有数据可导出", level=logging.WARNING)
             return
+
+        # 选择保存路径
         picker = ft.FilePicker()
         path = await picker.save_file(
-            dialog_title="导出匹配结果",
+            dialog_title="导出结果",
             file_name="匹配结果.xlsx",
             allowed_extensions=["xlsx"],
             initial_directory=_import_dir[0] or None,
         )
         if not path:
             return
-        try:
-            mode = _view_mode[0]
-            with pd.ExcelWriter(path, engine="openpyxl") as writer:
-                if mode == "matched" and _matched_sheets:
-                    combined = pd.concat(_matched_sheets.values(), ignore_index=True)
-                    combined.to_excel(writer, sheet_name="已匹配", index=False)
-                elif mode == "unmatched" and _unmatched_sheets:
-                    combined = pd.concat(_unmatched_sheets.values(), ignore_index=True)
-                    combined.to_excel(writer, sheet_name="未匹配", index=False)
-                else:
-                    for sname, sdf in _all_sheets.items():
-                        sdf.to_excel(writer, sheet_name=sname, index=False)
-            _log_message(log, f"已导出: {path}")
-        except Exception as ex:
-            _log_message(log, f"导出失败: {ex}", level=logging.ERROR)
+
+        # 初始化进度条
+        _import_progress_bar.visible = True
+        _import_progress_text.visible = True
+        _cancel_btn.visible = True
+        _import_cancelled.clear()
+        export_btn.disabled = True
         page.update()
 
+        try:
+            import xlsxwriter
+
+            # 根据视图模式选择数据
+            mode = _view_mode[0]
+            if mode == "matched" and _matched_sheets:
+                df_to_export = pd.concat(_matched_sheets.values(), ignore_index=True)
+                sheet_name = "已匹配"
+            elif mode == "unmatched" and _unmatched_sheets:
+                df_to_export = pd.concat(_unmatched_sheets.values(), ignore_index=True)
+                sheet_name = "未匹配"
+            else:
+                df_to_export = pd.concat(_all_sheets.values(), ignore_index=True)
+                sheet_name = "全部"
+
+            # 创建 xlsxwriter 对象
+            workbook = xlsxwriter.Workbook(path)
+            worksheet = workbook.add_worksheet(sheet_name)
+
+            # 写入表头
+            headers = list(df_to_export.columns)
+            for col, header in enumerate(headers):
+                worksheet.write(0, col, header)
+
+            # 分批写入数据
+            batch_size = 1000
+            total_rows = len(df_to_export)
+
+            for i in range(0, total_rows, batch_size):
+                if _import_cancelled.is_set():
+                    _log_message(log, "导出已取消")
+                    break
+
+                batch = df_to_export.iloc[i:i+batch_size]
+                for row_idx, (_, row) in enumerate(batch.iterrows(), start=i+1):
+                    for col_idx, value in enumerate(row):
+                        # 处理 NaN 值
+                        if pd.isna(value):
+                            worksheet.write(row_idx, col_idx, "")
+                        else:
+                            worksheet.write(row_idx, col_idx, value)
+
+                # 更新进度
+                processed = min(i + batch_size, total_rows)
+                progress = processed / total_rows
+                _import_progress_bar.value = progress
+                _import_progress_text.value = f"正在导出第 {processed}/{total_rows} 行..."
+                _log_message(log, f"正在导出第 {processed}/{total_rows} 行...")
+                page.update()
+
+                await asyncio.sleep(0)
+
+            # 完成
+            if not _import_cancelled.is_set():
+                workbook.close()
+                _log_message(log, f"已导出: {path}")
+                _update_last_directory(path)
+
+        except Exception as ex:
+            _log_message(log, f"导出失败: {ex}", level=logging.ERROR)
+        finally:
+            # 恢复 UI
+            _import_progress_bar.visible = False
+            _import_progress_text.visible = False
+            _cancel_btn.visible = False
+            export_btn.disabled = False
+            page.update()
     match_btn.on_click = on_match
     export_btn.on_click = on_export
 
