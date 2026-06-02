@@ -44,3 +44,6 @@ data/
 
 # User config (contains database credentials etc.)
 config.user.json
+
+# CodeGraph
+.codegraph/

@@ -12,13 +12,21 @@ except ImportError:
     import gui.theme as theme
 
 
+def _show_path_confirm(text_field: ft.TextField):
+    """在路径输入框右侧显示绿色确认勾。"""
+    text_field.suffix = ft.Icon(ft.Icons.CHECK_CIRCLE, color=theme.SUCCESS, size=20)
+    try:
+        text_field.update()
+    except (RuntimeError, AttributeError):
+        pass
+
+
 def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
     """创建批量处理模块区域，返回 (container, batch_refs)"""
 
     current_date = datetime.now()
     current_year = str(current_date.year)
     current_month = str(current_date.month)
-    # 使用 common.py 中的共享 _last_directory
 
     # --- 文件夹选择 ---
     batch_path = ft.TextField(
@@ -225,7 +233,6 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         except (RuntimeError, AttributeError):
             pass
 
-
     # ── 表内合并 / 合并输出 互斥 & 台账依赖 ──
     def _on_table_merge_change(e):
         if batch_table_merge.value:
@@ -330,19 +337,14 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
             if dp.value:
                 _selected_date[0] = dp.value.date()
                 _update_date_display()
-            page.close(dp)
+            page.pop_dialog()
 
         dp.on_change = _on_date_picked
-        dp.on_dismiss = lambda ev: page.close(dp)
-        page.open(dp)
+        dp.on_dismiss = lambda ev: page.pop_dialog()
+        page.show_dialog(dp)
 
     # --- 处理按钮 ---
-    batch_btn = ft.Button(
-        "批量处理",
-        icon=ft.Icons.BOLT,
-        disabled=False,
-        style=ft.ButtonStyle(bgcolor=theme.PRIMARY, color="#FFFFFF"),
-    )
+    batch_btn = theme.primary_btn("批量处理", icon=ft.Icons.BOLT, disabled=False)
 
     # --- 浏览按钮 ---
     async def on_batch_browse(e: ft.ControlEvent):
@@ -354,7 +356,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         if path:
             batch_path.value = path
             _update_last_directory(path)
-            batch_path.update()
+            _show_path_confirm(batch_path)
             batch_btn.disabled = False
             batch_btn.update()
 
@@ -364,27 +366,9 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
     date_nav_row = ft.Row(
         [
             date_display,
-            ft.Button(
-                "上一天",
-                icon=ft.Icons.ARROW_BACK_IOS,
-                on_click=_on_prev_day,
-                style=ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_PRIMARY),
-                height=32,
-            ),
-            ft.Button(
-                "今天",
-                icon=ft.Icons.CALENDAR_TODAY,
-                on_click=_on_today,
-                style=ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_PRIMARY),
-                height=32,
-            ),
-            ft.Button(
-                "选择日期",
-                icon=ft.Icons.CALENDAR_MONTH,
-                on_click=_on_pick_date,
-                style=ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_PRIMARY),
-                height=32,
-            ),
+            theme.secondary_btn("上一天", icon=ft.Icons.ARROW_BACK_IOS, on_click=_on_prev_day, height=32),
+            theme.secondary_btn("今天", icon=ft.Icons.CALENDAR_TODAY, on_click=_on_today, height=32),
+            theme.secondary_btn("选择日期", icon=ft.Icons.CALENDAR_MONTH, on_click=_on_pick_date, height=32),
         ],
         spacing=6,
         vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -400,24 +384,34 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     date_filter_toggle.on_change = _on_date_filter_toggle
 
-    # --- 布局辅助 ---
-    def _module_card(content_controls: list, label: str = "", spacing: int = 6) -> ft.Container:
-        """带可选小标题的分组卡片，与数据处理模块视觉一致。"""
-        controls = []
-        if label:
-            controls.append(
-                ft.Text(label, size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY)
-            )
-        controls.extend(content_controls)
-        return ft.Container(
-            content=ft.Column(controls, spacing=spacing),
-            padding=10,
-            border=ft.Border.all(1, theme.BORDER),
-            border_radius=theme.RADIUS_SM,
-            bgcolor=theme.SURFACE,
-        )
-
     # --- 布局 ---
+    # 处理选项（可折叠，2 列布局）
+    options_grid = ft.ResponsiveRow(
+        [
+            ft.Container(batch_auto_detect, col={"xs": 12, "md": 6}),
+            ft.Container(batch_header_toggle, col={"xs": 12, "md": 6}),
+            ft.Container(batch_ledger_toggle, col={"xs": 12, "md": 6}),
+            ft.Container(batch_merge, col={"xs": 12, "md": 6}),
+            ft.Container(batch_table_merge, col={"xs": 12, "md": 6}),
+            ft.Container(
+                ft.Row([batch_header_mode_row, batch_header_fuzzy], spacing=4, wrap=True),
+                col={"xs": 12, "md": 6},
+            ),
+            ft.Container(batch_base_table_row, col={"xs": 12, "md": 6}),
+        ],
+        run_spacing=4,
+        spacing=8,
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+    )
+
+    options_collapsible = theme.make_collapsible(
+        title="处理选项",
+        subtitle="数据检测、台账匹配、合并输出等处理参数",
+        icon=ft.Icons.TUNE,
+        initially_expanded=False,
+        content_controls=[options_grid],
+    )
+
     container = ft.Container(
         content=ft.Column(
             [
@@ -429,12 +423,12 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
                 ),
 
                 # ── 文件夹选择 ──
-                _module_card([
+                theme.module_card([
                     ft.Row([batch_path], spacing=8),
                 ], label="目标文件夹"),
 
                 # ── 日期参数 ──
-                _module_card([
+                theme.module_card([
                     ft.Row(
                         [batch_year, batch_month, date_filter_toggle],
                         spacing=6,
@@ -443,20 +437,8 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
                     date_nav_row,
                 ], label="日期参数"),
 
-                # ── 处理选项（3列紧凑布局） ──
-                _module_card([
-                    ft.Row(
-                        [batch_auto_detect, batch_header_toggle, batch_header_mode_row, batch_header_fuzzy],
-                        spacing=theme.SPACING_SM,
-                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                    ),
-                    ft.Row(
-                        [batch_ledger_toggle, batch_merge, batch_table_merge, batch_base_table_row],
-                        spacing=theme.SPACING_LG,
-                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                        wrap=True,
-                    ),
-                ], label="处理选项", spacing=4),
+                # ── 处理选项（折叠） ──
+                options_collapsible,
 
                 # ── 操作按钮 ──
                 ft.Row(

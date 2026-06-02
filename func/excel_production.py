@@ -9,6 +9,7 @@ import os
 import re
 
 from func.logger import get_logger
+from func.string_utils import clean_string
 
 logger = get_logger(__name__)
 
@@ -51,7 +52,7 @@ class MiningDataProcessor:
         if pd.isna(truck_name):
             return 0
 
-        truck_name_upper = str(truck_name).upper()
+        truck_name_upper = clean_string(truck_name).upper()
         for model, capacity in self.load_map.items():
             if model.upper() in truck_name_upper:
                 return capacity
@@ -59,9 +60,7 @@ class MiningDataProcessor:
 
     def safe_str(self, val):
         """安全转字符串"""
-        if pd.isna(val):
-            return ""
-        return str(val).strip()
+        return clean_string(val)
 
     def safe_number(self, val, default=0):
         """

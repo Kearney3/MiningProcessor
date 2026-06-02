@@ -133,10 +133,10 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs
 
     ledger_page_label = ft.Text("0 / 0", size=12, color=theme.TEXT_SECONDARY)
     ledger_prev_btn = ft.IconButton(
-        icon=ft.icons.Icons.CHEVRON_LEFT, tooltip="上一页", icon_size=18, disabled=True,
+        icon=ft.Icons.CHEVRON_LEFT, tooltip="上一页", icon_size=18, disabled=True,
     )
     ledger_next_btn = ft.IconButton(
-        icon=ft.icons.Icons.CHEVRON_RIGHT, tooltip="下一页", icon_size=18, disabled=True,
+        icon=ft.Icons.CHEVRON_RIGHT, tooltip="下一页", icon_size=18, disabled=True,
     )
     ledger_pagination = ft.Row(
         [ledger_prev_btn, ledger_page_label, ledger_next_btn],
@@ -226,17 +226,14 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs
 
     ledger_table_wrapper = ft.Column(
         controls=[
-            ft.Row(
-                controls=[ledger_table],
-                scroll=ft.ScrollMode.AUTO,
-            ),
+            ledger_table,
             _empty_state,
         ],
         scroll=ft.ScrollMode.AUTO,
         expand=True,
-        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-        alignment=ft.MainAxisAlignment.CENTER,
+        horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
     )
+    ledger_table.expand = True
 
     async def on_load(e: ft.ControlEvent):
         picker = ft.FilePicker()
@@ -374,16 +371,27 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, "LedgerRefs
         content=ft.Column(
             [
                 theme.section_title("设备台账"),
-                ft.Row(
+                ft.Column(
                     [
-                        theme.secondary_btn("导入台账", icon=ft.icons.Icons.UPLOAD, on_click=on_load),
-                        theme.secondary_btn("清空台账", icon=ft.icons.Icons.DELETE_SWEEP, on_click=on_clear),
-                        theme.secondary_btn("导出模板", icon=ft.icons.Icons.DOWNLOAD, on_click=on_export_template),
-                        save_default_btn := theme.primary_btn("保存为默认", icon=ft.icons.Icons.BOOKMARK, on_click=on_save_default, disabled=True),
-                        cancel_default_btn := theme.secondary_btn("取消默认", icon=ft.icons.Icons.BOOKMARK_REMOVE, on_click=on_cancel_default, disabled=not config_loader.has_equipment_ledger_cache()),
-                        ledger_path_label,
+                        ft.Row(
+                            [
+                                theme.secondary_btn("导入台账", icon=ft.Icons.UPLOAD, on_click=on_load),
+                                theme.secondary_btn("清空台账", icon=ft.Icons.DELETE_SWEEP, on_click=on_clear),
+                                theme.secondary_btn("导出模板", icon=ft.Icons.DOWNLOAD, on_click=on_export_template),
+                            ],
+                            spacing=8,
+                        ),
+                        ft.Row(
+                            [
+                                save_default_btn := theme.primary_btn("保存为默认", icon=ft.Icons.BOOKMARK, on_click=on_save_default, disabled=True),
+                                cancel_default_btn := theme.secondary_btn("取消默认", icon=ft.Icons.BOOKMARK_REMOVE, on_click=on_cancel_default, disabled=not config_loader.has_equipment_ledger_cache()),
+                                ledger_path_label,
+                            ],
+                            spacing=8,
+                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        ),
                     ],
-                    spacing=8,
+                    spacing=6,
                 ),
                 ft.Container(
                     content=ledger_table_wrapper,

@@ -165,10 +165,10 @@ def create_ledger_match_section(
 
     page_label = ft.Text("0 / 0", size=12, color=theme.TEXT_SECONDARY)
     prev_btn = ft.IconButton(
-        icon=ft.icons.Icons.CHEVRON_LEFT, tooltip="上一页", icon_size=18, disabled=True,
+        icon=ft.Icons.CHEVRON_LEFT, tooltip="上一页", icon_size=18, disabled=True,
     )
     next_btn = ft.IconButton(
-        icon=ft.icons.Icons.CHEVRON_RIGHT, tooltip="下一页", icon_size=18, disabled=True,
+        icon=ft.Icons.CHEVRON_RIGHT, tooltip="下一页", icon_size=18, disabled=True,
     )
 
     # ========================================================================
@@ -944,60 +944,92 @@ def create_ledger_match_section(
         alignment=ft.MainAxisAlignment.CENTER,
     )
 
+    # ── 文件操作栏 ──
+    file_row = ft.Row(
+        [
+            ft.Row(
+                [
+                    theme.secondary_btn("导入文件", icon=ft.Icons.UPLOAD, on_click=on_import),
+                    theme.secondary_btn("清空", icon=ft.Icons.DELETE_SWEEP, on_click=on_clear),
+                    file_label,
+                ],
+                spacing=8,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ),
+            sheet_dropdown,
+        ],
+        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+    )
+
+    # ── 进度条 ──
+    progress_row = ft.Row(
+        [_import_progress_bar, _import_progress_text, _cancel_btn],
+        spacing=8,
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+    )
+
+    # ── 匹配配置（可折叠，2 列网格） ──
+    match_config_grid = ft.ResponsiveRow(
+        [
+            ft.Container(
+                ft.Row([name_match_switch, name_dropdown], spacing=6, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                col={"xs": 12, "md": 6},
+            ),
+            ft.Container(
+                ft.Row([id_match_switch, id_dropdown], spacing=6, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                col={"xs": 12, "md": 6},
+            ),
+            ft.Container(
+                ft.Row([oil_match_switch, oil_dropdown], spacing=6, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                col={"xs": 12, "md": 6},
+            ),
+        ],
+        run_spacing=4,
+        spacing=8,
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+    )
+
+    match_config_collapsible = theme.make_collapsible(
+        title="匹配配置",
+        subtitle="选择设备名称/编号/油品列进行匹配",
+        icon=ft.Icons.TUNE,
+        initially_expanded=True,
+        content_controls=[match_config_grid],
+    )
+
+    # ── 操作栏（2 行） ──
+    action_rows = ft.Column(
+        [
+            ft.Row([match_btn, export_btn], spacing=8),
+            ft.Row([status_label, match_count_label], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+        ],
+        spacing=6,
+    )
+
     container = ft.Container(
         content=ft.Column(
             [
                 theme.section_title("台账匹配"),
-                ft.Row(
-                    [
-                        theme.secondary_btn("导入文件", icon=ft.icons.Icons.UPLOAD, on_click=on_import),
-                        theme.secondary_btn("清空", icon=ft.icons.Icons.DELETE_SWEEP, on_click=on_clear),
-                        file_label,
-                    ],
-                    spacing=8,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ft.Text(
+                    "导入 Excel 文件后选择匹配列，执行匹配并导出结果。",
+                    size=13,
+                    color=theme.TEXT_SECONDARY,
                 ),
-                ft.Row([sheet_dropdown], spacing=8),
-                ft.Row(
-                    [_import_progress_bar, _import_progress_text, _cancel_btn],
-                    spacing=8,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                ),
-                ft.Container(
-                    content=ft.Column(
-                        [
-                            ft.Row(
-                                [
-                                    ft.Text("设备匹配", size=12, color=theme.TEXT_SECONDARY, weight=ft.FontWeight.W_500),
-                                    name_match_switch,
-                                    name_dropdown,
-                                    ft.Container(width=8),
-                                    id_match_switch,
-                                    id_dropdown,
-                                ],
-                                spacing=8,
-                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                            ),
-                            ft.Row(
-                                [
-                                    ft.Text("油品匹配", size=12, color=theme.TEXT_SECONDARY, weight=ft.FontWeight.W_500),
-                                    oil_match_switch,
-                                    oil_dropdown,
-                                ],
-                                spacing=8,
-                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                            ),
-                        ],
-                        spacing=4,
-                    ),
-                    padding=ft.Padding.symmetric(vertical=4),
-                ),
-                ft.Row(
-                    [match_btn, export_btn, status_label, match_count_label],
-                    spacing=8,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                ),
+
+                # ── 文件操作 ──
+                theme.module_card([file_row, progress_row], spacing=6),
+
+                # ── 匹配配置（折叠） ──
+                match_config_collapsible,
+
+                # ── 操作栏 ──
+                action_rows,
+
+                # ── 视图切换 ──
                 view_segment,
+
+                # ── 数据表格 ──
                 ft.Container(
                     content=table_wrapper,
                     border=ft.Border.all(1, theme.BORDER),
@@ -1006,13 +1038,15 @@ def create_ledger_match_section(
                     bgcolor=theme.SURFACE_HIGH,
                     expand=True,
                 ),
+
+                # ── 分页 ──
                 ft.Row(
                     [prev_btn, page_label, next_btn],
                     spacing=4,
                     alignment=ft.MainAxisAlignment.CENTER,
                 ),
             ],
-            spacing=8,
+            spacing=theme.SPACING_MD,
             expand=True,
         ),
         padding=12,

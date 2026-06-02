@@ -6,6 +6,7 @@ from typing import List, Tuple
 
 import pandas as pd
 from func.logger import get_logger
+from func.string_utils import clean_string
 
 logger = get_logger(__name__)
 
@@ -88,7 +89,7 @@ def merge_excel_files(
             file_sheet_names[fpath].append(sname)
             try:
                 df_head = pd.read_excel(xl, sheet_name=sname, nrows=0)
-                header_dict[os.path.basename(fpath)][sname] = tuple(str(h) for h in df_head.columns)
+                header_dict[os.path.basename(fpath)][sname] = tuple(clean_string(h) for h in df_head.columns)
             except (ValueError, KeyError) as e:
                 logger.error(f"读取文件 '{fpath}' 的 Sheet '{sname}' 表头失败: {e}")
                 header_dict[os.path.basename(fpath)][sname] = ()
@@ -115,7 +116,7 @@ def merge_excel_files(
                 logger.warning(f"  警告: {os.path.basename(fpath)} 的 Sheet '{sname}' 为空，已跳过")
                 continue
 
-            current_headers = tuple(str(h) for h in df.columns)
+            current_headers = tuple(clean_string(h) for h in df.columns)
             if expected_headers is None:
                 expected_headers = current_headers
             else:
@@ -154,7 +155,7 @@ def merge_excel_files(
             sort_columns = []
             sort_ascending = []
             for cfg in sort_configs:
-                col = cfg.get("column", "").strip()
+                col = clean_string(cfg.get("column"))
                 asc = bool(cfg.get("ascending", True))
                 if not col:
                     continue

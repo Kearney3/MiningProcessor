@@ -86,6 +86,8 @@ class LogViewRefs(TypedDict):
     toolbar: ft.Row
     level_filter: ft.Dropdown
     export_button: ft.IconButton
+    clear_button: ft.IconButton
+    scroll_bottom_button: ft.IconButton
     resize_handle: ft.GestureDetector
     list_container: ft.Container
     log_list: ft.ListView

@@ -17,6 +17,7 @@ from func.equipment_ledger import EquipmentLedger
 from func.oil_ledger import OilLedger
 from func import config_loader
 from func.logger import get_logger
+from func.string_utils import clean_string
 
 logger = get_logger(__name__)
 
@@ -278,8 +279,8 @@ def _apply_ledger_to_sheets(
                 for _, row in df.iterrows():
                     name_val = row.get(name_col)
                     id_val = row.get(id_col) if id_col else None
-                    name_str = str(name_val) if not pd.isna(name_val) else None
-                    id_str = str(id_val) if id_val is not None and not pd.isna(id_val) else None
+                    name_str = clean_string(name_val) or None
+                    id_str = clean_string(id_val) or None
                     result = equipment_ledger.match_device(name=name_str, device_id=id_str)
                     if result:
                         std_names.append(result.get("标准设备名称", ""))
@@ -298,7 +299,7 @@ def _apply_ledger_to_sheets(
                 std_names_ex, std_ids_ex, std_companies_ex = [], [], []
                 for _, row in df.iterrows():
                     name_val = row.get(excavator_col)
-                    name_str = str(name_val) if not pd.isna(name_val) else None
+                    name_str = clean_string(name_val) or None
                     result = equipment_ledger.match_device(name=name_str, device_id=None)
                     if result:
                         std_names_ex.append(result.get("标准设备名称", ""))
@@ -321,8 +322,8 @@ def _apply_ledger_to_sheets(
                     for _, row in df.iterrows():
                         name_val = row.get(name_col)
                         id_val = row.get(id_col) if id_col else None
-                        name_str = str(name_val) if not pd.isna(name_val) else None
-                        id_str = str(id_val) if id_val is not None and not pd.isna(id_val) else None
+                        name_str = clean_string(name_val) or None
+                        id_str = clean_string(id_val) or None
                         result = equipment_ledger.match_device(name=name_str, device_id=id_str)
                         if result:
                             std_names.append(result.get("标准设备名称", ""))
@@ -346,7 +347,7 @@ def _apply_ledger_to_sheets(
                     if pd.isna(oil_val):
                         std_oils.append("")
                     else:
-                        result = oil_ledger.match(str(oil_val))
+                        result = oil_ledger.match(clean_string(oil_val))
                         std_oils.append(result["标准名称"] if result else "")
                 df["标准油品名称"] = std_oils
                 matched_any = True

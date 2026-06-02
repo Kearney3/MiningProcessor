@@ -9,6 +9,7 @@ from datetime import datetime
 import argparse
 
 from func.logger import get_logger
+from func.string_utils import clean_string
 
 logger = get_logger(__name__)
 
@@ -32,7 +33,7 @@ def parse_excel_data(file_path, target_year=None, return_sheets=False):
         # 2. 找到“日期”所在行
         date_row_idx = None
         for idx, val in df.iloc[:, 0].items():
-            if "日期" in str(val).strip():
+            if "日期" in clean_string(val):
                 date_row_idx = idx
                 break
 
@@ -62,14 +63,14 @@ def parse_excel_data(file_path, target_year=None, return_sheets=False):
         # 4. 寻找数据行并提取设备名称
         # 我们只关注 A列包含 "电力总消耗" 且包含 "EX-" 的行
         for idx in range(date_row_idx + 1, len(df)):
-            a_val = str(df.iloc[idx, 0])
+            a_val = clean_string(df.iloc[idx, 0])
 
             # 过滤规则：必须包含“电力总消耗”且不能包含“每立方”
             if "电力总消耗" in a_val and "每立方产量" not in a_val:
                 # 使用正则提取 EX-xxxx 格式的设备名称
                 device_match = re.search(r'(EX-[\w#.-]+)', a_val)
                 if device_match:
-                    device_name = device_match.group(1)
+                    device_name = clean_string(device_match.group(1))
 
                     # 5. 提取对应日期的消耗数值
                     for col_idx, current_date in date_mapping.items():

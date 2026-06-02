@@ -5,6 +5,7 @@ import re
 import argparse
 
 from func.logger import get_logger
+from func.string_utils import clean_string
 logger = get_logger(__name__)
 
 
@@ -21,9 +22,9 @@ def extract_data_from_sheet(df_raw, year, month, day):
     header_row = df_raw.iloc[1]
 
     # 找出表头中有效的列（非NaN且非空白）用于比对
-    valid_mask = header_row.notna() & (header_row.astype(str).str.strip() != '')
+    valid_mask = header_row.notna() & (header_row.apply(lambda x: clean_string(x)) != '')
     valid_cols = valid_mask[valid_mask].index.tolist()
-    valid_headers = header_row[valid_cols].astype(str).str.strip().tolist()
+    valid_headers = header_row[valid_cols].apply(clean_string).tolist()
 
     if not valid_headers:
         return None
@@ -31,7 +32,7 @@ def extract_data_from_sheet(df_raw, year, month, day):
     split_idx = -1
     # 从第3行（index 2）开始向下遍历，寻找再次出现的表头
     for idx in range(2, len(df_raw)):
-        current_row_vals = df_raw.iloc[idx][valid_cols].astype(str).str.strip().tolist()
+        current_row_vals = df_raw.iloc[idx][valid_cols].apply(clean_string).tolist()
         if current_row_vals[0] == valid_headers[0]:
             split_idx = idx
             break
@@ -130,7 +131,7 @@ def process_directory(base_dir, year, month, output_file):
             # 寻找与目标日期对应的 Sheet
             target_sheet_name = None
             for sheet in xls.sheet_names:
-                if sheet.strip().isdigit() and int(sheet.strip()) == target_day:
+                if clean_string(sheet).isdigit() and int(clean_string(sheet)) == target_day:
                     target_sheet_name = sheet
                     break
             if not target_sheet_name and len(xls.sheet_names) == 1:
@@ -183,7 +184,7 @@ def process_directory(base_dir, year, month, output_file):
 
         # 如果一行的这些关键列的数据，全部和列名（表头名）一模一样，那它一定是表头
         for col in check_cols:
-            is_header_row = is_header_row & (final_df[col].astype(str).str.strip() == str(col).strip())
+            is_header_row = is_header_row & (final_df[col].apply(clean_string) == clean_string(col))
 
         initial_len = len(final_df)
         # 仅保留 不是表头 的行 (使用 ~ 取反)

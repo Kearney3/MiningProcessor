@@ -10,6 +10,7 @@ from rapidfuzz import fuzz, process
 
 
 from func.logger import get_logger
+from func.string_utils import clean_string
 
 logger = get_logger(__name__)
 
@@ -71,8 +72,8 @@ class OilLedger:
         for _, row in self._df.iterrows():
             std_raw = row.get("标准油品名称")
             raw_raw = row.get("油品名称")
-            standard_name = "" if pd.isna(std_raw) else str(std_raw).strip()
-            raw_name = "" if pd.isna(raw_raw) else str(raw_raw).strip()
+            standard_name = clean_string(std_raw)
+            raw_name = clean_string(raw_raw)
 
             # 跳过标准名称和原始名称都为空的行
             if not standard_name and not raw_name:
@@ -115,7 +116,7 @@ class OilLedger:
         if self._df is None or not raw_name:
             return None
 
-        raw_name = str(raw_name).strip()
+        raw_name = clean_string(raw_name)
         if not raw_name:
             return None
 

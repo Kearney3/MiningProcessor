@@ -217,9 +217,9 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
             pass
 
     action_buttons = [
-        theme.primary_btn("保存数据库配置", icon=ft.icons.Icons.SAVE, on_click=save_database_config),
-        theme.secondary_btn("重新加载", icon=ft.icons.Icons.REFRESH, on_click=lambda _: _reload_database_config()),
-        theme.secondary_btn("恢复默认", icon=ft.icons.Icons.RESTART_ALT, on_click=reset_database_config),
+        theme.primary_btn("保存数据库配置", icon=ft.Icons.SAVE, on_click=save_database_config),
+        theme.secondary_btn("重新加载", icon=ft.Icons.REFRESH, on_click=lambda _: _reload_database_config()),
+        theme.secondary_btn("恢复默认", icon=ft.Icons.RESTART_ALT, on_click=reset_database_config),
     ]
 
     # ── 文件关键字配置 ──────────────────────────────────────────
@@ -285,9 +285,9 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
             pass
 
     kw_action_buttons = [
-        theme.primary_btn("保存关键字", icon=ft.icons.Icons.SAVE, on_click=save_keywords),
-        theme.secondary_btn("重新加载", icon=ft.icons.Icons.REFRESH, on_click=lambda _: _reload_keywords()),
-        theme.secondary_btn("恢复默认", icon=ft.icons.Icons.RESTART_ALT, on_click=reset_keywords),
+        theme.primary_btn("保存关键字", icon=ft.Icons.SAVE, on_click=save_keywords),
+        theme.secondary_btn("重新加载", icon=ft.Icons.REFRESH, on_click=lambda _: _reload_keywords()),
+        theme.secondary_btn("恢复默认", icon=ft.Icons.RESTART_ALT, on_click=reset_keywords),
     ]
 
     keywords_card = _make_collapsible(
@@ -373,7 +373,7 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
                 focused_border_color=theme.PRIMARY,
             )
             remove_btn = ft.IconButton(
-                icon=ft.icons.Icons.DELETE_OUTLINE,
+                icon=ft.Icons.DELETE_OUTLINE,
                 tooltip="删除此行",
                 icon_size=18,
                 icon_color=theme.ERROR,
@@ -544,11 +544,11 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
             pass
 
     header_action_buttons = [
-        theme.primary_btn("保存映射", icon=ft.icons.Icons.SAVE, on_click=_save_header_mapping),
-        theme.secondary_btn("重新加载", icon=ft.icons.Icons.REFRESH, on_click=lambda _: _reload_header_mapping()),
-        theme.secondary_btn("恢复默认", icon=ft.icons.Icons.RESTART_ALT, on_click=_reset_header_mapping),
-        theme.secondary_btn("清空配置", icon=ft.icons.Icons.DELETE_SWEEP, on_click=_clear_header_mapping),
-        theme.accent_btn("添加映射", icon=ft.icons.Icons.ADD, on_click=_add_header_row),
+        theme.primary_btn("保存映射", icon=ft.Icons.SAVE, on_click=_save_header_mapping),
+        theme.secondary_btn("重新加载", icon=ft.Icons.REFRESH, on_click=lambda _: _reload_header_mapping()),
+        theme.secondary_btn("恢复默认", icon=ft.Icons.RESTART_ALT, on_click=_reset_header_mapping),
+        theme.secondary_btn("清空配置", icon=ft.Icons.DELETE_SWEEP, on_click=_clear_header_mapping),
+        theme.accent_btn("添加映射", icon=ft.Icons.ADD, on_click=_add_header_row),
     ]
 
     header_mapping_card = _make_collapsible(
