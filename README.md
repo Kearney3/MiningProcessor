@@ -2,7 +2,7 @@
 
 矿山运营 Excel 报表批量处理工具。支持 CLI 命令行和 Flet 桌面 GUI 两种使用方式，自动解析矿山各类生产、油耗、电耗、工时报表，提取结构化数据并输出标准化 Excel。
 
-> **Python** ≥ 3.12 · **依赖管理** [uv](https://docs.astral.sh/uv/) · **GUI 框架** [Flet](https://flet.dev/)
+> **Python** ≥ 3.12（开发环境 3.14） · **依赖管理** [uv](https://docs.astral.sh/uv/) · **GUI 框架** [Flet](https://flet.dev/)
 
 ---
 
@@ -107,7 +107,7 @@ MiningProcessor/
 │   ├── logger.py               # 统一日志（CLI/GUI 共享）
 │   └── excel_*.py              # 各报表处理器
 ├── config.json                 # 持久化配置
-├── tests/                      # pytest 测试（217 个用例）
+├── tests/                      # pytest 测试（233 个用例）
 ├── assets/fonts/               # GUI 字体资源（MiSans 可变字体）
 ├── Notebook/                   # Jupyter 探索性分析笔记本
 ├── docs/                       # 文档目录
@@ -118,7 +118,12 @@ MiningProcessor/
 
 ## 配置说明
 
-`config.json` 包含以下配置项：
+项目采用双配置文件机制：
+
+- **`config.json`**：系统默认配置，提交到 Git，包含设备映射、班次名称等公共设置。
+- **`config.user.json`**：用户覆盖配置（已 gitignore），包含数据库凭据、工作效率表头映射等敏感/个性化设置。`load_config()` 运行时自动合并两者（user 覆盖 default）。
+
+`config.json` 主要配置项：
 
 | 配置项 | 说明 |
 |--------|------|
@@ -128,8 +133,14 @@ MiningProcessor/
 | `shift_mapping` | 班次名称映射（中/蒙文 → 英文） |
 | `output_naming` | 输出文件命名规则（是否含日期、班次） |
 | `worktime_header_apply` | 是否应用自定义表头映射 |
+| `user_config_default` | 用户配置默认值（`database`、`file_keywords`） |
+
+`config.user.json` 主要配置项：
+
+| 配置项 | 说明 |
+|--------|------|
 | `user_config.database` | 数据库连接参数（`db_type/host/port/name/user/password`） |
-| `user_config.worktime_header_mapping` | 工作效率表自定义表头映射 |
+| `user_config.worktime_header_mapping` | 工作效率表自定义表头映射（支持位置模式和模糊匹配） |
 | `user_config.file_keywords` | 各报表文件识别关键字 |
 
 > **注意**：GUI 中"应用当前配置"仅更新运行时内存（`apply_device_load_map()`），"保存配置"才会写回文件（`update_device_load_map()`）。
@@ -164,11 +175,13 @@ MiningProcessor/
 ## 测试
 
 ```bash
-# 运行全部测试（217 个用例）
+# 运行全部测试（233 个用例）
 uv run pytest
 
 # 运行指定测试文件
 uv run pytest tests/test_gui_components.py
+uv run pytest tests/test_config_loader.py
+uv run pytest tests/test_excel_merger.py
 
 # 按关键字过滤
 uv run pytest tests/test_gui_components.py -k config
@@ -177,7 +190,22 @@ uv run pytest tests/test_gui_components.py -k config
 uv run pytest -v
 ```
 
-测试覆盖范围：GUI 组件行为、配置读写落盘、日志线程分发、Excel 合并逻辑、设备台账匹配、油品台账等。
+测试覆盖范围：
+
+| 测试文件 | 覆盖内容 |
+|----------|----------|
+| `test_gui_components.py` | GUI 组件行为、布局、按钮交互 |
+| `test_config_loader.py` | 配置读写落盘、默认值合并、运行时配置 |
+| `test_logic_helpers.py` | GUI 逻辑辅助函数 |
+| `test_excel_merger.py` | Excel 合并与排序 |
+| `test_table_merge.py` | 表内合并聚合 |
+| `test_logger.py` / `test_log_consumer.py` | 日志格式化、队列分发 |
+| `test_ledger_mapping.py` / `test_ledger_match_improvements.py` | 设备台账匹配与后缀 |
+| `test_oil_ledger.py` | 油品台账管理 |
+| `test_user_config_section.py` | 用户配置面板 |
+| `test_production_config_flow.py` | 生产配置流程 |
+| `test_tab_switching.py` | Tab 切换行为 |
+| `test_drag_resize.py` | 拖拽调整 |
 
 ---
 
@@ -196,4 +224,4 @@ uv run flet build windows # Windows
 
 ## 许可证
 
-私有项目。
+MIT License。
