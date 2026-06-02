@@ -10,6 +10,7 @@ from rapidfuzz import fuzz, process
 
 
 from func.logger import get_logger
+from func.string_utils import clean_string
 
 logger = get_logger(__name__)
 
@@ -77,8 +78,8 @@ class EquipmentLedger:
         for _, row in self._df.iterrows():
             std_raw = row.get("标准设备名称")
             raw_raw = row.get("设备名称")
-            standard_name = "" if pd.isna(std_raw) else str(std_raw).strip()
-            raw_name = "" if pd.isna(raw_raw) else str(raw_raw).strip()
+            standard_name = clean_string(std_raw)
+            raw_name = clean_string(raw_raw)
 
             # 跳过标准名称和原始名称都为空的行
             if not standard_name and not raw_name:
@@ -106,11 +107,11 @@ class EquipmentLedger:
             id_raw = row.get("设备编号")
             std_id_raw = row.get("标准设备编号")
             company_raw = row.get("标准公司名称")
-            device_id = "" if pd.isna(id_raw) else str(id_raw).strip()
+            device_id = clean_string(id_raw)
             std_info = {
                 "标准设备名称": standard_name,
-                "标准设备编号": "" if pd.isna(std_id_raw) else str(std_id_raw).strip(),
-                "标准公司名称": "" if pd.isna(company_raw) else str(company_raw).strip(),
+                "标准设备编号": clean_string(std_id_raw),
+                "标准公司名称": clean_string(company_raw),
             }
             if device_id and device_id not in self._id_cache:
                 self._id_cache[device_id] = std_info
@@ -138,7 +139,7 @@ class EquipmentLedger:
         if self._df is None or not raw_name:
             return None
 
-        raw_name = str(raw_name).strip()
+        raw_name = clean_string(raw_name)
         if not raw_name:
             return None
 
@@ -184,7 +185,7 @@ class EquipmentLedger:
         """按设备编号精确匹配，返回标准信息 dict 或 None"""
         if not device_id:
             return None
-        device_id = str(device_id).strip()
+        device_id = clean_string(device_id)
         if not device_id:
             return None
         # 直接匹配
@@ -212,7 +213,7 @@ class EquipmentLedger:
 
         # 其次用名称模糊匹配
         if name:
-            name_result = self.match(str(name))
+            name_result = self.match(clean_string(name))
             if name_result:
                 # 补充编号和公司信息（如果编号缓存中有）
                 std_name = name_result["标准名称"]

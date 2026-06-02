@@ -18,6 +18,7 @@ TEXT_SECONDARY = "#64748B"  # 次要文字
 BORDER = "#E2E8F0"          # 边框/分隔线
 SIDEBAR_BG = "#FFFFFF"      # 侧边栏(与卡片同色)
 SIDEBAR_SELECTED = "#F0FDFA"
+SUCCESS = "#16A34A"         # 成功确认色
 
 # ── 间距 (8px grid) ──────────────────────────────────
 SPACING_XS = 4
@@ -35,6 +36,8 @@ RADIUS_LG = 10
 SIDEBAR_WIDTH = 180
 HEADER_HEIGHT = 48
 
+
+# ── 按钮样式 ─────────────────────────────────────────
 
 def primary_btn(text: str, icon: str = None, **kwargs) -> ft.Button:
     """青色主操作按钮"""
@@ -76,6 +79,19 @@ def accent_btn(text: str, icon: str = None, **kwargs) -> ft.Button:
     )
 
 
+def loading_btn(text: str, icon: str = None, **kwargs) -> ft.Button:
+    """加载态按钮 — 低饱和度青色，视觉上表示正在处理"""
+    return ft.Button(
+        text,
+        icon=icon,
+        style=ft.ButtonStyle(bgcolor="#A7F3D0", color=TEXT_PRIMARY),
+        disabled=True,
+        **kwargs,
+    )
+
+
+# ── 容器与布局 ───────────────────────────────────────
+
 def card_container(content, **kwargs) -> ft.Container:
     """卡片容器样式"""
     defaults = dict(
@@ -92,6 +108,87 @@ def section_title(text: str) -> ft.Text:
     """区域标题"""
     return ft.Text(text, size=18, weight=ft.FontWeight.W_600, color=PRIMARY)
 
+
+def module_card(content_controls: list, label: str = "", spacing: int = 6) -> ft.Container:
+    """带可选小标题的分组卡片，用于数据处理模块等区域。"""
+    controls = []
+    if label:
+        controls.append(
+            ft.Text(label, size=12, weight=ft.FontWeight.W_500, color=TEXT_SECONDARY)
+        )
+    controls.extend(content_controls)
+    return ft.Container(
+        content=ft.Column(controls, spacing=spacing),
+        padding=10,
+        border=ft.Border.all(1, BORDER),
+        border_radius=RADIUS_SM,
+        bgcolor=SURFACE,
+    )
+
+
+def make_collapsible(
+    title: str,
+    subtitle: str,
+    content_controls: list,
+    icon: str,
+    initially_expanded: bool = True,
+) -> ft.Container:
+    """将内容包装为可折叠的卡片区域。"""
+    _open = [initially_expanded]
+
+    body = ft.Container(
+        content=ft.Column(content_controls, spacing=8),
+        padding=ft.Padding.only(left=12, right=12, bottom=12),
+        visible=initially_expanded,
+    )
+
+    chevron = ft.Icon(
+        ft.Icons.EXPAND_LESS if initially_expanded else ft.Icons.EXPAND_MORE,
+        color=TEXT_SECONDARY,
+        size=20,
+    )
+
+    def _toggle(e):
+        _open[0] = not _open[0]
+        body.visible = _open[0]
+        chevron.name = ft.Icons.EXPAND_LESS if _open[0] else ft.Icons.EXPAND_MORE
+        try:
+            body.update()
+            chevron.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    header = ft.Container(
+        content=ft.Row(
+            [
+                ft.Icon(icon, color=PRIMARY, size=18),
+                ft.Column(
+                    [
+                        ft.Text(title, size=14, weight=ft.FontWeight.W_600, color=TEXT_PRIMARY),
+                        ft.Text(subtitle, size=11, color=TEXT_SECONDARY),
+                    ],
+                    spacing=1,
+                    expand=True,
+                ),
+                chevron,
+            ],
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        ),
+        padding=ft.Padding.symmetric(horizontal=12, vertical=10),
+        on_click=_toggle,
+        ink=True,
+    )
+
+    return ft.Container(
+        content=ft.Column([header, body], spacing=0),
+        border=ft.Border.all(1, BORDER),
+        border_radius=RADIUS_MD,
+        bgcolor=SURFACE,
+        clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+    )
+
+
+# ── 侧边栏 ───────────────────────────────────────────
 
 def sidebar_item(label: str, icon: str, selected: bool = False) -> ft.Container:
     """侧边栏导航项"""
@@ -111,4 +208,17 @@ def sidebar_item(label: str, icon: str, selected: bool = False) -> ft.Container:
         padding=ft.Padding.symmetric(horizontal=SPACING_MD, vertical=10),
         on_click=None,  # 由外部绑定
         ink=True,
+    )
+
+
+def sidebar_group_label(text: str) -> ft.Container:
+    """侧边栏分组标签"""
+    return ft.Container(
+        content=ft.Text(
+            text,
+            size=11,
+            weight=ft.FontWeight.W_600,
+            color=TEXT_SECONDARY,
+        ),
+        padding=ft.Padding.only(left=SPACING_MD + 4, top=SPACING_SM, bottom=SPACING_XS),
     )

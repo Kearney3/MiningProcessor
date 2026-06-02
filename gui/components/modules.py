@@ -13,6 +13,15 @@ except ImportError:
     import gui.theme as theme
 
 
+def _show_path_confirm(text_field: ft.TextField):
+    """在路径输入框右侧显示绿色确认勾。"""
+    text_field.suffix = ft.Icon(ft.Icons.CHECK_CIRCLE, color=theme.SUCCESS, size=20)
+    try:
+        text_field.update()
+    except (RuntimeError, AttributeError):
+        pass
+
+
 def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     """创建数据处理模块区域，返回 (container, module_refs)"""
 
@@ -28,7 +37,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         read_only=False,
         color=theme.TEXT_PRIMARY,
         suffix=ft.IconButton(
-            icon=ft.icons.Icons.FOLDER_OPEN,
+            icon=ft.Icons.FOLDER_OPEN,
             tooltip="浏览",
         ),
     )
@@ -36,14 +45,9 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         label="年份",
         width=125,
         options=[ft.dropdown.Option(str(y)) for y in range(2015, 2040)],
-        value="2025",
+        value=current_year,
     )
-    fuel_btn = ft.Button(
-        "处理",
-        icon=ft.icons.Icons.PLAY_ARROW,
-        disabled=False,
-        style=ft.ButtonStyle(bgcolor=theme.PRIMARY, color="#FFFFFF"),
-    )
+    fuel_btn = theme.primary_btn("处理", icon=ft.Icons.PLAY_ARROW, disabled=False)
 
     # --- Production ---
     prod_path = ft.TextField(
@@ -53,29 +57,16 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         read_only=False,
         color=theme.TEXT_PRIMARY,
     )
-    prod_file_btn = ft.Button(
-        "选文件",
-        icon=ft.icons.Icons.UPLOAD_FILE,
-        style=ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_PRIMARY),
-    )
-    prod_folder_btn = ft.Button(
-        "选文件夹",
-        icon=ft.icons.Icons.FOLDER_OPEN,
-        style=ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_PRIMARY),
-    )
+    prod_file_btn = theme.secondary_btn("选文件", icon=ft.Icons.UPLOAD_FILE)
+    prod_folder_btn = theme.secondary_btn("选文件夹", icon=ft.Icons.FOLDER_OPEN)
     prod_raw_start = ft.TextField(
         label="表头起始行",
         width=100,
-        value="6",
-        hint_text="6",
+        value="-1",
+        hint_text="-1",
         color=theme.TEXT_PRIMARY,
     )
-    prod_btn = ft.Button(
-        "处理",
-        icon=ft.icons.Icons.PLAY_ARROW,
-        disabled=False,
-        style=ft.ButtonStyle(bgcolor=theme.PRIMARY, color="#FFFFFF"),
-    )
+    prod_btn = theme.primary_btn("处理", icon=ft.Icons.PLAY_ARROW, disabled=False)
 
     # --- Electrical ---
     elec_path = ft.TextField(
@@ -85,7 +76,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         read_only=False,
         color=theme.TEXT_PRIMARY,
         suffix=ft.IconButton(
-            icon=ft.icons.Icons.FOLDER_OPEN,
+            icon=ft.Icons.FOLDER_OPEN,
             tooltip="浏览",
         ),
     )
@@ -93,14 +84,9 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         label="年份",
         width=125,
         options=[ft.dropdown.Option(str(y)) for y in range(2015, 2040)],
-        value="2025",
+        value=current_year,
     )
-    elec_btn = ft.Button(
-        "处理",
-        icon=ft.icons.Icons.PLAY_ARROW,
-        disabled=False,
-        style=ft.ButtonStyle(bgcolor=theme.PRIMARY, color="#FFFFFF"),
-    )
+    elec_btn = theme.primary_btn("处理", icon=ft.Icons.PLAY_ARROW, disabled=False)
 
     # --- Work time ---
     work_path = ft.TextField(
@@ -110,7 +96,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         read_only=False,
         color=theme.TEXT_PRIMARY,
         suffix=ft.IconButton(
-            icon=ft.icons.Icons.FOLDER_OPEN,
+            icon=ft.Icons.FOLDER_OPEN,
             tooltip="浏览",
         ),
     )
@@ -168,44 +154,40 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         def update(self):
             self._row.update()
 
-    work_header_mode = _ModeSelector(_work_mode_state, work_header_mode_row)
-
-    work_header_fuzzy = ft.Checkbox(
-        label="模糊匹配",
-        value=False,
-        visible=False,
-        tooltip="按列名匹配时启用模糊匹配（容错错别字）",
-    )
-
     def _update_work_chips():
-        is_pos = _work_mode_state[0] == "position"
-        _work_chip_position.bgcolor = theme.PRIMARY if is_pos else theme.SURFACE_HIGH
-        _work_chip_position.content.color = "#FFFFFF" if is_pos else theme.TEXT_SECONDARY
-        _work_chip_name.bgcolor = theme.PRIMARY if not is_pos else theme.SURFACE_HIGH
-        _work_chip_name.content.color = "#FFFFFF" if not is_pos else theme.TEXT_SECONDARY
-        work_header_fuzzy.visible = not is_pos
+        is_position = _work_mode_state[0] == "position"
+        _work_chip_position.bgcolor = theme.PRIMARY if is_position else theme.SURFACE_HIGH
+        _work_chip_position.content.color = "#FFFFFF" if is_position else theme.TEXT_SECONDARY
+        _work_chip_name.bgcolor = theme.PRIMARY if not is_position else theme.SURFACE_HIGH
+        _work_chip_name.content.color = "#FFFFFF" if not is_position else theme.TEXT_SECONDARY
+        work_header_fuzzy.visible = not is_position
         try:
             work_header_mode_row.update()
             work_header_fuzzy.update()
         except (RuntimeError, AttributeError):
             pass
 
-    def _on_work_chip_position(e):
+    def _on_chip_position(e):
         _work_mode_state[0] = "position"
         _update_work_chips()
 
-    def _on_work_chip_name(e):
+    def _on_chip_name(e):
         _work_mode_state[0] = "name"
         _update_work_chips()
 
-    _work_chip_position.on_click = _on_work_chip_position
-    _work_chip_name.on_click = _on_work_chip_name
-    work_btn = ft.Button(
-        "处理",
-        icon=ft.icons.Icons.PLAY_ARROW,
-        disabled=False,
-        style=ft.ButtonStyle(bgcolor=theme.PRIMARY, color="#FFFFFF"),
+    _work_chip_position.on_click = _on_chip_position
+    _work_chip_name.on_click = _on_chip_name
+
+    work_header_mode = _ModeSelector(_work_mode_state, work_header_mode_row)
+
+    work_header_fuzzy = ft.Checkbox(
+        label="模糊匹配",
+        value=False,
+        tooltip="按列名匹配时启用模糊匹配（允许列名部分匹配）",
+        visible=False,
     )
+
+    work_btn = theme.primary_btn("处理", icon=ft.Icons.PLAY_ARROW, disabled=False)
 
     # --- Excel Merger ---
     merge_path = ft.TextField(
@@ -215,7 +197,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         read_only=False,
         color=theme.TEXT_PRIMARY,
         suffix=ft.IconButton(
-            icon=ft.icons.Icons.FOLDER_OPEN,
+            icon=ft.Icons.FOLDER_OPEN,
             tooltip="浏览",
         ),
     )
@@ -230,12 +212,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         value=False,
         tooltip="勾选后，时间列将去除时分秒，格式为 YYYY-MM-DD",
     )
-    merge_btn = ft.Button(
-        "合并",
-        icon=ft.icons.Icons.MERGE_TYPE,
-        disabled=False,
-        style=ft.ButtonStyle(bgcolor=theme.PRIMARY, color="#FFFFFF"),
-    )
+    merge_btn = theme.primary_btn("合并", icon=ft.Icons.MERGE_TYPE, disabled=False)
 
     # --- 排序配置列表（Excel 合并用） ---
     sort_configs_state: list[dict] = []
@@ -298,13 +275,13 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                 sort_rules_column.update()
 
             up_btn = ft.IconButton(
-                icon=ft.icons.Icons.ARROW_UPWARD, tooltip="上移", on_click=move_up, icon_size=16
+                icon=ft.Icons.ARROW_UPWARD, tooltip="上移", on_click=move_up, icon_size=16
             )
             down_btn = ft.IconButton(
-                icon=ft.icons.Icons.ARROW_DOWNWARD, tooltip="下移", on_click=move_down, icon_size=16
+                icon=ft.Icons.ARROW_DOWNWARD, tooltip="下移", on_click=move_down, icon_size=16
             )
             del_btn = ft.IconButton(
-                icon=ft.icons.Icons.DELETE, tooltip="删除", on_click=remove_row, icon_size=16
+                icon=ft.Icons.DELETE, tooltip="删除", on_click=remove_row, icon_size=16
             )
 
             row_container = ft.Container(
@@ -333,13 +310,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         sort_configs_state.append({"column": "", "ascending": True})
         build_sort_rules()
 
-    add_sort_btn = ft.Button(
-        "添加排序条件",
-        icon=ft.icons.Icons.ADD,
-        on_click=add_sort_config,
-        height=36,
-        style=ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_PRIMARY),
-    )
+    add_sort_btn = theme.secondary_btn("添加排序条件", icon=ft.Icons.ADD, on_click=add_sort_config, height=36)
 
     async def on_fuel_browse(e: ft.ControlEvent):
         picker = ft.FilePicker()
@@ -351,7 +322,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         if files:
             fuel_path.value = files[0].path
             _update_last_directory(files[0].path)
-            fuel_path.update()
+            _show_path_confirm(fuel_path)
             fuel_btn.disabled = False
             fuel_btn.update()
 
@@ -365,7 +336,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         if files:
             prod_path.value = files[0].path
             _update_last_directory(files[0].path)
-            prod_path.update()
+            _show_path_confirm(prod_path)
             prod_btn.disabled = False
             prod_btn.update()
 
@@ -378,7 +349,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         if path:
             prod_path.value = path
             _last_directory[0] = path
-            prod_path.update()
+            _show_path_confirm(prod_path)
             prod_btn.disabled = False
             prod_btn.update()
 
@@ -392,7 +363,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         if files:
             elec_path.value = files[0].path
             _update_last_directory(files[0].path)
-            elec_path.update()
+            _show_path_confirm(elec_path)
             elec_btn.disabled = False
             elec_btn.update()
 
@@ -406,7 +377,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         if files:
             work_path.value = files[0].path
             _update_last_directory(files[0].path)
-            work_path.update()
+            _show_path_confirm(work_path)
             work_btn.disabled = False
             work_btn.update()
 
@@ -419,7 +390,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         if path:
             merge_path.value = path
             _last_directory[0] = path
-            merge_path.update()
+            _show_path_confirm(merge_path)
             merge_btn.disabled = False
             merge_btn.update()
 
@@ -466,15 +437,6 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
 
     work_header_toggle.on_change = _on_header_toggle_change
 
-    def _module_card(content_controls: list, spacing: int = 6) -> ft.Container:
-        return ft.Container(
-            content=ft.Column(content_controls, spacing=spacing),
-            padding=10,
-            border=ft.Border.all(1, theme.BORDER),
-            border_radius=theme.RADIUS_SM,
-            bgcolor=theme.SURFACE,
-        )
-
     container = ft.Container(
         content=ft.Column(
             [
@@ -484,16 +446,16 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                     size=13,
                     color=theme.TEXT_SECONDARY,
                 ),
-                _module_card([
+                theme.module_card([
                     ft.Row([fuel_path, fuel_year, fuel_btn], spacing=8),
                 ]),
-                _module_card([
+                theme.module_card([
                     ft.Row([prod_path, prod_file_btn, prod_folder_btn, prod_raw_start, prod_btn], spacing=8),
                 ]),
-                _module_card([
+                theme.module_card([
                     ft.Row([elec_path, elec_year, elec_btn], spacing=8),
                 ]),
-                _module_card([
+                theme.module_card([
                     ft.Row([work_path, work_year, work_month, work_btn], spacing=6),
                     ft.Row(
                         [work_header_toggle, work_header_mode_row, work_header_fuzzy],
@@ -502,7 +464,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                     ),
                     header_hint,
                 ]),
-                _module_card([
+                theme.module_card([
                     ft.Row([merge_path, merge_keyword, merge_strip_time, merge_btn], spacing=8),
                     ft.Text("排序配置（可选，留空则自动按第一个时间列排序）", size=12,
                             color=theme.TEXT_SECONDARY),

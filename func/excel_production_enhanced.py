@@ -10,18 +10,19 @@ import os
 import re
 
 from func import config_loader
+from func.string_utils import clean_string
 from func.logger import get_logger
 
 logger = get_logger(__name__)
 
 
 class MiningDataProcessor:
-    def __init__(self, version: str = "new", raw_start: int = 6, device_load_map: dict[str, int] | None = None,
+    def __init__(self, version: str = "new", raw_start: int = -1, device_load_map: dict[str, int] | None = None,
                  target_text: str = "Мото цагийн заалт"):
         """
         初始化数据处理器
         :param version: 版本，"new"或"old"
-        :param raw_start: 开始行号，默认6
+        :param raw_start: 开始行号，默认-1
         :param device_load_map: 自定义设备装载量映射
         :param target_text: 目标文本，默认"Мото цагийн заалт"
         """
@@ -73,7 +74,7 @@ class MiningDataProcessor:
         if pd.isna(truck_name):
             return 0
 
-        truck_name_upper = str(truck_name).upper()
+        truck_name_upper = clean_string(truck_name).upper()
         for model, capacity in self.load_map.items():
             if model.upper() in truck_name_upper:
                 return capacity
@@ -81,18 +82,7 @@ class MiningDataProcessor:
 
     def safe_str(self, val):
         """安全转字符串"""
-        try:
-            if isinstance(val, pd.Series):
-                val = val.iloc[0]
-            if pd.isna(val):
-                return ""
-        except Exception:
-            # print(f"异常：\n{val}")
-            # 删除换行符
-            val = str(val).replace("\n", "")
-            # print(f"转换后：{str(val).strip()}")
-        # print(f"当前列名: {val}")
-        return str(val).strip()
+        return clean_string(val)
 
     def safe_number(self, val, default=0):
         """

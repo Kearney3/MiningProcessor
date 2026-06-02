@@ -42,14 +42,25 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
 
     config_page_label = ft.Text("0 / 0", size=12, color=theme.TEXT_SECONDARY)
     config_prev_btn = ft.IconButton(
-        icon=ft.icons.Icons.CHEVRON_LEFT, tooltip="上一页", icon_size=18, disabled=True,
+        icon=ft.Icons.CHEVRON_LEFT, tooltip="上一页", icon_size=18, disabled=True,
     )
     config_next_btn = ft.IconButton(
-        icon=ft.icons.Icons.CHEVRON_RIGHT, tooltip="下一页", icon_size=18, disabled=True,
+        icon=ft.Icons.CHEVRON_RIGHT, tooltip="下一页", icon_size=18, disabled=True,
     )
     config_pagination = ft.Row(
         [config_prev_btn, config_page_label, config_next_btn],
         spacing=4, alignment=ft.MainAxisAlignment.CENTER,
+    )
+
+    _config_empty_state = ft.Column(
+        [
+            ft.Icon(ft.Icons.INVENTORY_2_OUTLINED, size=48, color=ft.Colors.GREY_300),
+            ft.Text("暂无设备配置", size=14, color=theme.TEXT_SECONDARY, weight=ft.FontWeight.W_500),
+            ft.Text("点击「添加设备」或「导入配置」开始", size=12, color=ft.Colors.GREY_400),
+        ],
+        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        alignment=ft.MainAxisAlignment.CENTER,
+        spacing=8,
     )
 
     def _config_total_pages():
@@ -114,6 +125,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
             )
 
         config_table.rows = rows
+        _config_empty_state.visible = not bool(rows)
         _update_config_page_controls()
         page.update()
 
@@ -232,8 +244,30 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
     def add_device(e: ft.ControlEvent):
         append_row()
 
-    def remove_selected(e: ft.ControlEvent):
+    def _do_remove(e=None):
+        page.pop_dialog()
         remove_selected_rows()
+        _log_message(log, "已删除选中设备配置")
+
+    confirm_dialog = ft.AlertDialog(
+        modal=True,
+        title=ft.Text("确认删除"),
+        content=ft.Text("确定要删除选中的设备配置吗？此操作不可撤销。"),
+        actions=[
+            ft.TextButton("取消", on_click=lambda e: page.pop_dialog()),
+            ft.TextButton("确认删除", on_click=_do_remove,
+                          style=ft.ButtonStyle(color=theme.ERROR)),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )
+
+    def remove_selected(e: ft.ControlEvent):
+        selected_count = sum(1 for row in config_state if row["selected"])
+        if selected_count == 0:
+            _log_message(log, "未选中任何设备", level=logging.WARNING)
+            return
+        confirm_dialog.content = ft.Text(f"确定要删除选中的 {selected_count} 条设备配置吗？此操作不可撤销。")
+        page.show_dialog(confirm_dialog)
 
     async def import_config(e: ft.ControlEvent):
         picker = ft.FilePicker()
@@ -264,18 +298,22 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
         except Exception as ex:
             _log_message(log, f"导入配置失败: {ex}", level=logging.ERROR)
 
-    action_buttons = [
-        theme.primary_btn("添加设备", icon=ft.icons.Icons.ADD, on_click=add_device),
-        theme.secondary_btn("导入配置", icon=ft.icons.Icons.FILE_UPLOAD, on_click=import_config),
-        theme.secondary_btn("保存配置", icon=ft.icons.Icons.SAVE, on_click=save_config),
-        ft.Container(width=16),
-        theme.accent_btn("应用当前配置", icon=ft.icons.Icons.CHECK_CIRCLE, on_click=apply_current_config),
-        theme.secondary_btn("恢复默认", icon=ft.icons.Icons.RESTART_ALT, on_click=restore_default_config),
-        ft.Container(width=16),
-        theme.destructive_btn("删除选中", icon=ft.icons.Icons.DELETE, on_click=remove_selected),
-    ]
+    _btn_add = theme.primary_btn("添加设备", icon=ft.Icons.ADD, on_click=add_device)
+    _btn_import = theme.secondary_btn("导入配置", icon=ft.Icons.FILE_UPLOAD, on_click=import_config)
+    _btn_save = theme.secondary_btn("保存配置", icon=ft.Icons.SAVE, on_click=save_config)
+    _btn_apply = theme.accent_btn("应用当前配置", icon=ft.Icons.CHECK_CIRCLE, on_click=apply_current_config)
+    _btn_reset = theme.secondary_btn("恢复默认", icon=ft.Icons.RESTART_ALT, on_click=restore_default_config)
+    _btn_delete = theme.destructive_btn("删除选中", icon=ft.Icons.DELETE, on_click=remove_selected)
+
+    action_buttons = [_btn_add, _btn_import, _btn_save, _btn_apply, _btn_reset, _btn_delete]
     action_button_rows = [
-        ft.Row(action_buttons, spacing=8, wrap=True, alignment=ft.MainAxisAlignment.START),
+        ft.Column(
+            [
+                ft.Row([_btn_add, _btn_import, _btn_save], spacing=8),
+                ft.Row([_btn_apply, _btn_reset, _btn_delete], spacing=8),
+            ],
+            spacing=6,
+        ),
     ]
 
     container = ft.Container(
@@ -284,7 +322,13 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
                 theme.section_title("设备装载量配置"),
                 *action_button_rows,
                 ft.Container(
-                    content=ft.ListView([config_table], expand=True, spacing=5),
+                    content=ft.Stack(
+                        [
+                            ft.ListView([config_table], expand=True, spacing=5),
+                            _config_empty_state,
+                        ],
+                        expand=True,
+                    ),
                     border=ft.Border.all(1, theme.BORDER),
                     border_radius=theme.RADIUS_MD,
                     padding=4,

@@ -266,6 +266,26 @@ def main(page: ft.Page):
             _update_last_directory(path)
         _export_logs_to_path(path)
 
+    clear_button = log_refs["clear_button"]
+    scroll_bottom_button = log_refs["scroll_bottom_button"]
+
+    def _clear_logs(e=None):
+        log_list.controls.clear()
+        with log_records_lock:
+            log_records.clear()
+        try:
+            log_list.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    def _scroll_to_bottom(e=None):
+        try:
+            page.run_task(log_list.scroll_to, offset=-1)
+        except (RuntimeError, AttributeError):
+            pass
+
+    clear_button.on_click = _clear_logs
+    scroll_bottom_button.on_click = _scroll_to_bottom
     level_filter.on_select = _apply_filters
     export_button.on_click = _export_logs
     resize_handle.on_vertical_drag_start = _on_vertical_drag_start
@@ -368,16 +388,21 @@ def main(page: ft.Page):
     if oil_ledger_refs.get("load_from_cache"):
         oil_ledger_refs["load_from_cache"]()
 
-    # ---- 侧边栏导航 ----
-    nav_items_data = [
-        ("数据处理", ft.Icons.PLAY_ARROW, "modules"),
-        ("批量处理", ft.Icons.BOLT, "batch"),
-        ("台账匹配", ft.Icons.MANAGE_SEARCH, "ledger_match"),
-        ("设备台账", ft.Icons.INVENTORY_2, "ledger"),
-        ("油品台账", ft.Icons.OIL_BARREL, "oil_ledger"),
-        ("装载量配置", ft.Icons.TUNE, "config"),
-        ("用户配置", ft.Icons.SETTINGS, "user_config"),
+    # ---- 侧边栏导航（分组） ----
+    nav_groups = [
+        ("工作区", [
+            ("数据处理", ft.Icons.PLAY_ARROW, "modules"),
+            ("批量处理", ft.Icons.BOLT, "batch"),
+            ("台账匹配", ft.Icons.MANAGE_SEARCH, "ledger_match"),
+        ]),
+        ("管理", [
+            ("设备台账", ft.Icons.INVENTORY_2, "ledger"),
+            ("油品台账", ft.Icons.OIL_BARREL, "oil_ledger"),
+            ("装载量配置", ft.Icons.TUNE, "config"),
+            ("用户配置", ft.Icons.SETTINGS, "user_config"),
+        ]),
     ]
+    nav_items_data = [item for _, items in nav_groups for item in items]
 
     # Content pages
     pages = {
@@ -400,15 +425,19 @@ def main(page: ft.Page):
             _update_sidebar()
         return handler
 
-    # Build sidebar nav items
+    # Build sidebar nav items with group labels
     sidebar_nav_items = []
-    for label, icon, key in nav_items_data:
-        item = theme.sidebar_item(label, icon, selected=(key == "modules"))
-        item.on_click = _select_page(key)
-        sidebar_nav_items.append(item)
+    _nav_item_map: dict[str, ft.Container] = {}
+    for group_label, items in nav_groups:
+        sidebar_nav_items.append(theme.sidebar_group_label(group_label))
+        for label, icon, key in items:
+            item = theme.sidebar_item(label, icon, selected=(key == "modules"))
+            item.on_click = _select_page(key)
+            sidebar_nav_items.append(item)
+            _nav_item_map[key] = item
 
     def _update_sidebar():
-        for (_, _, key), item in zip(nav_items_data, sidebar_nav_items):
+        for key, item in _nav_item_map.items():
             is_selected = (key == current_nav["key"])
             row = item.content
             icon_ctrl = row.controls[0]

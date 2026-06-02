@@ -22,10 +22,26 @@ from gui.components.common import _log_message
 # ---------------------------------------------------------------------------
 # 公共工具
 # ---------------------------------------------------------------------------
+# 保存按钮原始样式，以便恢复
+_btn_original_styles: dict[int, ft.ButtonStyle] = {}
+
+_LOADING_STYLE = ft.ButtonStyle(bgcolor="#CBD5E1", color="#64748B")
+
+
 def set_btn_state(btn: ft.Button, enabled: bool, label: str = "处理"):
-    """设置按钮状态"""
+    """设置按钮状态：禁用时置灰并显示加载态文字，恢复时还原原始样式"""
     btn.disabled = not enabled
     btn.text = label
+    if not enabled:
+        # 保存原始样式，切换为置灰样式
+        if id(btn) not in _btn_original_styles:
+            _btn_original_styles[id(btn)] = btn.style
+        btn.style = _LOADING_STYLE
+    else:
+        # 恢复原始样式
+        original = _btn_original_styles.pop(id(btn), None)
+        if original:
+            btn.style = original
     btn.update()
 
 
@@ -269,7 +285,7 @@ async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=
         _log_message(log, "请先选择 Excel 文件或文件夹", level=logging.WARNING)
         return
 
-    raw_start_text = (prod_refs["raw_start"].value or "6").strip()
+    raw_start_text = (prod_refs["raw_start"].value or "-1").strip()
     try:
         raw_start = int(raw_start_text)
         if raw_start != -1 and raw_start < 1:
@@ -364,7 +380,7 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
 
     year = int(batch_refs["year"].value)
     month = int(batch_refs["month"].value)
-    raw_start = -1 if batch_refs["auto_detect"].value else 6
+    raw_start = -1 if batch_refs["auto_detect"].value else -1
     merge_output = bool(batch_refs["merge"].value)
 
     # 表内合并选项
@@ -407,12 +423,12 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
         should_continue = [True]
 
         def _on_confirm(e):
-            page.close(dialog)
+            page.pop_dialog()
             should_continue[0] = True
             event.set()
 
         def _on_cancel(e):
-            page.close(dialog)
+            page.pop_dialog()
             should_continue[0] = False
             event.set()
 
@@ -431,7 +447,7 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
-        page.open(dialog)
+        page.show_dialog(dialog)
 
         # 等待用户操作（带超时防死锁）
         confirmed = await asyncio.to_thread(event.wait, 300)

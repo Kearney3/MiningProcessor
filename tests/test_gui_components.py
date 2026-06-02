@@ -131,6 +131,8 @@ class StubLogView:
         self.log_list = types.SimpleNamespace(controls=[], auto_scroll=True, spacing=4, update=lambda: None)
         self.level_filter = types.SimpleNamespace(value="ALL", on_select=None)
         self.export_button = types.SimpleNamespace(on_click=None)
+        self.clear_button = types.SimpleNamespace(on_click=None)
+        self.scroll_bottom_button = types.SimpleNamespace(on_click=None)
         self.resize_handle = types.SimpleNamespace(on_vertical_drag_update=None)
         self.list_container = types.SimpleNamespace(height=200, update=lambda: None)
         self._is_at_bottom = [True]
@@ -151,6 +153,8 @@ def make_stub_log_view():
     refs = {
         "level_filter": view.level_filter,
         "export_button": view.export_button,
+        "clear_button": view.clear_button,
+        "scroll_bottom_button": view.scroll_bottom_button,
         "resize_handle": view.resize_handle,
         "list_container": view.list_container,
         "log_list": view.log_list,
@@ -439,10 +443,13 @@ def test_config_action_buttons_use_consistent_widths():
     assert all(button is not None for button in refs["action_buttons"])
 
 
-def test_config_action_button_rows_are_left_aligned():
+def test_config_action_button_rows_are_two_rows():
     _, refs = components.create_config_section(DummyPage(), lambda message: None)
 
-    assert all(row.alignment == components.ft.MainAxisAlignment.START for row in refs["action_button_rows"])
+    # 2 行布局：action_button_rows[0] 是 Column 包含两个 Row
+    col = refs["action_button_rows"][0]
+    assert isinstance(col, components.ft.Column)
+    assert len(col.controls) == 2
 
 
 

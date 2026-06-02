@@ -34,7 +34,7 @@ def create_log_view(height: int = 300) -> tuple[ft.Container, "LogViewRefs"]:
     )
     level_filter = ft.Dropdown(
         label="级别",
-        width=200,
+        width=130,
         dense=True,
         content_padding=ft.Padding.symmetric(horizontal=8, vertical=6),
         value="ALL",
@@ -48,8 +48,18 @@ def create_log_view(height: int = 300) -> tuple[ft.Container, "LogViewRefs"]:
         ],
     )
     export_button = ft.IconButton(
-        icon=ft.icons.Icons.DOWNLOAD,
+        icon=ft.Icons.DOWNLOAD,
         tooltip="导出日志",
+        icon_size=18,
+    )
+    clear_button = ft.IconButton(
+        icon=ft.Icons.DELETE_SWEEP,
+        tooltip="清空日志",
+        icon_size=18,
+    )
+    scroll_bottom_button = ft.IconButton(
+        icon=ft.Icons.VERTICAL_ALIGN_BOTTOM,
+        tooltip="滚动到底部",
         icon_size=18,
     )
     resize_handle = ft.GestureDetector(
@@ -73,7 +83,7 @@ def create_log_view(height: int = 300) -> tuple[ft.Container, "LogViewRefs"]:
         mouse_cursor=ft.MouseCursor.RESIZE_UP_DOWN,
     )
     toolbar = ft.Row(
-        [level_filter, export_button],
+        [level_filter, export_button, clear_button, scroll_bottom_button],
         spacing=4,
         wrap=False,
         alignment=ft.MainAxisAlignment.START,
@@ -98,6 +108,8 @@ def create_log_view(height: int = 300) -> tuple[ft.Container, "LogViewRefs"]:
         "toolbar": toolbar,
         "level_filter": level_filter,
         "export_button": export_button,
+        "clear_button": clear_button,
+        "scroll_bottom_button": scroll_bottom_button,
         "resize_handle": resize_handle,
         "list_container": list_container,
         "log_list": log_list,

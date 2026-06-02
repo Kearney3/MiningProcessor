@@ -4,6 +4,7 @@ import argparse
 
 # 假设 func.logger 已经正确配置
 from func.logger import get_logger
+from func.string_utils import clean_string
 
 logger = get_logger(__name__)
 
@@ -34,7 +35,7 @@ def _apply_header_mapping(df: pd.DataFrame, mapping_config: dict) -> pd.DataFram
     if mode == "position":
         for entry in entries:
             idx = entry.get("index")
-            new_name = (entry.get("new") or "").strip()
+            new_name = clean_string(entry.get("new"))
             if idx is None or not new_name:
                 continue
             try:
@@ -44,14 +45,14 @@ def _apply_header_mapping(df: pd.DataFrame, mapping_config: dict) -> pd.DataFram
             # 用户界面使用 1-based 索引，内部转换为 0-based
             if 1 <= idx <= len(cols):
                 idx = idx - 1
-                old_name = str(cols[idx])
+                old_name = clean_string(cols[idx])
                 rename_map[old_name] = new_name
     else:
         # name 模式
         orig_to_new: dict[str, str] = {}
         for entry in entries:
-            orig = (entry.get("original") or "").strip()
-            new_name = (entry.get("new") or "").strip()
+            orig = clean_string(entry.get("original"))
+            new_name = clean_string(entry.get("new"))
             if orig and new_name:
                 orig_to_new[orig] = new_name
 
@@ -59,7 +60,7 @@ def _apply_header_mapping(df: pd.DataFrame, mapping_config: dict) -> pd.DataFram
             try:
                 from rapidfuzz import fuzz
                 for col in cols:
-                    col_str = str(col).strip()
+                    col_str = clean_string(col)
                     best_score = 0
                     best_target = None
                     for orig, new_name in orig_to_new.items():
@@ -72,12 +73,12 @@ def _apply_header_mapping(df: pd.DataFrame, mapping_config: dict) -> pd.DataFram
             except ImportError:
                 logger.warning("rapidfuzz 未安装，回退到精确匹配")
                 for col in cols:
-                    col_str = str(col).strip()
+                    col_str = clean_string(col)
                     if col_str in orig_to_new:
                         rename_map[col] = orig_to_new[col_str]
         else:
             for col in cols:
-                col_str = str(col).strip()
+                col_str = clean_string(col)
                 if col_str in orig_to_new:
                     rename_map[col] = orig_to_new[col_str]
 
@@ -115,7 +116,7 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
 
     for sheet_name in xls.sheet_names:
         # 确保sheet名称是数字（代表日期）
-        if not sheet_name.strip().isdigit():
+        if not clean_string(sheet_name).isdigit():
             logger.warning(f"跳过非日期Sheet: {sheet_name}")
             continue
 
@@ -123,7 +124,7 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
         df_raw = pd.read_excel(xls, sheet_name=sheet_name, header=None)
 
         # 1. 确定日期字符串 (YYYY-MM-DD)
-        day = int(sheet_name.strip())
+        day = int(clean_string(sheet_name))
         date_str = f"{year}-{month:02d}-{day:02d}"
         day_list.append(day)
 
@@ -132,14 +133,14 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
         header_row = df_raw.iloc[1]
 
         # 找出表头中有效的列（非NaN且非空白）用于比对
-        valid_mask = header_row.notna() & (header_row.astype(str).str.strip() != '')
+        valid_mask = header_row.notna() & (header_row.apply(lambda x: clean_string(x)) != '')
         valid_cols = valid_mask[valid_mask].index.tolist()
-        valid_headers = header_row[valid_cols].astype(str).str.strip().tolist()
+        valid_headers = header_row[valid_cols].apply(clean_string).tolist()
 
         split_idx = -1
         # 从第3行（index 2）开始向下遍历，寻找再次出现的表头
         for idx in range(2, len(df_raw)):
-            current_row_vals = df_raw.iloc[idx][valid_cols].astype(str).str.strip().tolist()
+            current_row_vals = df_raw.iloc[idx][valid_cols].apply(clean_string).tolist()
             # 如果当前行的有效列内容与提取的表头
             if current_row_vals[0] == valid_headers[0]:
                 split_idx = idx

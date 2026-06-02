@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 
 from func.logger import get_logger
+from func.string_utils import clean_string
 
 logger = get_logger(__name__)
 
@@ -43,7 +44,7 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False):
         # 3. 预解析班次位置
         col_to_shift = {}
         for col_idx in range(header_rows.shape[1]):
-            h4_val = str(header_rows.iloc[2, col_idx]).strip()
+            h4_val = clean_string(header_rows.iloc[2, col_idx])
             if "白班" in h4_val or "өдөр" in h4_val.lower():
                 col_to_shift[col_idx] = "Day"
             elif "夜班" in h4_val or "шөнө" in h4_val.lower():
@@ -55,10 +56,10 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False):
         for idx in range(header_rows.shape[1]):
             if stop_signal: break
 
-            h2 = str(header_rows.iloc[0, idx]).strip()  # 日期
-            h3 = str(header_rows.iloc[1, idx]).strip()  # 班组/关键字
-            h4 = str(header_rows.iloc[2, idx]).strip()  # 小时数或班次名
-            h5 = str(header_rows.iloc[3, idx]).strip()  # 油品
+            h2 = clean_string(header_rows.iloc[0, idx])  # 日期
+            h3 = clean_string(header_rows.iloc[1, idx])  # 班组/关键字
+            h4 = clean_string(header_rows.iloc[2, idx])  # 小时数或班次名
+            h5 = clean_string(header_rows.iloc[3, idx])  # 油品
             # print(f"列索引: {idx}, h2: {h2}, h3: {h3}, h4: {h4}, h5: {h5}")
             if "按照班子柴油准备" in h3:
                 stop_signal = True
@@ -121,11 +122,13 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False):
         for _, row in data_body.iterrows():
             device_name = row[1]
             device_id = row[2]
-            if pd.isna(device_id) or str(device_id).strip() == "": continue
+            device_id = clean_string(device_id)
+            if not device_id: continue
 
             if device_name in ["HITACHI EX2600"]:
                 device_name = f"{device_name} #{device_id}"
-            if not device_name or pd.isna(device_name) or str(device_name).strip() == "":
+            device_name = clean_string(device_name)
+            if not device_name:
                 continue
 
             current_row_initial_val = np.nan
@@ -148,7 +151,7 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False):
                         "fuel_type"] != "nan":
                         fuel_data_list.append({
                             "日期": dt, "班次": shift, "设备名称": device_name,
-                            "设备编号": device_id, "油品种类": col_info["fuel_type"], "油品消耗": val
+                            "设备编号": device_id, "油品种类": clean_string(col_info["fuel_type"]), "油品消耗": val
                         })
                         # print(f"设备: {device_name}, 日期: {dt}, 班次: {shift}, 油品: {col_info['fuel_type']}, 消耗: {val}, type:{type(col_info['fuel_type'])}")
                     elif col_info["data_type"] == "end_hours":
