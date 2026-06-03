@@ -57,6 +57,37 @@
     },
     "default_shift": "Night",
     "worktime_header_apply": true,
+    "worktime_header_mapping": {
+        "mode": "position",
+        "fuzzy": false,
+        "entries": [
+            {"index": 1, "original": "", "new": "日期"},
+            {"index": 2, "original": "", "new": "班次"},
+            {"index": 3, "original": "", "new": "序号"},
+            {"index": 4, "original": "", "new": "设备名称"},
+            {"index": 5, "original": "", "new": "公司"},
+            {"index": 6, "original": "", "new": "应运行分钟"},
+            {"index": 7, "original": "", "new": "应运行小时数"},
+            {"index": 8, "original": "", "new": "停车/换班"},
+            {"index": 9, "original": "", "new": "转移"},
+            {"index": 10, "original": "", "new": "挖机场地推土/清理墙壁"},
+            {"index": 11, "original": "", "new": "等待装货"},
+            {"index": 12, "original": "", "new": "爆破"},
+            {"index": 13, "original": "", "new": "就餐/休息时间"},
+            {"index": 14, "original": "", "new": "柴油"},
+            {"index": 15, "original": "", "new": "计划维修/润滑"},
+            {"index": 16, "original": "", "new": "未计划/故障"},
+            {"index": 17, "original": "", "new": "待命"},
+            {"index": 18, "original": "", "new": "因天气：大风暴，雨，雪"},
+            {"index": 19, "original": "", "new": "扬尘：洒水车不足"},
+            {"index": 20, "original": "", "new": "排队/装水"},
+            {"index": 21, "original": "", "new": "总产量生产运行分钟"},
+            {"index": 22, "original": "", "new": "因电力原因停车/计划"},
+            {"index": 23, "original": "", "new": "因电力原因停车/未计划"},
+            {"index": 24, "original": "", "new": "总产量生产运行小时"},
+            {"index": 25, "original": "", "new": "注释"}
+        ]
+    },
     "user_config_default": {
         "database": {
             "db_type": "",

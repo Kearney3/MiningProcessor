@@ -60,7 +60,6 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False):
             h3 = clean_string(header_rows.iloc[1, idx])  # 班组/关键字
             h4 = clean_string(header_rows.iloc[2, idx])  # 小时数或班次名
             h5 = clean_string(header_rows.iloc[3, idx])  # 油品
-            # print(f"列索引: {idx}, h2: {h2}, h3: {h3}, h4: {h4}, h5: {h5}")
             if "按照班子柴油准备" in h3:
                 stop_signal = True
                 continue
@@ -153,7 +152,6 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False):
                             "日期": dt, "班次": shift, "设备名称": device_name,
                             "设备编号": device_id, "油品种类": clean_string(col_info["fuel_type"]), "油品消耗": val
                         })
-                        # print(f"设备: {device_name}, 日期: {dt}, 班次: {shift}, 油品: {col_info['fuel_type']}, 消耗: {val}, type:{type(col_info['fuel_type'])}")
                     elif col_info["data_type"] == "end_hours":
                         if key not in shift_data_map: shift_data_map[key] = {}
                         shift_data_map[key]['end'] = val

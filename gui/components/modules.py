@@ -1,25 +1,15 @@
 """数据处理模块区域组件"""
 from datetime import datetime
-from pathlib import Path
 
 import flet as ft
 
-from .common import _last_directory, _update_last_directory
+from .common import _last_directory, _update_last_directory, _log_message, _get_initial_directory, _show_path_confirm, ChipToggle
 from .types import ModuleRefs
 
 try:
     from . import theme
 except ImportError:
     import gui.theme as theme
-
-
-def _show_path_confirm(text_field: ft.TextField):
-    """在路径输入框右侧显示绿色确认勾。"""
-    text_field.suffix = ft.Icon(ft.Icons.CHECK_CIRCLE, color=theme.SUCCESS, size=20)
-    try:
-        text_field.update()
-    except (RuntimeError, AttributeError):
-        pass
 
 
 def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
@@ -87,6 +77,24 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         value=current_year,
     )
     elec_btn = theme.primary_btn("处理", icon=ft.Icons.PLAY_ARROW, disabled=False)
+    elec_add_shift = ft.Checkbox(
+        label="添加班次列",
+        value=False,
+        tooltip="在日期列右侧新增班次列",
+    )
+    elec_default_shift = ft.Dropdown(
+        label="默认班次",
+        width=100,
+        options=[ft.dropdown.Option("Day"), ft.dropdown.Option("Night")],
+        value="Day",
+        visible=False,
+    )
+
+    def _on_shift_toggle(e):
+        elec_default_shift.visible = elec_add_shift.value
+        elec_default_shift.update()
+
+    elec_add_shift.on_change = _on_shift_toggle
 
     # --- Work time ---
     work_path = ft.TextField(
@@ -118,74 +126,25 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         tooltip="开启后按配置的映射关系重命名输出表头",
     )
     # ── 匹配模式芯片切换 ──
-    _work_mode_state = ["position"]  # "position" | "name"
-
-    _work_chip_position = ft.Container(
-        content=ft.Text("按位置", size=12, weight=ft.FontWeight.W_500, color="#FFFFFF"),
-        bgcolor=theme.PRIMARY,
-        border_radius=theme.RADIUS_SM,
-        padding=ft.Padding.symmetric(horizontal=10, vertical=4),
-        on_click=None,
-        ink=True,
-    )
-    _work_chip_name = ft.Container(
-        content=ft.Text("按列名", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
-        bgcolor=theme.SURFACE_HIGH,
-        border_radius=theme.RADIUS_SM,
-        padding=ft.Padding.symmetric(horizontal=10, vertical=4),
-        on_click=None,
-        ink=True,
-    )
-    work_header_mode_row = ft.Row(
-        [_work_chip_position, _work_chip_name],
-        spacing=0,
-        tight=True,
-        visible=work_header_toggle.value,
-    )
-
-    class _ModeSelector:
-        """带 .value 属性的芯片切换控件组，兼容 logic.py 的 .value 读取。"""
-        def __init__(self, state: list, row: ft.Row):
-            self._state = state
-            self._row = row
-        @property
-        def value(self) -> str:
-            return self._state[0]
-        def update(self):
-            self._row.update()
-
-    def _update_work_chips():
-        is_position = _work_mode_state[0] == "position"
-        _work_chip_position.bgcolor = theme.PRIMARY if is_position else theme.SURFACE_HIGH
-        _work_chip_position.content.color = "#FFFFFF" if is_position else theme.TEXT_SECONDARY
-        _work_chip_name.bgcolor = theme.PRIMARY if not is_position else theme.SURFACE_HIGH
-        _work_chip_name.content.color = "#FFFFFF" if not is_position else theme.TEXT_SECONDARY
-        work_header_fuzzy.visible = not is_position
-        try:
-            work_header_mode_row.update()
-            work_header_fuzzy.update()
-        except (RuntimeError, AttributeError):
-            pass
-
-    def _on_chip_position(e):
-        _work_mode_state[0] = "position"
-        _update_work_chips()
-
-    def _on_chip_name(e):
-        _work_mode_state[0] = "name"
-        _update_work_chips()
-
-    _work_chip_position.on_click = _on_chip_position
-    _work_chip_name.on_click = _on_chip_name
-
-    work_header_mode = _ModeSelector(_work_mode_state, work_header_mode_row)
-
     work_header_fuzzy = ft.Checkbox(
         label="模糊匹配",
         value=False,
         tooltip="按列名匹配时启用模糊匹配（允许列名部分匹配）",
         visible=False,
     )
+
+    def _on_work_mode_change(val):
+        work_header_fuzzy.visible = (val != "position")
+        try:
+            work_header_fuzzy.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    work_header_mode = ChipToggle(
+        options=[("position", "按位置"), ("name", "按列名")],
+        on_change=_on_work_mode_change,
+    )
+    work_header_mode.row.visible = work_header_toggle.value
 
     work_btn = theme.primary_btn("处理", icon=ft.Icons.PLAY_ARROW, disabled=False)
 
@@ -312,13 +271,28 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
 
     add_sort_btn = theme.secondary_btn("添加排序条件", icon=ft.Icons.ADD, on_click=add_sort_config, height=36)
 
+    # --- FilePicker instances (must be added to page.overlay to work repeatedly) ---
+    _fuel_picker = ft.FilePicker()
+    _prod_file_picker = ft.FilePicker()
+    _prod_folder_picker = ft.FilePicker()
+    _elec_picker = ft.FilePicker()
+    _work_picker = ft.FilePicker()
+    _merge_picker = ft.FilePicker()
+    page.services.extend([
+        _fuel_picker, _prod_file_picker, _prod_folder_picker,
+        _elec_picker, _work_picker, _merge_picker,
+    ])
+
     async def on_fuel_browse(e: ft.ControlEvent):
-        picker = ft.FilePicker()
-        files = await picker.pick_files(
-            dialog_title="选择燃油数据文件",
-            allowed_extensions=["xlsx", "xls"],
-            initial_directory=_last_directory[0] or None,
-        )
+        try:
+            files = await _fuel_picker.pick_files(
+                dialog_title="选择燃油数据文件",
+                allowed_extensions=["xlsx", "xls"],
+                initial_directory=_get_initial_directory(),
+            )
+        except Exception as ex:
+            _log_message(page.logger.error, f"选择文件失败: {ex}")
+            return
         if files:
             fuel_path.value = files[0].path
             _update_last_directory(files[0].path)
@@ -327,12 +301,15 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
             fuel_btn.update()
 
     async def on_prod_pick_file(e: ft.ControlEvent):
-        picker = ft.FilePicker()
-        files = await picker.pick_files(
-            dialog_title="选择生产数据文件",
-            allowed_extensions=["xlsx", "xls"],
-            initial_directory=_last_directory[0] or None,
-        )
+        try:
+            files = await _prod_file_picker.pick_files(
+                dialog_title="选择生产数据文件",
+                allowed_extensions=["xlsx", "xls"],
+                initial_directory=_get_initial_directory(),
+            )
+        except Exception as ex:
+            _log_message(page.logger.error, f"选择文件失败: {ex}")
+            return
         if files:
             prod_path.value = files[0].path
             _update_last_directory(files[0].path)
@@ -341,25 +318,31 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
             prod_btn.update()
 
     async def on_prod_pick_folder(e: ft.ControlEvent):
-        picker = ft.FilePicker()
-        path = await picker.get_directory_path(
-            dialog_title="选择生产数据文件夹",
-            initial_directory=_last_directory[0] or None,
-        )
+        try:
+            path = await _prod_folder_picker.get_directory_path(
+                dialog_title="选择生产数据文件夹",
+                initial_directory=_get_initial_directory(),
+            )
+        except Exception as ex:
+            _log_message(page.logger.error, f"选择文件夹失败: {ex}")
+            return
         if path:
             prod_path.value = path
-            _last_directory[0] = path
+            _update_last_directory(path, is_dir=True)
             _show_path_confirm(prod_path)
             prod_btn.disabled = False
             prod_btn.update()
 
     async def on_elec_browse(e: ft.ControlEvent):
-        picker = ft.FilePicker()
-        files = await picker.pick_files(
-            dialog_title="选择电力数据文件",
-            allowed_extensions=["xlsx", "xls"],
-            initial_directory=_last_directory[0] or None,
-        )
+        try:
+            files = await _elec_picker.pick_files(
+                dialog_title="选择电力数据文件",
+                allowed_extensions=["xlsx", "xls"],
+                initial_directory=_get_initial_directory(),
+            )
+        except Exception as ex:
+            _log_message(page.logger.error, f"选择文件失败: {ex}")
+            return
         if files:
             elec_path.value = files[0].path
             _update_last_directory(files[0].path)
@@ -368,12 +351,15 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
             elec_btn.update()
 
     async def on_work_browse(e: ft.ControlEvent):
-        picker = ft.FilePicker()
-        files = await picker.pick_files(
-            dialog_title="选择工时数据文件",
-            allowed_extensions=["xlsx", "xls"],
-            initial_directory=_last_directory[0] or None,
-        )
+        try:
+            files = await _work_picker.pick_files(
+                dialog_title="选择工时数据文件",
+                allowed_extensions=["xlsx", "xls"],
+                initial_directory=_get_initial_directory(),
+            )
+        except Exception as ex:
+            _log_message(page.logger.error, f"选择文件失败: {ex}")
+            return
         if files:
             work_path.value = files[0].path
             _update_last_directory(files[0].path)
@@ -382,14 +368,17 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
             work_btn.update()
 
     async def on_merge_browse(e: ft.ControlEvent):
-        picker = ft.FilePicker()
-        path = await picker.get_directory_path(
-            dialog_title="选择包含 Excel 文件的文件夹",
-            initial_directory=_last_directory[0] or None,
-        )
+        try:
+            path = await _merge_picker.get_directory_path(
+                dialog_title="选择包含 Excel 文件的文件夹",
+                initial_directory=_get_initial_directory(),
+            )
+        except Exception as ex:
+            _log_message(page.logger.error, f"选择文件夹失败: {ex}")
+            return
         if path:
             merge_path.value = path
-            _last_directory[0] = path
+            _update_last_directory(path, is_dir=True)
             _show_path_confirm(merge_path)
             merge_btn.disabled = False
             merge_btn.update()
@@ -420,16 +409,16 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
 
     def _on_header_toggle_change(e):
         visible = work_header_toggle.value
-        _work_chip_position.disabled = not visible
-        _work_chip_name.disabled = not visible
-        work_header_mode_row.visible = visible
+        for chip in work_header_mode._chips:
+            chip.disabled = not visible
+        work_header_mode.row.visible = visible
         if not visible:
             work_header_fuzzy.visible = False
         else:
-            work_header_fuzzy.visible = (_work_mode_state[0] == "name")
+            work_header_fuzzy.visible = (work_header_mode.value == "name")
         header_hint.visible = visible
         try:
-            work_header_mode_row.update()
+            work_header_mode.row.update()
             work_header_fuzzy.update()
             header_hint.update()
         except (RuntimeError, AttributeError):
@@ -450,15 +439,16 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                     ft.Row([fuel_path, fuel_year, fuel_btn], spacing=8),
                 ]),
                 theme.module_card([
-                    ft.Row([prod_path, prod_file_btn, prod_folder_btn, prod_raw_start, prod_btn], spacing=8),
+                    ft.Row([prod_path, prod_btn], spacing=8),
+                    ft.Row([prod_file_btn, prod_folder_btn, prod_raw_start], spacing=8),
                 ]),
                 theme.module_card([
-                    ft.Row([elec_path, elec_year, elec_btn], spacing=8),
+                    ft.Row([elec_path, elec_year, elec_add_shift, elec_default_shift, elec_btn], spacing=8),
                 ]),
                 theme.module_card([
                     ft.Row([work_path, work_year, work_month, work_btn], spacing=6),
                     ft.Row(
-                        [work_header_toggle, work_header_mode_row, work_header_fuzzy],
+                        [work_header_toggle, work_header_mode.row, work_header_fuzzy],
                         spacing=theme.SPACING_SM,
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
@@ -487,7 +477,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         "_match_toggle": match_toggle,
         "fuel": {"path": fuel_path, "year": fuel_year, "btn": fuel_btn},
         "prod": {"path": prod_path, "raw_start": prod_raw_start, "btn": prod_btn},
-        "elec": {"path": elec_path, "year": elec_year, "btn": elec_btn},
+        "elec": {"path": elec_path, "year": elec_year, "btn": elec_btn, "add_shift": elec_add_shift, "default_shift": elec_default_shift},
         "work": {"path": work_path, "year": work_year, "month": work_month, "header_toggle": work_header_toggle, "header_mode": work_header_mode, "header_fuzzy": work_header_fuzzy, "btn": work_btn},
         "merge": {
             "path": merge_path,

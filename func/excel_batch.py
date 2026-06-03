@@ -4,7 +4,6 @@
 支持关键字配置、合并输出（带 sheet 前缀）或分别输出
 """
 
-import logging
 import os
 import pandas as pd
 from datetime import datetime, date as date_type
@@ -18,6 +17,19 @@ from func.oil_ledger import OilLedger
 from func import config_loader
 from func.logger import get_logger
 from func.string_utils import clean_string
+
+
+def _check_cancel(cancel_event) -> bool:
+    return cancel_event is not None and cancel_event.is_set()
+
+
+def _emit_progress(progress_cb, payload):
+    if progress_cb is None:
+        return
+    try:
+        progress_cb(payload)
+    except Exception:
+        logger.debug("progress_cb failed", exc_info=True)
 
 logger = get_logger(__name__)
 
@@ -97,6 +109,8 @@ def process_files(
     filter_date: date_type | None = None,
     worktime_header_mapping: dict | None = None,
     table_merge_config: dict | None = None,
+    progress_cb=None,
+    cancel_event=None,
 ) -> dict[str, dict[str, pd.DataFrame]]:
     """
     根据已匹配的文件列表执行批量处理。
@@ -122,6 +136,10 @@ def process_files(
         month = now.month
 
     all_results: dict[str, dict[str, pd.DataFrame]] = {}
+    _emit_progress(progress_cb, {"stage": "preparing", "percent": 0.0, "current": 0, "total": 0, "detail": "开始处理"})
+    if _check_cancel(cancel_event):
+        _emit_progress(progress_cb, {"stage": "cancelled", "percent": 0.0, "current": 0, "total": 0, "detail": "用户取消，已完成部分输出"})
+        return all_results
 
     # ── 燃油数据 ──
     if "fuel" in matched:
@@ -190,6 +208,10 @@ def process_files(
             logger.warning(f"日期筛选后无剩余数据 ({filter_date})")
             return {}
 
+    if _check_cancel(cancel_event):
+        _emit_progress(progress_cb, {"stage": "cancelled", "percent": 0.0, "current": 0, "total": 0, "detail": "用户取消，已完成部分输出"})
+        return all_results
+
     # ── 台账匹配 ──
     if equipment_ledger or oil_ledger:
         for module_type in list(all_results.keys()):
@@ -197,13 +219,17 @@ def process_files(
                 all_results[module_type], equipment_ledger, oil_ledger
             )
 
+    if _check_cancel(cancel_event):
+        _emit_progress(progress_cb, {"stage": "cancelled", "percent": 0.0, "current": 0, "total": 0, "detail": "用户取消，已完成部分输出"})
+        return all_results
+
     # ── 输出 ──
     if table_merge_config:
-        _table_merge_and_write(all_results, folder_path, year, month, table_merge_config)
+        _table_merge_and_write(all_results, folder_path, year, month, table_merge_config, progress_cb=progress_cb, cancel_event=cancel_event)
     elif merge_output:
-        _write_merged(all_results, folder_path, year, month)
+        _write_merged(all_results, folder_path, year, month, progress_cb=progress_cb, cancel_event=cancel_event)
     else:
-        _write_separate(all_results, folder_path, year, month)
+        _write_separate(all_results, folder_path, year, month, progress_cb=progress_cb, cancel_event=cancel_event)
 
     return all_results
 
@@ -242,10 +268,16 @@ def _filter_by_date(
 # ---------------------------------------------------------------------------
 
 def _find_col(columns, candidates):
-    """在列名列表中查找第一个匹配的候选列名"""
+    """在列名列表中查找第一个匹配的候选列名（支持 strip 匹配）"""
+    # 先尝试精确匹配
     for c in candidates:
         if c in columns:
             return c
+    # 再尝试 strip 后匹配
+    stripped_map = {col.strip(): col for col in columns}
+    for c in candidates:
+        if c in stripped_map:
+            return stripped_map[c]
     return None
 
 
@@ -580,10 +612,16 @@ def _table_merge_and_write(
     year: int,
     month: int,
     table_merge_config: dict,
+    progress_cb=None,
+    cancel_event=None,
 ):
     """
     执行表内合并流程：聚合生产数据 → 左合并所有模块 → 输出单 sheet Excel。
     """
+    _emit_progress(progress_cb, {"stage": "writing", "percent": 1/3, "current": 1, "total": 3, "detail": "表内合并：开始聚合"})
+    if _check_cancel(cancel_event):
+        _emit_progress(progress_cb, {"stage": "cancelled", "percent": 1/3, "current": 1, "total": 3, "detail": "用户取消，已完成部分输出"})
+        return
     base_type = table_merge_config.get("base_type", "fuel")
     join_keys = ["日期", "班次", "标准设备名称"]
     default_shift = config_loader.get_default_shift() if hasattr(config_loader, 'get_default_shift') else "Night"
@@ -685,11 +723,16 @@ def _table_merge_and_write(
             logger.error(f"合并 '{label}' 失败: {e}")
 
     # 6. 列排序 & 输出
+    _emit_progress(progress_cb, {"stage": "writing", "percent": 2/3, "current": 2, "total": 3, "detail": "表内合并：开始写入"})
+    if _check_cancel(cancel_event):
+        _emit_progress(progress_cb, {"stage": "cancelled", "percent": 2/3, "current": 2, "total": 3, "detail": "用户取消，已完成部分输出"})
+        return
     merged = _reorder_columns(merged)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_file = os.path.join(folder_path, f"表内合并结果_{year}{month:02d}_{timestamp}.xlsx")
     merged.to_excel(output_file, index=False, sheet_name="合并数据")
     logger.info(f"表内合并完成: {output_file} ({len(merged)} 行)")
+    _emit_progress(progress_cb, {"stage": "finished", "percent": 1.0, "current": 3, "total": 3, "detail": "表内合并：写入完成"})
 
 # ---------------------------------------------------------------------------
 # 输出
@@ -700,22 +743,33 @@ def _write_merged(
     folder_path: str,
     year: int,
     month: int,
+    progress_cb=None,
+    cancel_event=None,
 ):
     """将所有模块的结果合并到单个 Excel 文件"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_file = os.path.join(folder_path, f"批量处理结果_{year}{month:02d}_{timestamp}.xlsx")
 
+    total = sum(len(sheets) for sheets in all_results.values())
+    current = 0
+    _emit_progress(progress_cb, {"stage": "writing", "percent": 0.0, "current": 0, "total": total, "detail": "开始合并输出"})
     with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
         for module_type, sheets in all_results.items():
             prefix = MODULE_PREFIXES.get(module_type, f"{module_type}_")
             for sheet_name, df in sheets.items():
+                if _check_cancel(cancel_event):
+                    _emit_progress(progress_cb, {"stage": "cancelled", "percent": max(current / total if total else 0.0, 0.0), "current": current, "total": total, "detail": "用户取消，已完成部分输出"})
+                    return
                 prefixed_name = f"{prefix}{sheet_name}"
                 if len(prefixed_name) > 31:
                     prefixed_name = prefixed_name[:31]
                 df.to_excel(writer, sheet_name=prefixed_name, index=False)
+                current += 1
                 logger.info(f"写入 Sheet: {prefixed_name} ({len(df)} 行)")
+                _emit_progress(progress_cb, {"stage": "writing", "percent": current / total if total else 1.0, "current": current, "total": total, "detail": f"写入 Sheet: {prefixed_name}"})
 
     logger.info(f"合并输出完成: {output_file}")
+    _emit_progress(progress_cb, {"stage": "finished", "percent": 1.0, "current": total, "total": total, "detail": "合并输出完成"})
 
 
 def _write_separate(
@@ -723,6 +777,8 @@ def _write_separate(
     folder_path: str,
     year: int,
     month: int,
+    progress_cb=None,
+    cancel_event=None,
 ):
     """将各模块结果分别输出为独立 Excel 文件"""
     output_files = {
@@ -732,12 +788,21 @@ def _write_separate(
         "worktime": f"{year}{month:02d}_工作效率表.xlsx",
     }
 
+    total = sum(1 for sheets in all_results.values() if sheets)
+    current = 0
+    _emit_progress(progress_cb, {"stage": "writing", "percent": 0.0, "current": 0, "total": total, "detail": "开始分开输出"})
     for module_type, sheets in all_results.items():
         if not sheets:
             continue
+        if _check_cancel(cancel_event):
+            _emit_progress(progress_cb, {"stage": "cancelled", "percent": max(current / total if total else 0.0, 0.0), "current": current, "total": total, "detail": "用户取消，已完成部分输出"})
+            return
         output_file = os.path.join(folder_path, output_files.get(module_type, f"{module_type}.xlsx"))
         with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
             for sheet_name, df in sheets.items():
                 df.to_excel(writer, sheet_name=sheet_name, index=False)
                 logger.info(f"写入: {output_file} / {sheet_name} ({len(df)} 行)")
+        current += 1
         logger.info(f"单独输出完成: {output_file}")
+        _emit_progress(progress_cb, {"stage": "writing", "percent": current / total if total else 1.0, "current": current, "total": total, "detail": f"已输出 {os.path.basename(output_file)}"})
+    _emit_progress(progress_cb, {"stage": "finished", "percent": 1.0, "current": total, "total": total, "detail": "分开输出完成"})

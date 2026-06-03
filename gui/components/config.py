@@ -227,12 +227,45 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
         except Exception as ex:
             _log_message(log, f"保存配置失败: {ex}", level=logging.ERROR)
 
+    def _restore_version(version: str, label: str):
+        """执行恢复指定版本的默认配置"""
+        def handler(e):
+            page.pop_dialog()
+            try:
+                device_map = config_loader.get_default_load_map(version)
+                set_config_state(
+                    [
+                        {"selected": False, "device": device, "capacity": cap}
+                        for device, cap in sorted(device_map.items())
+                    ]
+                )
+                _log_message(log, f"已恢复{label}")
+            except Exception as ex:
+                _log_message(log, f"恢复默认配置失败: {ex}", level=logging.ERROR)
+        return handler
+
     def restore_default_config(e: ft.ControlEvent):
-        try:
-            load_default_config_file(config_loader.get_config_file_path())
-            _log_message(log, "已恢复默认配置")
-        except Exception as ex:
-            _log_message(log, f"恢复默认配置失败: {ex}", level=logging.ERROR)
+        version_dialog = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("选择默认配置版本"),
+            content=ft.Column(
+                [
+                    ft.Text("请选择要恢复的设备装载量配置版本："),
+                    ft.Text("新版：当前在用的装载量标准", size=12, color=theme.TEXT_SECONDARY),
+                    ft.Text("旧版：历史使用的装载量标准", size=12, color=theme.TEXT_SECONDARY),
+                ],
+                spacing=8,
+                tight=True,
+            ),
+            actions=[
+                ft.TextButton("取消", on_click=lambda e: page.pop_dialog()),
+                ft.TextButton("旧版配置", on_click=_restore_version("old", "旧版默认配置")),
+                ft.TextButton("新版配置", on_click=_restore_version("new", "新版默认配置"),
+                              style=ft.ButtonStyle(color=theme.PRIMARY)),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        page.show_dialog(version_dialog)
 
     def apply_current_config(e: ft.ControlEvent):
         try:

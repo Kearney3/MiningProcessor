@@ -36,6 +36,21 @@ class TestFindCol:
     def test_empty_candidates(self):
         assert _find_col({"设备名称"}, []) is None
 
+    def test_strip_whitespace_match(self):
+        """列名有前后空格时，strip 后应能匹配"""
+        cols = {" 油品种类 ", "设备名称"}
+        assert _find_col(cols, ["油品种类", "油品名称"]) == " 油品种类 "
+
+    def test_strip_whitespace_candidate_priority(self):
+        """多个候选列名都能 strip 匹配时，按候选顺序返回第一个"""
+        cols = {" 油品名称 ", " 油品种类 "}
+        assert _find_col(cols, ["油品种类", "油品名称"]) == " 油品种类 "
+
+    def test_exact_match_takes_priority(self):
+        """精确匹配优先于 strip 匹配"""
+        cols = {"油品种类", " 油品种类 "}
+        assert _find_col(cols, ["油品种类"]) == "油品种类"
+
 
 # ---------------------------------------------------------------------------
 # _get_output_file
@@ -304,3 +319,119 @@ class TestApplyLedgerMatchingProductionData:
         assert result["标准设备名称（挖机）"].iloc[0] == "STD_EX2000"
 
 
+
+
+# ---------------------------------------------------------------------------
+# 工时模块 + 台账匹配集成测试（回归测试）
+# ---------------------------------------------------------------------------
+class TestWorktimeHeaderMapping:
+    """验证表头映射索引在日期/班次插入后仍然正确"""
+
+    def test_mapping_indices_before_insert(self, tmp_path):
+        """表头映射的 position 索引对应原始列位置（insert 之前）"""
+        from func.excel_worktime import _apply_header_mapping
+
+        # 模拟 insert 之前的 DataFrame（原始 Mongolian 列 + 班次）
+        df = pd.DataFrame({
+            "Д/дугаар": [1],
+            "Техникийн нэр": ["NTE240"],
+            "Компани": ["XX公司"],
+            "班次": ["Day"],
+        })
+
+        mapping = {
+            "mode": "position",
+            "fuzzy": False,
+            "entries": [
+                {"index": 1, "original": "", "new": "序号"},
+                {"index": 2, "original": "", "new": "设备名称"},
+                {"index": 3, "original": "", "new": "公司"},
+            ],
+        }
+
+        result = _apply_header_mapping(df, mapping)
+        assert list(result.columns) == ["序号", "设备名称", "公司", "班次"]
+
+
+class TestWorktimeLedgerMatching:
+    """验证工时数据（Mongolian 列名）经过表头映射后能正确触发台账匹配"""
+
+    def test_preloaded_sheets_with_mapped_columns(self, tmp_path):
+        """表头映射后工时数据的设备名称列应被台账匹配识别"""
+        df = pd.DataFrame({
+            "日期": ["2025-01-01"],
+            "班次": ["Day"],
+            "设备名称": ["NTE240 #1101"],
+            "公司": ["XX公司"],
+        })
+        out = str(tmp_path / "worktime.xlsx")
+        df.to_excel(out, index=False)
+
+        class StubLedger:
+            def match_device(self, name=None, device_id=None):
+                if name and "NTE240" in name:
+                    return {
+                        "标准设备名称": "NTE240 HT#1101",
+                        "标准设备编号": "HT#1101",
+                        "标准公司名称": "A公司",
+                    }
+                return None
+
+        preloaded = {"工时数据": df.copy()}
+        _apply_ledger_matching(out, equipment_ledger=StubLedger(), preloaded_sheets=preloaded)
+
+        result = pd.read_excel(out)
+        assert "标准设备名称" in result.columns
+        assert result["标准设备名称"].iloc[0] == "NTE240 HT#1101"
+        assert result["标准设备编号"].iloc[0] == "HT#1101"
+
+    def test_preloaded_sheets_with_raw_mongolian_columns(self, tmp_path):
+        """未映射的工时数据（Mongolian 列名）也应通过 preloaded_sheets 匹配"""
+        # 模拟未映射的原始 Mongolian 列名
+        df = pd.DataFrame({
+            "日期": ["2025-01-01"],
+            "班次": ["Day"],
+            "Техникийн нэр": ["NTE240 #1101"],
+        })
+        out = str(tmp_path / "worktime_raw.xlsx")
+        df.to_excel(out, index=False)
+
+        class StubLedger:
+            def match_device(self, name=None, device_id=None):
+                if name and "NTE240" in name:
+                    return {
+                        "标准设备名称": "NTE240 HT#1101",
+                        "标准设备编号": "HT#1101",
+                        "标准公司名称": "A公司",
+                    }
+                return None
+
+        # preloaded_sheets 包含已处理的 DataFrame
+        preloaded = {"工时数据": df.copy()}
+        _apply_ledger_matching(out, equipment_ledger=StubLedger(), preloaded_sheets=preloaded)
+
+        result = pd.read_excel(out)
+        # Mongolian 列名不在 _find_col 的候选列表中，但 preloaded 避免了重新读取
+        # 此时因为列名是 Mongolian，匹配不会触发（_find_col 找不到设备名称）
+        # 这正是为什么需要 Fix 1（表头映射）的原因
+        assert "标准设备名称" not in result.columns
+
+    def test_no_preloaded_sheets_reads_from_file(self, tmp_path):
+        """不传 preloaded_sheets 时应从文件读取（原有行为不变）"""
+        df = pd.DataFrame({"设备名称": ["TR100 #1"], "值": [100]})
+        out = str(tmp_path / "normal.xlsx")
+        df.to_excel(out, index=False)
+
+        class StubLedger:
+            def match_device(self, name=None, device_id=None):
+                return {
+                    "标准设备名称": "STD_TR100",
+                    "标准设备编号": "HT#1",
+                    "标准公司名称": "A公司",
+                }
+
+        _apply_ledger_matching(out, equipment_ledger=StubLedger(), preloaded_sheets=None)
+
+        result = pd.read_excel(out)
+        assert "标准设备名称" in result.columns
+        assert result["标准设备名称"].iloc[0] == "STD_TR100"

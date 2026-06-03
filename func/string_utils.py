@@ -56,27 +56,3 @@ def clean_string(val) -> str:
     s = s.strip()
     return s
 
-
-def clean_pandas_strings(df: pd.DataFrame, columns: list[str] | None = None) -> pd.DataFrame:
-    """
-    对 DataFrame 中指定列（默认所有 object/string 列）应用 clean_string。
-
-    原地修改并返回 DataFrame。
-
-    Args:
-        df: 要处理的 DataFrame
-        columns: 要清理的列名列表，None 时处理所有 object 类型列
-
-    Returns:
-        处理后的 DataFrame（同引用）
-    """
-    if df.empty:
-        return df
-
-    target_cols = columns if columns else df.select_dtypes(include=["object", "string", "category"]).columns.tolist()
-
-    for col in target_cols:
-        if col in df.columns:
-            df[col] = df[col].apply(clean_string)
-
-    return df

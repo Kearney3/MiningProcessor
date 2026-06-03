@@ -5,6 +5,7 @@ import argparse
 # 假设 func.logger 已经正确配置
 from func.logger import get_logger
 from func.string_utils import clean_string
+from func.excel_utils import split_day_night_shifts, clean_split_dataframe, strip_date_column, sort_by_date_shift
 
 logger = get_logger(__name__)
 
@@ -45,7 +46,7 @@ def _apply_header_mapping(df: pd.DataFrame, mapping_config: dict) -> pd.DataFram
             # 用户界面使用 1-based 索引，内部转换为 0-based
             if 1 <= idx <= len(cols):
                 idx = idx - 1
-                old_name = clean_string(cols[idx])
+                old_name = cols[idx]
                 rename_map[old_name] = new_name
     else:
         # name 模式
@@ -128,68 +129,14 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
         date_str = f"{year}-{month:02d}-{day:02d}"
         day_list.append(day)
 
-        # 2. 提取白班表头并寻找夜班表头 (通过表头复现来切割)
-        # 表头在第2行 (index 1)
-        header_row = df_raw.iloc[1]
-
-        # 找出表头中有效的列（非NaN且非空白）用于比对
-        valid_mask = header_row.notna() & (header_row.apply(lambda x: clean_string(x)) != '')
-        valid_cols = valid_mask[valid_mask].index.tolist()
-        valid_headers = header_row[valid_cols].apply(clean_string).tolist()
-
-        split_idx = -1
-        # 从第3行（index 2）开始向下遍历，寻找再次出现的表头
-        for idx in range(2, len(df_raw)):
-            current_row_vals = df_raw.iloc[idx][valid_cols].apply(clean_string).tolist()
-            # 如果当前行的有效列内容与提取的表头
-            if current_row_vals[0] == valid_headers[0]:
-                split_idx = idx
-                break
-
-        if split_idx == -1:
-            logger.warning(f"警告: Sheet {sheet_name} 未找到再次出现的表头，视作全天只有白班处理")
-            day_data = df_raw.iloc[2:].copy()
-            day_data.columns = header_row
-            day_data['班次'] = 'Day'
-            combined_day_df = day_data
-        else:
-            # --- 处理白班数据 ---
-            # 白班数据从第3行 (index 2) 到 夜班表头前一行 (split_idx - 1)
-            day_data = df_raw.iloc[2:split_idx - 1].copy()
-            day_data.columns = header_row
-            day_data['班次'] = 'Day'
-
-            # --- 处理夜班数据 ---
-            # 夜班数据从夜班表头的下一行 (split_idx + 1) 开始到最后
-            night_data = df_raw.iloc[split_idx + 1:].copy()
-            night_data.columns = header_row  # 夜班表头结构一致，直接套用
-            night_data['班次'] = 'Night'
-
-            # 合并当前Sheet的白班和夜班
-            combined_day_df = pd.concat([day_data, night_data], axis=0, ignore_index=True)
+        # 2. 分割 Day/Night 班次（day_end_offset=-1 对应原 worktime 行为）
+        combined_day_df = split_day_night_shifts(df_raw)
 
         # 插入日期列到第一列
         combined_day_df.insert(0, '日期', date_str)
 
-        # 3. 清理：忽略空表头列，并去掉全是空值的行
-        # 去掉列名为 NaN 的列
-        combined_day_df = combined_day_df.loc[:, combined_day_df.columns.notna()]
-
-        # 去掉第二列(索引为1的列)为空的行 (保留你原有的清理逻辑)
-        if len(combined_day_df.columns) > 1:
-            check_idx = -1
-            # 找到包含"Техникийн"的列索引
-            for idx, col in enumerate(combined_day_df.columns):
-                if 'Техникийн' in col:
-                    check_idx = idx
-                    break
-            if check_idx != -1:
-                check_col = combined_day_df.columns[check_idx]
-                combined_day_df.dropna(subset=[check_col], inplace=True)
-
-        # 去掉除了"日期"和"班次"之外全部为空的行
-        subset_cols = [c for c in combined_day_df.columns if c not in ['日期', '班次']]
-        combined_day_df.dropna(how='all', subset=subset_cols, inplace=True)
+        # 3. 清洗
+        combined_day_df = clean_split_dataframe(combined_day_df)
 
         all_data.append(combined_day_df)
         success_count += 1
@@ -206,21 +153,16 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
     final_df = pd.concat(all_data, axis=0, ignore_index=True)
 
     # 5. 排序：按日期排序, 并将日期列转换为日期类型, 去除时间部分
-    final_df['日期'] = pd.to_datetime(final_df['日期'], format='%Y-%m-%d').dt.date
-
-    # 白班在夜班前（Day 排在 Night 前面符合拼音/字母排序）
-    final_df.sort_values(by=['日期', '班次'], ascending=[True, True], inplace=True)
+    strip_date_column(final_df, date_format="%Y-%m-%d")
+    sort_by_date_shift(final_df)
 
     # 把日期和班次的位置放在第一列和第二列
     other_cols = [col for col in final_df.columns if col not in ['日期', '班次']]
     final_df = final_df[['日期', '班次'] + other_cols]
 
-    # 6. 应用表头映射
-    if header_mapping and header_mapping.get("entries"):
+    # 6. 应用表头映射（数据处理完成后，对最终列结构进行重命名）
+    if header_mapping and header_mapping.get('entries'):
         final_df = _apply_header_mapping(final_df, header_mapping)
-
-    if return_sheets:
-        return {"工时数据": final_df}
 
     # 7. 输出到Excel
     if output_file is None:
@@ -228,6 +170,9 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
         output_file = os.path.join(file_dir, f"{year}{month:02d}_工作效率表.xlsx")
     final_df.to_excel(output_file, index=False)
     logger.info(f"数据处理完成，已保存至: {output_file}")
+
+    if return_sheets:
+        return {"工时数据": final_df}
 
 
 # --- 参数配置 ---

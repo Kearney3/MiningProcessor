@@ -19,6 +19,8 @@ __pypackages__/
 # Agent configs
 .claude/
 .codex/
+.cursor/
+.trellis/
 
 # Test / cache
 .pytest_cache/

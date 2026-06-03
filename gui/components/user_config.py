@@ -57,68 +57,6 @@ def _normalize_port_text(value: str | None) -> str:
     return re.sub(r"\D+", "", (value or "").strip())
 
 
-def _make_collapsible(
-    title: str,
-    subtitle: str,
-    content_controls: list,
-    icon: str,
-    initially_expanded: bool = True,
-) -> ft.Container:
-    """将内容包装为可折叠的卡片区域。"""
-    _open = [initially_expanded]
-
-    body = ft.Container(
-        content=ft.Column(content_controls, spacing=8),
-        padding=ft.Padding.only(left=12, right=12, bottom=12),
-        visible=initially_expanded,
-    )
-
-    chevron = ft.Icon(
-        ft.Icons.EXPAND_LESS if initially_expanded else ft.Icons.EXPAND_MORE,
-        color=theme.TEXT_SECONDARY,
-        size=20,
-    )
-
-    def _toggle(e):
-        _open[0] = not _open[0]
-        body.visible = _open[0]
-        chevron.name = ft.Icons.EXPAND_LESS if _open[0] else ft.Icons.EXPAND_MORE
-        try:
-            body.update()
-            chevron.update()
-        except (RuntimeError, AttributeError):
-            pass
-
-    header = ft.Container(
-        content=ft.Row(
-            [
-                ft.Icon(icon, color=theme.PRIMARY, size=18),
-                ft.Column(
-                    [
-                        ft.Text(title, size=14, weight=ft.FontWeight.W_600, color=theme.TEXT_PRIMARY),
-                        ft.Text(subtitle, size=11, color=theme.TEXT_SECONDARY),
-                    ],
-                    spacing=1,
-                    expand=True,
-                ),
-                chevron,
-            ],
-            vertical_alignment=ft.CrossAxisAlignment.CENTER,
-        ),
-        padding=ft.Padding.symmetric(horizontal=12, vertical=10),
-        on_click=_toggle,
-        ink=True,
-    )
-
-    return ft.Container(
-        content=ft.Column([header, body], spacing=0),
-        border=ft.Border.all(1, theme.BORDER),
-        border_radius=theme.RADIUS_MD,
-        bgcolor=theme.SURFACE,
-        clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
-    )
-
-
 def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserConfigRefs"]:
     """创建用户配置页面，返回 (container, refs)。"""
 
@@ -290,7 +228,7 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
         theme.secondary_btn("恢复默认", icon=ft.Icons.RESTART_ALT, on_click=reset_keywords),
     ]
 
-    keywords_card = _make_collapsible(
+    keywords_card = theme.make_collapsible(
         title="文件关键字配置",
         subtitle="用于批量处理时自动识别文件夹中的数据文件",
         icon=ft.Icons.KEY,
@@ -551,7 +489,7 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
         theme.accent_btn("添加映射", icon=ft.Icons.ADD, on_click=_add_header_row),
     ]
 
-    header_mapping_card = _make_collapsible(
+    header_mapping_card = theme.make_collapsible(
         title="工作效率表头映射配置",
         subtitle="配置行号/原始列名到新列名的映射关系",
         icon=ft.Icons.TABLE_CHART,
@@ -567,7 +505,7 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
         ft.Row(action_buttons, spacing=8, wrap=True, alignment=ft.MainAxisAlignment.START),
     ]
 
-    database_card = _make_collapsible(
+    database_card = theme.make_collapsible(
         title="数据库连接配置",
         subtitle="用于配置常用数据库连接信息",
         icon=ft.Icons.STORAGE,

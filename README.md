@@ -11,10 +11,9 @@
 | 入口 | CLI 命令 | 功能 | 输入 | 输出 |
 |------|----------|------|------|------|
 | `excel_fuel.py` | `fuel` | 设备柴油消耗统计 | 设备柴油消耗表 | `Fuel.xlsx` |
-| `excel_electrical.py` | `electrical` | 设备电耗统计 | 含 `Electrical` 的 sheet | 电耗汇总表 |
+| `excel_electrical.py` | `electrical` | 设备电耗统计 | 含 `Electrical` 的 sheet | 电耗汇总表（可选班次列） |
 | `excel_worktime.py` | `worktime` | 工作效率统计 | 工时报表文件/文件夹 | 按年月命名的效率表 |
 | `excel_worktime_multifile.py` | `worktime-batch` | 工时批量处理 | 工时报表文件夹 | 多文件汇总 |
-| `excel_production.py` | `production-old` | 白班/夜班生产报表解析 | 生产报表文件夹 | 生产数据汇总 |
 | `excel_production_enhanced.py` | `production` | 增强版生产报表解析（GUI 默认） | 生产报表文件/文件夹 | 生产数据汇总 |
 | `excel_merger.py` | `merge` | 按关键字批量合并同结构 Excel | 文件夹 + 关键字 | 合并后的 Excel |
 | `excel_batch.py` | — | 批量多报表综合处理 | 文件夹 | 综合统计表 |
@@ -49,7 +48,7 @@ uv run python -m gui
 
 GUI 提供完整的处理流程入口：
 
-- 各类报表一键处理
+- 各类报表一键处理（电力模块可选添加班次列）
 - 配置编辑（设备装载量映射、班次名称等）
 - 用户配置菜单（数据库连接、工作效率表头映射）
 - 实时日志展示
@@ -65,6 +64,7 @@ uv run fuel <输入文件> --year 2025
 
 # 电耗处理
 uv run electrical <输入文件> --year 2025
+uv run electrical <输入文件> --year 2025 --add-shift  # 新增班次列 (Day/Night)
 
 # 工时统计
 uv run worktime <输入文件或文件夹> --year 2025 --month 1
@@ -91,6 +91,7 @@ MiningProcessor/
 │   │   ├── modules.py          # 报表处理模块面板
 │   │   ├── config.py           # 配置编辑面板
 │   │   ├── batch.py            # 批量处理面板
+│   │   ├── ledger_base.py      # 台账组件通用工厂（消除重复代码）
 │   │   ├── ledger.py           # 设备台账面板
 │   │   ├── ledger_match.py     # 台账匹配面板
 │   │   ├── oil_ledger.py       # 油品台账面板
@@ -105,9 +106,11 @@ MiningProcessor/
 │   ├── equipment_ledger.py     # 设备台账与模糊匹配
 │   ├── oil_ledger.py           # 油品台账管理
 │   ├── logger.py               # 统一日志（CLI/GUI 共享）
+│   ├── string_utils.py         # 字符串清理工具
+│   ├── excel_utils.py          # Excel 共享工具（日期标准化、排序、班次分割）
 │   └── excel_*.py              # 各报表处理器
 ├── config.json                 # 持久化配置
-├── tests/                      # pytest 测试（233 个用例）
+├── tests/                      # pytest 测试（274 个用例）
 ├── assets/fonts/               # GUI 字体资源（MiSans 可变字体）
 ├── Notebook/                   # Jupyter 探索性分析笔记本
 ├── docs/                       # 文档目录
@@ -175,7 +178,7 @@ MiningProcessor/
 ## 测试
 
 ```bash
-# 运行全部测试（233 个用例）
+# 运行全部测试（274 个用例）
 uv run pytest
 
 # 运行指定测试文件
@@ -202,6 +205,9 @@ uv run pytest -v
 | `test_logger.py` / `test_log_consumer.py` | 日志格式化、队列分发 |
 | `test_ledger_mapping.py` / `test_ledger_match_improvements.py` | 设备台账匹配与后缀 |
 | `test_oil_ledger.py` | 油品台账管理 |
+| `test_string_utils.py` | 字符串清理工具 |
+| `test_excel_batch_progress.py` | 批量处理进度计算 |
+| `test_gui_batch_progress.py` | GUI 批量进度显示 |
 | `test_user_config_section.py` | 用户配置面板 |
 | `test_production_config_flow.py` | 生产配置流程 |
 | `test_tab_switching.py` | Tab 切换行为 |

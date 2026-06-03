@@ -2,7 +2,6 @@
 import datetime
 import asyncio
 import logging
-import math
 import threading
 from pathlib import Path
 
@@ -11,23 +10,12 @@ import flet as ft
 
 
 
-from .common import _log_message, _last_directory as _import_dir, _update_last_directory
+from .common import _log_message, _last_directory as _import_dir, _update_last_directory, _cell_text
 
 try:
     from . import theme
 except ImportError:
     import gui.theme as theme
-
-
-def _cell_text(value) -> str:
-    if value is None:
-        return ""
-    try:
-        if isinstance(value, float) and math.isnan(value):
-            return ""
-    except (TypeError, ValueError):
-        pass
-    return str(value)
 
 
 def _strip_date_only_times(df: pd.DataFrame) -> pd.DataFrame:
@@ -55,6 +43,7 @@ def create_ledger_match_section(
 
     PAGE_SIZE = 20
     _all_sheets: dict[str, pd.DataFrame] = {}  # sheet_name -> DataFrame (原始数据)
+    _matched_all_sheets: dict[str, pd.DataFrame] = {}  # sheet_name -> 匹配后的完整数据
     _filtered_df: list[pd.DataFrame] = [None]  # 当前 sheet 经过排序/筛选后的视图
     _current_sheet = [""]
     _page = [0]
@@ -176,9 +165,14 @@ def create_ledger_match_section(
     # ========================================================================
     def _get_current_df() -> pd.DataFrame | None:
         name = _current_sheet[0]
-        if not name or name not in _all_sheets:
+        if not name:
             return None
-        return _all_sheets[name]
+        # 优先返回匹配后的数据，如果没有则返回原始数据
+        if name in _matched_all_sheets:
+            return _matched_all_sheets[name]
+        if name in _all_sheets:
+            return _all_sheets[name]
+        return None
 
     def _apply_filter_and_sort():
         """对当前 sheet 的 DataFrame 应用排序，更新 _filtered_df"""
@@ -384,21 +378,25 @@ def create_ledger_match_section(
                 dd.value = None
         if not name_dropdown.value:
             for c in cols:
-                if c in ("设备名称", "矿卡名称"):
+                if c.strip() in ("设备名称", "矿卡名称"):
                     name_dropdown.value = c
                     break
         if not id_dropdown.value:
             for c in cols:
-                if c == "设备编号":
+                if c.strip() == "设备编号":
                     id_dropdown.value = c
                     break
         if not oil_dropdown.value:
             for c in cols:
-                if c in ("油品种类", "油品名称"):
+                if c.strip() in ("油品种类", "油品名称"):
                     oil_dropdown.value = c
                     break
 
     def _on_sheet_change(sheet_name: str):
+        logging.getLogger(__name__).debug(
+            "_on_sheet_change called: sheet_name=%r, _all_sheets.keys()=%s",
+            sheet_name, list(_all_sheets.keys())[:5],
+        )
         if not sheet_name or sheet_name not in _all_sheets:
             return
         _current_sheet[0] = sheet_name
@@ -406,12 +404,21 @@ def create_ledger_match_section(
         _sort_column[0] = None
         _columns.clear()
         _sort_ascending[0] = True
+        # 重置视图模式为"全部"，避免切换 sheet 后显示不一致
+        _view_mode[0] = "all"
+        view_segment.selected = ["all"]
         df = _all_sheets[sheet_name]
         _update_column_dropdowns(list(df.columns))
         _update_match_status(sheet_name)
         build_table()
 
-    sheet_dropdown.on_change = lambda e: _on_sheet_change(e.control.value)
+    def _on_sheet_dropdown_change(e):
+        logging.getLogger(__name__).debug(
+            "sheet_dropdown.on_select fired: value=%r", e.control.value
+        )
+        _on_sheet_change(e.control.value)
+
+    sheet_dropdown.on_select = _on_sheet_dropdown_change
 
     # ========================================================================
     # 文件导入
@@ -467,7 +474,12 @@ def create_ledger_match_section(
                 # 读取表头（第一行）
                 headers = []
                 for cell in next(ws.iter_rows(min_row=1, max_row=1)):
-                    headers.append(cell.value if cell.value is not None else f"Col{cell.column - 1}")
+                    val = cell.value
+                    if val is not None:
+                        # strip 空白字符，避免列名匹配失败
+                        headers.append(str(val).strip())
+                    else:
+                        headers.append(f"Col{cell.column - 1}")
 
                 # 分批读取数据行
                 rows_data = []
@@ -491,13 +503,21 @@ def create_ledger_match_section(
 
                 # 构建 DataFrame
                 if rows_data:
+                    # 检查数据行长度与表头是否一致
+                    header_len = len(headers)
+                    row_lens = set(len(r) for r in rows_data)
+                    if len(row_lens) > 1 or (row_lens and header_len not in row_lens):
+                        logging.getLogger(__name__).debug(
+                            "Sheet %r: header_len=%d, row_lengths=%s",
+                            sname, header_len, row_lens,
+                        )
                     df = pd.DataFrame(rows_data, columns=headers)
                     df = _strip_date_only_times(df)
                 else:
                     df = pd.DataFrame(columns=headers)
 
                 parsed_sheets[sname] = df
-                _log_message(log, f"已导入 {sname}: {len(df)} 行")
+                _log_message(log, f"已导入 {sname}: {len(df)} 行, {len(df.columns)} 列")
 
             wb.close()
 
@@ -520,6 +540,9 @@ def create_ledger_match_section(
         # 使用已解析的数据
         _all_sheets.clear()
         _all_sheets.update(parsed_sheets)
+        logging.getLogger(__name__).debug(
+            "on_import: _all_sheets keys=%s", list(_all_sheets.keys())
+        )
 
         _update_last_directory(path)
         file_label.value = Path(path).name
@@ -529,10 +552,8 @@ def create_ledger_match_section(
         if sheet_names:
             first = sheet_names[0]
             sheet_dropdown.value = first
-            _current_sheet[0] = first
-            _page[0] = 0
-            df = _all_sheets.get(first, pd.DataFrame())
-            _update_column_dropdowns(list(df.columns))
+            # 直接调用 _on_sheet_change 确保初始化完整
+            _on_sheet_change(first)
         else:
             _current_sheet[0] = ""
 
@@ -548,6 +569,7 @@ def create_ledger_match_section(
         _hide_import_progress()
         _matched_sheets.clear()
         _unmatched_sheets.clear()
+        _matched_all_sheets.clear()
         _view_mode[0] = "all"
         view_segment.selected = ["all"]
         view_segment.disabled = True
@@ -584,7 +606,7 @@ def create_ledger_match_section(
             return
 
         eq_ledger = ledger_refs.get("get_ledger", lambda: None)()
-        oil_ledger = oil_ledger_refs.get("get_oil_ledger", lambda: None)()
+        oil_ledger = oil_ledger_refs.get("get_oil", lambda: None)()
 
         if not eq_ledger and not oil_ledger:
             _log_message(log, "请先在设备台账或油品台账页导入台账", level=logging.WARNING)
@@ -767,9 +789,16 @@ def create_ledger_match_section(
                     await asyncio.sleep(0)
                 
                 result_df["标准油品名称"] = std_oils
-            _all_sheets[_current_sheet[0]] = result_df
+            # 保存匹配结果到单独的字典，不覆盖原始数据
+            _matched_all_sheets[_current_sheet[0]] = result_df
             _page[0] = 0
             build_table()
+
+            # 记录日志
+            logging.getLogger(__name__).debug(
+                "on_match: updated _matched_all_sheets[%r], columns=%s",
+                _current_sheet[0], list(result_df.columns),
+            )
 
             # 拆分匹配成功/失败的行
             sheet = _current_sheet[0]
@@ -849,7 +878,9 @@ def create_ledger_match_section(
                 df_to_export = pd.concat(_unmatched_sheets.values(), ignore_index=True)
                 sheet_name = "未匹配"
             else:
-                df_to_export = pd.concat(_all_sheets.values(), ignore_index=True)
+                # 优先使用匹配后的完整数据，如果没有则使用原始数据
+                export_data = _matched_all_sheets if _matched_all_sheets else _all_sheets
+                df_to_export = pd.concat(export_data.values(), ignore_index=True)
                 sheet_name = "全部"
 
             # 创建 xlsxwriter 对象
@@ -865,11 +896,18 @@ def create_ledger_match_section(
             for col, header in enumerate(headers):
                 worksheet.write(0, col, header)
 
-            # 识别日期列
+            # 识别日期列（包括 datetime64 和 date/datetime 对象）
             date_columns = set()
             for col in headers:
                 if pd.api.types.is_datetime64_any_dtype(df_to_export[col]):
                     date_columns.add(col)
+                else:
+                    # 检查是否有 date/datetime 对象
+                    sample = df_to_export[col].dropna().head(10)
+                    if not sample.empty and sample.apply(
+                        lambda v: isinstance(v, (datetime.date, datetime.datetime))
+                    ).any():
+                        date_columns.add(col)
 
             # 分批写入数据
             batch_size = 1000
