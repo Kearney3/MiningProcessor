@@ -1,24 +1,14 @@
 """批量处理模块区域组件"""
 from datetime import datetime, timedelta
-from pathlib import Path
 
 import flet as ft
 
-from .common import _last_directory, _update_last_directory
+from .common import _last_directory, _update_last_directory, _log_message, _get_initial_directory, _show_path_confirm, ChipToggle
 
 try:
     from . import theme
 except ImportError:
     import gui.theme as theme
-
-
-def _show_path_confirm(text_field: ft.TextField):
-    """在路径输入框右侧显示绿色确认勾。"""
-    text_field.suffix = ft.Icon(ft.Icons.CHECK_CIRCLE, color=theme.SUCCESS, size=20)
-    try:
-        text_field.update()
-    except (RuntimeError, AttributeError):
-        pass
 
 
 def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
@@ -85,65 +75,10 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
     )
 
     # ── 基准表芯片切换（表内合并专用） ──
-    _base_table_state = ["fuel"]  # "fuel" | "worktime"
-
-    _chip_fuel = ft.Container(
-        content=ft.Text("燃油数据", size=12, weight=ft.FontWeight.W_500, color="#FFFFFF"),
-        bgcolor=theme.PRIMARY,
-        border_radius=theme.RADIUS_SM,
-        padding=ft.Padding.symmetric(horizontal=10, vertical=4),
-        on_click=None,
-        ink=True,
+    batch_base_table = ChipToggle(
+        options=[("fuel", "燃油数据"), ("worktime", "工时数据")],
     )
-    _chip_worktime = ft.Container(
-        content=ft.Text("工时数据", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
-        bgcolor=theme.SURFACE_HIGH,
-        border_radius=theme.RADIUS_SM,
-        padding=ft.Padding.symmetric(horizontal=10, vertical=4),
-        on_click=None,
-        ink=True,
-    )
-
-    class _BaseTableSelector:
-        """带 .value 属性的芯片切换控件组，兼容 logic.py 的 .value 读取。"""
-        def __init__(self, state: list, row: ft.Row):
-            self._state = state
-            self._row = row
-        @property
-        def value(self) -> str:
-            return self._state[0]
-        def update(self):
-            self._row.update()
-
-    batch_base_table_row = ft.Row(
-        [_chip_fuel, _chip_worktime],
-        spacing=0,
-        tight=True,
-        visible=batch_table_merge.value,
-    )
-    batch_base_table = _BaseTableSelector(_base_table_state, batch_base_table_row)
-
-    def _update_base_table_chips():
-        is_fuel = _base_table_state[0] == "fuel"
-        _chip_fuel.bgcolor = theme.PRIMARY if is_fuel else theme.SURFACE_HIGH
-        _chip_fuel.content.color = "#FFFFFF" if is_fuel else theme.TEXT_SECONDARY
-        _chip_worktime.bgcolor = theme.PRIMARY if not is_fuel else theme.SURFACE_HIGH
-        _chip_worktime.content.color = "#FFFFFF" if not is_fuel else theme.TEXT_SECONDARY
-        try:
-            batch_base_table_row.update()
-        except (RuntimeError, AttributeError):
-            pass
-
-    def _on_chip_fuel(e):
-        _base_table_state[0] = "fuel"
-        _update_base_table_chips()
-
-    def _on_chip_worktime(e):
-        _base_table_state[0] = "worktime"
-        _update_base_table_chips()
-
-    _chip_fuel.on_click = _on_chip_fuel
-    _chip_worktime.on_click = _on_chip_worktime
+    batch_base_table.row.visible = batch_table_merge.value
 
     # --- 工作效率表头修改开关 ---
     batch_header_toggle = ft.Checkbox(
@@ -151,43 +86,8 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         value=True,
         tooltip="开启后按配置的映射关系重命名工作效率表输出表头",
     )
+
     # ── 匹配模式芯片切换 ──
-    _batch_mode_state = ["position"]  # "position" | "name"
-
-    _batch_chip_position = ft.Container(
-        content=ft.Text("按位置", size=12, weight=ft.FontWeight.W_500, color="#FFFFFF"),
-        bgcolor=theme.PRIMARY,
-        border_radius=theme.RADIUS_SM,
-        padding=ft.Padding.symmetric(horizontal=10, vertical=4),
-        on_click=None,
-        ink=True,
-    )
-    _batch_chip_name = ft.Container(
-        content=ft.Text("按列名", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
-        bgcolor=theme.SURFACE_HIGH,
-        border_radius=theme.RADIUS_SM,
-        padding=ft.Padding.symmetric(horizontal=10, vertical=4),
-        on_click=None,
-        ink=True,
-    )
-    class _ModeSelector:
-        """带 .value 属性的芯片切换控件组，兼容 logic.py 的 .value 读取。"""
-        def __init__(self, state: list, row: ft.Row):
-            self._state = state
-            self._row = row
-        @property
-        def value(self) -> str:
-            return self._state[0]
-        def update(self):
-            self._row.update()
-
-    batch_header_mode_row = ft.Row(
-        [_batch_chip_position, _batch_chip_name],
-        spacing=0,
-        tight=True,
-    )
-    batch_header_mode = _ModeSelector(_batch_mode_state, batch_header_mode_row)
-
     batch_header_fuzzy = ft.Checkbox(
         label="模糊匹配",
         value=False,
@@ -195,40 +95,28 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         tooltip="按列名匹配时启用模糊匹配（容错错别字）",
     )
 
-    def _update_batch_chips():
-        is_pos = _batch_mode_state[0] == "position"
-        _batch_chip_position.bgcolor = theme.PRIMARY if is_pos else theme.SURFACE_HIGH
-        _batch_chip_position.content.color = "#FFFFFF" if is_pos else theme.TEXT_SECONDARY
-        _batch_chip_name.bgcolor = theme.PRIMARY if not is_pos else theme.SURFACE_HIGH
-        _batch_chip_name.content.color = "#FFFFFF" if not is_pos else theme.TEXT_SECONDARY
-        batch_header_fuzzy.visible = not is_pos
+    def _on_batch_mode_change(val):
+        batch_header_fuzzy.visible = (val != "position")
         try:
-            batch_header_mode_row.update()
             batch_header_fuzzy.update()
         except (RuntimeError, AttributeError):
             pass
 
-    def _on_batch_chip_position(e):
-        _batch_mode_state[0] = "position"
-        _update_batch_chips()
-
-    def _on_batch_chip_name(e):
-        _batch_mode_state[0] = "name"
-        _update_batch_chips()
-
-    _batch_chip_position.on_click = _on_batch_chip_position
-    _batch_chip_name.on_click = _on_batch_chip_name
+    batch_header_mode = ChipToggle(
+        options=[("position", "按位置"), ("name", "按列名")],
+        on_change=_on_batch_mode_change,
+    )
 
     def _on_batch_header_toggle(e):
         enabled = batch_header_toggle.value
-        _batch_chip_position.disabled = not enabled
-        _batch_chip_name.disabled = not enabled
+        for chip in batch_header_mode._chips:
+            chip.disabled = not enabled
         if not enabled:
             batch_header_fuzzy.visible = False
         else:
-            batch_header_fuzzy.visible = (_batch_mode_state[0] == "name")
+            batch_header_fuzzy.visible = (batch_header_mode.value == "name")
         try:
-            batch_header_mode_row.update()
+            batch_header_mode.row.update()
             batch_header_fuzzy.update()
         except (RuntimeError, AttributeError):
             pass
@@ -240,10 +128,10 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
             batch_merge.disabled = True
         else:
             batch_merge.disabled = False
-        batch_base_table_row.visible = batch_table_merge.value
+        batch_base_table.row.visible = batch_table_merge.value
         try:
             batch_merge.update()
-            batch_base_table_row.update()
+            batch_base_table.row.update()
         except (RuntimeError, AttributeError):
             pass
 
@@ -253,12 +141,12 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         if batch_merge.value:
             batch_table_merge.value = False
             batch_table_merge.disabled = True
-            batch_base_table_row.visible = False
+            batch_base_table.row.visible = False
         else:
             batch_table_merge.disabled = not batch_ledger_toggle.value
         try:
             batch_table_merge.update()
-            batch_base_table_row.update()
+            batch_base_table.row.update()
         except (RuntimeError, AttributeError):
             pass
 
@@ -268,12 +156,12 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         if not batch_ledger_toggle.value:
             batch_table_merge.value = False
             batch_table_merge.disabled = True
-            batch_base_table_row.visible = False
+            batch_base_table.row.visible = False
         else:
             batch_table_merge.disabled = batch_merge.value
         try:
             batch_table_merge.update()
-            batch_base_table_row.update()
+            batch_base_table.row.update()
         except (RuntimeError, AttributeError):
             pass
 
@@ -346,16 +234,25 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
     # --- 处理按钮 ---
     batch_btn = theme.primary_btn("批量处理", icon=ft.Icons.BOLT, disabled=False)
 
+    # --- 进度区 ---
+    batch_progress_bar = ft.ProgressBar(value=0.0, visible=False)
+    batch_progress_text = ft.Text(value="", size=12, color=theme.TEXT_SECONDARY, visible=False)
+    batch_cancel_btn = theme.secondary_btn("取消", icon=ft.Icons.CANCEL, visible=False, height=32)
+
     # --- 浏览按钮 ---
     async def on_batch_browse(e: ft.ControlEvent):
         picker = ft.FilePicker()
-        path = await picker.get_directory_path(
-            dialog_title="选择批量处理文件夹",
-            initial_directory=_last_directory[0] or None,
-        )
+        try:
+            path = await picker.get_directory_path(
+                dialog_title="选择批量处理文件夹",
+                initial_directory=_get_initial_directory(),
+            )
+        except Exception as ex:
+            _log_message(page.logger.error, f"选择文件夹失败: {ex}")
+            return
         if path:
             batch_path.value = path
-            _update_last_directory(path)
+            _update_last_directory(path, is_dir=True)
             _show_path_confirm(batch_path)
             batch_btn.disabled = False
             batch_btn.update()
@@ -394,14 +291,21 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
             ft.Container(batch_merge, col={"xs": 12, "md": 6}),
             ft.Container(batch_table_merge, col={"xs": 12, "md": 6}),
             ft.Container(
-                ft.Row([batch_header_mode_row, batch_header_fuzzy], spacing=4, wrap=True),
+                ft.Row([batch_header_mode.row, batch_header_fuzzy], spacing=4, wrap=True),
                 col={"xs": 12, "md": 6},
             ),
-            ft.Container(batch_base_table_row, col={"xs": 12, "md": 6}),
+            ft.Container(batch_base_table.row, col={"xs": 12, "md": 6}),
         ],
         run_spacing=4,
         spacing=8,
         vertical_alignment=ft.CrossAxisAlignment.CENTER,
+    )
+
+    progress_row = ft.Row(
+        [batch_progress_bar, batch_progress_text, batch_cancel_btn],
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        spacing=8,
+        visible=False,
     )
 
     options_collapsible = theme.make_collapsible(
@@ -440,6 +344,9 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
                 # ── 处理选项（折叠） ──
                 options_collapsible,
 
+                # ── 进度区 ──
+                progress_row,
+
                 # ── 操作按钮 ──
                 ft.Row(
                     [batch_btn],
@@ -471,6 +378,10 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "date_filter_toggle": date_filter_toggle,
         "selected_date": _selected_date,
         "btn": batch_btn,
+        "progress_bar": batch_progress_bar,
+        "progress_text": batch_progress_text,
+        "cancel_btn": batch_cancel_btn,
+        "progress_row": progress_row,
     }
 
     return container, batch_refs

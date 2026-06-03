@@ -27,6 +27,37 @@ _btn_original_styles: dict[int, ft.ButtonStyle] = {}
 
 _LOADING_STYLE = ft.ButtonStyle(bgcolor="#CBD5E1", color="#64748B")
 
+# 模块类型中文标签
+_MODULE_LABELS = {
+    "fuel": "燃油数据",
+    "electrical": "电力数据",
+    "production": "生产数据",
+    "worktime": "工时数据",
+    "merge": "文件合并",
+    "batch": "批量处理",
+}
+
+
+def _show_snackbar(page: ft.Page, message: str, is_error: bool = False):
+    """显示 snackbar 通知"""
+    snackbar = ft.SnackBar(
+        content=ft.Text(message, color=ft.Colors.WHITE),
+        bgcolor=ft.Colors.RED_700 if is_error else ft.Colors.GREEN_700,
+        duration=3000,
+    )
+    page.overlay.append(snackbar)
+    snackbar.open = True
+    page.update()
+    # 3秒后移除
+    import threading
+    def remove():
+        try:
+            page.overlay.remove(snackbar)
+            page.update()
+        except (ValueError, RuntimeError):
+            pass
+    threading.Timer(3.5, remove).start()
+
 
 def set_btn_state(btn: ft.Button, enabled: bool, label: str = "处理"):
     """设置按钮状态：禁用时置灰并显示加载态文字，恢复时还原原始样式"""
@@ -49,14 +80,20 @@ def set_btn_state(btn: ft.Button, enabled: bool, label: str = "处理"):
 # 台账匹配后处理
 # ---------------------------------------------------------------------------
 def _find_col(columns, candidates):
-    """在列名列表中查找第一个匹配的候选列名"""
+    """在列名列表中查找第一个匹配的候选列名（支持 strip 匹配）"""
+    # 先尝试精确匹配
     for c in candidates:
         if c in columns:
             return c
+    # 再尝试 strip 后匹配
+    stripped_map = {col.strip(): col for col in columns}
+    for c in candidates:
+        if c in stripped_map:
+            return stripped_map[c]
     return None
 
 
-def _apply_ledger_matching(output_file: str, equipment_ledger=None, oil_ledger=None):
+def _apply_ledger_matching(output_file: str, equipment_ledger=None, oil_ledger=None, preloaded_sheets=None):
     """
     对已写入的 Excel 文件进行台账匹配后处理。
     读取每个 sheet，检测列名，追加匹配字段，重新写回。
@@ -65,17 +102,20 @@ def _apply_ledger_matching(output_file: str, equipment_ledger=None, oil_ledger=N
     if not equipment_ledger and not oil_ledger:
         return
 
-    try:
-        xl = pd.ExcelFile(output_file)
-    except Exception as ex:
-        logging.warning(f"无法读取输出文件进行台账匹配: {ex}")
-        return
+    if preloaded_sheets:
+        sheets_to_match = dict(preloaded_sheets)
+    else:
+        try:
+            xl = pd.ExcelFile(output_file)
+        except Exception as ex:
+            logging.warning(f"无法读取输出文件进行台账匹配: {ex}")
+            return
+        sheets_to_match = {name: xl.parse(name) for name in xl.sheet_names}
 
     sheet_data = {}
     matched_any = False
 
-    for sheet_name in xl.sheet_names:
-        df = xl.parse(sheet_name)
+    for sheet_name, df in sheets_to_match.items():
         cols = set(df.columns)
 
         # 设备匹配
@@ -210,6 +250,7 @@ def _execute_task(module_type: str, path: str, **kwargs) -> str | None:
     oil_ledger = kwargs.pop("oil_ledger", None)
 
     try:
+        worktime_sheets = None
         if module_type == "fuel":
             process_diesel_data(path, kwargs.get("year"))
         elif module_type == "production":
@@ -224,14 +265,17 @@ def _execute_task(module_type: str, path: str, **kwargs) -> str | None:
                 output_file = os.path.join(os.path.dirname(path) or ".", "合并产量.xlsx")
                 processor.process_single_file(path, output_file)
         elif module_type == "electrical":
-            parse_excel_data(path, kwargs.get("year"))
+            parse_excel_data(path, kwargs.get("year"),
+                             add_shift_column=kwargs.get("add_shift_column", False),
+                             default_shift=kwargs.get("default_shift", "Day"))
         elif module_type == "worktime":
             year = kwargs.get("year", 2025)
             month = kwargs.get("month", 1)
             header_mapping = kwargs.get("header_mapping", None)
             file_dir = os.path.dirname(path) or "."
             output_file = os.path.join(file_dir, f"{year}{month:02d}_工作效率表.xlsx")
-            process_excel_data(path, year, month, output_file, header_mapping=header_mapping)
+            worktime_sheets = process_excel_data(path, year, month, output_file,
+                                                 return_sheets=True, header_mapping=header_mapping)
         elif module_type == "merge":
             keyword = kwargs.get("keyword", "")
             strip_time = kwargs.get("strip_time", False)
@@ -243,7 +287,9 @@ def _execute_task(module_type: str, path: str, **kwargs) -> str | None:
         if equipment_ledger or oil_ledger:
             output_file = _get_output_file(module_type, path, **kwargs)
             if output_file and os.path.exists(output_file):
-                _apply_ledger_matching(output_file, equipment_ledger, oil_ledger)
+                sheets_data = worktime_sheets if module_type == "worktime" else None
+                _apply_ledger_matching(output_file, equipment_ledger, oil_ledger,
+                                       preloaded_sheets=sheets_data)
     except Exception as ex:
         error_message = str(ex)
 
@@ -252,14 +298,17 @@ def _execute_task(module_type: str, path: str, **kwargs) -> str | None:
 
 async def run_task(page: ft.Page, module_type: str, path: str, btn: ft.Button, log, **kwargs):
     """异步执行处理任务，按钮状态由调用方自行恢复"""
-    del page, btn  # 保留现有调用签名，避免影响其他调用方
+    del btn  # 保留现有调用签名，避免影响其他调用方
 
-    _log_message(log, f"[{module_type}] 开始处理...")
+    label = _MODULE_LABELS.get(module_type, module_type)
+    _log_message(log, f"[{label}] 开始处理...")
     error_message = await asyncio.to_thread(_execute_task, module_type, path, **kwargs)
     if error_message:
-        _log_message(log, f"[{module_type}] 处理失败: {error_message}", level=logging.ERROR)
+        _log_message(log, f"[{label}] 处理失败: {error_message}", level=logging.ERROR)
+        _show_snackbar(page, f"{label}处理失败", is_error=True)
     else:
-        _log_message(log, f"[{module_type}] 处理成功")
+        _log_message(log, f"[{label}] 处理成功")
+        _show_snackbar(page, f"{label}处理完成")
 
 
 # ---------------------------------------------------------------------------
@@ -315,8 +364,13 @@ async def on_elec_process(page: ft.Page, elec_refs: dict, log, equipment_ledger=
         return
 
     btn = elec_refs["btn"]
+    add_shift = elec_refs.get("add_shift")
+    default_shift_ref = elec_refs.get("default_shift")
     set_btn_state(btn, False, "处理中...")
-    await run_task(page, "electrical", path, btn, log, year=year, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
+    await run_task(page, "electrical", path, btn, log, year=year,
+                   add_shift_column=add_shift.value if add_shift else False,
+                   default_shift=default_shift_ref.value if default_shift_ref else "Day",
+                   equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
     set_btn_state(btn, True, "处理")
 
 
@@ -369,8 +423,73 @@ async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledge
     set_btn_state(btn, True, "合并")
 
 
+def _show_batch_progress(progress_row, progress_bar, progress_text, cancel_btn):
+    if progress_bar is not None:
+        progress_bar.value = 0.0
+        progress_bar.visible = True
+        progress_bar.update()
+    if progress_text is not None:
+        progress_text.value = "0%"
+        progress_text.visible = True
+        progress_text.update()
+    if cancel_btn is not None:
+        cancel_btn.disabled = False
+        cancel_btn.visible = True
+        cancel_btn.update()
+    if progress_row is not None:
+        progress_row.visible = True
+        progress_row.update()
+
+
+def _hide_batch_progress(progress_row, progress_bar, progress_text, cancel_btn):
+    if progress_bar is not None:
+        progress_bar.visible = False
+        progress_bar.update()
+    if progress_text is not None:
+        progress_text.visible = False
+        progress_text.update()
+    if cancel_btn is not None:
+        cancel_btn.visible = False
+        cancel_btn.update()
+    if progress_row is not None:
+        progress_row.visible = False
+        progress_row.update()
+
+
+def _handle_batch_cancel(cancel_event, cancel_btn):
+    if cancel_event is not None:
+        cancel_event.set()
+    if cancel_btn is not None:
+        cancel_btn.disabled = True
+        cancel_btn.update()
+
+
+async def _consume_batch_progress_queue(progress_queue, progress_bar, progress_text):
+    last_percent = None
+    while True:
+        try:
+            payload = progress_queue.get_nowait()
+        except Exception:
+            break
+        last_percent = payload.get("percent", last_percent)
+        if progress_bar is not None and last_percent is not None:
+            progress_bar.value = float(last_percent)
+            progress_bar.update()
+        if progress_text is not None and last_percent is not None:
+            progress_text.value = f"{int(last_percent * 100)}%"
+            progress_text.update()
+    if last_percent is not None:
+        if progress_bar is not None:
+            progress_bar.value = float(last_percent)
+            progress_bar.update()
+        if progress_text is not None:
+            progress_text.value = f"{int(last_percent * 100)}%"
+            progress_text.update()
+
+
 async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledger=None, oil_ledger=None):
     """批量处理按钮回调（带文件扫描 + 缺失确认弹窗）"""
+    import queue
     import threading
 
     path = batch_refs["path"].value
@@ -393,6 +512,19 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
 
     btn = batch_refs["btn"]
     set_btn_state(btn, False, "扫描中...")
+
+    progress_bar = batch_refs.get("progress_bar")
+    progress_text = batch_refs.get("progress_text")
+    progress_row = batch_refs.get("progress_row")
+    cancel_btn = batch_refs.get("cancel_btn")
+    cancel_event = batch_refs.get("cancel_event")
+    if cancel_event is None and cancel_btn is not None:
+        cancel_event = threading.Event()
+        batch_refs["cancel_event"] = cancel_event
+    if cancel_btn is not None:
+        cancel_btn.on_click = lambda e: _handle_batch_cancel(cancel_event, cancel_btn)
+    _show_batch_progress(progress_row, progress_bar, progress_text, cancel_btn)
+    progress_queue = queue.Queue()
 
     # ── 第一阶段：扫描文件 ──
     try:
@@ -475,17 +607,32 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
     # ── 第三阶段：执行处理 ──
     set_btn_state(btn, False, "处理中...")
     try:
-        await asyncio.to_thread(
-            process_files,
-            path, matched, year, month, raw_start, merge_output,
-            equipment_ledger, oil_ledger, filter_date,
-            worktime_header_mapping,
-            table_merge_config,
-        )
-        _log_message(log, "批量处理完成")
+        thread_result = {}
+        def _batch_target():
+            try:
+                thread_result["value"] = process_files(
+                    path, matched, year, month, raw_start, merge_output,
+                    equipment_ledger, oil_ledger, filter_date,
+                    worktime_header_mapping,
+                    table_merge_config,
+                    progress_cb=progress_queue.put_nowait,
+                    cancel_event=cancel_event,
+                )
+            except Exception as ex:
+                thread_result["error"] = ex
+
+        await asyncio.to_thread(_batch_target)
+        await _consume_batch_progress_queue(progress_queue, progress_bar, progress_text)
+        if "error" in thread_result:
+            raise thread_result["error"]
+        if cancel_event is not None and cancel_event.is_set():
+            _log_message(log, "用户取消了批量处理", level=logging.WARNING)
+        else:
+            _log_message(log, "批量处理完成")
     except Exception as ex:
         _log_message(log, f"批量处理失败: {ex}", level=logging.ERROR)
     finally:
+        _hide_batch_progress(progress_row, progress_bar, progress_text, cancel_btn)
         set_btn_state(btn, True, "批量处理")
 
 
@@ -506,7 +653,14 @@ def wire_processing_buttons(module_refs: dict, page: ft.Page, log, ledger_refs: 
         if not toggle or not toggle.value:
             return None, None
         eq = ledger_refs.get("get_ledger", lambda: None)()
-        oil = oil_ledger_refs.get("get_oil_ledger", lambda: None)()
+        oil = oil_ledger_refs.get("get_oil", lambda: None)()
+        # 日志：显示台账加载状态
+        if eq is None and oil is None:
+            logging.warning("台账匹配已启用，但设备台账和油品台账均未加载")
+        elif eq is None:
+            logging.warning("设备台账未加载，设备匹配将被跳过")
+        elif oil is None:
+            logging.warning("油品台账未加载，油品匹配将被跳过")
         return eq, oil
 
     async def handle_fuel_click(e: ft.ControlEvent):
@@ -541,7 +695,7 @@ def wire_processing_buttons(module_refs: dict, page: ft.Page, log, ledger_refs: 
             batch_toggle = module_refs["batch"].get("ledger_toggle")
             if batch_toggle and batch_toggle.value:
                 eq = ledger_refs.get("get_ledger", lambda: None)()
-                oil = oil_ledger_refs.get("get_oil_ledger", lambda: None)()
+                oil = oil_ledger_refs.get("get_oil", lambda: None)()
             else:
                 eq, oil = None, None
             await on_batch_process(page, module_refs["batch"], log, equipment_ledger=eq, oil_ledger=oil)

@@ -79,7 +79,7 @@ class OilLedgerRefs(TypedDict):
     oil_table: ft.DataTable
     oil_path_label: ft.Text
     oil_records: list[dict]
-    get_oil_ledger: Callable[[], Any]
+    get_oil: Callable[[], Any]
 
 
 class LogViewRefs(TypedDict):

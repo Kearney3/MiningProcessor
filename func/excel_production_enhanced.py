@@ -114,7 +114,6 @@ class MiningDataProcessor:
         """
         for col in columns:
             col_str = self.safe_str(col)
-            # print(f"当前列名: {col}, 关键字: {keywords}")
             # 判断 keywords 是否是嵌套列表 (list of lists)
             if keywords and isinstance(keywords[0], list):
                 # 嵌套模式：需要满足某一组内的所有关键字 (AND 逻辑)

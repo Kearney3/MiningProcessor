@@ -5,7 +5,7 @@ import pytest
 import pandas as pd
 import numpy as np
 
-from func.string_utils import clean_string, clean_pandas_strings
+from func.string_utils import clean_string
 
 
 class TestCleanString:
@@ -127,45 +127,3 @@ class TestCleanString:
     def test_mongolian_with_newline(self):
         assert clean_string("Мото цагийн\nзаалт") == "Мото цагийн заалт"
 
-
-class TestCleanPandasStrings:
-    """测试 clean_pandas_strings 函数"""
-
-    def test_cleans_object_columns(self):
-        df = pd.DataFrame({
-            "name": ["  Alice  ", "Bob\nSmith", "Charlie\tJr"],
-            "value": [1, 2, 3],
-        })
-        result = clean_pandas_strings(df)
-        assert result["name"].tolist() == ["Alice", "Bob Smith", "Charlie Jr"]
-        assert result["value"].tolist() == [1, 2, 3]  # 数值列不受影响
-
-    def test_specific_columns(self):
-        df = pd.DataFrame({
-            "a": ["  hello  ", "  world  "],
-            "b": ["  keep  spaces  ", "  as is  "],
-        })
-        result = clean_pandas_strings(df, columns=["a"])
-        assert result["a"].tolist() == ["hello", "world"]
-        # b 列未指定，保持原样
-        assert result["b"].tolist() == ["  keep  spaces  ", "  as is  "]
-
-    def test_empty_dataframe(self):
-        df = pd.DataFrame()
-        result = clean_pandas_strings(df)
-        assert result.empty
-
-    def test_no_object_columns(self):
-        df = pd.DataFrame({"x": [1, 2], "y": [3.0, 4.0]})
-        result = clean_pandas_strings(df)
-        assert result["x"].tolist() == [1, 2]
-
-    def test_handles_nan_in_object_column(self):
-        df = pd.DataFrame({"name": ["  Alice  ", np.nan, "  Bob  "]})
-        result = clean_pandas_strings(df)
-        assert result["name"].tolist() == ["Alice", "", "Bob"]
-
-    def test_returns_same_reference(self):
-        df = pd.DataFrame({"name": ["test"]})
-        result = clean_pandas_strings(df)
-        assert result is df  # 原地修改

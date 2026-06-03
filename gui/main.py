@@ -244,6 +244,9 @@ def main(page: ft.Page):
         except RuntimeError:
             pass
 
+    _log_export_picker = ft.FilePicker()
+    page.services.append(_log_export_picker)
+
     def _build_export_text() -> str:
         return "\n".join(str(record["message"]) for record in _get_filtered_log_records())
 
@@ -255,8 +258,7 @@ def main(page: ft.Page):
         log(f"日志已导出: {export_path}")
 
     async def _export_logs(_e: ft.ControlEvent):
-        picker = ft.FilePicker()
-        path = await picker.save_file(
+        path = await _log_export_picker.save_file(
             dialog_title="导出日志",
             file_name=f"logs-{datetime.now().strftime('%Y-%m-%d')}.txt",
             allowed_extensions=["txt", "log"],
@@ -381,12 +383,6 @@ def main(page: ft.Page):
 
     # ---- 绑定处理按钮 ----
     logic.wire_processing_buttons(module_refs, page, log, ledger_refs, oil_ledger_refs)
-
-    # ---- 自动加载默认台账缓存 ----
-    if ledger_refs.get("load_from_cache"):
-        ledger_refs["load_from_cache"]()
-    if oil_ledger_refs.get("load_from_cache"):
-        oil_ledger_refs["load_from_cache"]()
 
     # ---- 侧边栏导航（分组） ----
     nav_groups = [

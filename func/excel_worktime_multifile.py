@@ -6,79 +6,29 @@ import argparse
 
 from func.logger import get_logger
 from func.string_utils import clean_string
+from func.excel_utils import split_day_night_shifts, clean_split_dataframe, strip_date_column, sort_by_date_shift
 logger = get_logger(__name__)
 
 
 def extract_data_from_sheet(df_raw, year, month, day):
-    """
+    “””
     核心业务逻辑：从单个 DataFrame 中提取白班和夜班数据
-    """
-    date_str = f"{year}-{month:02d}-{day:02d}"
+    “””
+    date_str = f”{year}-{month:02d}-{day:02d}”
 
-    # 表头在第2行 (index 1)
     if len(df_raw) < 2:
         return None
 
-    header_row = df_raw.iloc[1]
-
-    # 找出表头中有效的列（非NaN且非空白）用于比对
-    valid_mask = header_row.notna() & (header_row.apply(lambda x: clean_string(x)) != '')
-    valid_cols = valid_mask[valid_mask].index.tolist()
-    valid_headers = header_row[valid_cols].apply(clean_string).tolist()
-
-    if not valid_headers:
+    # 分割 Day/Night 班次（day_end_offset=0 对应原 multifile 行为）
+    combined_day_df = split_day_night_shifts(df_raw, day_end_offset=0)
+    if combined_day_df is None or combined_day_df.empty:
         return None
 
-    split_idx = -1
-    # 从第3行（index 2）开始向下遍历，寻找再次出现的表头
-    for idx in range(2, len(df_raw)):
-        current_row_vals = df_raw.iloc[idx][valid_cols].apply(clean_string).tolist()
-        if current_row_vals[0] == valid_headers[0]:
-            split_idx = idx
-            break
-
-    if split_idx == -1:
-        # 没有找到夜班表头，视作全白班
-        day_data = df_raw.iloc[2:].copy()
-        day_data.columns = header_row
-        day_data['班次'] = 'Day'
-        combined_day_df = day_data
-    else:
-        # 处理白班数据 (从第3行 到 夜班表头前一行)
-        day_data = df_raw.iloc[2:split_idx].copy()
-        day_data.columns = header_row
-        day_data['班次'] = 'Day'
-
-        # 处理夜班数据 (从夜班表头的下一行 到最后)
-        night_data = df_raw.iloc[split_idx + 1:].copy()
-        night_data.columns = header_row
-        night_data['班次'] = 'Night'
-
-        combined_day_df = pd.concat([day_data, night_data], axis=0, ignore_index=True)
-
     # 插入日期列到第一列
-    combined_day_df.insert(0, '日期', date_str)
+    combined_day_df.insert(0, “日期”, date_str)
 
-    # 清理：忽略空表头列
-    combined_day_df = combined_day_df.loc[:, combined_day_df.columns.notna()]
-    if '' in combined_day_df.columns:
-        combined_day_df = combined_day_df.drop(columns=[''])
-
-    # 去掉第二列(索引为1的列)为空的行 (保留你原有的清理逻辑)
-    if len(combined_day_df.columns) > 1:
-        check_idx = -1
-        # 找到包含”Техникийн”的列索引
-        for idx, col in enumerate(combined_day_df.columns):
-            if 'Техникийн' in col:
-                check_idx = idx
-                break
-        if check_idx != -1:
-            check_col = combined_day_df.columns[check_idx]
-            combined_day_df.dropna(subset=[check_col], inplace=True)
-
-    # 去掉除了“日期”和“班次”之外全部为空的行
-    subset_cols = [c for c in combined_day_df.columns if c not in ['日期', '班次']]
-    combined_day_df.dropna(how='all', subset=subset_cols, inplace=True)
+    # 清洗
+    combined_day_df = clean_split_dataframe(combined_day_df)
 
     return combined_day_df
 
@@ -166,8 +116,8 @@ def process_directory(base_dir, year, month, output_file):
     final_df = pd.concat(all_data, axis=0, ignore_index=True)
 
     # 排序与列格式化
-    final_df['日期'] = pd.to_datetime(final_df['日期'], format='%Y-%m-%d').dt.date
-    final_df.sort_values(by=['日期', '班次'], ascending=[True, True], inplace=True)
+    strip_date_column(final_df, date_format="%Y-%m-%d")
+    sort_by_date_shift(final_df)
 
     # 将日期和班次强制排在最前面
     other_cols = [col for col in final_df.columns if col not in ['日期', '班次']]

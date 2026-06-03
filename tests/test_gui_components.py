@@ -37,8 +37,24 @@ main_spec.loader.exec_module(gui_main)
 
 
 class DummyPage:
+    def __init__(self):
+        self.overlay = []
+        self.services = []
+        self._dialogs = []
+
     def update(self):
         pass
+
+    def show_dialog(self, dialog):
+        dialog.open = True
+        self._dialogs.append(dialog)
+
+    def pop_dialog(self):
+        for dlg in reversed(self._dialogs):
+            if dlg.open:
+                dlg.open = False
+                return dlg
+        return None
 
 
 class WindowSpy:
@@ -56,6 +72,7 @@ class PageSpy:
         self.theme = None
         self.window = WindowSpy()
         self.controls = []
+        self.services = []
         self.thread_calls = []
         self.on_close = None
         self.on_disconnect = None
@@ -419,20 +436,29 @@ def test_restore_default_button_loads_builtin_config_file(monkeypatch, tmp_path)
         encoding="utf-8",
     )
     monkeypatch.setattr(config_loader, "get_config_file_path", lambda: built_in_config)
+    monkeypatch.setattr(config_loader, "get_default_load_map", lambda version="new": {"NTE240": 90} if version == "new" else {"NTE240": 80})
 
-    _, refs = components.create_config_section(DummyPage(), logs.append)
+    page = DummyPage()
+    _, refs = components.create_config_section(page, logs.append)
     refs["set_config_state"]([
         {"selected": False, "device": "TEMP", "capacity": "1"},
     ])
 
     restore_button = _find_button(refs, "恢复默认")
 
+    # 点击恢复默认按钮，弹出版本选择对话框
     restore_button.on_click(DummyControlEvent())
+    assert len(page._dialogs) == 1
+
+    # 找到"新版配置"按钮并点击
+    dialog = page._dialogs[0]
+    new_version_btn = dialog.actions[2]  # "新版配置"是第三个按钮
+    new_version_btn.on_click(DummyControlEvent())
 
     assert _config_table_values(refs) == [
         {"selected": False, "device": "NTE240", "capacity": "90"}
     ]
-    assert logs[-1] == "已恢复默认配置"
+    assert logs[-1] == "已恢复新版默认配置"
 
 
 
@@ -941,8 +967,9 @@ def test_column_mapping_confirm_works_via_show_dialog():
     """
     page = PageSpy()
     confirmed = []
+    _STANDARD_COLS = [("设备名称", "设备的原始名称")]
     dialog = components.create_column_mapping_dialog(
-        page, ["设备名称"], lambda m, s: confirmed.append((m, s))
+        page, ["设备名称"], _STANDARD_COLS, lambda m, s: confirmed.append((m, s))
     )
     page.show_dialog(dialog)
     assert dialog.open is True
@@ -961,10 +988,11 @@ def test_column_mapping_cancel_closes_dialog():
     """Clicking '取消' on the column mapping dialog must close it."""
     page = PageSpy()
     columns = ["设备名称", "设备编号", "公司"]
+    _STANDARD_COLS = [("设备名称", ""), ("设备编号", ""), ("公司", "")]
     confirmed = []
 
     dialog = components.create_column_mapping_dialog(
-        page, columns, lambda m, s: confirmed.append((m, s))
+        page, columns, _STANDARD_COLS, lambda m, s: confirmed.append((m, s))
     )
 
     # Open the dialog via page API
@@ -990,10 +1018,11 @@ def test_column_mapping_confirm_closes_dialog():
     """Clicking '确认导入' on the column mapping dialog must close it and call on_confirm."""
     page = PageSpy()
     columns = ["设备名称", "设备编号", "公司"]
+    _STANDARD_COLS = [("设备名称", ""), ("设备编号", ""), ("公司", "")]
     confirmed = []
 
     dialog = components.create_column_mapping_dialog(
-        page, columns, lambda m, s: confirmed.append((m, s))
+        page, columns, _STANDARD_COLS, lambda m, s: confirmed.append((m, s))
     )
 
     # Open the dialog via page API
@@ -1019,10 +1048,11 @@ def test_oil_column_mapping_cancel_closes_dialog():
     """Clicking '取消' on the oil column mapping dialog must close it."""
     page = PageSpy()
     columns = ["油品名称", "标准油品名称"]
+    _OIL_STANDARD_COLS = [("油品名称", ""), ("标准油品名称", "")]
     confirmed = []
 
-    dialog = components.create_oil_column_mapping_dialog(
-        page, columns, lambda m, s: confirmed.append((m, s))
+    dialog = components.create_column_mapping_dialog(
+        page, columns, _OIL_STANDARD_COLS, lambda m, s: confirmed.append((m, s)), height=300
     )
 
     page.show_dialog(dialog)
