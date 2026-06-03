@@ -110,7 +110,7 @@ MiningProcessor/
 │   ├── excel_utils.py          # Excel 共享工具（日期标准化、排序、班次分割）
 │   └── excel_*.py              # 各报表处理器
 ├── config.json                 # 持久化配置
-├── tests/                      # pytest 测试（274 个用例）
+├── tests/                      # pytest 测试（277 个用例）
 ├── assets/fonts/               # GUI 字体资源（MiSans 可变字体）
 ├── Notebook/                   # Jupyter 探索性分析笔记本
 ├── docs/                       # 文档目录
@@ -178,7 +178,7 @@ MiningProcessor/
 ## 测试
 
 ```bash
-# 运行全部测试（274 个用例）
+# 运行全部测试（277 个用例）
 uv run pytest
 
 # 运行指定测试文件
