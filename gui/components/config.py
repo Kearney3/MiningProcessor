@@ -314,9 +314,8 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
         path = files[0].path
         _update_last_directory(path)
         try:
-            import json as _json
             with open(path, "r", encoding="utf-8") as f:
-                data = _json.load(f)
+                data = json.load(f)
             imported = data.get("device_load_map", {})
             if not imported:
                 _log_message(log, "文件不含 device_load_map", level=logging.WARNING)

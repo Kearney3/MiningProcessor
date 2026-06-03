@@ -19,6 +19,9 @@ from func.logger import get_logger
 from func.string_utils import clean_string
 
 
+logger = get_logger(__name__)
+
+
 def _check_cancel(cancel_event) -> bool:
     return cancel_event is not None and cancel_event.is_set()
 
@@ -30,8 +33,6 @@ def _emit_progress(progress_cb, payload):
         progress_cb(payload)
     except Exception:
         logger.debug("progress_cb failed", exc_info=True)
-
-logger = get_logger(__name__)
 
 MODULE_LABELS = {
     "fuel": "燃油数据",
