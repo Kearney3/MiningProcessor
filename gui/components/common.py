@@ -3,6 +3,7 @@ import flet as ft
 import logging
 import math
 import threading
+import pandas as pd
 from pathlib import Path
 
 from func.config_loader import get_user_config, update_user_config
