@@ -94,16 +94,24 @@ class LogViewRefs(TypedDict):
     _is_at_bottom: list[bool]
 
 
+class SyncRefs(TypedDict):
+    path: ft.TextField
+    mode: Any  # ChipToggle
+    types: dict[str, ft.Checkbox]
+    dry_run: ft.Checkbox
+    btn: ft.Button
+    result_text: ft.Text
+
+
 class UserConfigRefs(TypedDict):
-    action_buttons: list[ft.Button]
-    action_button_rows: list[ft.Row]
-    db_type: ft.Dropdown
-    db_host: ft.TextField
-    db_port: ft.TextField
-    db_name: ft.TextField
-    db_user: ft.TextField
-    db_password: ft.TextField
-    status_text: ft.Text
-    reload_database_config: Callable[[], None]
-    save_database_config: Callable[[Any], None]
-    reset_database_config: Callable[[Any], None]
+    mb_mode: ft.Dropdown
+    mb_db_host: ft.TextField
+    mb_db_port: ft.TextField
+    mb_db_name: ft.TextField
+    mb_db_user: ft.TextField
+    mb_db_pass: ft.TextField
+    mb_status_text: ft.Text
+    mb_action_buttons: list[ft.Button]
+    reload_mb_config: Callable[[], None]
+    save_mb_config: Callable[[Any], None]
+    reset_mb_config: Callable[[Any], None]

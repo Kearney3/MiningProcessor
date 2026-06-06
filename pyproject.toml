@@ -11,6 +11,7 @@ dependencies = [
     "flet>=0.21.0",
     "xlsxwriter>=3.0.0",
     "rapidfuzz>=3.0.0",
+    "psycopg2-binary>=2.9.9",
 ]
 
 [project.scripts]
@@ -21,6 +22,7 @@ production = "func.excel_production_enhanced:main"
 worktime = "func.excel_worktime:main"
 worktime-batch = "func.excel_worktime_multifile:main"
 merge = "func.excel_merger:main"
+sync-minebase = "func.sync_to_minebase:main"
 
 [dependency-groups]
 dev = [

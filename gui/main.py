@@ -380,15 +380,18 @@ def main(page: ft.Page):
     batch_section, batch_refs = cmp.create_batch_section(page)
     module_refs["batch"] = batch_refs
     ledger_match_section, ledger_match_refs = cmp.create_ledger_match_section(page, log, ledger_refs, oil_ledger_refs)
+    sync_section, sync_refs = cmp.create_sync_section(page)
 
     # ---- 绑定处理按钮 ----
     logic.wire_processing_buttons(module_refs, page, log, ledger_refs, oil_ledger_refs)
+    logic.wire_sync_button(sync_refs, page, log)
 
     # ---- 侧边栏导航（分组） ----
     nav_groups = [
         ("工作区", [
             ("数据处理", ft.Icons.PLAY_ARROW, "modules"),
             ("批量处理", ft.Icons.BOLT, "batch"),
+            ("数据同步", ft.Icons.CLOUD_SYNC, "sync"),
             ("台账匹配", ft.Icons.MANAGE_SEARCH, "ledger_match"),
         ]),
         ("管理", [
@@ -404,6 +407,7 @@ def main(page: ft.Page):
     pages = {
         "modules": ft.Column([modules_section], expand=True, spacing=8),
         "batch": ft.Column([batch_section], expand=True, spacing=8),
+        "sync": ft.Column([sync_section], expand=True, spacing=8),
         "ledger_match": ft.Column([ledger_match_section], expand=True, spacing=8),
         "ledger": ft.Column([ledger_section], expand=True, spacing=8),
         "oil_ledger": ft.Column([oil_ledger_section], expand=True, spacing=8),
