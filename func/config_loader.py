@@ -452,3 +452,82 @@ def clear_oil_ledger_cache() -> None:
 
 def has_oil_ledger_cache() -> bool:
     return _OIL_LEDGER_CACHE.exists()
+
+
+# ---------------------------------------------------------------------------
+# MineBase 同步配置
+# ---------------------------------------------------------------------------
+
+_MINEBASE_CONFIG_FALLBACK: dict[str, Any] = {
+    "mode": "api",
+    "api": {"url": "http://localhost:3000", "username": "", "password": ""},
+    "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "postgres", "password": ""},
+}
+
+
+def get_minebase_config() -> dict[str, Any]:
+    """获取 MineBase 同步配置（config.json 默认值 + config.user.json 覆盖）。"""
+    config = load_config()
+    return _deep_merge(_MINEBASE_CONFIG_FALLBACK, config.get("minebase", {}))
+
+
+def get_minebase_config_default() -> dict[str, Any]:
+    """获取 MineBase 同步的默认配置（仅 config.json，不含用户覆盖）。"""
+    config = _load_json(_CONFIG_FILE)
+    return dict(config.get("minebase", {}))
+
+
+def get_minebase_mode() -> str:
+    """获取 MineBase 同步模式：'api' 或 'database'。"""
+    return get_minebase_config().get("mode", "api")
+
+
+def get_minebase_api_config() -> dict[str, Any]:
+    """获取 MineBase API 模式配置。"""
+    return get_minebase_config().get("api", {})
+
+
+def get_minebase_db_config() -> dict[str, Any]:
+    """获取 MineBase 数据库直连模式配置。"""
+    return get_minebase_config().get("database", {})
+
+
+def save_minebase_config(minebase_cfg: dict[str, Any]) -> None:
+    """保存 MineBase 配置到 config.user.json。"""
+    update_user_config({"minebase": minebase_cfg})
+
+
+# ---------------------------------------------------------------------------
+# MineBase 列映射
+# ---------------------------------------------------------------------------
+
+# 用户自定义映射的独立文件路径（不在 config.user.json 中，方便单独管理）
+_MINEBASE_MAPPING_FILE = Path(__file__).parent.parent / "minebase_column_mapping.json"
+
+
+def get_minebase_column_mapping() -> dict[str, dict[str, str]]:
+    """获取 MineBase 列映射配置。
+
+    优先读取 minebase_column_mapping.json（用户自定义），
+    不存在时回退到 config.json 中的默认值。
+    """
+    if _MINEBASE_MAPPING_FILE.exists():
+        try:
+            with open(_MINEBASE_MAPPING_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    # 回退到 config.json 中的默认值
+    config = _load_json(_CONFIG_FILE)
+    return dict(config.get("minebase_column_mapping", {}))
+
+
+def save_minebase_column_mapping(mapping: dict[str, dict[str, str]]) -> None:
+    """保存用户自定义列映射到独立 JSON 文件。"""
+    _save_json(_MINEBASE_MAPPING_FILE, mapping)
+
+
+def reset_minebase_column_mapping() -> None:
+    """删除用户自定义映射文件，恢复为 config.json 中的默认值。"""
+    if _MINEBASE_MAPPING_FILE.exists():
+        _MINEBASE_MAPPING_FILE.unlink()

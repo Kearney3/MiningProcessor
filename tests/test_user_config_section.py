@@ -15,7 +15,7 @@ import flet as ft
 
 
 def _find_button(refs, label):
-    for button in refs["action_buttons"]:
+    for button in refs["mb_action_buttons"]:
         for attr in ("text", "value"):
             if getattr(button, attr, None) == label:
                 return button
@@ -63,12 +63,12 @@ def _reset_runtime_config():
 def test_user_config_section_contains_expected_action_buttons():
     _, refs = components.create_user_config_section(DummyPage(), lambda message: None)
 
-    assert _find_button(refs, "保存数据库配置") is not None
+    assert _find_button(refs, "保存配置") is not None
     assert _find_button(refs, "重新加载") is not None
     assert _find_button(refs, "恢复默认") is not None
 
 
-def test_user_config_save_persists_database_section(monkeypatch, tmp_path):
+def test_user_config_save_persists_minebase_config(monkeypatch, tmp_path):
     logs = []
     config_file = tmp_path / "config.json"
     config_file.write_text(json.dumps({}), encoding="utf-8")
@@ -79,19 +79,20 @@ def test_user_config_save_persists_database_section(monkeypatch, tmp_path):
     page = PageSpy()
     _, refs = components.create_user_config_section(page, logs.append)
 
-    refs["db_type"].value = "mysql"
-    refs["db_host"].value = "127.0.0.1"
-    refs["db_port"].value = "5432"
-    refs["db_name"].value = "mining"
-    refs["db_user"].value = "admin"
-    refs["db_password"].value = "secret"
+    refs["mb_mode"].value = "database"
+    refs["mb_db_host"].value = "127.0.0.1"
+    refs["mb_db_port"].value = "5432"
+    refs["mb_db_name"].value = "minebase"
+    refs["mb_db_user"].value = "admin"
+    refs["mb_db_pass"].value = "secret"
 
-    refs["save_database_config"](DummyControlEvent())
+    refs["save_mb_config"](DummyControlEvent())
 
     saved = json.loads(user_file.read_text(encoding="utf-8"))
-    assert saved["user_config"]["database"]["db_port"] == 5432
-    assert saved["user_config"]["database"]["db_host"] == "127.0.0.1"
-    assert logs[-1] == "已保存数据库连接配置"
+    assert saved["user_config"]["minebase"]["mode"] == "database"
+    assert saved["user_config"]["minebase"]["database"]["host"] == "127.0.0.1"
+    assert saved["user_config"]["minebase"]["database"]["port"] == 5432
+    assert logs[-1] == "已保存 MineBase 连接配置"
 
 
 def test_user_config_invalid_port_shows_error(monkeypatch, tmp_path):
@@ -103,9 +104,9 @@ def test_user_config_invalid_port_shows_error(monkeypatch, tmp_path):
     monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", user_file)
 
     _, refs = components.create_user_config_section(PageSpy(), logs.append)
-    refs["db_port"].value = "99999"
+    refs["mb_db_port"].value = "99999"
 
-    refs["save_database_config"](DummyControlEvent())
+    refs["save_mb_config"](DummyControlEvent())
 
-    assert refs["db_port"].error_text == "端口必须在 0-65535 之间"
-    assert logs[-1] == "保存数据库配置失败：端口不合法"
+    assert refs["mb_db_port"].error_text == "端口必须在 0-65535 之间"
+    assert logs[-1] == "保存 MineBase 配置失败：端口不合法"

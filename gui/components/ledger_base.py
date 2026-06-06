@@ -200,11 +200,14 @@ def create_ledger_section_factory(
     next_btn.on_click = _on_next
 
     # --- 操作函数 ---
+    # 用于在 on_import 和 _do_import 之间传递选中的文件路径
+    _selected_file = [None]
+
     def _do_import(mapping: dict, skip_header: bool):
         """列映射确认后的导入逻辑"""
         nonlocal records
         try:
-            file_path = _last_directory[0]
+            file_path = _selected_file[0]
             if not file_path or not os.path.exists(file_path):
                 _log_message(log, "未选择文件")
                 return
@@ -257,6 +260,7 @@ def create_ledger_section_factory(
         if not files:
             return
         file_path = files[0].path
+        _selected_file[0] = file_path  # 保存文件路径供 _do_import 使用
         _update_last_directory(file_path)
         try:
             df = pd.read_excel(file_path)
@@ -270,19 +274,30 @@ def create_ledger_section_factory(
         except Exception as ex:
             _log_message(log, f"读取{cfg.label_prefix}文件失败: {ex}", level=logging.ERROR)
 
-    def on_export_template(e):
+    async def on_export_template(e):
         """导出模板"""
         try:
+            # 使用文件选择器让用户选择保存位置
+            picker = ft.FilePicker()
+            save_path = await picker.save_file(
+                dialog_title=f"保存{cfg.template_filename}",
+                file_name=cfg.template_filename,
+                initial_directory=_last_directory[0] if _last_directory[0] else None,
+                allowed_extensions=["xlsx"],
+            )
+            if not save_path:
+                return
+
             backend_class = getattr(cfg.backend_module, cfg.backend_class_name)
             instance = backend_class()
-            path = os.path.join(os.getcwd(), cfg.template_filename)
             if hasattr(instance, 'export_template'):
-                instance.export_template(path)
+                instance.export_template(save_path)
             else:
                 # 回退：创建空模板
                 df = pd.DataFrame(columns=cfg.columns)
-                df.to_excel(path, index=False)
-            _log_message(log, f"已导出模板: {path}")
+                df.to_excel(save_path, index=False)
+            _update_last_directory(save_path)
+            _log_message(log, f"已导出模板: {save_path}")
         except Exception as ex:
             _log_message(log, f"导出模板失败: {ex}", level=logging.ERROR)
 

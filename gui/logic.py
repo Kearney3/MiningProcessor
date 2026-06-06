@@ -14,6 +14,7 @@ from func.excel_electrical import parse_excel_data
 from func.excel_worktime import process_excel_data
 from func.excel_merger import merge_excel_files
 from func.excel_batch import scan_files, process_files, MODULE_LABELS
+from func.sync_to_minebase import sync as sync_to_minebase
 
 
 from gui.components.common import _log_message
@@ -700,6 +701,96 @@ def wire_processing_buttons(module_refs: dict, page: ft.Page, log, ledger_refs: 
                 eq, oil = None, None
             await on_batch_process(page, module_refs["batch"], log, equipment_ledger=eq, oil_ledger=oil)
         module_refs["batch"]["btn"].on_click = handle_batch_click
+
+
+async def on_sync_process(page: ft.Page, sync_refs: dict, log):
+    """MineBase 同步按钮回调"""
+    path = sync_refs["path"].value
+    if not path:
+        _log_message(log, "[数据同步] 请先选择输出目录", level=logging.WARNING)
+        _show_snackbar(page, "请选择输出目录", is_error=True)
+        return
+
+    mode_toggle = sync_refs["mode"]
+    mode = mode_toggle.value if mode_toggle else "api"
+
+    type_checks = sync_refs["types"]
+    selected_types = [k for k, cb in type_checks.items() if cb.value]
+    if not selected_types:
+        _log_message(log, "[数据同步] 请至少选择一种数据类型", level=logging.WARNING)
+        _show_snackbar(page, "请选择数据类型", is_error=True)
+        return
+
+    dry_run = sync_refs["dry_run"].value
+    btn = sync_refs["btn"]
+    result_text = sync_refs["result_text"]
+
+    set_btn_state(btn, False, "同步中...")
+    result_text.visible = False
+    result_text.update()
+
+    try:
+        _log_message(log, f"[数据同步] 开始同步 (模式={mode}, 类型={selected_types}, 预览={dry_run})")
+
+        def _do_sync():
+            return sync_to_minebase(
+                input_dir=path,
+                mode=mode,
+                data_types=selected_types,
+                dry_run=dry_run,
+            )
+
+        results = await asyncio.to_thread(_do_sync)
+
+        if not results:
+            _log_message(log, "[数据同步] 未找到可同步的文件", level=logging.WARNING)
+            _show_snackbar(page, "未找到可同步的文件", is_error=True)
+            result_text.value = "未找到可同步的文件"
+            result_text.color = "#F59E0B"
+            result_text.visible = True
+            result_text.update()
+            return
+
+        total = {"success": 0, "skipped": 0, "failed": 0}
+        for r in results.values():
+            for k in total:
+                total[k] += r.get(k, 0)
+
+        summary = f"成功: {total['success']}  跳过: {total['skipped']}  失败: {total['failed']}"
+        _log_message(log, f"[数据同步] 同步完成 — {summary}")
+
+        if total["failed"] > 0:
+            result_text.value = summary
+            result_text.color = "#EF4444"
+            _show_snackbar(page, f"同步完成（有 {total['failed']} 行失败）", is_error=True)
+        elif dry_run:
+            result_text.value = f"[预览] {summary}"
+            result_text.color = "#0891B2"
+            _show_snackbar(page, "预览完成")
+        else:
+            result_text.value = summary
+            result_text.color = "#10B981"
+            _show_snackbar(page, "同步完成")
+
+        result_text.visible = True
+        result_text.update()
+
+    except Exception as ex:
+        _log_message(log, f"[数据同步] 同步失败: {ex}", level=logging.ERROR)
+        _show_snackbar(page, "同步失败", is_error=True)
+        result_text.value = f"失败: {ex}"
+        result_text.color = "#EF4444"
+        result_text.visible = True
+        result_text.update()
+    finally:
+        set_btn_state(btn, True, "同步到 MineBase")
+
+
+def wire_sync_button(sync_refs: dict, page: ft.Page, log):
+    """绑定 MineBase 同步按钮"""
+    async def handle_sync_click(e: ft.ControlEvent):
+        await on_sync_process(page, sync_refs, log)
+    sync_refs["btn"].on_click = handle_sync_click
 
 
 def init(config_section_refs: dict):

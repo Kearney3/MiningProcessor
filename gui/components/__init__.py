@@ -10,6 +10,7 @@ from .modules import create_modules_section
 from .batch import create_batch_section
 from .log_view import create_log_view
 from .user_config import create_user_config_section
+from .sync_minebase import create_sync_section
 
 __all__ = [
     "_log_message",
@@ -22,4 +23,5 @@ __all__ = [
     "create_log_view",
     "create_user_config_section",
     "create_batch_section",
+    "create_sync_section",
 ]
