@@ -128,8 +128,9 @@ def read_and_map_excel(
         logger.info("Excel 文件为空: %s", file_path)
         return []
 
-    # 只保留映射中存在的列
-    source_cols = [c for c in df.columns if c in column_mapping]
+    # 只保留映射中存在的列，排除标记为 __SKIP__ 的列
+    _SKIP = "__SKIP__"
+    source_cols = [c for c in df.columns if c in column_mapping and column_mapping[c] != _SKIP]
     if not source_cols:
         logger.warning("Excel 中没有匹配到映射列: %s (列: %s)", file_path, list(df.columns))
         return []
