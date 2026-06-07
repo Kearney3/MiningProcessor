@@ -138,7 +138,7 @@ def make_collapsible(
 
     body = ft.Container(
         content=ft.Column(content_controls, spacing=8),
-        padding=ft.Padding.only(left=12, right=12, bottom=12),
+        padding=ft.Padding.only(left=SPACING_MD, right=SPACING_MD, bottom=SPACING_MD),
         visible=initially_expanded,
     )
 
@@ -174,7 +174,7 @@ def make_collapsible(
             ],
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         ),
-        padding=ft.Padding.symmetric(horizontal=12, vertical=10),
+        padding=ft.Padding.symmetric(horizontal=SPACING_MD, vertical=10),
         on_click=_toggle,
         ink=True,
     )

@@ -74,10 +74,16 @@ def _make_refs(tmp_path, cancel_event=None, progress_bar=None, progress_text=Non
 
 
 class FakePage:
+    def __init__(self):
+        self.overlay = []
+
     def pop_dialog(self):
         pass
 
     def show_dialog(self, dialog):
+        pass
+
+    def update(self):
         pass
 
 

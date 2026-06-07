@@ -1,4 +1,6 @@
 """GUI 组件共享工具函数与状态"""
+from datetime import datetime
+
 import flet as ft
 import logging
 import math
@@ -19,6 +21,12 @@ def _get_initial_directory() -> str | None:
     if d and Path(d).is_dir():
         return d
     return None
+
+
+def year_options(start_offset: int = -5, end_offset: int = 10) -> list[ft.dropdown.Option]:
+    """生成年份下拉选项列表，基于当前年份动态计算范围。"""
+    current = datetime.now().year
+    return [ft.dropdown.Option(str(y)) for y in range(current + start_offset, current + end_offset + 1)]
 
 
 def _log_message(log, message: str, level: int = logging.INFO):

@@ -523,7 +523,7 @@ def create_ledger_match_section(
 
         except Exception as ex:
             file_label.value = f"读取失败: {ex}"
-            file_label.color = ft.Colors.RED
+            file_label.color = theme.ERROR
             _log_message(log, f"读取文件失败: {ex}", level=logging.ERROR)
             _hide_import_progress()
             page.update()
@@ -565,7 +565,8 @@ def create_ledger_match_section(
         page.update()
     # ========================================================================
 
-    def on_clear(e):
+    def _do_clear_impl():
+        """清空的实际逻辑"""
         _hide_import_progress()
         _matched_sheets.clear()
         _unmatched_sheets.clear()
@@ -597,6 +598,27 @@ def create_ledger_match_section(
         data_table.rows = []
         _log_message(log, "已清空")
         page.update()
+
+    def _do_clear_confirmed(e):
+        page.pop_dialog()
+        _do_clear_impl()
+
+    _clear_confirm_dialog = ft.AlertDialog(
+        modal=True,
+        title=ft.Text("确认清空"),
+        content=ft.Text("确定要清空所有已导入数据和匹配结果吗？此操作不可撤销。"),
+        actions=[
+            ft.TextButton("取消", on_click=lambda e: page.pop_dialog()),
+            ft.TextButton("确认清空", on_click=_do_clear_confirmed,
+                          style=ft.ButtonStyle(color=theme.ERROR)),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )
+
+    def on_clear(e):
+        if not _all_sheets:
+            return
+        page.show_dialog(_clear_confirm_dialog)
     # 执行匹配
     # ========================================================================
     async def on_match(e):
@@ -988,7 +1010,7 @@ def create_ledger_match_section(
             ft.Row(
                 [
                     theme.secondary_btn("导入文件", icon=ft.Icons.UPLOAD, on_click=on_import),
-                    theme.secondary_btn("清空", icon=ft.Icons.DELETE_SWEEP, on_click=on_clear),
+                    theme.destructive_btn("清空", icon=ft.Icons.DELETE_SWEEP, on_click=on_clear),
                     file_label,
                 ],
                 spacing=8,

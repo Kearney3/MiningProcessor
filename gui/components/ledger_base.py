@@ -301,8 +301,9 @@ def create_ledger_section_factory(
         except Exception as ex:
             _log_message(log, f"导出模板失败: {ex}", level=logging.ERROR)
 
-    def on_clear(e):
-        """清空"""
+    def _do_clear(e):
+        """执行清空"""
+        page.pop_dialog()
         nonlocal records
         records = []
         _instance[0] = None
@@ -311,6 +312,27 @@ def create_ledger_section_factory(
         path_label.color = ft.Colors.GREY
         build_table()
         _log_message(log, f"{cfg.label_prefix}已清空")
+
+    _clear_confirm_dialog = ft.AlertDialog(
+        modal=True,
+        title=ft.Text("确认清空"),
+        content=ft.Text(""),
+        actions=[
+            ft.TextButton("取消", on_click=lambda e: page.pop_dialog()),
+            ft.TextButton("确认清空", on_click=_do_clear,
+                          style=ft.ButtonStyle(color=theme.ERROR)),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )
+
+    def on_clear(e):
+        """清空（带确认弹窗）"""
+        if not records:
+            return
+        _clear_confirm_dialog.content = ft.Text(
+            f"确定要清空所有 {cfg.label_prefix} 数据吗？\n清空后需重新导入文件并配置列映射。"
+        )
+        page.show_dialog(_clear_confirm_dialog)
 
     def on_save_default(e):
         """保存为默认"""
