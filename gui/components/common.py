@@ -72,6 +72,40 @@ def month_options() -> list[ft.dropdown.Option]:
     return [ft.dropdown.Option(str(m)) for m in range(1, 13)]
 
 
+def create_confirm_dialog(
+    page: ft.Page,
+    title: str,
+    message: str,
+    on_confirm,
+    confirm_text: str = "确认",
+    cancel_text: str = "取消",
+) -> ft.AlertDialog:
+    """标准确认/取消弹窗，确认按钮使用 ERROR 色。"""
+    try:
+        from . import theme
+    except ImportError:
+        import gui.theme as theme
+
+    def _on_cancel(e):
+        page.pop_dialog()
+
+    def _on_ok(e):
+        page.pop_dialog()
+        on_confirm(e)
+
+    return ft.AlertDialog(
+        modal=True,
+        title=ft.Text(title),
+        content=ft.Text(message),
+        actions=[
+            ft.TextButton(cancel_text, on_click=_on_cancel),
+            ft.TextButton(confirm_text, on_click=_on_ok,
+                          style=ft.ButtonStyle(color=theme.ERROR)),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )
+
+
 def _update_last_directory(path: str, *, is_dir: bool = False) -> None:
     """统一更新共享的文件选择器目录，并持久化到 config.user.json。
 
