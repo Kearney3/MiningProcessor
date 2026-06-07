@@ -222,3 +222,31 @@ def sidebar_group_label(text: str) -> ft.Container:
         ),
         padding=ft.Padding.only(left=SPACING_MD + 4, top=SPACING_SM, bottom=SPACING_XS),
     )
+
+
+def empty_state(icon_name: str, title: str, hint: str) -> ft.Column:
+    """标准化的空状态占位组件。"""
+    return ft.Column(
+        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        alignment=ft.MainAxisAlignment.CENTER,
+        spacing=8,
+        controls=[
+            ft.Icon(icon_name, size=48, color=GREY_300),
+            ft.Text(title, size=14, color=TEXT_SECONDARY, weight=ft.FontWeight.W_500),
+            ft.Text(hint, size=12, color=GREY_400),
+        ],
+    )
+
+
+def table_container(*children, expand: bool = True, **kwargs) -> ft.Container:
+    """标准化的表格容器，带边框、圆角和背景色。"""
+    content = ft.Column(list(children), expand=True) if len(children) > 1 else children[0]
+    return ft.Container(
+        content=content,
+        bgcolor=SURFACE_HIGH,
+        border=ft.Border.all(1, BORDER),
+        border_radius=RADIUS_MD,
+        padding=4,
+        expand=expand,
+        **kwargs,
+    )

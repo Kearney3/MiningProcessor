@@ -37,6 +37,41 @@ def _log_message(log, message: str, level: int = logging.INFO):
         log(message)
 
 
+def safe_update(*controls):
+    """安全调用控件的 update()，忽略未挂载时的异常。"""
+    for ctrl in controls:
+        try:
+            ctrl.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+
+PAGE_SIZE = 20
+
+
+def strip_date_only_times(df: pd.DataFrame) -> pd.DataFrame:
+    """对 datetime 列检测：若所有非空值的时间部分均为 00:00:00，
+    则转换为 date 对象，避免 Excel 导出时出现多余的 ' 00:00:00'。"""
+    import datetime as _dt
+    midnight = _dt.time(0, 0, 0)
+    for col in df.columns:
+        if not pd.api.types.is_datetime64_any_dtype(df[col]):
+            continue
+        times = df[col].dropna().dt.time
+        if times.empty:
+            continue
+        if (times == midnight).all():
+            df[col] = df[col].apply(
+                lambda v: v.date() if pd.notna(v) else v
+            )
+    return df
+
+
+def month_options() -> list[ft.dropdown.Option]:
+    """生成 1-12 月下拉选项列表。"""
+    return [ft.dropdown.Option(str(m)) for m in range(1, 13)]
+
+
 def _update_last_directory(path: str, *, is_dir: bool = False) -> None:
     """统一更新共享的文件选择器目录，并持久化到 config.user.json。
 

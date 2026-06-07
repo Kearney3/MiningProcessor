@@ -15,7 +15,7 @@ from func import config_loader
 from .common import (
     _log_message, _last_directory, _update_last_directory,
     SortState, create_sortable_columns, _cell_text,
-    create_column_mapping_dialog,
+    create_column_mapping_dialog, PAGE_SIZE,
 )
 
 try:
@@ -89,8 +89,6 @@ def create_ledger_section_factory(
         data_row_min_height=28,
         data_row_max_height=36,
     )
-
-    PAGE_SIZE = 20
 
     def _total_pages() -> int:
         return max(1, (len(records) + PAGE_SIZE - 1) // PAGE_SIZE)

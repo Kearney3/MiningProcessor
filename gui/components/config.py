@@ -5,7 +5,7 @@ from pathlib import Path
 
 import flet as ft
 
-from .common import _log_message, _last_directory, _update_last_directory
+from .common import _log_message, _last_directory, _update_last_directory, PAGE_SIZE
 from .types import ConfigRefs
 
 try:
@@ -14,11 +14,15 @@ except ImportError:
     import gui.theme as theme
 
 
+def _device_map_to_rows(device_map: dict) -> list[dict]:
+    """将设备装载量字典转换为配置表格行数据。"""
+    return [{"selected": False, "device": d, "capacity": c} for d, c in sorted(device_map.items())]
+
+
 def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs"]:
     """创建设备装载量配置区域，返回 (container, refs)"""
     from func import config_loader
 
-    PAGE_SIZE = 20
     config_state: list[dict] = []
     _config_page = [0]
     refs = {}
@@ -168,12 +172,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
         except Exception:
             logging.getLogger(__name__).warning("加载配置失败，使用空配置", exc_info=True)
             device_map = {}
-        set_config_state(
-            [
-                {"selected": False, "device": device, "capacity": cap}
-                for device, cap in sorted(device_map.items())
-            ]
-        )
+        set_config_state(_device_map_to_rows(device_map))
 
     def build_device_load_map() -> dict[str, int]:
         device_load_map = {}
@@ -194,12 +193,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
         with Path(path).open("r", encoding="utf-8") as f:
             data = json.load(f)
         imported = data.get("device_load_map", {})
-        set_config_state(
-            [
-                {"selected": False, "device": device, "capacity": cap}
-                for device, cap in sorted(imported.items())
-            ]
-        )
+        set_config_state(_device_map_to_rows(imported))
 
     def save_config_to_path(path):
         if not path:
@@ -233,12 +227,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
             page.pop_dialog()
             try:
                 device_map = config_loader.get_default_load_map(version)
-                set_config_state(
-                    [
-                        {"selected": False, "device": device, "capacity": cap}
-                        for device, cap in sorted(device_map.items())
-                    ]
-                )
+                set_config_state(_device_map_to_rows(device_map))
                 _log_message(log, f"已恢复{label}")
             except Exception as ex:
                 _log_message(log, f"恢复默认配置失败: {ex}", level=logging.ERROR)
@@ -320,12 +309,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
             if not imported:
                 _log_message(log, "文件不含 device_load_map", level=logging.WARNING)
                 return
-            set_config_state(
-                [
-                    {"selected": False, "device": device, "capacity": cap}
-                    for device, cap in sorted(imported.items())
-                ]
-            )
+            set_config_state(_device_map_to_rows(imported))
             _log_message(log, f"已导入 {len(imported)} 条设备装载量配置")
         except Exception as ex:
             _log_message(log, f"导入配置失败: {ex}", level=logging.ERROR)

@@ -1085,14 +1085,14 @@ def test_strip_date_only_times_converts_date_columns():
     """Datetime columns with only date values (time=00:00:00) should be
     converted to date objects so Excel export shows '2019-01-01' not
     '2019-01-01 00:00:00'."""
-    from gui.components.ledger_match import _strip_date_only_times
+    from gui.components.common import strip_date_only_times
 
     df = pd.DataFrame({
         "日期": pd.to_datetime(["2019-01-01", "2019-06-15", "2020-12-31"]),
         "设备名称": ["TR100", "TR200", "TR300"],
         "数量": [10, 20, 30],
     })
-    result = _strip_date_only_times(df)
+    result = strip_date_only_times(df)
     # Date column should be pure date objects
     assert result["日期"].dtype == object
     assert all(isinstance(v, pd.Timestamp) is False for v in result["日期"].dropna())
@@ -1102,12 +1102,12 @@ def test_strip_date_only_times_converts_date_columns():
 
 def test_strip_date_only_times_keeps_time_columns():
     """Datetime columns with actual time values should NOT be stripped."""
-    from gui.components.ledger_match import _strip_date_only_times
+    from gui.components.common import strip_date_only_times
 
     df = pd.DataFrame({
         "时间": pd.to_datetime(["2019-01-01 08:30:00", "2019-06-15 14:00:00"]),
         "数量": [10, 20],
     })
-    result = _strip_date_only_times(df)
+    result = strip_date_only_times(df)
     # Time column should remain as datetime
     assert pd.api.types.is_datetime64_any_dtype(result["时间"])

@@ -10,7 +10,7 @@ import flet as ft
 
 
 
-from .common import _log_message, _last_directory as _import_dir, _update_last_directory, _cell_text
+from .common import _log_message, _last_directory as _import_dir, _update_last_directory, _cell_text, PAGE_SIZE, strip_date_only_times
 
 try:
     from . import theme
@@ -18,31 +18,12 @@ except ImportError:
     import gui.theme as theme
 
 
-def _strip_date_only_times(df: pd.DataFrame) -> pd.DataFrame:
-    """对 datetime 列检测：若所有非空值的时间部分均为 00:00:00，
-    则转换为 date 对象，避免 Excel 导出时出现多余的 ' 00:00:00'。"""
-    for col in df.columns:
-        if not pd.api.types.is_datetime64_any_dtype(df[col]):
-            continue
-        times = df[col].dropna().dt.time
-        if times.empty:
-            continue
-        import datetime as _dt
-        midnight = _dt.time(0, 0, 0)
-        if (times == midnight).all():
-            df[col] = df[col].apply(
-                lambda v: v.date() if pd.notna(v) else v
-            )
-    return df
-
-
 def create_ledger_match_section(
     page: ft.Page, log, ledger_refs: dict, oil_ledger_refs: dict
 ) -> tuple[ft.Container, dict]:
     """创建台账匹配工具区域，返回 (container, refs)"""
 
-    PAGE_SIZE = 20
-    _all_sheets: dict[str, pd.DataFrame] = {}  # sheet_name -> DataFrame (原始数据)
+    _all_sheets: dict[str, pd.DataFrame] = {}
     _matched_all_sheets: dict[str, pd.DataFrame] = {}  # sheet_name -> 匹配后的完整数据
     _filtered_df: list[pd.DataFrame] = [None]  # 当前 sheet 经过排序/筛选后的视图
     _current_sheet = [""]
@@ -512,7 +493,7 @@ def create_ledger_match_section(
                             sname, header_len, row_lens,
                         )
                     df = pd.DataFrame(rows_data, columns=headers)
-                    df = _strip_date_only_times(df)
+                    df = strip_date_only_times(df)
                 else:
                     df = pd.DataFrame(columns=headers)
 
