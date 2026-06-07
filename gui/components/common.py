@@ -72,6 +72,55 @@ def month_options() -> list[ft.dropdown.Option]:
     return [ft.dropdown.Option(str(m)) for m in range(1, 13)]
 
 
+def make_browse_handler(
+    picker: ft.FilePicker,
+    target_field: ft.TextField,
+    target_btn,
+    dialog_title: str,
+    mode: str = "file",
+    extensions: list[str] | None = None,
+    log_fn=None,
+):
+    """创建文件/目录浏览处理函数。
+
+    Args:
+        picker: 已注册到 page.services 的 FilePicker 实例。
+        target_field: 显示路径的 TextField。
+        target_btn: 浏览成功后启用的按钮。
+        dialog_title: 对话框标题。
+        mode: "file" 使用 pick_files，"folder" 使用 get_directory_path。
+        extensions: 文件模式下的允许扩展名（如 ["xlsx", "xls"]）。
+        log_fn: 日志函数（可选）。
+    """
+    async def _browse(e: ft.ControlEvent):
+        try:
+            if mode == "folder":
+                result = await picker.get_directory_path(
+                    dialog_title=dialog_title,
+                    initial_directory=_get_initial_directory(),
+                )
+                path = result
+            else:
+                files = await picker.pick_files(
+                    dialog_title=dialog_title,
+                    allowed_extensions=extensions,
+                    initial_directory=_get_initial_directory(),
+                )
+                path = files[0].path if files else None
+        except Exception as ex:
+            if log_fn:
+                log_fn(f"选择{'文件夹' if mode == 'folder' else '文件'}失败: {ex}")
+            return
+        if path:
+            target_field.value = path
+            _update_last_directory(path, is_dir=(mode == "folder"))
+            _show_path_confirm(target_field)
+            target_btn.disabled = False
+            target_btn.update()
+
+    return _browse
+
+
 def create_confirm_dialog(
     page: ft.Page,
     title: str,
@@ -104,6 +153,53 @@ def create_confirm_dialog(
         ],
         actions_alignment=ft.MainAxisAlignment.END,
     )
+
+
+class HeaderModeConfig:
+    """工时表头模式切换控件组（Checkbox + ChipToggle + 模糊匹配 Checkbox）。
+
+    用法：
+        hmc = HeaderModeConfig(label="表头修改", tooltip="...")
+        # 在布局中使用 hmc.toggle, hmc.mode.row, hmc.fuzzy
+        # 在 refs 中注册 hmc.toggle, hmc.mode, hmc.fuzzy
+    """
+
+    def __init__(
+        self,
+        label: str = "表头修改",
+        tooltip: str = "开启后按配置的映射关系重命名输出表头",
+        fuzzy_label: str = "模糊匹配",
+        fuzzy_tooltip: str = "按列名匹配时启用模糊匹配（允许列名部分匹配）",
+        on_toggle_extra=None,
+    ):
+        self.toggle = ft.Checkbox(label=label, value=True, tooltip=tooltip)
+        self.fuzzy = ft.Checkbox(
+            label=fuzzy_label, value=False, tooltip=fuzzy_tooltip, visible=False,
+        )
+        self.mode = ChipToggle(
+            options=[("position", "按位置"), ("name", "按列名")],
+            on_change=self._on_mode_change,
+        )
+        self.mode.row.visible = self.toggle.value
+        self._on_toggle_extra = on_toggle_extra
+        self.toggle.on_change = self._on_toggle_change
+
+    def _on_mode_change(self, val):
+        self.fuzzy.visible = (val != "position")
+        safe_update(self.fuzzy)
+
+    def _on_toggle_change(self, e):
+        enabled = self.toggle.value
+        for chip in self.mode._chips:
+            chip.disabled = not enabled
+        self.mode.row.visible = enabled
+        if not enabled:
+            self.fuzzy.visible = False
+        else:
+            self.fuzzy.visible = (self.mode.value == "name")
+        safe_update(self.mode.row, self.fuzzy)
+        if self._on_toggle_extra:
+            self._on_toggle_extra(enabled)
 
 
 def _update_last_directory(path: str, *, is_dir: bool = False) -> None:
