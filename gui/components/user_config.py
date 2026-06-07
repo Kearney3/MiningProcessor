@@ -596,7 +596,13 @@ def _create_column_mapping_section(page: ft.Page, log):
     def _sync_state_from_rows():
         """将当前行列表同步回 _mapping_state（保存前调用）。"""
         for dt, rows in _mapping_rows.items():
-            _mapping_state[dt] = {r[0]: r[1] for r in rows if r[0].strip()}
+            state = {}
+            for r in rows:
+                if r[0].strip():
+                    state[r[0]] = _SKIP if (len(r) > 2 and r[2]) else r[1]
+            _mapping_state[dt] = state
+
+    _SKIP = "__SKIP__"
 
     def _build_mapping_rows():
         controls = []
@@ -606,6 +612,7 @@ def _create_column_mapping_section(page: ft.Page, log):
         # 表头
         controls.append(ft.Row(
             [
+                ft.Text("", width=40),
                 ft.Text("源列名（Excel 列）", expand=True, size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
                 ft.Text("目标字段（MineBase）", expand=True, size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
                 ft.Text("", width=40),
@@ -614,13 +621,16 @@ def _create_column_mapping_section(page: ft.Page, log):
         ))
 
         for i in range(len(rows)):
+            is_excluded = (rows[i][1] == _SKIP)
+
             src_field = ft.TextField(
                 value=rows[i][0], expand=True, text_size=13, dense=True,
                 color=theme.TEXT_PRIMARY, border_color=theme.BORDER, focused_border_color=theme.PRIMARY,
             )
             dst_field = ft.TextField(
-                value=rows[i][1], expand=True, text_size=13, dense=True,
+                value="" if is_excluded else rows[i][1], expand=True, text_size=13, dense=True,
                 color=theme.TEXT_PRIMARY, border_color=theme.BORDER, focused_border_color=theme.PRIMARY,
+                disabled=is_excluded,
             )
 
             def _on_menu_select(e, _field=dst_field, _idx=i):
@@ -634,11 +644,32 @@ def _create_column_mapping_section(page: ft.Page, log):
                 icon=ft.Icons.ARROW_DROP_DOWN,
                 tooltip="选择目标字段",
                 icon_size=20,
+                disabled=is_excluded,
                 items=[
                     ft.PopupMenuItem(content=ft.Text(v), on_click=_on_menu_select) for v in options
                 ],
             )
             remove_btn = ft.IconButton(icon=ft.Icons.DELETE_OUTLINE, tooltip="删除", icon_size=18, icon_color=theme.ERROR)
+
+            exclude_cb = ft.Checkbox(
+                value=is_excluded,
+                tooltip="排除此列（不导入）",
+                active_color=theme.WARNING,
+            )
+
+            def _on_exclude_change(e, _idx=i, _dst=dst_field, _menu=dst_menu):
+                excluded = e.control.value
+                if excluded:
+                    rows[_idx][1] = _SKIP
+                    _dst.value = ""
+                    _dst.disabled = True
+                    _menu.disabled = True
+                else:
+                    rows[_idx][1] = ""
+                    _dst.disabled = False
+                    _menu.disabled = False
+                _dst.update()
+                _menu.update()
 
             def _on_src_change(e, _idx=i):
                 rows[_idx][0] = e.control.value.strip()
@@ -650,11 +681,12 @@ def _create_column_mapping_section(page: ft.Page, log):
                 rows.pop(_idx)
                 _build_mapping_rows()
 
+            exclude_cb.on_change = _on_exclude_change
             src_field.on_change = _on_src_change
             dst_field.on_change = _on_dst_change
             remove_btn.on_click = _on_remove
 
-            controls.append(ft.Row([src_field, dst_field, dst_menu, remove_btn], spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER))
+            controls.append(ft.Row([exclude_cb, src_field, dst_field, dst_menu, remove_btn], spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER))
 
         mapping_rows_column.controls = controls
         try:
@@ -672,7 +704,7 @@ def _create_column_mapping_section(page: ft.Page, log):
         dt = _current_mapping_type[0]
         if dt not in _mapping_rows:
             _mapping_rows[dt] = []
-        _mapping_rows[dt].append(["", ""])
+        _mapping_rows[dt].append(["", "", False])
         _build_mapping_rows()
 
     def _reload_mapping():
@@ -685,7 +717,7 @@ def _create_column_mapping_section(page: ft.Page, log):
         # 从 _mapping_state 初始化行列表
         for dt in _mapping_data_types:
             entries = _mapping_state.get(dt, {})
-            _mapping_rows[dt] = [[k, v] for k, v in entries.items()]
+            _mapping_rows[dt] = [[k, v, v == _SKIP] for k, v in entries.items()]
         mapping_status_text.value = ""
 
     def _save_mapping(e=None):
