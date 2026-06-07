@@ -15,6 +15,7 @@ from func import config_loader
 from func.config_loader import DEFAULT_FILE_KEYWORDS, get_minebase_column_mapping, save_minebase_column_mapping, reset_minebase_column_mapping, get_minebase_config_default
 from .common import _log_message
 
+
 def _sync_port_state(port_field: ft.TextField, is_valid: bool, message: str = ""):
     """统一端口字段的边框和提示状态。"""
     port_field.border_color = ft.Colors.RED if not is_valid else theme.BORDER
@@ -29,16 +30,13 @@ def _normalize_port_text(value: str | None) -> str:
     return re.sub(r"\D+", "", (value or "").strip())
 
 
-def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserConfigRefs"]:
-    """创建用户配置页面，返回 (container, refs)。"""
+# ---------------------------------------------------------------------------
+# 1. 文件关键字配置
+# ---------------------------------------------------------------------------
 
-    section_hint = ft.Text(
-        "这里用于管理与业务处理无关的个人偏好设置。",
-        size=13,
-        color=theme.TEXT_SECONDARY,
-    )
+def _create_keywords_section(page: ft.Page, log):
+    """创建文件关键字配置卡片，返回 (card, refs_dict)。"""
 
-    # ── 文件关键字配置 ──────────────────────────────────────────
     kw_fuel = ft.TextField(label="燃油数据", hint_text="例如: 设备柴油消耗,Техник", expand=True, color=theme.TEXT_PRIMARY)
     kw_electrical = ft.TextField(label="电力数据", hint_text="例如: Electrical", expand=True, color=theme.TEXT_PRIMARY)
     kw_production = ft.TextField(label="生产数据", hint_text="例如: 白班,夜班", expand=True, color=theme.TEXT_PRIMARY)
@@ -125,10 +123,15 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
         ],
     )
 
+    return keywords_card, {"reload": _reload_keywords, "save": save_keywords, "reset": reset_keywords}
 
-    # ---------------------------------------------------------------------------
-    # 工作效率表头映射配置
-    # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# 2. 工作效率表头映射配置
+# ---------------------------------------------------------------------------
+
+def _create_header_mapping_section(page: ft.Page, log):
+    """创建工作效率表头映射配置卡片，返回 (card, refs_dict)。"""
 
     _header_mapping_state: list[dict] = []  # [{index: int|None, original: str, new: str}, ...]
 
@@ -379,9 +382,15 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
         ],
     )
 
-    # ---------------------------------------------------------------------------
-    # MineBase 连接配置
-    # ---------------------------------------------------------------------------
+    return header_mapping_card, {"reload": _reload_header_mapping}
+
+
+# ---------------------------------------------------------------------------
+# 3. MineBase 连接配置
+# ---------------------------------------------------------------------------
+
+def _create_minebase_section(page: ft.Page, log):
+    """创建 MineBase 连接配置卡片，返回 (card, refs_dict)。"""
 
     mb_mode = ft.Dropdown(
         label="同步模式",
@@ -514,9 +523,27 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
         ],
     )
 
-    # ---------------------------------------------------------------------------
-    # 列映射配置
-    # ---------------------------------------------------------------------------
+    return minebase_card, {
+        "mb_mode": mb_mode,
+        "mb_db_host": mb_db_host,
+        "mb_db_port": mb_db_port,
+        "mb_db_name": mb_db_name,
+        "mb_db_user": mb_db_user,
+        "mb_db_pass": mb_db_pass,
+        "mb_status_text": mb_status_text,
+        "mb_action_buttons": mb_action_buttons,
+        "reload": _reload_mb_config,
+        "save": _save_mb_config,
+        "reset": _reset_mb_config,
+    }
+
+
+# ---------------------------------------------------------------------------
+# 4. 列映射配置
+# ---------------------------------------------------------------------------
+
+def _create_column_mapping_section(page: ft.Page, log):
+    """创建 MineBase 列映射配置卡片，返回 (card, refs_dict)。"""
 
     _mapping_state: dict[str, dict[str, str]] = {}  # {data_type: {src: dst}}
     _mapping_data_types = ["work_efficiency", "fuel_consumption", "electricity_consumption", "equipment_operation", "production_record"]
@@ -720,6 +747,27 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
         ],
     )
 
+    return mapping_card, {"reload": _reload_mapping, "build": _build_mapping_rows}
+
+
+# ---------------------------------------------------------------------------
+# 主组装函数
+# ---------------------------------------------------------------------------
+
+def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserConfigRefs"]:
+    """创建用户配置页面，返回 (container, refs)。"""
+
+    section_hint = ft.Text(
+        "这里用于管理与业务处理无关的个人偏好设置。",
+        size=13,
+        color=theme.TEXT_SECONDARY,
+    )
+
+    keywords_card, kw_refs = _create_keywords_section(page, log)
+    header_mapping_card, hm_refs = _create_header_mapping_section(page, log)
+    minebase_card, mb_refs = _create_minebase_section(page, log)
+    mapping_card, map_refs = _create_column_mapping_section(page, log)
+
     container = ft.Container(
         content=ft.Column(
             [
@@ -741,24 +789,24 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
     )
 
     refs: UserConfigRefs = {
-        "mb_mode": mb_mode,
-        "mb_db_host": mb_db_host,
-        "mb_db_port": mb_db_port,
-        "mb_db_name": mb_db_name,
-        "mb_db_user": mb_db_user,
-        "mb_db_pass": mb_db_pass,
-        "mb_status_text": mb_status_text,
-        "mb_action_buttons": mb_action_buttons,
-        "reload_mb_config": _reload_mb_config,
-        "save_mb_config": _save_mb_config,
-        "reset_mb_config": _reset_mb_config,
-        "reload_keywords": _reload_keywords,
-        "reload_header_mapping": _reload_header_mapping,
+        "mb_mode": mb_refs["mb_mode"],
+        "mb_db_host": mb_refs["mb_db_host"],
+        "mb_db_port": mb_refs["mb_db_port"],
+        "mb_db_name": mb_refs["mb_db_name"],
+        "mb_db_user": mb_refs["mb_db_user"],
+        "mb_db_pass": mb_refs["mb_db_pass"],
+        "mb_status_text": mb_refs["mb_status_text"],
+        "mb_action_buttons": mb_refs["mb_action_buttons"],
+        "reload_mb_config": mb_refs["reload"],
+        "save_mb_config": mb_refs["save"],
+        "reset_mb_config": mb_refs["reset"],
+        "reload_keywords": kw_refs["reload"],
+        "reload_header_mapping": hm_refs["reload"],
     }
 
-    _reload_keywords()
-    _reload_header_mapping()
-    _reload_mb_config()
-    _reload_mapping()
-    _build_mapping_rows()
+    kw_refs["reload"]()
+    hm_refs["reload"]()
+    mb_refs["reload"]()
+    map_refs["reload"]()
+    map_refs["build"]()
     return container, refs
