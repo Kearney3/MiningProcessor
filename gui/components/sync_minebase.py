@@ -42,18 +42,16 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         ),
     )
 
-    async def on_browse(e):
-        def on_result(result: ft.FilePickerResultEvent):
-            if result.path:
-                sync_path.value = result.path
-                _update_last_directory(result.path, is_dir=True)
-                _show_path_confirm(sync_path)
-                sync_path.update()
+    _browse_picker = ft.FilePicker()
+    page.services.append(_browse_picker)
 
-        file_picker = ft.FilePicker(on_result=on_result)
-        page.overlay.append(file_picker)
-        page.update()
-        file_picker.get_directory_path(dialog_title="选择输出目录")
+    async def on_browse(e):
+        result = await _browse_picker.get_directory_path_async(dialog_title="选择输出目录")
+        if result.path:
+            sync_path.value = result.path
+            _update_last_directory(result.path, is_dir=True)
+            _show_path_confirm(sync_path)
+            sync_path.update()
 
     sync_path.suffix.on_click = on_browse
 

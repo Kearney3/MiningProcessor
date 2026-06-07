@@ -619,6 +619,50 @@ def create_ledger_match_section(
         if not _all_sheets:
             return
         page.show_dialog(_clear_confirm_dialog)
+
+    async def _batch_match(
+        df: pd.DataFrame,
+        source_col: str,
+        match_fn,
+        result_keys: list[str],
+        batch_size: int,
+        total_work: int,
+        progress_label: str,
+        id_col: str | None = None,
+    ) -> dict[str, list]:
+        """通用批量匹配循环，返回 {result_key: [values...]}。"""
+        results = {k: [] for k in result_keys}
+        total_rows = len(df)
+        for start in range(0, total_rows, batch_size):
+            if _import_cancelled.is_set():
+                _log_message(log, "匹配已取消")
+                break
+
+            batch = df.iloc[start:start + batch_size]
+            for _, row in batch.iterrows():
+                n = str(row[source_col]) if source_col and source_col in df.columns and not pd.isna(row.get(source_col)) else None
+                i_val = str(row[id_col]) if id_col and id_col in df.columns and not pd.isna(row.get(id_col)) else None
+                if id_col:
+                    r = match_fn(name=n, device_id=i_val)
+                else:
+                    r = match_fn(n) if n else None
+                if r:
+                    for k in result_keys:
+                        results[k].append(r.get(k, ""))
+                else:
+                    for k in result_keys:
+                        results[k].append("")
+
+            # 更新进度
+            processed = min(start + batch_size, total_rows)
+            progress = processed / total_work
+            _import_progress_bar.value = progress
+            _import_progress_text.value = f"{progress_label}: {processed}/{total_work}"
+            page.update()
+            await asyncio.sleep(0)
+
+        return results
+
     # 执行匹配
     # ========================================================================
     async def on_match(e):
@@ -664,153 +708,48 @@ def create_ledger_match_section(
             matched_count = 0
 
             # 设备匹配
+            DEVICE_KEYS = ["标准设备名称", "标准设备编号", "标准公司名称"]
             if eq_ledger and (name_col or id_col):
                 # 检测是否同时存在矿卡名称和挖机名称（生产数据场景）
                 has_truck_col = "矿卡名称" in result_df.columns
                 has_excavator_col = "挖机名称" in result_df.columns
-                
+
                 if has_truck_col and has_excavator_col:
                     # 生产数据场景：分别匹配矿卡和挖机，添加后缀
-                    # 计算总工作量（矿卡 + 挖机）
                     total_work = total_rows * 2
-                    processed = 0
-                    
-                    # 匹配矿卡名称
-                    std_names, std_ids, std_companies = [], [], []
-                    for i in range(0, total_rows, batch_size):
-                        if _import_cancelled.is_set():
-                            _log_message(log, "匹配已取消")
-                            break
-                        
-                        batch = df.iloc[i:i+batch_size]
-                        for _, row in batch.iterrows():
-                            n = str(row["矿卡名称"]) if "矿卡名称" in result_df.columns and not pd.isna(row.get("矿卡名称")) else None
-                            i_val = str(row[id_col]) if id_col and id_col in result_df.columns and not pd.isna(row.get(id_col)) else None
-                            r = eq_ledger.match_device(name=n, device_id=i_val)
-                            if r:
-                                std_names.append(r.get("标准设备名称", ""))
-                                std_ids.append(r.get("标准设备编号", ""))
-                                std_companies.append(r.get("标准公司名称", ""))
-                                matched_count += 1
-                            else:
-                                std_names.append("")
-                                std_ids.append("")
-                                std_companies.append("")
-                        
-                        # 更新进度
-                        processed += len(batch)
-                        progress = processed / total_work
-                        _import_progress_bar.value = progress
-                        _import_progress_text.value = f"正在匹配矿卡: {processed}/{total_work}"
-                        page.update()
-                        
-                        # 让出控制权，避免 UI 冻结
-                        await asyncio.sleep(0)
-                    
-                    result_df["标准设备名称（矿卡）"] = std_names
-                    result_df["标准设备编号（矿卡）"] = std_ids
-                    result_df["标准公司名称（矿卡）"] = std_companies
-                    
-                    # 匹配挖机名称
-                    std_names_ex, std_ids_ex, std_companies_ex = [], [], []
-                    for i in range(0, total_rows, batch_size):
-                        if _import_cancelled.is_set():
-                            _log_message(log, "匹配已取消")
-                            break
-                        
-                        batch = df.iloc[i:i+batch_size]
-                        for _, row in batch.iterrows():
-                            n = str(row["挖机名称"]) if "挖机名称" in result_df.columns and not pd.isna(row.get("挖机名称")) else None
-                            r = eq_ledger.match_device(name=n, device_id=None)
-                            if r:
-                                std_names_ex.append(r.get("标准设备名称", ""))
-                                std_ids_ex.append(r.get("标准设备编号", ""))
-                                std_companies_ex.append(r.get("标准公司名称", ""))
-                            else:
-                                std_names_ex.append("")
-                                std_ids_ex.append("")
-                                std_companies_ex.append("")
-                        
-                        # 更新进度
-                        processed += len(batch)
-                        progress = processed / total_work
-                        _import_progress_bar.value = progress
-                        _import_progress_text.value = f"正在匹配挖机: {processed}/{total_work}"
-                        page.update()
-                        
-                        # 让出控制权，避免 UI 冻结
-                        await asyncio.sleep(0)
-                    
-                    result_df["标准设备名称（挖机）"] = std_names_ex
-                    result_df["标准设备编号（挖机）"] = std_ids_ex
-                    result_df["标准公司名称（挖机）"] = std_companies_ex
+
+                    truck_r = await _batch_match(
+                        df, "矿卡名称", eq_ledger.match_device, DEVICE_KEYS,
+                        batch_size, total_work, "正在匹配矿卡", id_col=id_col,
+                    )
+                    for k, suffix in zip(DEVICE_KEYS, ["（矿卡）", "（矿卡）", "（矿卡）"]):
+                        result_df[k + suffix] = truck_r[k]
+                    matched_count += sum(1 for v in truck_r[DEVICE_KEYS[0]] if v)
+
+                    excav_r = await _batch_match(
+                        df, "挖机名称", lambda name, device_id=None: eq_ledger.match_device(name=name, device_id=device_id), DEVICE_KEYS,
+                        batch_size, total_work, "正在匹配挖机",
+                    )
+                    for k, suffix in zip(DEVICE_KEYS, ["（挖机）", "（挖机）", "（挖机）"]):
+                        result_df[k + suffix] = excav_r[k]
                 else:
                     # 原有逻辑：单列匹配（非生产数据场景）
-                    std_names, std_ids, std_companies = [], [], []
-                    for i in range(0, total_rows, batch_size):
-                        if _import_cancelled.is_set():
-                            _log_message(log, "匹配已取消")
-                            break
-                        
-                        batch = df.iloc[i:i+batch_size]
-                        for _, row in batch.iterrows():
-                            n = str(row[name_col]) if name_col and name_col in result_df.columns and not pd.isna(row.get(name_col)) else None
-                            i_val = str(row[id_col]) if id_col and id_col in result_df.columns and not pd.isna(row.get(id_col)) else None
-                            r = eq_ledger.match_device(name=n, device_id=i_val)
-                            if r:
-                                std_names.append(r.get("标准设备名称", ""))
-                                std_ids.append(r.get("标准设备编号", ""))
-                                std_companies.append(r.get("标准公司名称", ""))
-                                matched_count += 1
-                            else:
-                                std_names.append("")
-                                std_ids.append("")
-                                std_companies.append("")
-                        
-                        # 更新进度
-                        processed += len(batch)
-                        progress = processed / total_rows
-                        _import_progress_bar.value = progress
-                        _import_progress_text.value = f"正在匹配第 {processed}/{total_rows} 行..."
-                        page.update()
-                        
-                        # 让出控制权，避免 UI 冻结
-                        await asyncio.sleep(0)
-                    
-                    result_df["标准设备名称"] = std_names
-                    result_df["标准设备编号"] = std_ids
-                    result_df["标准公司名称"] = std_companies
+                    equip_r = await _batch_match(
+                        df, name_col, eq_ledger.match_device, DEVICE_KEYS,
+                        batch_size, total_rows, "正在匹配设备", id_col=id_col,
+                    )
+                    for k in DEVICE_KEYS:
+                        result_df[k] = equip_r[k]
+                    matched_count += sum(1 for v in equip_r[DEVICE_KEYS[0]] if v)
 
             # 油品匹配
-            oil_matched = 0
+            OIL_KEY = "标准名称"
             if oil_ledger and oil_col and oil_col in result_df.columns:
-                std_oils = []
-                for i in range(0, total_rows, batch_size):
-                    if _import_cancelled.is_set():
-                        _log_message(log, "匹配已取消")
-                        break
-                    
-                    batch = df.iloc[i:i+batch_size]
-                    for _, row in batch.iterrows():
-                        v = row[oil_col]
-                        r = oil_ledger.match(str(v)) if not pd.isna(v) else None
-                        if r:
-                            std_oils.append(r["标准名称"])
-                            oil_matched += 1
-                        else:
-                            std_oils.append("")
-                    
-                    # 更新进度
-                    processed += len(batch)
-                    progress = processed / total_rows
-                    _import_progress_bar.value = progress
-                    _import_progress_text.value = f"正在匹配油品: {processed}/{total_rows}"
-                    page.update()
-                    
-                    # 让出控制权，避免 UI 冻结
-                    await asyncio.sleep(0)
-                
-                result_df["标准油品名称"] = std_oils
+                oil_r = await _batch_match(
+                    df, oil_col, lambda v: oil_ledger.match(v), [OIL_KEY],
+                    batch_size, total_rows, "正在匹配油品",
+                )
+                result_df["标准油品名称"] = oil_r[OIL_KEY]
             # 保存匹配结果到单独的字典，不覆盖原始数据
             _matched_all_sheets[_current_sheet[0]] = result_df
             _page[0] = 0
@@ -907,73 +846,84 @@ def create_ledger_match_section(
 
             # 创建 xlsxwriter 对象
             workbook = xlsxwriter.Workbook(path)
-            worksheet = workbook.add_worksheet(sheet_name)
+            try:
+                worksheet = workbook.add_worksheet(sheet_name)
 
-            # 定义日期格式
-            date_fmt = workbook.add_format({'num_format': 'yyyy-mm-dd'})
-            datetime_fmt = workbook.add_format({'num_format': 'yyyy-mm-dd hh:mm:ss'})
+                # 定义日期格式
+                date_fmt = workbook.add_format({'num_format': 'yyyy-mm-dd'})
 
-            # 写入表头
-            headers = list(df_to_export.columns)
-            for col, header in enumerate(headers):
-                worksheet.write(0, col, header)
+                # 写入表头
+                headers = list(df_to_export.columns)
+                for col, header in enumerate(headers):
+                    worksheet.write(0, col, header)
 
-            # 识别日期列（包括 datetime64 和 date/datetime 对象）
-            date_columns = set()
-            for col in headers:
-                if pd.api.types.is_datetime64_any_dtype(df_to_export[col]):
-                    date_columns.add(col)
-                else:
-                    # 检查是否有 date/datetime 对象
-                    sample = df_to_export[col].dropna().head(10)
-                    if not sample.empty and sample.apply(
-                        lambda v: isinstance(v, (datetime.date, datetime.datetime))
-                    ).any():
+                # 识别日期列（包括 datetime64 和 date/datetime 对象）
+                date_columns = set()
+                for col in headers:
+                    if pd.api.types.is_datetime64_any_dtype(df_to_export[col]):
                         date_columns.add(col)
+                    else:
+                        # 检查是否有 date/datetime 对象
+                        sample = df_to_export[col].dropna().head(10)
+                        if not sample.empty and sample.apply(
+                            lambda v: isinstance(v, (datetime.date, datetime.datetime))
+                        ).any():
+                            date_columns.add(col)
 
-            # 分批写入数据
-            batch_size = 1000
-            total_rows = len(df_to_export)
+                # 分批写入数据
+                batch_size = 1000
+                total_rows = len(df_to_export)
 
-            for i in range(0, total_rows, batch_size):
-                if _import_cancelled.is_set():
-                    _log_message(log, "导出已取消")
-                    break
+                for i in range(0, total_rows, batch_size):
+                    if _import_cancelled.is_set():
+                        _log_message(log, "导出已取消")
+                        break
 
-                batch = df_to_export.iloc[i:i+batch_size]
-                for row_idx, (_, row) in enumerate(batch.iterrows(), start=i+1):
-                    for col_idx, col_name in enumerate(headers):
-                        value = row[col_name]
-                        # 处理 NaN 值
-                        if pd.isna(value):
-                            worksheet.write(row_idx, col_idx, "")
-                        elif col_name in date_columns:
-                            # 日期列使用日期格式
-                            try:
-                                if isinstance(value, pd.Timestamp):
-                                    worksheet.write_datetime(row_idx, col_idx, value.to_pydatetime(), date_fmt)
-                                elif isinstance(value, (datetime.date, datetime.datetime)):
-                                    worksheet.write_datetime(row_idx, col_idx, value, date_fmt)
-                                else:
-                                    worksheet.write(row_idx, col_idx, value)
-                            except Exception:
-                                worksheet.write(row_idx, col_idx, str(value))
-                        else:
-                            worksheet.write(row_idx, col_idx, value)
+                    batch = df_to_export.iloc[i:i+batch_size]
+                    for row_idx, (_, row) in enumerate(batch.iterrows(), start=i+1):
+                        for col_idx, col_name in enumerate(headers):
+                            value = row[col_name]
+                            # 处理 NaN 值
+                            if pd.isna(value):
+                                worksheet.write(row_idx, col_idx, "")
+                            elif col_name in date_columns:
+                                # 日期列使用日期格式
+                                try:
+                                    if isinstance(value, pd.Timestamp):
+                                        worksheet.write_datetime(row_idx, col_idx, value.to_pydatetime(), date_fmt)
+                                    elif isinstance(value, (datetime.date, datetime.datetime)):
+                                        worksheet.write_datetime(row_idx, col_idx, value, date_fmt)
+                                    else:
+                                        worksheet.write(row_idx, col_idx, value)
+                                except Exception:
+                                    worksheet.write(row_idx, col_idx, str(value))
+                            else:
+                                worksheet.write(row_idx, col_idx, value)
 
-                # 更新进度
-                processed = min(i + batch_size, total_rows)
-                progress = processed / total_rows
-                _import_progress_bar.value = progress
-                _import_progress_text.value = f"正在导出第 {processed}/{total_rows} 行..."
-                page.update()
+                    # 更新进度
+                    processed = min(i + batch_size, total_rows)
+                    progress = processed / total_rows
+                    _import_progress_bar.value = progress
+                    _import_progress_text.value = f"正在导出第 {processed}/{total_rows} 行..."
+                    page.update()
 
-                await asyncio.sleep(0)
-            # 完成
-            if not _import_cancelled.is_set():
+                    await asyncio.sleep(0)
+
+            finally:
+                # 确保 workbook 始终关闭，避免文件损坏和句柄泄漏
                 workbook.close()
+
+            if not _import_cancelled.is_set():
                 _log_message(log, f"已导出: {path}")
                 _update_last_directory(path)
+            else:
+                # 取消时删除不完整的文件
+                try:
+                    import os
+                    os.remove(path)
+                    _log_message(log, "已删除不完整的导出文件")
+                except OSError:
+                    pass
 
         except Exception as ex:
             _log_message(log, f"导出失败: {ex}", level=logging.ERROR)

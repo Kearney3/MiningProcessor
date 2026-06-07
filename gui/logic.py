@@ -39,25 +39,54 @@ _MODULE_LABELS = {
 }
 
 
+_active_snackbar: ft.SnackBar | None = None
+
+
 def _show_snackbar(page: ft.Page, message: str, is_error: bool = False):
-    """显示 snackbar 通知"""
+    """显示 snackbar 通知（线程安全，单一活跃实例）"""
+    global _active_snackbar
+    # 移除上一个未消失的 snackbar
+    if _active_snackbar is not None:
+        try:
+            page.overlay.remove(_active_snackbar)
+        except ValueError:
+            pass
+        _active_snackbar = None
+
     snackbar = ft.SnackBar(
         content=ft.Text(message, color=ft.Colors.WHITE),
         bgcolor=ft.Colors.RED_700 if is_error else ft.Colors.GREEN_700,
         duration=3000,
     )
+    _active_snackbar = snackbar
     page.overlay.append(snackbar)
     snackbar.open = True
     page.update()
-    # 3秒后移除
-    import threading
-    def remove():
-        try:
-            page.overlay.remove(snackbar)
-            page.update()
-        except (ValueError, RuntimeError):
-            pass
-    threading.Timer(3.5, remove).start()
+
+    # 使用 asyncio 在 Flet 事件循环中安全清理
+    async def _cleanup():
+        nonlocal snackbar
+        await asyncio.sleep(3.5)
+        if _active_snackbar is snackbar:
+            try:
+                page.overlay.remove(snackbar)
+                page.update()
+            except (ValueError, RuntimeError):
+                pass
+            _active_snackbar = None
+
+    try:
+        page.run_task(_cleanup)
+    except (AttributeError, RuntimeError):
+        # 降级：run_task 不可用时用 Timer
+        import threading
+        def _fallback_cleanup():
+            try:
+                page.overlay.remove(snackbar)
+                page.update()
+            except (ValueError, RuntimeError):
+                pass
+        threading.Timer(3.5, _fallback_cleanup).start()
 
 
 def set_btn_state(btn: ft.Button, enabled: bool, label: str = "处理"):
@@ -533,120 +562,123 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
     if cancel_event is None and cancel_btn is not None:
         cancel_event = threading.Event()
         batch_refs["cancel_event"] = cancel_event
+    # 每次运行前重置取消状态，避免上次取消影响本次运行
+    if cancel_event is not None:
+        cancel_event.clear()
     if cancel_btn is not None:
         cancel_btn.on_click = lambda e: _handle_batch_cancel(cancel_event, cancel_btn)
     _show_batch_progress(progress_row, progress_bar, progress_text, cancel_btn)
     progress_queue = queue.Queue()
 
-    # ── 第一阶段：扫描文件 ──
     try:
-        matched, missing = await asyncio.to_thread(scan_files, path)
-    except Exception as ex:
-        _log_message(log, f"文件扫描失败: {ex}", level=logging.ERROR)
-        set_btn_state(btn, True, "批量处理")
-        return
-
-    found_labels = [MODULE_LABELS.get(k, k) for k in matched]
-    missing_labels = [MODULE_LABELS.get(k, k) for k in missing]
-    _log_message(log, f"扫描完成 — 已找到: {', '.join(found_labels) or '无'}; 未找到: {', '.join(missing_labels) or '无'}")
-
-    # ── 第二阶段：表内合并基准表验证 & 缺失确认弹窗 ──
-    if table_merge_config:
-        base_type = table_merge_config["base_type"]
-        # 燃油基准需要 fuel，工时基准需要 worktime
-        required_for_base = "fuel" if base_type == "fuel" else "worktime"
-        if required_for_base not in matched:
-            base_label = MODULE_LABELS.get(required_for_base, required_for_base)
-            _log_message(log, f"表内合并需要{base_label}数据，但未找到对应文件", level=logging.ERROR)
-            set_btn_state(btn, True, "批量处理")
+        # ── 第一阶段：扫描文件 ──
+        try:
+            matched, missing = await asyncio.to_thread(scan_files, path)
+        except Exception as ex:
+            _log_message(log, f"文件扫描失败: {ex}", level=logging.ERROR)
             return
 
-    if missing:
-        # 表内合并模式下，只警告非基准表缺失；否则沿用原逻辑
-        event = threading.Event()
-        should_continue = [True]
+        found_labels = [MODULE_LABELS.get(k, k) for k in matched]
+        missing_labels = [MODULE_LABELS.get(k, k) for k in missing]
+        _log_message(log, f"扫描完成 — 已找到: {', '.join(found_labels) or '无'}; 未找到: {', '.join(missing_labels) or '无'}")
 
-        def _on_confirm(e):
-            page.pop_dialog()
-            should_continue[0] = True
-            event.set()
-
-        def _on_cancel(e):
-            page.pop_dialog()
-            should_continue[0] = False
-            event.set()
-
-        missing_text = "、".join(missing_labels)
+        # ── 第二阶段：表内合并基准表验证 & 缺失确认弹窗 ──
         if table_merge_config:
-            msg = f"以下类型的数据文件未在文件夹中检测到：\n\n{missing_text}\n\n表内合并将跳过缺失部分，是否继续？"
-        else:
-            msg = f"以下类型的数据文件未在文件夹中检测到：\n\n{missing_text}\n\n是否继续处理已找到的数据？"
-        dialog = ft.AlertDialog(
-            modal=True,
-            title=ft.Text("部分数据文件未找到"),
-            content=ft.Text(msg),
-            actions=[
-                ft.TextButton("继续处理", on_click=_on_confirm),
-                ft.TextButton("取消", on_click=_on_cancel),
-            ],
-            actions_alignment=ft.MainAxisAlignment.END,
-        )
-        page.show_dialog(dialog)
+            base_type = table_merge_config["base_type"]
+            # 燃油基准需要 fuel，工时基准需要 worktime
+            required_for_base = "fuel" if base_type == "fuel" else "worktime"
+            if required_for_base not in matched:
+                base_label = MODULE_LABELS.get(required_for_base, required_for_base)
+                _log_message(log, f"表内合并需要{base_label}数据，但未找到对应文件", level=logging.ERROR)
+                return
 
-        # 等待用户操作（带超时防死锁）
-        confirmed = await asyncio.to_thread(event.wait, 300)
-        if not confirmed or not should_continue[0]:
-            _log_message(log, "用户取消了批量处理", level=logging.WARNING)
-            set_btn_state(btn, True, "批量处理")
-            return
+        if missing:
+            # 表内合并模式下，只警告非基准表缺失；否则沿用原逻辑
+            event = threading.Event()
+            should_continue = [True]
 
-    # 日期筛选参数
-    filter_date = None
-    if batch_refs.get("date_filter_toggle") and batch_refs["date_filter_toggle"].value:
-        filter_date = batch_refs["selected_date"][0]
+            def _on_confirm(e):
+                page.pop_dialog()
+                should_continue[0] = True
+                event.set()
 
-    # 表头映射：根据开关状态决定是否传入
-    worktime_header_mapping = None
-    header_toggle = batch_refs.get("header_toggle")
-    if header_toggle and header_toggle.value:
-        mapping_config = config_loader.get_worktime_header_mapping()
-        header_mode = batch_refs.get("header_mode")
-        header_fuzzy = batch_refs.get("header_fuzzy")
-        mapping_config["mode"] = header_mode.value if header_mode else "position"
-        mapping_config["fuzzy"] = header_fuzzy.value if header_fuzzy else False
-        worktime_header_mapping = mapping_config
+            def _on_cancel(e):
+                page.pop_dialog()
+                should_continue[0] = False
+                event.set()
 
-    # ── 第三阶段：执行处理 ──
-    set_btn_state(btn, False, "处理中...")
-    try:
-        thread_result = {}
-        def _batch_target():
-            try:
-                thread_result["value"] = process_files(
-                    path, matched, year, month, raw_start, merge_output,
-                    equipment_ledger, oil_ledger, filter_date,
-                    worktime_header_mapping,
-                    table_merge_config,
-                    progress_cb=progress_queue.put_nowait,
-                    cancel_event=cancel_event,
-                )
-            except Exception as ex:
-                thread_result["error"] = ex
+            missing_text = "、".join(missing_labels)
+            if table_merge_config:
+                msg = f"以下类型的数据文件未在文件夹中检测到：\n\n{missing_text}\n\n表内合并将跳过缺失部分，是否继续？"
+            else:
+                msg = f"以下类型的数据文件未在文件夹中检测到：\n\n{missing_text}\n\n是否继续处理已找到的数据？"
+            dialog = ft.AlertDialog(
+                modal=True,
+                title=ft.Text("部分数据文件未找到"),
+                content=ft.Text(msg),
+                actions=[
+                    ft.TextButton("继续处理", on_click=_on_confirm),
+                    ft.TextButton("取消", on_click=_on_cancel),
+                ],
+                actions_alignment=ft.MainAxisAlignment.END,
+            )
+            page.show_dialog(dialog)
 
-        await asyncio.to_thread(_batch_target)
-        await _consume_batch_progress_queue(progress_queue, progress_bar, progress_text)
-        if "error" in thread_result:
-            raise thread_result["error"]
-        if cancel_event is not None and cancel_event.is_set():
-            _log_message(log, "用户取消了批量处理", level=logging.WARNING)
-            _show_snackbar(page, "批量处理已取消")
-        else:
-            _log_message(log, "批量处理完成")
-            _show_snackbar(page, "批量处理完成")
-    except Exception as ex:
-        _log_message(log, f"批量处理失败: {ex}", level=logging.ERROR)
-        _show_snackbar(page, f"批量处理失败: {ex}", is_error=True)
+            # 等待用户操作（带超时防死锁）
+            confirmed = await asyncio.to_thread(event.wait, 300)
+            if not confirmed or not should_continue[0]:
+                _log_message(log, "用户取消了批量处理", level=logging.WARNING)
+                return
+
+        # 日期筛选参数
+        filter_date = None
+        if batch_refs.get("date_filter_toggle") and batch_refs["date_filter_toggle"].value:
+            filter_date = batch_refs["selected_date"][0]
+
+        # 表头映射：根据开关状态决定是否传入
+        worktime_header_mapping = None
+        header_toggle = batch_refs.get("header_toggle")
+        if header_toggle and header_toggle.value:
+            mapping_config = config_loader.get_worktime_header_mapping()
+            header_mode = batch_refs.get("header_mode")
+            header_fuzzy = batch_refs.get("header_fuzzy")
+            mapping_config["mode"] = header_mode.value if header_mode else "position"
+            mapping_config["fuzzy"] = header_fuzzy.value if header_fuzzy else False
+            worktime_header_mapping = mapping_config
+
+        # ── 第三阶段：执行处理 ──
+        set_btn_state(btn, False, "处理中...")
+        try:
+            thread_result = {}
+            def _batch_target():
+                try:
+                    thread_result["value"] = process_files(
+                        path, matched, year, month, raw_start, merge_output,
+                        equipment_ledger, oil_ledger, filter_date,
+                        worktime_header_mapping,
+                        table_merge_config,
+                        progress_cb=progress_queue.put_nowait,
+                        cancel_event=cancel_event,
+                    )
+                except Exception as ex:
+                    thread_result["error"] = ex
+
+            await asyncio.to_thread(_batch_target)
+            await _consume_batch_progress_queue(progress_queue, progress_bar, progress_text)
+            if "error" in thread_result:
+                raise thread_result["error"]
+            if cancel_event is not None and cancel_event.is_set():
+                _log_message(log, "用户取消了批量处理", level=logging.WARNING)
+                _show_snackbar(page, "批量处理已取消")
+            else:
+                _log_message(log, "批量处理完成")
+                _show_snackbar(page, "批量处理完成")
+        except Exception as ex:
+            _log_message(log, f"批量处理失败: {ex}", level=logging.ERROR)
+            _show_snackbar(page, f"批量处理失败: {ex}", is_error=True)
+
     finally:
+        # 确保所有路径（包括早期返回）都清理进度条和按钮状态
         _hide_batch_progress(progress_row, progress_bar, progress_text, cancel_btn)
         set_btn_state(btn, True, "批量处理")
 
