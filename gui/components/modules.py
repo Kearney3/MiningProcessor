@@ -3,7 +3,7 @@ from datetime import datetime
 
 import flet as ft
 
-from .common import _last_directory, _update_last_directory, _log_message, _get_initial_directory, _show_path_confirm, ChipToggle
+from .common import _last_directory, _update_last_directory, _log_message, _get_initial_directory, _show_path_confirm, ChipToggle, year_options
 from .types import ModuleRefs
 
 try:
@@ -34,7 +34,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     fuel_year = ft.Dropdown(
         label="年份",
         width=125,
-        options=[ft.dropdown.Option(str(y)) for y in range(2015, 2040)],
+        options=year_options(),
         value=current_year,
     )
     fuel_btn = theme.primary_btn("处理", icon=ft.Icons.PLAY_ARROW, disabled=False)
@@ -73,7 +73,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     elec_year = ft.Dropdown(
         label="年份",
         width=125,
-        options=[ft.dropdown.Option(str(y)) for y in range(2015, 2040)],
+        options=year_options(),
         value=current_year,
     )
     elec_btn = theme.primary_btn("处理", icon=ft.Icons.PLAY_ARROW, disabled=False)
@@ -111,7 +111,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     work_year = ft.Dropdown(
         label="年份",
         width=125,
-        options=[ft.dropdown.Option(str(y)) for y in range(2015, 2040)],
+        options=year_options(),
         value=current_year,
     )
     work_month = ft.Dropdown(

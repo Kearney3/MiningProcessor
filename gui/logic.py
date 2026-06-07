@@ -639,10 +639,13 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
             raise thread_result["error"]
         if cancel_event is not None and cancel_event.is_set():
             _log_message(log, "用户取消了批量处理", level=logging.WARNING)
+            _show_snackbar(page, "批量处理已取消")
         else:
             _log_message(log, "批量处理完成")
+            _show_snackbar(page, "批量处理完成")
     except Exception as ex:
         _log_message(log, f"批量处理失败: {ex}", level=logging.ERROR)
+        _show_snackbar(page, f"批量处理失败: {ex}", is_error=True)
     finally:
         _hide_batch_progress(progress_row, progress_bar, progress_text, cancel_btn)
         set_btn_state(btn, True, "批量处理")
