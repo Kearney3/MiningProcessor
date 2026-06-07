@@ -29,7 +29,6 @@ def temp_config(tmp_path, monkeypatch):
         "default_year": 2025,
         "default_month": 6,
         "shift_mapping": {"白班": "Day", "夜班": "Night"},
-        "output_naming": {"include_date": True},
     }
     config_file = tmp_path / "config.json"
     config_file.write_text(json.dumps(config_data, ensure_ascii=False), encoding="utf-8")

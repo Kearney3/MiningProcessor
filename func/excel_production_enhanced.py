@@ -154,18 +154,20 @@ class MiningDataProcessor:
         # for row, col in zip(positions[0], positions[1]):
         #     logger.info(f"在第 {row} 行，第 {col} 列找到文本")
 
+        # 使用局部变量避免多线程竞态条件（process_folder 并发调用时共享同一实例）
+        raw_start = self.raw_start
         if self.auto_detect == True:
             mask = df_raw.apply(lambda row: row.astype(str).str.contains(self.target_text).any(), axis=1)
             # 获取对应的索引
             row_indices = df_raw[mask].index.tolist()
             if len(row_indices) > 0:
-                self.raw_start = row_indices[0] + 1
-                logger.info(f"开启自动检测，找到目标文本{self.target_text}，行号为: {self.raw_start}")
+                raw_start = row_indices[0] + 1
+                logger.info(f"开启自动检测，找到目标文本{self.target_text}，行号为: {raw_start}")
             else:
                 raise ValueError(f"未找到目标文本{self.target_text},请检查数据是否正确")
 
-        # 2. 找最后一列：第6行匹配“总趟数”，前一列为最后一列
-        row6 = df_raw.iloc[self.raw_start - 1, :]
+        # 2. 找最后一列：第6行匹配"总趟数"，前一列为最后一列
+        row6 = df_raw.iloc[raw_start - 1, :]
         total_col_idx = None
         for idx, val in row6.items():
             if any(k in self.safe_str(val) for k in ["总趟数", "Нийт рейс"]):
@@ -179,8 +181,8 @@ class MiningDataProcessor:
             last_col_idx = df_raw.shape[1] - 1
 
         # 3. 构造复合表头
-        header6 = df_raw.iloc[self.raw_start - 1, :last_col_idx + 1].ffill()
-        header7 = df_raw.iloc[self.raw_start, :last_col_idx + 1]
+        header6 = df_raw.iloc[raw_start - 1, :last_col_idx + 1].ffill()
+        header7 = df_raw.iloc[raw_start, :last_col_idx + 1]
 
         combined_headers = []
         for h6, h7 in zip(header6, header7):
@@ -188,8 +190,8 @@ class MiningDataProcessor:
             h7_str = self.safe_str(h7)
             combined_headers.append(f"{h6_str}｜{h7_str}")
 
-        # 4. 数据区：第self.raw_start+1行开始
-        data = df_raw.iloc[self.raw_start + 1: last_row_idx + 1, :last_col_idx + 1].copy()
+        # 4. 数据区：第raw_start+1行开始
+        data = df_raw.iloc[raw_start + 1: last_row_idx + 1, :last_col_idx + 1].copy()
         if data.empty:
             return pd.DataFrame(), pd.DataFrame()
 
@@ -213,7 +215,7 @@ class MiningDataProcessor:
         running_rows = []
         production_rows = []
 
-        # 哪些列属于“生产列”
+        # 哪些列属于“生产列"
         exclude_keywords = ["小时数", "公里数", "总趟数", "备注", "开始", "结束", "公司"]
 
         for _, row in data.iterrows():
@@ -241,7 +243,7 @@ class MiningDataProcessor:
 
                 col_str = self.safe_str(col)
 
-                # 排除运行类列，只保留“挖机｜矿石类型”类列
+                # 排除运行类列，只保留“挖机｜矿石类型"类列
                 if any(k in col_str for k in exclude_keywords):
                     continue
 
@@ -250,7 +252,7 @@ class MiningDataProcessor:
 
                 parts = col_str.split("｜", 1)
                 excavator_name = self.safe_str(parts[0])
-                # 排除运行类列，只保留“挖机｜矿石类型”类列
+                # 排除运行类列，只保留“挖机｜矿石类型"类列
                 if any(k in excavator_name for k in ["Мото", "Эхэлсэн", "Компани", "км", "Дууссан"]):
                     continue
                 ore_type = self.safe_str(parts[1])
@@ -410,6 +412,10 @@ class MiningDataProcessor:
         file_list = self.collect_excel_files(folder_path)
         total_files = len(file_list)
 
+        # output_file 兜底（提前到 total_files 检查之前，避免 None 传入 ExcelWriter）
+        if output_file is None and not return_sheets:
+            output_file = os.path.join(folder_path, "合并产量.xlsx")
+
         if total_files == 0:
             logger.warning("未找到符合条件的 Excel 文件。")
             with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
@@ -459,9 +465,6 @@ class MiningDataProcessor:
             logger.info(
                 f"统计信息：共处理 {total_files} 个文件，成功 {success_files} 个，失败 {total_files - success_files} 个")
             return sheets if sheets else None
-
-        if output_file is None:
-            output_file = os.path.join(folder_path, "合并产量.xlsx")
 
         with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
             final_running.to_excel(writer, sheet_name='运行数据', index=False)

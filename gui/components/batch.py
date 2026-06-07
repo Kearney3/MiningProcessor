@@ -52,6 +52,21 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         tooltip="生产数据表头起始行使用自动检测",
     )
 
+    # --- 表头起始行（仅在取消自动检测时显示） ---
+    batch_raw_start = ft.TextField(
+        label="表头起始行",
+        width=100,
+        value="-1",
+        hint_text="-1（自动检测）",
+        visible=False,
+    )
+
+    def _on_auto_detect_change(e):
+        batch_raw_start.visible = not batch_auto_detect.value
+        batch_raw_start.update()
+
+    batch_auto_detect.on_change = _on_auto_detect_change
+
     # --- 合并输出 ---
     batch_merge = ft.Checkbox(
         label="合并输出",
@@ -285,7 +300,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
     # 处理选项（可折叠，2 列布局）
     options_grid = ft.ResponsiveRow(
         [
-            ft.Container(batch_auto_detect, col={"xs": 12, "md": 6}),
+            ft.Container(ft.Row([batch_auto_detect, batch_raw_start], spacing=4), col={"xs": 12, "md": 6}),
             ft.Container(batch_header_toggle, col={"xs": 12, "md": 6}),
             ft.Container(batch_ledger_toggle, col={"xs": 12, "md": 6}),
             ft.Container(batch_merge, col={"xs": 12, "md": 6}),
@@ -368,6 +383,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "year": batch_year,
         "month": batch_month,
         "auto_detect": batch_auto_detect,
+        "raw_start_input": batch_raw_start,
         "merge": batch_merge,
         "table_merge": batch_table_merge,
         "base_table": batch_base_table,

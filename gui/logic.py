@@ -498,9 +498,23 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
         _log_message(log, "请先选择文件夹", level=logging.WARNING)
         return
 
+    btn = batch_refs["btn"]
+    set_btn_state(btn, False, "扫描中...")
+
     year = int(batch_refs["year"].value)
     month = int(batch_refs["month"].value)
-    raw_start = -1 if batch_refs["auto_detect"].value else -1
+    if batch_refs["auto_detect"].value:
+        raw_start = -1
+    else:
+        raw_start_text = (batch_refs.get("raw_start_input") and batch_refs["raw_start_input"].value or "-1").strip()
+        try:
+            raw_start = int(raw_start_text)
+            if raw_start != -1 and raw_start < 1:
+                raise ValueError
+        except ValueError:
+            _log_message(log, "请输入有效的 raw_start（正整数或-1【自动检测行】）", level=logging.WARNING)
+            set_btn_state(btn, True, "开始处理")
+            return
     merge_output = bool(batch_refs["merge"].value)
 
     # 表内合并选项
@@ -510,9 +524,6 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
         base_table_type = batch_refs.get("base_table")
         base_type = base_table_type.value if base_table_type else "fuel"
         table_merge_config = {"base_type": base_type}
-
-    btn = batch_refs["btn"]
-    set_btn_state(btn, False, "扫描中...")
 
     progress_bar = batch_refs.get("progress_bar")
     progress_text = batch_refs.get("progress_text")

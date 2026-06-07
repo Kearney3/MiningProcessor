@@ -884,6 +884,11 @@ class ImportPickerSpy:
 
 def test_config_save_picker_remembers_initial_directory(monkeypatch, tmp_path):
     """After saving config, next save_file call uses the same directory."""
+    # 隔离配置文件，避免测试写入真实 config.user.json
+    import func.config_loader as config_loader
+    user_file = tmp_path / "config.user.json"
+    monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", user_file)
+
     SavePickerSpy.reset()
     monkeypatch.setattr(components.ft, "FilePicker", SavePickerSpy)
 
