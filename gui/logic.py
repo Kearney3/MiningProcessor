@@ -66,6 +66,7 @@ def _show_snackbar(page: ft.Page, message: str, is_error: bool = False):
     # 使用 asyncio 在 Flet 事件循环中安全清理
     async def _cleanup():
         nonlocal snackbar
+        global _active_snackbar
         await asyncio.sleep(3.5)
         if _active_snackbar is snackbar:
             try:
