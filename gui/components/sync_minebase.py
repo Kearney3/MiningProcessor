@@ -110,10 +110,10 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     )
 
     # --- 布局 ---
-    type_row = ft.Row(
-        [select_all] + list(type_checks.values()),
-        wrap=True,
-        spacing=12,
+    type_row = ft.ResponsiveRow(
+        [ft.Container(select_all, col={"xs": 12, "md": 6})]
+        + [ft.Container(cb, col={"xs": 12, "md": 6}) for cb in type_checks.values()],
+        run_spacing=4,
     )
 
     container = ft.Container(
