@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 import flet as ft
 
-from .common import _last_directory, _update_last_directory, _log_message, _get_initial_directory, _show_path_confirm, ChipToggle, year_options, month_options
+from .common import _last_directory, _update_last_directory, _log_message, _get_initial_directory, _show_path_confirm, ChipToggle, year_options, month_options, make_browse_handler, HeaderModeConfig
 
 try:
     from . import theme
@@ -96,45 +96,12 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
     batch_base_table.row.visible = batch_table_merge.value
 
     # --- 工作效率表头修改开关 ---
-    batch_header_toggle = ft.Checkbox(
+    _batch_hmc = HeaderModeConfig(
         label="工作效率表头修改",
-        value=True,
         tooltip="开启后按配置的映射关系重命名工作效率表输出表头",
+        fuzzy_label="模糊匹配",
+        fuzzy_tooltip="按列名匹配时启用模糊匹配（容错错别字）",
     )
-
-    # ── 匹配模式芯片切换 ──
-    batch_header_fuzzy = ft.Checkbox(
-        label="模糊匹配",
-        value=False,
-        visible=False,
-        tooltip="按列名匹配时启用模糊匹配（容错错别字）",
-    )
-
-    def _on_batch_mode_change(val):
-        batch_header_fuzzy.visible = (val != "position")
-        try:
-            batch_header_fuzzy.update()
-        except (RuntimeError, AttributeError):
-            pass
-
-    batch_header_mode = ChipToggle(
-        options=[("position", "按位置"), ("name", "按列名")],
-        on_change=_on_batch_mode_change,
-    )
-
-    def _on_batch_header_toggle(e):
-        enabled = batch_header_toggle.value
-        for chip in batch_header_mode._chips:
-            chip.disabled = not enabled
-        if not enabled:
-            batch_header_fuzzy.visible = False
-        else:
-            batch_header_fuzzy.visible = (batch_header_mode.value == "name")
-        try:
-            batch_header_mode.row.update()
-            batch_header_fuzzy.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     # ── 表内合并 / 合并输出 互斥 & 台账依赖 ──
     def _on_table_merge_change(e):
@@ -181,8 +148,6 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
             pass
 
     batch_ledger_toggle.on_change = _on_ledger_toggle_for_merge
-
-    batch_header_toggle.on_change = _on_batch_header_toggle
 
     # --- 日期筛选 ---
     _selected_date = [current_date.date()]  # 用列表包裹以便闭包修改
@@ -255,22 +220,13 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
     batch_cancel_btn = theme.secondary_btn("取消", icon=ft.Icons.CANCEL, visible=False, height=32)
 
     # --- 浏览按钮 ---
-    async def on_batch_browse(e: ft.ControlEvent):
-        picker = ft.FilePicker()
-        try:
-            path = await picker.get_directory_path(
-                dialog_title="选择批量处理文件夹",
-                initial_directory=_get_initial_directory(),
-            )
-        except Exception as ex:
-            _log_message(page.logger.error, f"选择文件夹失败: {ex}")
-            return
-        if path:
-            batch_path.value = path
-            _update_last_directory(path, is_dir=True)
-            _show_path_confirm(batch_path)
-            batch_btn.disabled = False
-            batch_btn.update()
+    _batch_picker = ft.FilePicker()
+    page.services.append(_batch_picker)
+    on_batch_browse = make_browse_handler(
+        _batch_picker, batch_path, batch_btn, "选择批量处理文件夹",
+        mode="folder",
+        log_fn=lambda msg: _log_message(page.logger.error, msg),
+    )
 
     batch_path.suffix.on_click = on_batch_browse
 
@@ -301,12 +257,12 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
     options_grid = ft.ResponsiveRow(
         [
             ft.Container(ft.Row([batch_auto_detect, batch_raw_start], spacing=4), col={"xs": 12, "md": 6}),
-            ft.Container(batch_header_toggle, col={"xs": 12, "md": 6}),
+            ft.Container(_batch_hmc.toggle, col={"xs": 12, "md": 6}),
             ft.Container(batch_ledger_toggle, col={"xs": 12, "md": 6}),
             ft.Container(batch_merge, col={"xs": 12, "md": 6}),
             ft.Container(batch_table_merge, col={"xs": 12, "md": 6}),
             ft.Container(
-                ft.Row([batch_header_mode.row, batch_header_fuzzy], spacing=4, wrap=True),
+                ft.Row([_batch_hmc.mode.row, _batch_hmc.fuzzy], spacing=4, wrap=True),
                 col={"xs": 12, "md": 6},
             ),
             ft.Container(batch_base_table.row, col={"xs": 12, "md": 6}),
@@ -388,9 +344,9 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "table_merge": batch_table_merge,
         "base_table": batch_base_table,
         "ledger_toggle": batch_ledger_toggle,
-        "header_toggle": batch_header_toggle,
-        "header_mode": batch_header_mode,
-        "header_fuzzy": batch_header_fuzzy,
+        "header_toggle": _batch_hmc.toggle,
+        "header_mode": _batch_hmc.mode,
+        "header_fuzzy": _batch_hmc.fuzzy,
         "date_filter_toggle": date_filter_toggle,
         "selected_date": _selected_date,
         "btn": batch_btn,
