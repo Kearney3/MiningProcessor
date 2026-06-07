@@ -278,15 +278,10 @@ def create_ledger_match_section(
             return _unmatched_sheets.get(sheet)
         return _filtered_df[0]
 
-    _empty_state = ft.Column(
-        [
-            ft.Icon(ft.Icons.TABLE_CHART_OUTLINED, size=48, color=ft.Colors.GREY_300),
-            ft.Text("暂无数据", size=14, color=theme.TEXT_SECONDARY, weight=ft.FontWeight.W_500),
-            ft.Text("点击上方「导入文件」开始", size=12, color=ft.Colors.GREY_400),
-        ],
-        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-        alignment=ft.MainAxisAlignment.CENTER,
-        spacing=8,
+    _empty_state = theme.empty_state(
+        ft.Icons.TABLE_CHART_OUTLINED,
+        "暂无数据",
+        "点击上方「导入文件」开始",
     )
 
     def build_table():

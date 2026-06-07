@@ -231,9 +231,9 @@ def empty_state(icon_name: str, title: str, hint: str) -> ft.Column:
         alignment=ft.MainAxisAlignment.CENTER,
         spacing=8,
         controls=[
-            ft.Icon(icon_name, size=48, color=GREY_300),
+            ft.Icon(icon_name, size=48, color=ft.Colors.GREY_300),
             ft.Text(title, size=14, color=TEXT_SECONDARY, weight=ft.FontWeight.W_500),
-            ft.Text(hint, size=12, color=GREY_400),
+            ft.Text(hint, size=12, color=ft.Colors.GREY_400),
         ],
     )
 

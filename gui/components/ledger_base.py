@@ -120,15 +120,10 @@ def create_ledger_section_factory(
             records = df.to_dict("records")
 
     # --- 空状态提示 ---
-    empty_hint = ft.Column(
-        [
-            ft.Icon(cfg.empty_icon, size=48, color=ft.Colors.GREY_300),
-            ft.Text(cfg.empty_text, size=14, color=theme.TEXT_SECONDARY, weight=ft.FontWeight.W_500),
-            ft.Text("点击上方「导入台账」开始", size=12, color=ft.Colors.GREY_400),
-        ],
-        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-        alignment=ft.MainAxisAlignment.CENTER,
-        spacing=8,
+    empty_hint = theme.empty_state(
+        cfg.empty_icon,
+        cfg.empty_text,
+        "点击上方「导入台账」开始",
     )
 
     # --- 表格包装器 ---

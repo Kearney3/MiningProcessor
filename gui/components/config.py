@@ -56,15 +56,10 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
         spacing=4, alignment=ft.MainAxisAlignment.CENTER,
     )
 
-    _config_empty_state = ft.Column(
-        [
-            ft.Icon(ft.Icons.INVENTORY_2_OUTLINED, size=48, color=ft.Colors.GREY_300),
-            ft.Text("暂无设备配置", size=14, color=theme.TEXT_SECONDARY, weight=ft.FontWeight.W_500),
-            ft.Text("点击「添加设备」或「导入配置」开始", size=12, color=ft.Colors.GREY_400),
-        ],
-        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-        alignment=ft.MainAxisAlignment.CENTER,
-        spacing=8,
+    _config_empty_state = theme.empty_state(
+        ft.Icons.INVENTORY_2_OUTLINED,
+        "暂无设备配置",
+        "点击「添加设备」或「导入配置」开始",
     )
 
     def _config_total_pages():
