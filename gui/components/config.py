@@ -5,7 +5,7 @@ from pathlib import Path
 
 import flet as ft
 
-from .common import _log_message, _last_directory, _update_last_directory, PAGE_SIZE
+from .common import _log_message, _last_directory, _update_last_directory, PAGE_SIZE, create_confirm_dialog
 from .types import ConfigRefs
 
 try:
@@ -266,16 +266,10 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
         remove_selected_rows()
         _log_message(log, "已删除选中设备配置")
 
-    confirm_dialog = ft.AlertDialog(
-        modal=True,
-        title=ft.Text("确认删除"),
-        content=ft.Text("确定要删除选中的设备配置吗？此操作不可撤销。"),
-        actions=[
-            ft.TextButton("取消", on_click=lambda e: page.pop_dialog()),
-            ft.TextButton("确认删除", on_click=_do_remove,
-                          style=ft.ButtonStyle(color=theme.ERROR)),
-        ],
-        actions_alignment=ft.MainAxisAlignment.END,
+    confirm_dialog = create_confirm_dialog(
+        page, "确认删除",
+        "确定要删除选中的设备配置吗？此操作不可撤销。",
+        _do_remove, confirm_text="确认删除",
     )
 
     def remove_selected(e: ft.ControlEvent):

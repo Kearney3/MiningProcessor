@@ -10,7 +10,7 @@ import flet as ft
 
 
 
-from .common import _log_message, _last_directory as _import_dir, _update_last_directory, _cell_text, PAGE_SIZE, strip_date_only_times
+from .common import _log_message, _last_directory as _import_dir, _update_last_directory, _cell_text, PAGE_SIZE, strip_date_only_times, create_confirm_dialog
 
 try:
     from . import theme
@@ -579,16 +579,10 @@ def create_ledger_match_section(
         page.pop_dialog()
         _do_clear_impl()
 
-    _clear_confirm_dialog = ft.AlertDialog(
-        modal=True,
-        title=ft.Text("确认清空"),
-        content=ft.Text("确定要清空所有已导入数据和匹配结果吗？此操作不可撤销。"),
-        actions=[
-            ft.TextButton("取消", on_click=lambda e: page.pop_dialog()),
-            ft.TextButton("确认清空", on_click=_do_clear_confirmed,
-                          style=ft.ButtonStyle(color=theme.ERROR)),
-        ],
-        actions_alignment=ft.MainAxisAlignment.END,
+    _clear_confirm_dialog = create_confirm_dialog(
+        page, "确认清空",
+        "确定要清空所有已导入数据和匹配结果吗？此操作不可撤销。",
+        _do_clear_confirmed, confirm_text="确认清空",
     )
 
     def on_clear(e):
