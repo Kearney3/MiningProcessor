@@ -346,111 +346,139 @@ async def run_task(page: ft.Page, module_type: str, path: str, btn: ft.Button, l
 # ---------------------------------------------------------------------------
 async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=None, oil_ledger=None):
     """燃油处理按钮回调"""
-    path = fuel_refs["path"].value
-    if not path:
-        _log_message(log, "请先选择文件", level=logging.WARNING)
-        return
     btn = fuel_refs["btn"]
-    year = int(fuel_refs["year"].value)
     set_btn_state(btn, False, "处理中...")
-    await run_task(page, "fuel", path, btn, log, year=year, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
-    set_btn_state(btn, True, "处理")
+    try:
+        path = fuel_refs["path"].value
+        if not path:
+            _log_message(log, "请先选择文件", level=logging.WARNING)
+            set_btn_state(btn, True, "处理")
+            return
+        year = int(fuel_refs["year"].value)
+        await run_task(page, "fuel", path, btn, log, year=year, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
+        set_btn_state(btn, True, "处理")
+    except Exception:
+        set_btn_state(btn, True, "处理")
+        raise
 
 
 async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=None, oil_ledger=None):
     """生产处理按钮回调"""
-    path = prod_refs["path"].value
-    if not path:
-        _log_message(log, "请先选择 Excel 文件或文件夹", level=logging.WARNING)
-        return
-
-    raw_start_text = (prod_refs["raw_start"].value or "-1").strip()
-    try:
-        raw_start = int(raw_start_text)
-        if raw_start != -1 and raw_start < 1:
-            raise ValueError
-    except ValueError:
-        _log_message(log, "请输入有效的 raw_start（正整数或-1【自动检测行】）", level=logging.WARNING)
-        return
-
     btn = prod_refs["btn"]
     set_btn_state(btn, False, "处理中...")
-    await run_task(page, "production", path, btn, log, raw_start=raw_start, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
-    set_btn_state(btn, True, "处理")
+    try:
+        path = prod_refs["path"].value
+        if not path:
+            _log_message(log, "请先选择 Excel 文件或文件夹", level=logging.WARNING)
+            set_btn_state(btn, True, "处理")
+            return
+
+        raw_start_text = (prod_refs["raw_start"].value or "-1").strip()
+        try:
+            raw_start = int(raw_start_text)
+            if raw_start != -1 and raw_start < 1:
+                raise ValueError
+        except ValueError:
+            _log_message(log, "请输入有效的 raw_start（正整数或-1【自动检测行】）", level=logging.WARNING)
+            set_btn_state(btn, True, "处理")
+            return
+
+        await run_task(page, "production", path, btn, log, raw_start=raw_start, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
+        set_btn_state(btn, True, "处理")
+    except Exception:
+        set_btn_state(btn, True, "处理")
+        raise
 
 
 async def on_elec_process(page: ft.Page, elec_refs: dict, log, equipment_ledger=None, oil_ledger=None):
     """电力处理按钮回调"""
-    path = elec_refs["path"].value
-    if not path:
-        _log_message(log, "请先选择文件", level=logging.WARNING)
-        return
-
-    year_text = elec_refs["year"].value
-    try:
-        year = int(year_text)
-    except (TypeError, ValueError):
-        _log_message(log, "请输入有效的年份", level=logging.WARNING)
-        return
-
     btn = elec_refs["btn"]
-    add_shift = elec_refs.get("add_shift")
-    default_shift_ref = elec_refs.get("default_shift")
     set_btn_state(btn, False, "处理中...")
-    await run_task(page, "electrical", path, btn, log, year=year,
-                   add_shift_column=add_shift.value if add_shift else False,
-                   default_shift=default_shift_ref.value if default_shift_ref else "Day",
-                   equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
-    set_btn_state(btn, True, "处理")
+    try:
+        path = elec_refs["path"].value
+        if not path:
+            _log_message(log, "请先选择文件", level=logging.WARNING)
+            set_btn_state(btn, True, "处理")
+            return
+
+        year_text = elec_refs["year"].value
+        try:
+            year = int(year_text)
+        except (TypeError, ValueError):
+            _log_message(log, "请输入有效的年份", level=logging.WARNING)
+            set_btn_state(btn, True, "处理")
+            return
+
+        add_shift = elec_refs.get("add_shift")
+        default_shift_ref = elec_refs.get("default_shift")
+        await run_task(page, "electrical", path, btn, log, year=year,
+                       add_shift_column=add_shift.value if add_shift else False,
+                       default_shift=default_shift_ref.value if default_shift_ref else "Day",
+                       equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
+        set_btn_state(btn, True, "处理")
+    except Exception:
+        set_btn_state(btn, True, "处理")
+        raise
 
 
 async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=None, oil_ledger=None):
     """工时处理按钮回调"""
-    path = work_refs["path"].value
-    if not path:
-        _log_message(log, "请先选择文件", level=logging.WARNING)
-        return
     btn = work_refs["btn"]
-    year = int(work_refs["year"].value)
-    month = int(work_refs["month"].value)
-    # 表头映射：根据开关状态决定是否传入
-    header_mapping = None
-    header_toggle = work_refs.get("header_toggle")
-    if header_toggle and header_toggle.value:
-        mapping_config = config_loader.get_worktime_header_mapping()
-        header_mode = work_refs.get("header_mode")
-        header_fuzzy = work_refs.get("header_fuzzy")
-        mapping_config["mode"] = header_mode.value if header_mode else "position"
-        mapping_config["fuzzy"] = header_fuzzy.value if header_fuzzy else False
-        header_mapping = mapping_config
     set_btn_state(btn, False, "处理中...")
-    await run_task(page, "worktime", path, btn, log, year=year, month=month,
-                   equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
-                   header_mapping=header_mapping)
-    set_btn_state(btn, True, "处理")
+    try:
+        path = work_refs["path"].value
+        if not path:
+            _log_message(log, "请先选择文件", level=logging.WARNING)
+            set_btn_state(btn, True, "处理")
+            return
+        year = int(work_refs["year"].value)
+        month = int(work_refs["month"].value)
+        # 表头映射：根据开关状态决定是否传入
+        header_mapping = None
+        header_toggle = work_refs.get("header_toggle")
+        if header_toggle and header_toggle.value:
+            mapping_config = config_loader.get_worktime_header_mapping()
+            header_mode = work_refs.get("header_mode")
+            header_fuzzy = work_refs.get("header_fuzzy")
+            mapping_config["mode"] = header_mode.value if header_mode else "position"
+            mapping_config["fuzzy"] = header_fuzzy.value if header_fuzzy else False
+            header_mapping = mapping_config
+        await run_task(page, "worktime", path, btn, log, year=year, month=month,
+                       equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
+                       header_mapping=header_mapping)
+        set_btn_state(btn, True, "处理")
+    except Exception:
+        set_btn_state(btn, True, "处理")
+        raise
 
 
 async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledger=None, oil_ledger=None):
     """Excel 合并按钮回调"""
-    path = merge_refs["path"].value
-    if not path:
-        _log_message(log, "请先选择文件夹", level=logging.WARNING)
-        return
-    keyword = (merge_refs["keyword"].value or "").strip()
-    if not keyword:
-        _log_message(log, "请输入文件名关键字", level=logging.WARNING)
-        return
-    strip_time = bool(merge_refs["strip_time"].value)
-    # 收集排序配置
-    sort_configs = []
-    for cfg in merge_refs.get("sort_configs_state", []):
-        col = (cfg.get("column") or "").strip()
-        if col:
-            sort_configs.append({"column": col, "ascending": bool(cfg.get("ascending", True))})
     btn = merge_refs["btn"]
     set_btn_state(btn, False, "合并中...")
-    await run_task(page, "merge", path, btn, log, keyword=keyword, strip_time=strip_time, sort_configs=sort_configs, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
-    set_btn_state(btn, True, "合并")
+    try:
+        path = merge_refs["path"].value
+        if not path:
+            _log_message(log, "请先选择文件夹", level=logging.WARNING)
+            set_btn_state(btn, True, "合并")
+            return
+        keyword = (merge_refs["keyword"].value or "").strip()
+        if not keyword:
+            _log_message(log, "请输入文件名关键字", level=logging.WARNING)
+            set_btn_state(btn, True, "合并")
+            return
+        # 收集排序配置
+        sort_configs = []
+        for cfg in merge_refs.get("sort_configs_state", []):
+            col = (cfg.get("column") or "").strip()
+            if col:
+                sort_configs.append({"column": col, "ascending": bool(cfg.get("ascending", True))})
+        strip_time = bool(merge_refs["strip_time"].value)
+        await run_task(page, "merge", path, btn, log, keyword=keyword, strip_time=strip_time, sort_configs=sort_configs, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
+        set_btn_state(btn, True, "合并")
+    except Exception:
+        set_btn_state(btn, True, "合并")
+        raise
 
 
 def _show_batch_progress(progress_row, progress_bar, progress_text, cancel_btn):

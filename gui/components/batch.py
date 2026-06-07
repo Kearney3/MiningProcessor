@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 import flet as ft
 
-from .common import _last_directory, _update_last_directory, _log_message, _get_initial_directory, _show_path_confirm, ChipToggle, year_options
+from .common import _last_directory, _update_last_directory, _log_message, _get_initial_directory, _show_path_confirm, ChipToggle, year_options, month_options
 
 try:
     from . import theme
@@ -41,7 +41,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
     batch_month = ft.Dropdown(
         label="月份",
         width=125,
-        options=[ft.dropdown.Option(str(m)) for m in range(1, 13)],
+        options=month_options(),
         value=current_month,
     )
 

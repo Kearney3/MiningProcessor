@@ -3,7 +3,7 @@ from datetime import datetime
 
 import flet as ft
 
-from .common import _last_directory, _update_last_directory, _log_message, _get_initial_directory, _show_path_confirm, ChipToggle, year_options
+from .common import _last_directory, _update_last_directory, _log_message, _get_initial_directory, _show_path_confirm, ChipToggle, year_options, month_options
 from .types import ModuleRefs
 
 try:
@@ -117,7 +117,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     work_month = ft.Dropdown(
         label="月份",
         width=125,
-        options=[ft.dropdown.Option(str(month)) for month in range(1, 13)],
+        options=month_options(),
         value=current_month,
     )
     work_header_toggle = ft.Checkbox(
