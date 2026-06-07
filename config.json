@@ -45,10 +45,6 @@
     },
     "default_year": 2025,
     "default_month": 1,
-    "output_naming": {
-        "include_date": true,
-        "include_shift": true
-    },
     "shift_mapping": {
         "白班": "Day",
         "夜班": "Night",
@@ -136,14 +132,6 @@
         }
     },
     "user_config_default": {
-        "database": {
-            "db_type": "",
-            "db_host": "localhost",
-            "db_port": 3306,
-            "db_name": "",
-            "db_user": "",
-            "db_password": ""
-        },
         "file_keywords": {
             "fuel": ["Fuel report "],
             "electrical": ["Цахилгааны хэлтэс"],

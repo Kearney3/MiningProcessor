@@ -134,9 +134,8 @@ MiningProcessor/
 | `device_load_map_old` | 旧版装载量映射（历史兼容） |
 | `default_year` / `default_month` | 默认年月参数 |
 | `shift_mapping` | 班次名称映射（中/蒙文 → 英文） |
-| `output_naming` | 输出文件命名规则（是否含日期、班次） |
 | `worktime_header_apply` | 是否应用自定义表头映射 |
-| `user_config_default` | 用户配置默认值（`database`、`file_keywords`） |
+| `user_config_default` | 用户配置默认值（`file_keywords`） |
 
 `config.user.json` 主要配置项：
 
