@@ -27,6 +27,8 @@ jobs:
   build-macos:
     name: macOS arm64
     runs-on: macos-latest  # Apple Silicon (M1+)
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -217,7 +219,8 @@ jobs:
       - name: Build Python sidecar (PyInstaller — native arm64)
         shell: bash
         run: |
-          uv sync --dev
+          # psycopg2-binary 没有 Windows ARM64 预编译 wheel，跳过安装
+          uv sync --dev --no-install-package psycopg2-binary
           uv run pyinstaller tauri_bridge.spec \
             --distpath build-sidecar \
             --clean --noconfirm
