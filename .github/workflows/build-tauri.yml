@@ -5,7 +5,7 @@ name: Build Tauri App
 
 on:
   push:
-    branches: [main, feat/tauri-migration]
+    branches: [main]
     tags: ["v*"]
   pull_request:
     branches: [main]
@@ -60,9 +60,11 @@ jobs:
       - name: Build Python sidecar (PyInstaller)
         shell: bash
         run: |
-          uv sync --dev
+          uv sync --dev --no-extras
           uv run pyinstaller tauri_bridge.spec \
             --distpath build-sidecar \
+            --exclude-module psycopg2 \
+            --exclude-module psycopg2-binary \
             --clean --noconfirm
           ls -lh build-sidecar/tauri-bridge
 
@@ -74,7 +76,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v0.0.0-dev' }}
+          tagName: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
           releaseName: "矿山数据处理工具 ${{ github.ref_name }}"
           releaseBody: "See the assets below for download links."
           releaseDraft: true
@@ -84,8 +86,9 @@ jobs:
       - name: Embed sidecar into .app bundle
         shell: bash
         run: |
-          # 找到 .app bundle
-          APP_DIR=$(find src-tauri/target/release/bundle/macos -name "*.app" -maxdepth 1 | head -1)
+          # Tauri action 使用 --target 时产物在 target/<triple>/ 下
+          BUNDLE_DIR="src-tauri/target/aarch64-apple-darwin/release/bundle"
+          APP_DIR=$(find "$BUNDLE_DIR/macos" -name "*.app" -maxdepth 1 | head -1)
           if [ -n "$APP_DIR" ]; then
             cp build-sidecar/tauri-bridge "$APP_DIR/Contents/MacOS/tauri-bridge"
             chmod +x "$APP_DIR/Contents/MacOS/tauri-bridge"
@@ -93,6 +96,9 @@ jobs:
             codesign --force --sign - "$APP_DIR" || true
             echo "✅ Sidecar embedded in $APP_DIR"
             ls -lh "$APP_DIR/Contents/MacOS/"
+          else
+            echo "⚠️ .app bundle not found in $BUNDLE_DIR"
+            ls -R "$BUNDLE_DIR" || true
           fi
 
       - name: Upload macOS artifact
@@ -100,8 +106,8 @@ jobs:
         with:
           name: macos-arm64
           path: |
-            src-tauri/target/release/bundle/macos/*.app
-            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app
+            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
           if-no-files-found: error
 
   # ══════════════════════════════════════════════════════════
@@ -141,9 +147,11 @@ jobs:
       - name: Build Python sidecar (PyInstaller)
         shell: bash
         run: |
-          uv sync --dev
+          uv sync --dev --no-extras
           uv run pyinstaller tauri_bridge.spec \
             --distpath build-sidecar \
+            --exclude-module psycopg2 \
+            --exclude-module psycopg2-binary \
             --clean --noconfirm
           ls -lh build-sidecar/tauri-bridge.exe
 
@@ -160,16 +168,15 @@ jobs:
       - name: Embed sidecar into Windows bundle
         shell: bash
         run: |
-          # 查找 NSIS 安装包或 MSI 目录
-          for dir in src-tauri/target/release/bundle/nsis src-tauri/target/release/bundle/msi; do
+          # 查找 NSIS 安装包目录
+          for dir in src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis; do
             if [ -d "$dir" ]; then
-              # 复制 sidecar 到 bundle 同级目录（安装后与主程序同目录）
               cp build-sidecar/tauri-bridge.exe "$dir/" 2>/dev/null || true
               echo "✅ Sidecar placed in $dir"
             fi
           done
           # 也复制到 release 目录供直接运行
-          cp build-sidecar/tauri-bridge.exe src-tauri/target/release/ 2>/dev/null || true
+          cp build-sidecar/tauri-bridge.exe src-tauri/target/x86_64-pc-windows-msvc/release/ 2>/dev/null || true
           echo "✅ Sidecar embedded for Windows x64"
 
       - name: Upload Windows x64 artifact
@@ -177,9 +184,8 @@ jobs:
         with:
           name: windows-x64
           path: |
-            src-tauri/target/release/bundle/nsis/*.exe
-            src-tauri/target/release/bundle/msi/*.msi
-            src-tauri/target/release/tauri-bridge.exe
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+            src-tauri/target/x86_64-pc-windows-msvc/release/tauri-bridge.exe
           if-no-files-found: warn
 
   # ══════════════════════════════════════════════════════════
@@ -219,10 +225,12 @@ jobs:
       - name: Build Python sidecar (PyInstaller — native arm64)
         shell: bash
         run: |
-          # psycopg2-binary 没有 Windows ARM64 预编译 wheel，跳过安装
-          uv sync --dev --no-install-package psycopg2-binary
+          # psycopg2-binary 没有 Windows ARM64 预编译 wheel，排除安装
+          uv sync --dev --no-extras --exclude psycopg2-binary
           uv run pyinstaller tauri_bridge.spec \
             --distpath build-sidecar \
+            --exclude-module psycopg2 \
+            --exclude-module psycopg2-binary \
             --clean --noconfirm
           ls -lh build-sidecar/tauri-bridge.exe
           # 验证是原生 arm64 二进制
@@ -241,8 +249,7 @@ jobs:
       - name: Embed sidecar into Windows arm64 bundle
         shell: bash
         run: |
-          for dir in src-tauri/target/aarch64-pc-windows-msvc/release/bundle/nsis \
-                     src-tauri/target/aarch64-pc-windows-msvc/release/bundle/msi; do
+          for dir in src-tauri/target/aarch64-pc-windows-msvc/release/bundle/nsis; do
             if [ -d "$dir" ]; then
               cp build-sidecar/tauri-bridge.exe "$dir/" 2>/dev/null || true
               echo "✅ Native arm64 sidecar embedded in $dir"
@@ -255,5 +262,4 @@ jobs:
           name: windows-arm64
           path: |
             src-tauri/target/aarch64-pc-windows-msvc/release/bundle/nsis/*.exe
-            src-tauri/target/aarch64-pc-windows-msvc/release/bundle/msi/*.msi
           if-no-files-found: warn
