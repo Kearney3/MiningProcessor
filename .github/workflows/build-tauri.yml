@@ -60,7 +60,7 @@ jobs:
       - name: Build Python sidecar (PyInstaller)
         shell: bash
         run: |
-          uv sync --dev --no-extra
+          uv sync --dev
           uv run pyinstaller tauri_bridge.spec \
             --distpath build-sidecar \
             --exclude-module psycopg2 \
@@ -147,7 +147,7 @@ jobs:
       - name: Build Python sidecar (PyInstaller)
         shell: bash
         run: |
-          uv sync --dev --no-extra
+          uv sync --dev
           uv run pyinstaller tauri_bridge.spec \
             --distpath build-sidecar \
             --exclude-module psycopg2 \
@@ -225,8 +225,8 @@ jobs:
       - name: Build Python sidecar (PyInstaller — native arm64)
         shell: bash
         run: |
-          # psycopg2-binary 没有 Windows ARM64 预编译 wheel，排除安装
-          uv sync --dev --no-extra --exclude psycopg2-binary
+          # psycopg2-binary 没有 Windows ARM64 预编译 wheel，跳过解析和安装
+          uv sync --dev --no-install-package psycopg2-binary
           uv run pyinstaller tauri_bridge.spec \
             --distpath build-sidecar \
             --exclude-module psycopg2 \
