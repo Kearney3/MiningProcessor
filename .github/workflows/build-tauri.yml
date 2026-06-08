@@ -181,15 +181,17 @@ jobs:
           if-no-files-found: warn
 
   # ══════════════════════════════════════════════════════════
-  # Windows arm64 (交叉编译 Tauri，sidecar 由 x64 job 提供)
+  # Windows arm64（原生 arm64 runner + 原生 PyInstaller）
   # ══════════════════════════════════════════════════════════
   build-windows-arm64:
     name: Windows arm64
-    runs-on: windows-latest
-    needs: build-windows-x64
+    runs-on: windows-11-arm  # GitHub 原生 Windows arm64 runner
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -212,32 +214,35 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build Python sidecar (PyInstaller — native arm64)
+        shell: bash
+        run: |
+          uv sync --dev
+          uv run pyinstaller tauri_bridge.spec \
+            --distpath build-sidecar \
+            --clean --noconfirm
+          ls -lh build-sidecar/tauri-bridge.exe
+          # 验证是原生 arm64 二进制
+          file build-sidecar/tauri-bridge.exe || true
+
       - name: Build frontend
         run: pnpm build
 
-      - name: Build Tauri app (cross-compile)
+      - name: Build Tauri app (native arm64)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: "--target aarch64-pc-windows-msvc"
 
-      - name: Download x64 sidecar
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-x64
-          path: sidecar-x64
-
-      - name: Embed sidecar (x64 binary on arm64 — Rosetta/emulation)
+      - name: Embed sidecar into Windows arm64 bundle
         shell: bash
         run: |
-          # Windows arm64 可以通过 x64 模拟运行 x64 二进制
-          # 或者后续替换为原生 arm64 PyInstaller 构建
           for dir in src-tauri/target/aarch64-pc-windows-msvc/release/bundle/nsis \
                      src-tauri/target/aarch64-pc-windows-msvc/release/bundle/msi; do
             if [ -d "$dir" ]; then
-              cp sidecar-x64/src-tauri/target/release/tauri-bridge.exe "$dir/" 2>/dev/null || true
-              echo "✅ x64 sidecar placed in $dir (runs via emulation on arm64)"
+              cp build-sidecar/tauri-bridge.exe "$dir/" 2>/dev/null || true
+              echo "✅ Native arm64 sidecar embedded in $dir"
             fi
           done
 
