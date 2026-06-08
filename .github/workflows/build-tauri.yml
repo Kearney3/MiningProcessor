@@ -63,8 +63,6 @@ jobs:
           uv sync --dev
           uv run pyinstaller tauri_bridge.spec \
             --distpath build-sidecar \
-            --exclude-module psycopg2 \
-            --exclude-module psycopg2-binary \
             --clean --noconfirm
           ls -lh build-sidecar/tauri-bridge
 
@@ -150,8 +148,6 @@ jobs:
           uv sync --dev
           uv run pyinstaller tauri_bridge.spec \
             --distpath build-sidecar \
-            --exclude-module psycopg2 \
-            --exclude-module psycopg2-binary \
             --clean --noconfirm
           ls -lh build-sidecar/tauri-bridge.exe
 
@@ -225,12 +221,10 @@ jobs:
       - name: Build Python sidecar (PyInstaller — native arm64)
         shell: bash
         run: |
-          # psycopg2-binary 没有 Windows ARM64 预编译 wheel，跳过解析和安装
+          # psycopg2-binary 没有 Windows ARM64 预编译 wheel，跳过安装
           uv sync --dev --no-install-package psycopg2-binary
           uv run pyinstaller tauri_bridge.spec \
             --distpath build-sidecar \
-            --exclude-module psycopg2 \
-            --exclude-module psycopg2-binary \
             --clean --noconfirm
           ls -lh build-sidecar/tauri-bridge.exe
           # 验证是原生 arm64 二进制
