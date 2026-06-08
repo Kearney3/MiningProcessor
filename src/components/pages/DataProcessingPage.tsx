@@ -111,13 +111,13 @@ const MergeSvgIcon = () => (
   </svg>
 );
 
-/** Per-module accent border colors */
+/** Per-module accent border colors — subtle top accent instead of thick left border */
 const accentMap: Record<string, string> = {
-  fuel: "border-l-amber-500",
-  production: "border-l-emerald-500",
-  electrical: "border-l-yellow-500",
-  worktime: "border-l-blue-500",
-  merge: "border-l-purple-500",
+  fuel: "border-t-2 border-t-amber-400",
+  production: "border-t-2 border-t-emerald-400",
+  electrical: "border-t-2 border-t-yellow-400",
+  worktime: "border-t-2 border-t-blue-400",
+  merge: "border-t-2 border-t-purple-400",
 };
 
 function ModuleCard({
@@ -133,7 +133,7 @@ function ModuleCard({
 }) {
   return (
     <div
-      className={`bg-white rounded-xl border border-slate-200 border-l-4 ${accentMap[accent]} p-5 hover:shadow-md transition-shadow`}
+      className={`bg-white rounded-xl border border-slate-200 ${accentMap[accent]} p-5 hover:shadow-md transition-shadow`}
     >
       <div className="flex items-center gap-2.5 mb-4">
         {icon}
