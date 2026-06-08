@@ -379,6 +379,31 @@ def _update_device_load_map(params: dict) -> dict:
     return {"ok": True}
 
 
+# ─── 列映射配置方法 ───
+
+@_register("get_minebase_column_mapping")
+def _get_minebase_column_mapping(params: dict) -> dict:
+    """获取 MineBase 列映射配置。"""
+    from func.config_loader import get_minebase_column_mapping
+    return get_minebase_column_mapping()
+
+
+@_register("save_minebase_column_mapping")
+def _save_minebase_column_mapping(params: dict) -> dict:
+    """保存 MineBase 列映射配置。"""
+    from func.config_loader import save_minebase_column_mapping
+    save_minebase_column_mapping(params["mapping"])
+    return {"ok": True}
+
+
+@_register("reset_minebase_column_mapping")
+def _reset_minebase_column_mapping(params: dict) -> dict:
+    """重置 MineBase 列映射为默认值。"""
+    from func.config_loader import reset_minebase_column_mapping
+    reset_minebase_column_mapping()
+    return {"ok": True}
+
+
 @_register("get_equipment_ledger_data")
 def _get_equipment_ledger_data(params: dict) -> dict:
     import pandas as pd
