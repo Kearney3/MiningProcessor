@@ -17,56 +17,39 @@ type TableMergeMode = "split" | "merge" | "table_merge";
 type BaseTableType = "fuel" | "worktime";
 
 // ═══════════════════════════════════════
-// SVG Icon Components
+// Design-system tokens
 // ═══════════════════════════════════════
 
-const FuelSvgIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 22V6a2 2 0 012-2h6a2 2 0 012 2v16" />
-    <path d="M13 10h2a2 2 0 012 2v2a2 2 0 002 2h0a2 2 0 002-2V9.83a2 2 0 00-.59-1.42L18 6" />
-    <path d="M3 22h10" />
-    <path d="M7 10V6" />
-    <path d="M11 10V6" />
+const inputClass = "border border-slate-300 rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors";
+const btnSecondaryClass = "shrink-0 flex items-center gap-1.5 text-sm border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-md transition-colors";
+const btnPrimaryClass = "flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed";
+
+// ═══════════════════════════════════════
+// Lucide-style SVG Icons (16x16, stroke-width 2)
+// ═══════════════════════════════════════
+
+const SearchIcon = () => (
+  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8" />
+    <line x1="21" y1="21" x2="16.65" y2="16.65" />
   </svg>
 );
 
-const ProductionSvgIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="7" height="18" rx="1" />
-    <rect x="14" y="8" width="7" height="13" rx="1" />
-    <path d="M6 7h1" />
-    <path d="M6 11h1" />
-    <path d="M6 15h1" />
-    <path d="M17 12h1" />
-    <path d="M17 16h1" />
+const FolderIcon = () => (
+  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
   </svg>
 );
 
-const ElectricalSvgIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+const SettingsIcon = () => (
+  <svg className="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
   </svg>
 );
 
-const WorktimeSvgIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" />
-    <polyline points="12 6 12 12 16 14" />
-  </svg>
-);
-
-const MergeSvgIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="7" width="8" height="4" rx="1" />
-    <rect x="2" y="13" width="8" height="4" rx="1" />
-    <rect x="14" y="10" width="8" height="4" rx="1" />
-    <path d="M10 9h2l2 2" />
-    <path d="M10 17h2l2-2" />
-  </svg>
-);
-
-const CalendarSvgIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+const CalendarIcon = () => (
+  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
     <line x1="16" y1="2" x2="16" y2="6" />
     <line x1="8" y1="2" x2="8" y2="6" />
@@ -74,15 +57,8 @@ const CalendarSvgIcon = () => (
   </svg>
 );
 
-const SettingsSvgIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="3" />
-    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
-  </svg>
-);
-
-const RulerSvgIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+const RulerIcon = () => (
+  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21.3 15.3a2.4 2.4 0 010 3.4l-2.6 2.6a2.4 2.4 0 01-3.4 0L2.7 8.7a2.4 2.4 0 010-3.4l2.6-2.6a2.4 2.4 0 013.4 0z" />
     <path d="M14.5 12.5l2-2" />
     <path d="M11.5 9.5l2-2" />
@@ -91,38 +67,93 @@ const RulerSvgIcon = () => (
   </svg>
 );
 
-const SearchSvgIcon = () => (
-  <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-    <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+const PlayIcon = () => (
+  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="5 3 19 12 5 21 5 3" />
   </svg>
 );
 
-const FolderSvgIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+const CheckIcon = () => (
+  <svg className="w-3.5 h-3.5 shrink-0 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="20 6 9 17 4 12" />
   </svg>
 );
 
-const PlaySvgIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+const XIcon = () => (
+  <svg className="w-3.5 h-3.5 shrink-0 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 );
 
-const CheckCircleSvgIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 20 20" fill="currentColor">
-    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+const StopCircleIcon = () => (
+  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <rect x="9" y="9" width="6" height="6" />
   </svg>
 );
 
-const XCircleSvgIcon = () => (
-  <svg className="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+const CheckCircleIcon = () => (
+  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+    <polyline points="22 4 12 14.01 9 11.01" />
   </svg>
 );
 
-const QuestionSvgIcon = () => (
-  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+const XCircleIcon = () => (
+  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <line x1="15" y1="9" x2="9" y2="15" />
+    <line x1="9" y1="9" x2="15" y2="15" />
+  </svg>
+);
+
+const AlertTriangleIcon = () => (
+  <svg className="w-5 h-5 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+);
+
+/** 16x16 module icons for scan results */
+const FuelIcon = () => (
+  <svg className="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+  </svg>
+);
+
+const ProductionIcon = () => (
+  <svg className="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="20" x2="18" y2="10" />
+    <line x1="12" y1="20" x2="12" y2="4" />
+    <line x1="6" y1="20" x2="6" y2="14" />
+  </svg>
+);
+
+const ElectricalIcon = () => (
+  <svg className="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+  </svg>
+);
+
+const WorktimeIcon = () => (
+  <svg className="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 6 12 12 16 14" />
+  </svg>
+);
+
+const MergeIcon = () => (
+  <svg className="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="12 2 2 7 12 12 22 7 12 2" />
+    <polyline points="2 17 12 22 22 17" />
+    <polyline points="2 12 12 17 22 12" />
+  </svg>
+);
+
+const QuestionIcon = () => (
+  <svg className="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10" />
     <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3" />
     <line x1="12" y1="17" x2="12.01" y2="17" />
@@ -133,22 +164,20 @@ const QuestionSvgIcon = () => (
 // Constants
 // ═══════════════════════════════════════
 
-const dataTypeConfig: Record<string, { icon: React.ReactNode; label: string; color: string; bg: string; border: string }> = {
-  油耗:     { icon: <FuelSvgIcon />, label: "油耗",     color: "text-cyan-600",    bg: "bg-cyan-50",    border: "border-cyan-200" },
-  生产:     { icon: <ProductionSvgIcon />, label: "生产",     color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" },
-  电力:     { icon: <ElectricalSvgIcon />, label: "电力",     color: "text-amber-600",   bg: "bg-amber-50",   border: "border-amber-200" },
-  工时:     { icon: <WorktimeSvgIcon />, label: "工时",     color: "text-blue-600",    bg: "bg-blue-50",    border: "border-blue-200" },
-  production: { icon: <ProductionSvgIcon />, label: "生产",  color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" },
-  fuel:     { icon: <FuelSvgIcon />, label: "油耗",     color: "text-cyan-600",    bg: "bg-cyan-50",    border: "border-cyan-200" },
-  electrical: { icon: <ElectricalSvgIcon />, label: "电力",  color: "text-amber-600",   bg: "bg-amber-50",   border: "border-amber-200" },
-  worktime: { icon: <WorktimeSvgIcon />, label: "工时",     color: "text-blue-600",    bg: "bg-blue-50",    border: "border-blue-200" },
-  merge:    { icon: <MergeSvgIcon />, label: "合并",     color: "text-purple-600",  bg: "bg-purple-50",  border: "border-purple-200" },
+const dataTypeConfig: Record<string, { icon: React.ReactNode; label: string }> = {
+  油耗:       { icon: <FuelIcon />,         label: "油耗" },
+  生产:       { icon: <ProductionIcon />,   label: "生产" },
+  电力:       { icon: <ElectricalIcon />,   label: "电力" },
+  工时:       { icon: <WorktimeIcon />,     label: "工时" },
+  production: { icon: <ProductionIcon />,   label: "生产" },
+  fuel:       { icon: <FuelIcon />,         label: "油耗" },
+  electrical: { icon: <ElectricalIcon />,   label: "电力" },
+  worktime:   { icon: <WorktimeIcon />,     label: "工时" },
+  merge:      { icon: <MergeIcon />,        label: "合并" },
 };
 
-const fallbackConfig = { icon: <QuestionSvgIcon />, label: "", color: "text-slate-600", bg: "bg-slate-50", border: "border-slate-200" };
-
 function getTypeConfig(type: string) {
-  return dataTypeConfig[type] ?? { ...fallbackConfig, label: type };
+  return dataTypeConfig[type] ?? { icon: <QuestionIcon />, label: type };
 }
 
 function formatToday(): string {
@@ -166,7 +195,7 @@ function shiftDate(dateStr: string, days: number): string {
 // Small reusable UI components
 // ═══════════════════════════════════════
 
-/** Collapsible section with a chevron and smooth height */
+/** Collapsible section with chevron icon */
 function Collapsible({
   title,
   icon,
@@ -180,20 +209,24 @@ function Collapsible({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border border-slate-200 rounded-xl overflow-hidden">
+    <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
       >
         {icon && <span className="text-slate-400">{icon}</span>}
         <span className="flex-1 text-left">{title}</span>
         <svg
           className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-          viewBox="0 0 20 20"
-          fill="currentColor"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         >
-          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+          <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
       <div
@@ -211,7 +244,7 @@ function SectionDivider({ label }: { label?: string }) {
   return (
     <div className="flex items-center gap-3 my-4">
       <div className="flex-1 h-px bg-slate-200" />
-      {label && <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">{label}</span>}
+      {label && <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">{label}</span>}
       <div className="flex-1 h-px bg-slate-200" />
     </div>
   );
@@ -228,7 +261,7 @@ function ChipToggle({
   options: { label: string; value: string; tip?: string }[];
 }) {
   return (
-    <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden">
+    <div className="inline-flex rounded-md border border-slate-200 overflow-hidden">
       {options.map((o, i) => (
         <button
           key={o.value}
@@ -236,7 +269,7 @@ function ChipToggle({
           title={o.tip}
           className={`text-xs px-3 py-1.5 transition-colors ${
             value === o.value
-              ? "bg-cyan-500 text-white"
+              ? "bg-slate-900 text-white"
               : "bg-white text-slate-600 hover:bg-slate-50"
           } ${i > 0 ? "border-l border-slate-200" : ""}`}
         >
@@ -247,7 +280,38 @@ function ChipToggle({
   );
 }
 
-/** Confirmation dialog overlay with backdrop blur */
+/** Toggle switch — restrained design */
+function Toggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label: string;
+}) {
+  return (
+    <label className="flex items-center gap-2.5 cursor-pointer select-none">
+      <button
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors ${
+          checked ? "bg-blue-600" : "bg-slate-200"
+        }`}
+      >
+        <span
+          className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+            checked ? "translate-x-4" : "translate-x-0.5"
+          }`}
+        />
+      </button>
+      <span className="text-sm text-slate-700">{label}</span>
+    </label>
+  );
+}
+
+/** Confirmation dialog overlay */
 function ConfirmDialog({
   title,
   message,
@@ -267,13 +331,11 @@ function ConfirmDialog({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden animate-fade-in">
+      <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4 overflow-hidden">
         <div className="px-6 pt-6 pb-2">
           <div className="flex items-center gap-3 mb-3">
-            <div className="shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-              <svg className="w-5 h-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
+            <div className="shrink-0 w-9 h-9 rounded-md bg-amber-50 flex items-center justify-center">
+              <AlertTriangleIcon />
             </div>
             <h3 className="text-base font-semibold text-slate-800">{title}</h3>
           </div>
@@ -282,7 +344,7 @@ function ConfirmDialog({
             <ul className="mt-3 space-y-1">
               {details.map((d, i) => (
                 <li key={i} className="flex items-center gap-2 text-xs text-slate-500">
-                  <span className="w-1 h-1 rounded-full bg-orange-400 shrink-0" />
+                  <span className="w-1 h-1 rounded-full bg-slate-400 shrink-0" />
                   {d}
                 </li>
               ))}
@@ -292,13 +354,13 @@ function ConfirmDialog({
         <div className="flex gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100">
           <button
             onClick={onCancel}
-            className="flex-1 text-sm font-medium px-4 py-2.5 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 transition-colors"
+            className="flex-1 text-sm font-medium px-4 py-1.5 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors"
           >
             {cancelLabel ?? "取消"}
           </button>
           <button
             onClick={onConfirm}
-            className="flex-1 text-sm font-medium px-4 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white transition-colors"
+            className="flex-1 text-sm font-medium px-4 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 text-white transition-colors"
           >
             {confirmLabel ?? "继续处理"}
           </button>
@@ -309,16 +371,16 @@ function ConfirmDialog({
 }
 
 // ═══════════════════════════════════════
-// Animated progress bar
+// Progress bar — restrained
 // ═══════════════════════════════════════
 
-function AnimatedProgressBar({ percent, stage, detail }: { percent: number; stage: string; detail: string }) {
+function ProgressBar({ percent, stage, detail }: { percent: number; stage: string; detail: string }) {
   const pct = Math.round(percent * 100);
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5">
+    <div className="bg-white rounded-lg border border-slate-200 p-4">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-blue-500 animate-spin" viewBox="0 0 24 24" fill="none">
+          <svg className="w-4 h-4 text-slate-500 animate-spin" viewBox="0 0 24 24" fill="none">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
@@ -326,43 +388,14 @@ function AnimatedProgressBar({ percent, stage, detail }: { percent: number; stag
         </div>
         <span className="text-xs font-mono text-slate-500">{pct}%</span>
       </div>
-      <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+      <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
         <div
-          className="h-3 rounded-full transition-all duration-500 ease-out bg-gradient-to-r from-blue-500 to-cyan-500 relative overflow-hidden"
+          className="h-1.5 rounded-full bg-blue-600 transition-all duration-500 ease-out"
           style={{ width: `${pct}%` }}
-        >
-          <div
-            className="absolute inset-0 animate-gradient-shift"
-            style={{
-              background: "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%)",
-              backgroundSize: "200% 100%",
-            }}
-          />
-        </div>
+        />
       </div>
       {detail && <p className="mt-2 text-xs text-slate-400 truncate">{detail}</p>}
     </div>
-  );
-}
-
-// ═══════════════════════════════════════
-// Cancel button with pulse animation
-// ═══════════════════════════════════════
-
-function PulsingCancelButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="relative text-sm font-medium px-5 py-2.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600 transition-colors group"
-    >
-      <span className="absolute inset-0 rounded-lg bg-red-400/20 animate-ping" />
-      <span className="relative flex items-center gap-1.5">
-        <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
-        </svg>
-        取消
-      </span>
-    </button>
   );
 }
 
@@ -389,7 +422,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
   const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
   const [rawStart, setRawStart] = useState("-1");
 
-  // -- Output mode (replaces old mergeOutput boolean) --
+  // -- Output mode --
   const [tableMergeMode, setTableMergeMode] = useState<TableMergeMode>("merge");
   const [baseTableType, setBaseTableType] = useState<BaseTableType>("fuel");
 
@@ -451,7 +484,6 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
         use_ledger: useLedger,
       };
 
-      // Table merge mode
       if (tableMergeMode === "merge") {
         params.merge_output = true;
       } else if (tableMergeMode === "table_merge") {
@@ -461,12 +493,10 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
         params.merge_output = false;
       }
 
-      // Date filter
       if (dateFilterEnabled && filterDate) {
         params.filter_date = filterDate;
       }
 
-      // Header mapping
       if (useHeaderMapping) {
         params.use_worktime_header_mapping = true;
         params.header_mode = headerMode;
@@ -509,37 +539,34 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-slate-800">批量处理</h2>
-          <p className="text-sm text-slate-500 mt-0.5">扫描文件夹并批量处理多种报表</p>
+          <h2 className="text-lg font-semibold text-slate-800">批量处理</h2>
+          <p className="text-sm text-slate-500">扫描文件夹并批量处理多种报表</p>
         </div>
       </div>
 
       {/* ════════════════════════════════════
           Section 1: Folder & Scan
           ════════════════════════════════════ */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
+      <div className="bg-white rounded-lg border border-slate-200 p-4">
         <div className="flex gap-2">
           <input
             type="text"
             value={folderPath}
             onChange={(e) => { setFolderPath(e.target.value); setScanResult(null); }}
             placeholder="选择包含报表的文件夹"
-            className={`input flex-1 ${folderPath === "" ? "border-amber-300 bg-amber-50/30" : ""}`}
+            className={`${inputClass} flex-1 ${folderPath === "" ? "border-amber-300 bg-amber-50/30" : ""}`}
           />
-          <button
-            onClick={browse}
-            className="shrink-0 flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-lg transition-colors"
-          >
-            <FolderSvgIcon />
+          <button onClick={browse} className={btnSecondaryClass}>
+            <FolderIcon />
             浏览
           </button>
           <button
             onClick={handleScan}
             disabled={!folderPath || scanning}
-            className={`shrink-0 flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg font-medium transition-colors ${
+            className={`shrink-0 flex items-center gap-1.5 text-sm px-3.5 py-1.5 rounded-md font-medium transition-colors ${
               !folderPath || scanning
                 ? "bg-slate-100 text-slate-400"
-                : "bg-slate-600 hover:bg-slate-700 text-white"
+                : "bg-slate-900 hover:bg-slate-800 text-white"
             }`}
           >
             {scanning ? (
@@ -552,48 +579,35 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
               </>
             ) : (
               <>
-                <SearchSvgIcon />
+                <SearchIcon />
                 扫描文件
               </>
             )}
           </button>
         </div>
 
-        {/* ── Scan results as status cards ── */}
+        {/* ── Scan results as simple text list ── */}
         {scanResult && (
-          <div className="mt-4">
-            <p className="text-xs font-medium text-slate-500 mb-3">扫描结果</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-              {Object.entries(scanResult.matched).map(([type, files]) => {
-                const cfg = getTypeConfig(type);
-                return (
-                  <div
-                    key={type}
-                    className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border ${cfg.bg} ${cfg.border} transition-colors`}
-                  >
-                    <span className={`shrink-0 ${cfg.color}`}>{cfg.icon}</span>
-                    <div className="min-w-0">
-                      <p className={`text-xs font-semibold ${cfg.color} truncate`}>{cfg.label || type}</p>
-                      <p className="text-[11px] text-slate-400">{(files as string[]).length} 个文件</p>
-                    </div>
-                    <CheckCircleSvgIcon className="w-4 h-4 ml-auto shrink-0 text-green-500" />
-                  </div>
-                );
-              })}
-              {scanResult.missing.map((type) => (
-                <div
-                  key={type}
-                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border bg-orange-50 border-orange-200"
-                >
-                  <span className="shrink-0 text-orange-500"><QuestionSvgIcon /></span>
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-orange-600 truncate">{type}</p>
-                    <p className="text-[11px] text-orange-400">未找到</p>
-                  </div>
-                  <XCircleSvgIcon />
+          <div className="mt-3 space-y-1.5">
+            {Object.entries(scanResult.matched).map(([type, files]) => {
+              const cfg = getTypeConfig(type);
+              return (
+                <div key={type} className="flex items-center gap-2 text-sm text-slate-700 py-1">
+                  <CheckIcon />
+                  <span className="text-slate-500">{cfg.icon}</span>
+                  <span className="text-slate-700">{cfg.label || type}</span>
+                  <span className="text-xs text-slate-400">({(files as string[]).length} 个文件)</span>
                 </div>
-              ))}
-            </div>
+              );
+            })}
+            {scanResult.missing.map((type) => (
+              <div key={type} className="flex items-center gap-2 text-sm py-1">
+                <XIcon />
+                <QuestionIcon />
+                <span className="text-slate-500">{type}</span>
+                <span className="text-xs text-slate-400">未找到</span>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -601,9 +615,9 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
       {/* ════════════════════════════════════
           Section 2: Parameters
           ════════════════════════════════════ */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
-        <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-          <span className="text-slate-400"><SettingsSvgIcon /></span>
+      <div className="bg-white rounded-lg border border-slate-200 p-4">
+        <h3 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
+          <SettingsIcon />
           参数配置
         </h3>
 
@@ -615,7 +629,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
               type="number"
               value={year}
               onChange={(e) => setYear(e.target.value)}
-              className="input"
+              className={inputClass}
             />
           </div>
           <div>
@@ -626,7 +640,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
               onChange={(e) => setMonth(e.target.value)}
               min={1}
               max={12}
-              className="input"
+              className={inputClass}
             />
           </div>
           <div>
@@ -635,29 +649,15 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
               type="number"
               value={rawStart}
               onChange={(e) => setRawStart(e.target.value)}
-              className="input"
+              className={inputClass}
             />
           </div>
-          <div className="flex items-end">
-            <label className="flex items-center gap-2.5 cursor-pointer select-none group pb-2">
-              <button
-                role="switch"
-                aria-checked={useLedger}
-                onClick={() => setUseLedger(!useLedger)}
-                className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${
-                  useLedger ? "bg-emerald-500" : "bg-slate-200"
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-                    useLedger ? "translate-x-5" : "translate-x-1"
-                  }`}
-                />
-              </button>
-              <span className="text-xs font-medium text-slate-600 group-hover:text-slate-800 transition-colors">
-                台账匹配
-              </span>
-            </label>
+          <div className="flex items-end pb-0.5">
+            <Toggle
+              checked={useLedger}
+              onChange={setUseLedger}
+              label="台账匹配"
+            />
           </div>
         </div>
 
@@ -695,40 +695,26 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
           ════════════════════════════════════ */}
 
       {/* ── Date filter ── */}
-      <Collapsible title="日期过滤" icon={<CalendarSvgIcon />}>
+      <Collapsible title="日期过滤" icon={<CalendarIcon />}>
         <div className="mt-3 space-y-3">
-          <label className="flex items-center gap-2.5 cursor-pointer select-none group">
-            <button
-              role="switch"
-              aria-checked={dateFilterEnabled}
-              onClick={() => setDateFilterEnabled(!dateFilterEnabled)}
-              className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${
-                dateFilterEnabled ? "bg-emerald-500" : "bg-slate-200"
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-                  dateFilterEnabled ? "translate-x-5" : "translate-x-1"
-                }`}
-              />
-            </button>
-            <span className="text-sm font-medium text-slate-700 group-hover:text-slate-900 transition-colors">
-              按日期过滤
-            </span>
-          </label>
+          <Toggle
+            checked={dateFilterEnabled}
+            onChange={setDateFilterEnabled}
+            label="按日期过滤"
+          />
 
           {dateFilterEnabled && (
             <div className="space-y-3 pl-1">
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setFilterDate(shiftDate(filterDate, -1))}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+                  className="text-xs px-3 py-1.5 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
                 >
                   上一天
                 </button>
                 <button
                   onClick={() => setFilterDate(formatToday())}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+                  className="text-xs px-3 py-1.5 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
                 >
                   今天
                 </button>
@@ -737,9 +723,9 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
                     const el = document.getElementById("batch-filter-date") as HTMLInputElement | null;
                     el?.showPicker?.();
                   }}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-cyan-200 text-cyan-600 hover:bg-cyan-50 transition-colors flex items-center gap-1"
+                  className="text-xs px-3 py-1.5 rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-1"
                 >
-                  <CalendarSvgIcon />
+                  <CalendarIcon />
                   选择日期
                 </button>
               </div>
@@ -750,7 +736,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
                   type="date"
                   value={filterDate}
                   onChange={(e) => setFilterDate(e.target.value)}
-                  className="input !w-auto"
+                  className={`${inputClass} w-auto`}
                 />
                 <span className="text-xs text-slate-400 font-mono">{filterDate}</span>
               </div>
@@ -760,27 +746,13 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
       </Collapsible>
 
       {/* ── Header mapping ── */}
-      <Collapsible title="工时表头映射" icon={<RulerSvgIcon />}>
+      <Collapsible title="工时表头映射" icon={<RulerIcon />}>
         <div className="mt-3 space-y-3">
-          <label className="flex items-center gap-2.5 cursor-pointer select-none group">
-            <button
-              role="switch"
-              aria-checked={useHeaderMapping}
-              onClick={() => setUseHeaderMapping(!useHeaderMapping)}
-              className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${
-                useHeaderMapping ? "bg-emerald-500" : "bg-slate-200"
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-                  useHeaderMapping ? "translate-x-5" : "translate-x-1"
-                }`}
-              />
-            </button>
-            <span className="text-sm font-medium text-slate-700 group-hover:text-slate-900 transition-colors">
-              启用表头映射
-            </span>
-          </label>
+          <Toggle
+            checked={useHeaderMapping}
+            onChange={setUseHeaderMapping}
+            label="启用表头映射"
+          />
 
           {useHeaderMapping && (
             <div className="space-y-3 pl-1">
@@ -804,7 +776,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
                 />
                 <span className="text-xs text-slate-600">启用模糊匹配</span>
               </label>
-              <p className="text-[11px] text-slate-400 leading-relaxed">
+              <p className="text-xs text-slate-400 leading-relaxed">
                 映射规则可在「用户配置 &rarr; 工作效率表头映射配置」中编辑
               </p>
             </div>
@@ -816,7 +788,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
           Section 4: Progress
           ════════════════════════════════════ */}
       {processing && bridge.progress && (
-        <AnimatedProgressBar
+        <ProgressBar
           percent={bridge.progress.percent}
           stage={bridge.progress.stage}
           detail={bridge.progress.detail}
@@ -830,29 +802,33 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
         <button
           onClick={handleProcess}
           disabled={!scanResult || processing}
-          className={`btn-primary flex items-center gap-2 ${
-            !scanResult || processing
-              ? "!bg-slate-100 !text-slate-400 cursor-not-allowed"
-              : "bg-cyan-600 hover:bg-cyan-700 text-white"
-          }`}
+          className={`${btnPrimaryClass} flex items-center gap-2`}
         >
-          {!processing && <PlaySvgIcon />}
+          {!processing && <PlayIcon />}
           {processing ? "处理中..." : "开始批量处理"}
         </button>
-        {processing && <PulsingCancelButton onClick={handleCancel} />}
+        {processing && (
+          <button
+            onClick={handleCancel}
+            className="flex items-center gap-1.5 text-sm text-red-600 hover:text-red-700 transition-colors px-3.5 py-1.5"
+          >
+            <StopCircleIcon />
+            取消
+          </button>
+        )}
       </div>
 
       {/* ── Result / Error ── */}
       {result && (
-        <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 animate-fade-in">
-          <CheckCircleSvgIcon />
+        <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 rounded-md px-2.5 py-1.5">
+          <CheckCircleIcon />
           {result}
         </div>
       )}
       {error && (
-        <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3 animate-fade-in">
-          <XCircleSvgIcon />
-          {error}
+        <div className="flex items-start gap-2 text-xs text-red-700 bg-red-50 rounded-md px-2.5 py-1.5">
+          <XCircleIcon />
+          <span>{error}</span>
         </div>
       )}
 
@@ -870,18 +846,6 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
           onCancel={() => setShowConfirm(false)}
         />
       )}
-
-      {/* ── Inline keyframes for gradient animation ── */}
-      <style>{`
-        @keyframes gradient-shift {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-        .animate-gradient-shift {
-          animation: gradient-shift 2s ease infinite;
-        }
-      `}</style>
     </div>
   );
 }
