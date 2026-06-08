@@ -316,15 +316,24 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
         config.loadDataMethod,
         { from_cache: true }
       );
-      setRows(res.rows || []);
-      setColumns(res.columns || []);
+      const allRows = res.rows || [];
+      const allColumns = res.columns || [];
+      // 只展示标准列映射的表头，过滤掉原始文件中的无关列
+      const standardSet = new Set(config.standardColumns);
+      const filteredColumns = allColumns.filter((c) => standardSet.has(c));
+      // 如果标准列中有后端新增的但不在 columns 里的，也补上
+      for (const sc of config.standardColumns) {
+        if (!filteredColumns.includes(sc)) filteredColumns.push(sc);
+      }
+      setRows(allRows);
+      setColumns(filteredColumns);
       setIsDefault(!!res.is_default);
     } catch (e) {
       setError(String(e));
     } finally {
       setLoading(false);
     }
-  }, [bridge, config.loadDataMethod]);
+  }, [bridge, config.loadDataMethod, config.standardColumns]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
