@@ -9,6 +9,70 @@ type LoadMap = Record<string, number>;
 const PAGE_SIZE = 20;
 
 /* ------------------------------------------------------------------ */
+/*  SVG Icons                                                          */
+/* ------------------------------------------------------------------ */
+
+const IconImport = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+  </svg>
+);
+
+const IconExport = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+  </svg>
+);
+
+const IconRestore = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a5 5 0 015 5v2M3 10l4-4M3 10l4 4" />
+  </svg>
+);
+
+const IconRefresh = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+  </svg>
+);
+
+const IconTrash = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+);
+
+const IconSave = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+  </svg>
+);
+
+const IconApply = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+  </svg>
+);
+
+const IconPlus = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+  </svg>
+);
+
+const IconCheck = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+  </svg>
+);
+
+const IconWarning = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+  </svg>
+);
+
+/* ------------------------------------------------------------------ */
 /*  Toast                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -33,10 +97,18 @@ function Toast({
         ? "bg-red-600"
         : "bg-slate-700";
 
+  const icon =
+    kind === "success" ? (
+      <IconCheck />
+    ) : kind === "error" ? (
+      <IconWarning />
+    ) : null;
+
   return (
     <div
-      className={`fixed bottom-6 right-6 z-50 ${bg} text-white text-sm px-5 py-2.5 rounded-lg shadow-lg animate-[fadeIn_.2s_ease-out]`}
+      className={`fixed bottom-6 right-6 z-50 ${bg} text-white text-sm px-5 py-2.5 rounded-lg shadow-lg flex items-center gap-2 animate-[fadeIn_.2s_ease-out]`}
     >
+      {icon}
       {message}
     </div>
   );
@@ -60,20 +132,20 @@ function ConfirmDialog({
   onCancel: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-xl p-6 w-[400px] max-w-[90vw]">
         <h3 className="text-base font-semibold text-slate-800 mb-2">{title}</h3>
         <div className="text-sm text-slate-600 mb-5">{body}</div>
         <div className="flex justify-end gap-2">
           <button
             onClick={onCancel}
-            className="text-sm px-4 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600"
+            className="btn-secondary text-sm px-4 py-1.5"
           >
             取消
           </button>
           <button
             onClick={onConfirm}
-            className="text-sm px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium"
+            className="btn-danger text-sm px-4 py-1.5"
           >
             {confirmLabel ?? "确定"}
           </button>
@@ -95,7 +167,7 @@ function RestoreDefaultsDialog({
   onCancel: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-xl p-6 w-[400px] max-w-[90vw]">
         <h3 className="text-base font-semibold text-slate-800 mb-2">恢复默认配置</h3>
         <p className="text-sm text-slate-600 mb-5">
@@ -120,7 +192,7 @@ function RestoreDefaultsDialog({
         <div className="flex justify-end">
           <button
             onClick={onCancel}
-            className="text-sm px-4 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600"
+            className="btn-secondary text-sm px-4 py-1.5"
           >
             取消
           </button>
@@ -144,6 +216,8 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
   const [toast, setToast] = useState<{ msg: string; kind: "success" | "error" | "info" } | null>(null);
   const [newName, setNewName] = useState("");
   const [newValue, setSetValue] = useState("");
+  const [newNameError, setNewNameError] = useState<string | null>(null);
+  const [newValueError, setNewValueError] = useState<string | null>(null);
 
   // selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -234,9 +308,22 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
   };
 
   const handleAdd = () => {
-    if (!newName.trim()) return;
+    let hasError = false;
+    if (!newName.trim()) {
+      setNewNameError("请输入设备名称");
+      hasError = true;
+    } else {
+      setNewNameError(null);
+    }
     const num = parseFloat(newValue);
-    if (isNaN(num)) return;
+    if (isNaN(num) || num <= 0) {
+      setNewValueError("请输入有效的装载量");
+      hasError = true;
+    } else {
+      setNewValueError(null);
+    }
+    if (hasError) return;
+
     setLoadMap((prev) => ({ ...prev, [newName.trim()]: num }));
     setNewName("");
     setSetValue("");
@@ -374,21 +461,16 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
     }
   };
 
-  /* ---- validation helper ----------------------------------------- */
-
-  const _isValidCapacity = (v: string) => {
-    const n = parseFloat(v);
-    return !isNaN(n) && n > 0;
-  };
-
-  void _isValidCapacity; // used in template validation
-
   /* ---- render ---------------------------------------------------- */
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-slate-400">
-        加载中...
+      <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-3">
+        <svg className="w-8 h-8 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+        <span className="text-sm">加载中...</span>
       </div>
     );
   }
@@ -412,112 +494,98 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-slate-800">装载量配置</h2>
 
-        {/* dirty indicator */}
-        {isDirty && (
-          <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-3 py-0.5">
-            已修改（未保存）
+        {/* status badges */}
+        {isDirty ? (
+          <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-3 py-1">
+            <IconWarning />
+            已应用（未保存）
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-3 py-1">
+            <IconCheck />
+            已保存
           </span>
         )}
       </div>
 
       {/* ---- toolbar ---------------------------------------------- */}
-      <div className="flex flex-wrap items-center gap-2 mb-4 p-3 bg-slate-50 rounded-xl border border-slate-200">
+      <div className="flex flex-wrap items-center gap-2 mb-4 p-3 bg-white rounded-xl border border-slate-200 shadow-sm">
         {/* import / export */}
-        <button
-          onClick={handleImport}
-          className="inline-flex items-center gap-1.5 text-sm bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-3 py-1.5 rounded-lg transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
-          </svg>
+        <button onClick={handleImport} className="btn-secondary inline-flex items-center gap-1.5 text-sm">
+          <IconImport />
           导入配置
         </button>
-        <button
-          onClick={handleExport}
-          className="inline-flex items-center gap-1.5 text-sm bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-3 py-1.5 rounded-lg transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M17 8l-5-5-5 5M12 3v12" />
-          </svg>
+        <button onClick={handleExport} className="btn-secondary inline-flex items-center gap-1.5 text-sm">
+          <IconExport />
           导出配置
         </button>
 
-        <div className="w-px h-5 bg-slate-300 mx-1" />
+        <div className="w-px h-5 bg-slate-200 mx-1" />
 
         {/* delete selected */}
         {selected.size > 0 && (
           <>
             <button
               onClick={() => setConfirmDeleteDialog(true)}
-              className="inline-flex items-center gap-1.5 text-sm bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 px-3 py-1.5 rounded-lg transition-colors"
+              className="btn-danger inline-flex items-center gap-1.5 text-sm"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
+              <IconTrash />
               删除选中 ({selected.size})
             </button>
-            <div className="w-px h-5 bg-slate-300 mx-1" />
+            <div className="w-px h-5 bg-slate-200 mx-1" />
           </>
         )}
 
         {/* restore defaults */}
-        <button
-          onClick={() => setRestoreDialog(true)}
-          className="inline-flex items-center gap-1.5 text-sm bg-white hover:bg-slate-100 text-slate-600 border border-slate-300 px-3 py-1.5 rounded-lg transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a5 5 0 015 5v2M3 10l4-4M3 10l4 4" />
-          </svg>
+        <button onClick={() => setRestoreDialog(true)} className="btn-secondary inline-flex items-center gap-1.5 text-sm">
+          <IconRestore />
           恢复默认
         </button>
 
         <div className="flex-1" />
 
         {/* right side: reload + apply + save */}
-        <button
-          onClick={loadData}
-          className="text-sm bg-white hover:bg-slate-100 text-slate-600 border border-slate-300 px-3 py-1.5 rounded-lg transition-colors"
-        >
+        <button onClick={loadData} className="btn-secondary inline-flex items-center gap-1.5 text-sm">
+          <IconRefresh />
           重载
         </button>
         <button
           onClick={handleApply}
           disabled={applying || !isDirty}
-          className={`text-sm px-4 py-1.5 rounded-lg font-medium transition-colors ${
-            applying || !isDirty
-              ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-              : "bg-amber-500 hover:bg-amber-600 text-white"
+          className={`btn-secondary inline-flex items-center gap-1.5 text-sm ${
+            applying || !isDirty ? "opacity-50 cursor-not-allowed" : ""
           }`}
         >
+          <IconApply />
           {applying ? "应用中..." : "应用"}
         </button>
         <button
           onClick={handleSave}
           disabled={saving || !isDirty}
-          className={`text-sm px-4 py-1.5 rounded-lg font-medium transition-colors ${
-            saving || !isDirty
-              ? "bg-slate-100 text-slate-400 cursor-not-allowed"
-              : "bg-cyan-600 hover:bg-cyan-700 text-white"
+          className={`btn-primary inline-flex items-center gap-1.5 text-sm ${
+            saving || !isDirty ? "opacity-50 cursor-not-allowed" : ""
           }`}
         >
+          <IconSave />
           {saving ? "保存中..." : "保存"}
         </button>
       </div>
 
       {/* ---- error ----------------------------------------------- */}
       {error && (
-        <div className="mb-4 text-sm text-red-700 bg-red-50 rounded-lg px-4 py-3">
+        <div className="mb-4 text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-4 py-3 flex items-center gap-2">
+          <IconWarning />
           {error}
         </div>
       )}
 
       {/* ---- table ----------------------------------------------- */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="w-10 px-3 py-2.5">
+                <th className="w-10 px-3 py-3">
                   <input
                     ref={checkboxRef}
                     type="checkbox"
@@ -526,28 +594,32 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
                     className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 cursor-pointer"
                   />
                 </th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">
+                <th className="text-left px-4 py-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                   设备名称
                 </th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-slate-500">
+                <th className="text-left px-4 py-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                   装载量 (吨)
                 </th>
-                <th className="text-right px-4 py-2.5 text-xs font-medium text-slate-500 w-20">
+                <th className="text-right px-4 py-3 text-[11px] font-semibold text-slate-500 uppercase tracking-wider w-20">
                   操作
                 </th>
               </tr>
             </thead>
             <tbody>
-              {pageEntries.map(([name, value]) => {
+              {pageEntries.map(([name, value], idx) => {
                 const invalid = value <= 0;
                 return (
                   <tr
                     key={name}
-                    className={`border-b border-slate-50 transition-colors ${
-                      selected.has(name) ? "bg-cyan-50/50" : "hover:bg-slate-50/50"
-                    }`}
+                    className={`border-b border-slate-100 transition-colors ${
+                      selected.has(name)
+                        ? "bg-cyan-50/50"
+                        : idx % 2 === 1
+                          ? "bg-slate-50/40"
+                          : "bg-white"
+                    } hover:bg-cyan-50/30`}
                   >
-                    <td className="w-10 px-3 py-2">
+                    <td className="w-10 px-3 py-2.5">
                       <input
                         type="checkbox"
                         checked={selected.has(name)}
@@ -555,26 +627,30 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
                         className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 cursor-pointer"
                       />
                     </td>
-                    <td className="px-4 py-2 text-slate-700 font-medium">
+                    <td className="px-4 py-2.5 text-slate-700 font-medium">
                       {name}
                     </td>
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-2.5">
                       <input
                         type="number"
                         value={value}
                         onChange={(e) => handleUpdate(name, e.target.value)}
-                        className={`w-24 text-sm border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 ${
+                        className={`w-24 text-sm border rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 transition-colors ${
                           invalid
-                            ? "border-red-400 bg-red-50 text-red-700"
-                            : "border-slate-200"
+                            ? "border-red-400 bg-red-50 text-red-700 focus:ring-red-500/30"
+                            : "border-slate-200 focus:border-cyan-400"
                         }`}
                       />
+                      {invalid && (
+                        <p className="text-red-500 text-xs mt-1">数值必须大于 0</p>
+                      )}
                     </td>
-                    <td className="px-4 py-2 text-right">
+                    <td className="px-4 py-2.5 text-right">
                       <button
                         onClick={() => handleDelete(name)}
-                        className="text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                        className="inline-flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors"
                       >
+                        <IconTrash />
                         删除
                       </button>
                     </td>
@@ -585,41 +661,51 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
               {/* empty state */}
               {entries.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="text-center py-10 text-slate-400 text-sm">
-                    暂无配置项
+                  <td colSpan={4} className="text-center py-16">
+                    <svg className="w-16 h-16 mx-auto text-slate-200 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                    <p className="text-slate-400 text-sm">暂无配置项</p>
                   </td>
                 </tr>
               )}
 
               {/* add row */}
               <tr>
-                <td className="w-10 px-3 py-2" />
+                <td className="w-10 px-3 py-2.5" />
                 <td colSpan={3} className="p-0">
-                  <div className="flex items-center gap-3 px-4 py-3 border-t-2 border-dashed border-slate-200 bg-slate-50/30">
-                    <input
-                      type="text"
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                      placeholder="新设备名称"
-                      className="flex-1 text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 bg-white"
-                    />
-                    <input
-                      type="number"
-                      value={newValue}
-                      onChange={(e) => setSetValue(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                      placeholder="吨数"
-                      className="w-24 text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 bg-white"
-                    />
+                  <div className="flex items-center gap-3 px-4 py-3 border-t-2 border-dashed border-slate-200 bg-slate-50/50">
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        value={newName}
+                        onChange={(e) => { setNewName(e.target.value); setNewNameError(null); }}
+                        onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                        placeholder="新设备名称"
+                        className={`w-full text-sm border rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 bg-white transition-colors ${
+                          newNameError ? "border-red-400 focus:ring-red-500/30" : "border-slate-200"
+                        }`}
+                      />
+                      {newNameError && <p className="text-red-500 text-xs mt-1">{newNameError}</p>}
+                    </div>
+                    <div className="w-32">
+                      <input
+                        type="number"
+                        value={newValue}
+                        onChange={(e) => { setSetValue(e.target.value); setNewValueError(null); }}
+                        onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                        placeholder="吨数"
+                        className={`w-full text-sm border rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 bg-white transition-colors ${
+                          newValueError ? "border-red-400 focus:ring-red-500/30" : "border-slate-200"
+                        }`}
+                      />
+                      {newValueError && <p className="text-red-500 text-xs mt-1">{newValueError}</p>}
+                    </div>
                     <button
                       onClick={handleAdd}
-                      disabled={!newName.trim() || !newValue}
-                      className="inline-flex items-center gap-1 text-sm text-cyan-600 hover:text-cyan-700 px-3 py-1.5 rounded-lg hover:bg-cyan-50 disabled:text-slate-300 disabled:hover:bg-transparent transition-colors font-medium"
+                      className="btn-primary inline-flex items-center gap-1 text-sm"
                     >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                      </svg>
+                      <IconPlus />
                       添加
                     </button>
                   </div>
@@ -630,7 +716,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
         </div>
 
         {/* ---- footer: pagination + count -------------------------- */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-t border-slate-100">
+        <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/30">
           <span className="text-xs text-slate-400">共 {entries.length} 台设备</span>
 
           {totalPages > 1 && (
@@ -638,19 +724,25 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
               <button
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
                 disabled={safePage === 0}
-                className="text-xs px-2.5 py-1 rounded border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors"
+                className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors"
               >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
                 上一页
               </button>
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-slate-500 min-w-[4rem] text-center">
                 {safePage + 1} / {totalPages}
               </span>
               <button
                 onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                 disabled={safePage >= totalPages - 1}
-                className="text-xs px-2.5 py-1 rounded border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors"
+                className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors"
               >
                 下一页
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
               </button>
             </div>
           )}

@@ -88,14 +88,98 @@ const DEFAULT_MINEBASE_CONFIG: MineBaseConfig = {
   database: { host: "localhost", port: 5432, database: "minebase", user: "postgres", password: "" },
 };
 
+/* ------------------------------------------------------------------ */
+/*  SVG Icons                                                          */
+/* ------------------------------------------------------------------ */
+
+const IconKeywords = () => (
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+  </svg>
+);
+
+const IconTableHeader = () => (
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+  </svg>
+);
+
+const IconDatabase = () => (
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+  </svg>
+);
+
+const IconColumns = () => (
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" />
+  </svg>
+);
+
+const IconSave = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+  </svg>
+);
+
+const IconRefresh = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+  </svg>
+);
+
+const IconRestore = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a5 5 0 015 5v2M3 10l4-4M3 10l4 4" />
+  </svg>
+);
+
+const IconPlus = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+  </svg>
+);
+
+const IconClose = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+  </svg>
+);
+
+const IconEye = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+  </svg>
+);
+
+const IconEyeOff = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l18 18" />
+  </svg>
+);
+
+const IconCheck = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+  </svg>
+);
+
+const IconError = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
 // ---------------------------------------------------------------------------
-// Collapsible Section Card
+// Collapsible Section Card with colored left border
 // ---------------------------------------------------------------------------
 
 function SectionCard({
   title,
   subtitle,
   color,
+  icon,
   expanded,
   onToggle,
   children,
@@ -103,18 +187,22 @@ function SectionCard({
   title: string;
   subtitle: string;
   color: string;
+  icon: React.ReactNode;
   expanded: boolean;
   onToggle: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-5 py-3 hover:bg-slate-50 transition-colors"
+        className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-slate-50 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <div className={`w-1 h-8 rounded-full ${color}`} />
+          <div className={`w-1 h-9 rounded-full ${color}`} />
+          <div className={`flex items-center gap-2.5 ${color.replace("bg-", "text-")}`}>
+            {icon}
+          </div>
           <div className="text-left">
             <h3 className="text-sm font-semibold text-slate-700">{title}</h3>
             <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
@@ -130,7 +218,7 @@ function SectionCard({
         </svg>
       </button>
       {expanded && (
-        <div className="px-5 pb-4 border-t border-slate-100 pt-4">{children}</div>
+        <div className="px-5 pb-5 border-t border-slate-100 pt-4">{children}</div>
       )}
     </div>
   );
@@ -156,35 +244,37 @@ function ActionButtons({
   extraLabel?: string;
 }) {
   return (
-    <div className="flex gap-2 flex-wrap mt-4">
+    <div className="flex gap-2 flex-wrap mt-5 pt-4 border-t border-slate-100">
       <button
         onClick={onSave}
         disabled={saving}
-        className={`text-sm px-3 py-1.5 rounded-lg font-medium ${
-          saving
-            ? "bg-slate-100 text-slate-400"
-            : "bg-cyan-600 hover:bg-cyan-700 text-white"
+        className={`btn-primary inline-flex items-center gap-1.5 text-sm ${
+          saving ? "opacity-50 cursor-not-allowed" : ""
         }`}
       >
+        <IconSave />
         {saving ? "保存中..." : "保存"}
       </button>
       <button
         onClick={onReload}
-        className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg"
+        className="btn-secondary inline-flex items-center gap-1.5 text-sm"
       >
+        <IconRefresh />
         重新加载
       </button>
       <button
         onClick={onReset}
-        className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg"
+        className="btn-secondary inline-flex items-center gap-1.5 text-sm"
       >
+        <IconRestore />
         恢复默认
       </button>
       {onExtra && extraLabel && (
         <button
           onClick={onExtra}
-          className="text-sm bg-teal-50 hover:bg-teal-100 text-teal-700 px-3 py-1.5 rounded-lg"
+          className="btn-secondary inline-flex items-center gap-1.5 text-sm"
         >
+          <IconPlus />
           {extraLabel}
         </button>
       )}
@@ -198,13 +288,23 @@ function ActionButtons({
 
 function StatusMessage({ message, kind }: { message: string; kind: "success" | "error" | "info" }) {
   if (!message) return null;
+
   const cls =
     kind === "error"
-      ? "text-red-700 bg-red-50"
+      ? "text-red-700 bg-red-50 border-red-200"
       : kind === "success"
-        ? "text-green-700 bg-green-50"
-        : "text-slate-600 bg-slate-50";
-  return <div className={`mt-2 text-sm rounded-lg px-3 py-2 ${cls}`}>{message}</div>;
+        ? "text-emerald-700 bg-emerald-50 border-emerald-200"
+        : "text-slate-600 bg-slate-50 border-slate-200";
+
+  const icon =
+    kind === "error" ? <IconError /> : kind === "success" ? <IconCheck /> : null;
+
+  return (
+    <div className={`mt-3 text-sm rounded-lg px-3 py-2 border flex items-center gap-2 ${cls}`}>
+      {icon}
+      {message}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -275,20 +375,21 @@ function FileKeywordsSection({ bridge }: { bridge: BridgeProp }) {
     <SectionCard
       title="文件关键字"
       subtitle="批量处理时用于匹配文件名的关键字，多个关键字用英文逗号分隔"
-      color="bg-amber-500"
+      color="bg-blue-500"
+      icon={<IconKeywords />}
       expanded={expanded}
       onToggle={() => setExpanded(!expanded)}
     >
-      <div className="space-y-3">
+      <div className="space-y-4">
         {fields.map(({ key, label, hint }) => (
           <div key={key}>
-            <label className="text-xs font-medium text-slate-500 mb-1 block">{label}</label>
+            <label className="text-xs font-medium text-slate-500 mb-1.5 block">{label}</label>
             <input
               type="text"
               value={join(keywords[key])}
               onChange={(e) => updateField(key, e.target.value)}
               placeholder={hint}
-              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500"
+              className="input w-full text-sm"
             />
           </div>
         ))}
@@ -402,7 +503,8 @@ function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
     <SectionCard
       title="工时表头映射"
       subtitle="配置工时 Excel 表头的重命名规则"
-      color="bg-blue-500"
+      color="bg-amber-500"
+      icon={<IconTableHeader />}
       expanded={expanded}
       onToggle={() => setExpanded(!expanded)}
     >
@@ -434,17 +536,17 @@ function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
             type="checkbox"
             checked={fuzzy}
             onChange={(e) => setFuzzy(e.target.checked)}
-            className="rounded border-slate-300"
+            className="rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
           />
           模糊匹配
         </label>
       </div>
 
       {/* Column headers */}
-      <div className="grid grid-cols-[60px_1fr_1fr_32px] gap-2 mb-1">
-        <span className="text-xs font-medium text-slate-400">列号</span>
-        <span className="text-xs font-medium text-slate-400">原始列名</span>
-        <span className="text-xs font-medium text-slate-400">匹配列名</span>
+      <div className="grid grid-cols-[60px_1fr_1fr_32px] gap-2 mb-2 px-0.5">
+        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">列号</span>
+        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">原始列名</span>
+        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">匹配列名</span>
         <span />
       </div>
 
@@ -461,30 +563,28 @@ function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
                 updateEntry(idx, "index", v ? parseInt(v, 10) : null);
               }}
               placeholder="从1起"
-              className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+              className="input w-full text-sm"
             />
             <input
               type="text"
               value={entry.original}
               onChange={(e) => updateEntry(idx, "original", e.target.value)}
               placeholder="原始列名"
-              className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+              className="input w-full text-sm"
             />
             <input
               type="text"
               value={entry.new}
               onChange={(e) => updateEntry(idx, "new", e.target.value)}
               placeholder="匹配列名"
-              className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+              className="input w-full text-sm"
             />
             <button
               onClick={() => removeRow(idx)}
               className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
               title="删除此行"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <IconClose />
             </button>
           </div>
         ))}
@@ -588,7 +688,8 @@ function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
     <SectionCard
       title="MineBase 连接配置"
       subtitle="配置 MineBase 数据库同步的连接参数"
-      color="bg-violet-500"
+      color="bg-emerald-500"
+      icon={<IconDatabase />}
       expanded={expanded}
       onToggle={() => setExpanded(!expanded)}
     >
@@ -617,52 +718,43 @@ function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
 
       {/* API fields */}
       {config.mode === "api" && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div>
-            <label className="text-xs font-medium text-slate-500 mb-1 block">API 地址</label>
+            <label className="text-xs font-medium text-slate-500 mb-1.5 block">API 地址</label>
             <input
               type="text"
               value={config.api.url}
               onChange={(e) => updateApi("url", e.target.value)}
               placeholder="http://localhost:3000"
-              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500"
+              className="input w-full text-sm"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">用户名</label>
+              <label className="text-xs font-medium text-slate-500 mb-1.5 block">用户名</label>
               <input
                 type="text"
                 value={config.api.username}
                 onChange={(e) => updateApi("username", e.target.value)}
-                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500"
+                className="input w-full text-sm"
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">密码</label>
+              <label className="text-xs font-medium text-slate-500 mb-1.5 block">密码</label>
               <div className="relative">
                 <input
                   type={passwordType}
                   value={config.api.password}
                   onChange={(e) => updateApi("password", e.target.value)}
-                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500"
+                  className="input w-full text-sm pr-10"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                   title={showPassword ? "隐藏" : "显示"}
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    {showPassword ? (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l18 18" />
-                    ) : (
-                      <>
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </>
-                    )}
-                  </svg>
+                  {showPassword ? <IconEyeOff /> : <IconEye />}
                 </button>
               </div>
             </div>
@@ -672,30 +764,28 @@ function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
 
       {/* Database fields */}
       {config.mode === "database" && (
-        <div className="space-y-3">
-          <div className="grid grid-cols-[1fr_120px] gap-3">
+        <div className="space-y-4">
+          <div className="grid grid-cols-[1fr_120px] gap-4">
             <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">数据库主机</label>
+              <label className="text-xs font-medium text-slate-500 mb-1.5 block">数据库主机</label>
               <input
                 type="text"
                 value={config.database.host}
                 onChange={(e) => updateDb("host", e.target.value)}
                 placeholder="localhost"
-                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500"
+                className="input w-full text-sm"
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">端口</label>
+              <label className="text-xs font-medium text-slate-500 mb-1.5 block">端口</label>
               <input
                 type="number"
                 min={0}
                 max={65535}
                 value={config.database.port}
                 onChange={(e) => updateDb("port", parseInt(e.target.value, 10) || 5432)}
-                className={`w-full text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 ${
-                  validatePort(config.database.port)
-                    ? "border-red-300 focus:border-red-500"
-                    : "border-slate-200 focus:border-cyan-500"
+                className={`input w-full text-sm ${
+                  validatePort(config.database.port) ? "border-red-400 focus:ring-red-500/30" : ""
                 }`}
               />
               {validatePort(config.database.port) && (
@@ -704,50 +794,41 @@ function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-500 mb-1 block">数据库名</label>
+            <label className="text-xs font-medium text-slate-500 mb-1.5 block">数据库名</label>
             <input
               type="text"
               value={config.database.database}
               onChange={(e) => updateDb("database", e.target.value)}
               placeholder="minebase"
-              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500"
+              className="input w-full text-sm"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">用户名</label>
+              <label className="text-xs font-medium text-slate-500 mb-1.5 block">用户名</label>
               <input
                 type="text"
                 value={config.database.user}
                 onChange={(e) => updateDb("user", e.target.value)}
-                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500"
+                className="input w-full text-sm"
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">密码</label>
+              <label className="text-xs font-medium text-slate-500 mb-1.5 block">密码</label>
               <div className="relative">
                 <input
                   type={passwordType}
                   value={config.database.password}
                   onChange={(e) => updateDb("password", e.target.value)}
-                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 pr-10 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500"
+                  className="input w-full text-sm pr-10"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                   title={showPassword ? "隐藏" : "显示"}
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    {showPassword ? (
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L6.59 6.59m7.532 7.532l3.29 3.29M3 3l18 18" />
-                    ) : (
-                      <>
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                      </>
-                    )}
-                  </svg>
+                  {showPassword ? <IconEyeOff /> : <IconEye />}
                 </button>
               </div>
             </div>
@@ -777,12 +858,16 @@ function ColumnMappingSection() {
     <SectionCard
       title="列映射配置"
       subtitle="配置 MiningProcessor 输出列到 MineBase 字段的映射关系"
-      color="bg-emerald-500"
+      color="bg-purple-500"
+      icon={<IconColumns />}
       expanded={expanded}
       onToggle={() => setExpanded(!expanded)}
     >
-      <div className="flex items-center justify-center py-12 text-slate-400 text-sm">
-        列映射配置编辑器开发中...
+      <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-3">
+        <svg className="w-12 h-12 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        </svg>
+        <p className="text-sm">列映射配置编辑器开发中...</p>
       </div>
     </SectionCard>
   );
@@ -795,7 +880,7 @@ function ColumnMappingSection() {
 export function UserConfigPage({ bridge }: { bridge: BridgeProp }) {
   return (
     <div>
-      <div className="mb-4">
+      <div className="mb-5">
         <h2 className="text-lg font-semibold text-slate-800">用户配置</h2>
         <p className="text-xs text-slate-400 mt-0.5">管理与业务处理无关的个人偏好设置</p>
       </div>
