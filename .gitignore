@@ -15,6 +15,7 @@ __pypackages__/
 
 # IDE
 .idea/
+.vscode/
 
 # Agent configs
 .claude/
@@ -49,3 +50,20 @@ config.user.json
 
 # CodeGraph
 .codegraph/
+
+# Node.js
+node_modules/
+
+# Tauri build output
+src-tauri/target/
+src-tauri/gen/
+src-tauri/binaries/
+
+# PyInstaller
+dist/
+build/*.warn
+build/*.toc
+*.spec.bak
+
+# Vite
+dist/
