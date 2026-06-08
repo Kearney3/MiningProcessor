@@ -583,7 +583,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
             onClick={browseFile}
           >
             <div className={`mb-3 p-3 rounded-full transition-colors ${
-              dragOver ? "bg-blue-100 text-blue-500" : "bg-slate-100 text-slate-400"
+              dragOver ? "bg-blue-100 text-blue-600" : "bg-slate-100 text-slate-400"
             }`}>
               <UploadCloudIcon className="w-8 h-8" />
             </div>
@@ -766,8 +766,8 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-pulse-subtle" />
               </div>
               <div className="flex gap-4 text-xs text-slate-600">
-                <span>矿卡列: <code className="font-mono text-slate-800 bg-amber-100/60 px-1.5 py-0.5 rounded">{dualTruckCol}</code></span>
-                <span>挖机列: <code className="font-mono text-slate-800 bg-amber-100/60 px-1.5 py-0.5 rounded">{dualExcavatorCol}</code></span>
+                <span>矿卡列: <code className="font-mono text-amber-800 bg-amber-100/60 px-1.5 py-0.5 rounded">{dualTruckCol}</code></span>
+                <span>挖机列: <code className="font-mono text-amber-800 bg-amber-100/60 px-1.5 py-0.5 rounded">{dualExcavatorCol}</code></span>
               </div>
               <p className="text-xs text-slate-500 mt-2">
                 匹配结果将生成 "标准设备名称（矿卡）" 和 "标准设备名称（挖机）" 两列
