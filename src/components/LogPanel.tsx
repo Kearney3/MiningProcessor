@@ -6,33 +6,54 @@ interface LogPanelProps {
   onClear: () => void;
 }
 
-const LEVEL_STYLES: Record<string, { pill: string; text: string }> = {
-  INFO: {
-    pill: "bg-blue-50 text-blue-600 border border-blue-200/50",
-    text: "text-slate-600",
-  },
-  WARNING: {
-    pill: "bg-amber-50 text-amber-600 border border-amber-200/50",
-    text: "text-amber-700",
-  },
-  ERROR: {
-    pill: "bg-red-50 text-red-600 border border-red-200/50",
-    text: "text-red-600",
-  },
-  DEBUG: {
-    pill: "bg-slate-50 text-slate-400 border border-slate-200/50",
-    text: "text-slate-400",
-  },
-  STDERR: {
-    pill: "bg-red-50 text-red-500 border border-red-200/50",
-    text: "text-red-500",
-  },
+/** Colored dot per level */
+const LEVEL_DOT: Record<string, string> = {
+  INFO: "bg-blue-400",
+  WARNING: "bg-amber-400",
+  ERROR: "bg-red-400",
+  DEBUG: "bg-slate-500",
+  STDERR: "bg-red-400",
 };
 
-const DEFAULT_LEVEL_STYLE = {
-  pill: "bg-slate-50 text-slate-500 border border-slate-200/50",
-  text: "text-slate-600",
+/** Text color per level */
+const LEVEL_TEXT: Record<string, string> = {
+  INFO: "text-slate-400",
+  WARNING: "text-amber-400",
+  ERROR: "text-red-400",
+  DEBUG: "text-slate-500",
+  STDERR: "text-red-400",
 };
+
+const DEFAULT_DOT = "bg-slate-500";
+const DEFAULT_TEXT = "text-slate-400";
+
+// --- Toolbar SVG icons ---
+
+function IconClipboard() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
+function IconCheck() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+function IconTrash() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  );
+}
 
 export function LogPanel({ logs, onClear }: LogPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -82,28 +103,34 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
 
   return (
     <div
-      className="log-panel-wrapper border-t border-slate-200/80 bg-white shrink-0 flex flex-col"
+      className="log-panel-wrapper border-t border-slate-700/50 bg-[#0F172A] shrink-0 flex flex-col transition-[height] duration-200"
       style={{ height }}
     >
-      {/* Drag handle */}
+      {/* Drag handle with dot pattern */}
       <div
-        className="h-1.5 cursor-row-resize hover:bg-cyan-100/60 transition-colors flex items-center justify-center group"
+        className="h-2 cursor-row-resize flex items-center justify-center group"
         onMouseDown={() => setIsResizing(true)}
       >
-        <div className="w-8 h-0.5 bg-slate-300 rounded-full group-hover:bg-cyan-400 transition-colors" />
+        <div className="flex items-center gap-1">
+          <span className="w-[3px] h-[3px] rounded-full bg-slate-600 group-hover:bg-slate-400 transition-colors" />
+          <span className="w-[3px] h-[3px] rounded-full bg-slate-600 group-hover:bg-slate-400 transition-colors" />
+          <span className="w-[3px] h-[3px] rounded-full bg-slate-600 group-hover:bg-slate-400 transition-colors" />
+          <span className="w-[3px] h-[3px] rounded-full bg-slate-600 group-hover:bg-slate-400 transition-colors" />
+          <span className="w-[3px] h-[3px] rounded-full bg-slate-600 group-hover:bg-slate-400 transition-colors" />
+        </div>
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center gap-2 px-4 py-1.5 border-b border-slate-100 shrink-0">
-        <span className="text-xs font-semibold text-slate-500 tracking-wide">日志</span>
-        <span className="inline-flex items-center justify-center min-w-[24px] h-4 px-1.5 text-[10px] font-medium text-slate-500 bg-slate-100 rounded-full">
+      <div className="flex items-center gap-2 px-4 py-1.5 border-b border-slate-700/50 bg-slate-800/50 shrink-0">
+        <span className="text-xs font-semibold text-slate-400 tracking-wide">日志</span>
+        <span className="inline-flex items-center justify-center min-w-[24px] h-4 px-1.5 text-[10px] font-medium text-slate-500 bg-slate-700/60 rounded-full">
           {filteredLogs.length}
         </span>
         <div className="ml-auto flex items-center gap-1">
           <select
             value={filterLevel}
             onChange={(e) => setFilterLevel(e.target.value)}
-            className="text-xs bg-slate-50 border border-slate-200 rounded-md px-2 py-0.5 text-slate-600 cursor-pointer hover:border-slate-300"
+            className="text-xs bg-slate-700 border border-slate-600/50 rounded-md px-2 py-0.5 text-slate-300 cursor-pointer hover:border-slate-500 appearance-none"
           >
             <option value="ALL">全部</option>
             <option value="INFO">INFO</option>
@@ -113,26 +140,28 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
           <button
             onClick={() => setAutoScroll(!autoScroll)}
             className={`
-              text-xs px-2 py-0.5 rounded-md font-medium cursor-pointer
+              text-xs px-2 py-0.5 rounded-md font-medium cursor-pointer transition-colors
               ${autoScroll
-                ? "bg-cyan-50 text-cyan-700 border border-cyan-200/50"
-                : "text-slate-400 hover:bg-slate-100 border border-transparent"
+                ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                : "text-slate-500 hover:text-slate-400 border border-transparent"
               }
             `}
           >
-            ↓自动
+            Auto
           </button>
           <button
             onClick={handleCopyAll}
-            className="text-xs text-slate-400 hover:text-slate-600 px-2 py-0.5 rounded-md hover:bg-slate-100 font-medium cursor-pointer border border-transparent hover:border-slate-200"
+            title={copied ? "已复制" : "复制全部"}
+            className="p-1 rounded text-slate-500 hover:text-slate-300 hover:bg-slate-700/50 cursor-pointer transition-colors"
           >
-            {copied ? "已复制 ✓" : "复制全部"}
+            {copied ? <IconCheck /> : <IconClipboard />}
           </button>
           <button
             onClick={onClear}
-            className="text-xs text-slate-400 hover:text-slate-600 px-2 py-0.5 rounded-md hover:bg-slate-100 font-medium cursor-pointer border border-transparent hover:border-slate-200"
+            title="清空"
+            className="p-1 rounded text-slate-500 hover:text-red-400 hover:bg-slate-700/50 cursor-pointer transition-colors"
           >
-            清空
+            <IconTrash />
           </button>
         </div>
       </div>
@@ -140,26 +169,20 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
       {/* Log entries */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto thin-scrollbar font-mono text-xs px-4 py-1.5">
         {filteredLogs.length === 0 ? (
-          <div className="text-slate-300 text-center py-6 text-sm">暂无日志</div>
+          <div className="text-slate-600 text-center py-6 text-sm">等待日志...</div>
         ) : (
           filteredLogs.map((entry, i) => {
-            const style = LEVEL_STYLES[entry.level] || DEFAULT_LEVEL_STYLE;
+            const dotColor = LEVEL_DOT[entry.level] || DEFAULT_DOT;
+            const textColor = LEVEL_TEXT[entry.level] || DEFAULT_TEXT;
             return (
               <div
                 key={i}
-                className="py-0.5 flex items-baseline gap-3 hover:bg-slate-50/60 rounded px-1 -mx-1"
+                className="py-0.5 flex items-baseline gap-3 hover:bg-white/[0.03] rounded px-1 -mx-1"
               >
                 <span
-                  className={`
-                    inline-flex items-center justify-center shrink-0
-                    w-12 text-center text-[10px] font-semibold leading-tight
-                    px-1.5 py-0.5 rounded-full
-                    ${style.pill}
-                  `}
-                >
-                  {entry.level}
-                </span>
-                <span className={`${style.text} break-all`}>
+                  className={`inline-block shrink-0 w-1.5 h-1.5 rounded-full mt-[5px] ${dotColor}`}
+                />
+                <span className={`${textColor} break-all`}>
                   {entry.message}
                 </span>
               </div>

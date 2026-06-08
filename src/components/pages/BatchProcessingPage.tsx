@@ -17,22 +17,135 @@ type TableMergeMode = "split" | "merge" | "table_merge";
 type BaseTableType = "fuel" | "worktime";
 
 // ═══════════════════════════════════════
+// SVG Icon Components
+// ═══════════════════════════════════════
+
+const FuelSvgIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 22V6a2 2 0 012-2h6a2 2 0 012 2v16" />
+    <path d="M13 10h2a2 2 0 012 2v2a2 2 0 002 2h0a2 2 0 002-2V9.83a2 2 0 00-.59-1.42L18 6" />
+    <path d="M3 22h10" />
+    <path d="M7 10V6" />
+    <path d="M11 10V6" />
+  </svg>
+);
+
+const ProductionSvgIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="7" height="18" rx="1" />
+    <rect x="14" y="8" width="7" height="13" rx="1" />
+    <path d="M6 7h1" />
+    <path d="M6 11h1" />
+    <path d="M6 15h1" />
+    <path d="M17 12h1" />
+    <path d="M17 16h1" />
+  </svg>
+);
+
+const ElectricalSvgIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+  </svg>
+);
+
+const WorktimeSvgIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 6 12 12 16 14" />
+  </svg>
+);
+
+const MergeSvgIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="7" width="8" height="4" rx="1" />
+    <rect x="2" y="13" width="8" height="4" rx="1" />
+    <rect x="14" y="10" width="8" height="4" rx="1" />
+    <path d="M10 9h2l2 2" />
+    <path d="M10 17h2l2-2" />
+  </svg>
+);
+
+const CalendarSvgIcon = () => (
+  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+);
+
+const SettingsSvgIcon = () => (
+  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="3" />
+    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
+  </svg>
+);
+
+const RulerSvgIcon = () => (
+  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21.3 15.3a2.4 2.4 0 010 3.4l-2.6 2.6a2.4 2.4 0 01-3.4 0L2.7 8.7a2.4 2.4 0 010-3.4l2.6-2.6a2.4 2.4 0 013.4 0z" />
+    <path d="M14.5 12.5l2-2" />
+    <path d="M11.5 9.5l2-2" />
+    <path d="M8.5 6.5l2-2" />
+    <path d="M17.5 15.5l2-2" />
+  </svg>
+);
+
+const SearchSvgIcon = () => (
+  <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+  </svg>
+);
+
+const FolderSvgIcon = () => (
+  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+  </svg>
+);
+
+const PlaySvgIcon = () => (
+  <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+  </svg>
+);
+
+const CheckCircleSvgIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+  </svg>
+);
+
+const XCircleSvgIcon = () => (
+  <svg className="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+  </svg>
+);
+
+const QuestionSvgIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+);
+
+// ═══════════════════════════════════════
 // Constants
 // ═══════════════════════════════════════
 
-const dataTypeConfig: Record<string, { icon: string; label: string; color: string; bg: string; border: string }> = {
-  油耗:     { icon: "⛽", label: "油耗",     color: "text-cyan-600",    bg: "bg-cyan-50",    border: "border-cyan-200" },
-  生产:     { icon: "🏗️", label: "生产",     color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" },
-  电力:     { icon: "⚡", label: "电力",     color: "text-amber-600",   bg: "bg-amber-50",   border: "border-amber-200" },
-  工时:     { icon: "⏱️", label: "工时",     color: "text-blue-600",    bg: "bg-blue-50",    border: "border-blue-200" },
-  production: { icon: "🏗️", label: "生产",  color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" },
-  fuel:     { icon: "⛽", label: "油耗",     color: "text-cyan-600",    bg: "bg-cyan-50",    border: "border-cyan-200" },
-  electrical: { icon: "⚡", label: "电力",  color: "text-amber-600",   bg: "bg-amber-50",   border: "border-amber-200" },
-  worktime: { icon: "⏱️", label: "工时",     color: "text-blue-600",    bg: "bg-blue-50",    border: "border-blue-200" },
-  merge:    { icon: "📋", label: "合并",     color: "text-purple-600",  bg: "bg-purple-50",  border: "border-purple-200" },
+const dataTypeConfig: Record<string, { icon: React.ReactNode; label: string; color: string; bg: string; border: string }> = {
+  油耗:     { icon: <FuelSvgIcon />, label: "油耗",     color: "text-cyan-600",    bg: "bg-cyan-50",    border: "border-cyan-200" },
+  生产:     { icon: <ProductionSvgIcon />, label: "生产",     color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" },
+  电力:     { icon: <ElectricalSvgIcon />, label: "电力",     color: "text-amber-600",   bg: "bg-amber-50",   border: "border-amber-200" },
+  工时:     { icon: <WorktimeSvgIcon />, label: "工时",     color: "text-blue-600",    bg: "bg-blue-50",    border: "border-blue-200" },
+  production: { icon: <ProductionSvgIcon />, label: "生产",  color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" },
+  fuel:     { icon: <FuelSvgIcon />, label: "油耗",     color: "text-cyan-600",    bg: "bg-cyan-50",    border: "border-cyan-200" },
+  electrical: { icon: <ElectricalSvgIcon />, label: "电力",  color: "text-amber-600",   bg: "bg-amber-50",   border: "border-amber-200" },
+  worktime: { icon: <WorktimeSvgIcon />, label: "工时",     color: "text-blue-600",    bg: "bg-blue-50",    border: "border-blue-200" },
+  merge:    { icon: <MergeSvgIcon />, label: "合并",     color: "text-purple-600",  bg: "bg-purple-50",  border: "border-purple-200" },
 };
 
-const fallbackConfig = { icon: "📄", label: "", color: "text-slate-600", bg: "bg-slate-50", border: "border-slate-200" };
+const fallbackConfig = { icon: <QuestionSvgIcon />, label: "", color: "text-slate-600", bg: "bg-slate-50", border: "border-slate-200" };
 
 function getTypeConfig(type: string) {
   return dataTypeConfig[type] ?? { ...fallbackConfig, label: type };
@@ -53,7 +166,7 @@ function shiftDate(dateStr: string, days: number): string {
 // Small reusable UI components
 // ═══════════════════════════════════════
 
-/** Collapsible section with a chevron */
+/** Collapsible section with a chevron and smooth height */
 function Collapsible({
   title,
   icon,
@@ -61,7 +174,7 @@ function Collapsible({
   children,
 }: {
   title: string;
-  icon?: string;
+  icon?: React.ReactNode;
   defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
@@ -71,23 +184,24 @@ function Collapsible({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+        className="w-full flex items-center gap-2.5 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
       >
-        {icon && <span className="text-base">{icon}</span>}
+        {icon && <span className="text-slate-400">{icon}</span>}
         <span className="flex-1 text-left">{title}</span>
         <svg
-          className={`w-4 h-4 text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
           viewBox="0 0 20 20"
           fill="currentColor"
         >
-          <path
-            fillRule="evenodd"
-            d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-            clipRule="evenodd"
-          />
+          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
         </svg>
       </button>
-      {open && <div className="px-4 pb-4 border-t border-slate-100">{children}</div>}
+      <div
+        className="overflow-hidden transition-all duration-300 ease-in-out"
+        style={{ maxHeight: open ? "500px" : "0px", opacity: open ? 1 : 0 }}
+      >
+        <div className="px-4 pb-4 border-t border-slate-100">{children}</div>
+      </div>
     </div>
   );
 }
@@ -133,7 +247,7 @@ function ChipToggle({
   );
 }
 
-/** Confirmation dialog overlay */
+/** Confirmation dialog overlay with backdrop blur */
 function ConfirmDialog({
   title,
   message,
@@ -153,16 +267,12 @@ function ConfirmDialog({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden animate-fade-in">
         <div className="px-6 pt-6 pb-2">
           <div className="flex items-center gap-3 mb-3">
             <div className="shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
               <svg className="w-5 h-5 text-amber-600" viewBox="0 0 20 20" fill="currentColor">
-                <path
-                  fillRule="evenodd"
-                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                  clipRule="evenodd"
-                />
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
             </div>
             <h3 className="text-base font-semibold text-slate-800">{title}</h3>
@@ -172,7 +282,7 @@ function ConfirmDialog({
             <ul className="mt-3 space-y-1">
               {details.map((d, i) => (
                 <li key={i} className="flex items-center gap-2 text-xs text-slate-500">
-                  <span className="text-orange-400">-</span>
+                  <span className="w-1 h-1 rounded-full bg-orange-400 shrink-0" />
                   {d}
                 </li>
               ))}
@@ -208,7 +318,7 @@ function AnimatedProgressBar({ percent, stage, detail }: { percent: number; stag
     <div className="bg-white rounded-xl border border-slate-200 p-5">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <svg className="w-4 h-4 text-cyan-500 animate-spin" viewBox="0 0 24 24" fill="none">
+          <svg className="w-4 h-4 text-blue-500 animate-spin" viewBox="0 0 24 24" fill="none">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
@@ -218,13 +328,13 @@ function AnimatedProgressBar({ percent, stage, detail }: { percent: number; stag
       </div>
       <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
         <div
-          className="h-3 rounded-full transition-all duration-500 ease-out relative overflow-hidden"
+          className="h-3 rounded-full transition-all duration-500 ease-out bg-gradient-to-r from-blue-500 to-cyan-500 relative overflow-hidden"
           style={{ width: `${pct}%` }}
         >
           <div
             className="absolute inset-0 animate-gradient-shift"
             style={{
-              background: "linear-gradient(90deg, #06b6d4, #3b82f6, #8b5cf6, #06b6d4)",
+              background: "linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%)",
               backgroundSize: "200% 100%",
             }}
           />
@@ -248,11 +358,7 @@ function PulsingCancelButton({ onClick }: { onClick: () => void }) {
       <span className="absolute inset-0 rounded-lg bg-red-400/20 animate-ping" />
       <span className="relative flex items-center gap-1.5">
         <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-          <path
-            fillRule="evenodd"
-            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z"
-            clipRule="evenodd"
-          />
+          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clipRule="evenodd" />
         </svg>
         取消
       </span>
@@ -403,8 +509,8 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">批量处理</h2>
-          <p className="text-xs text-slate-400 mt-0.5">扫描文件夹并批量处理多种报表</p>
+          <h2 className="text-xl font-semibold text-slate-800">批量处理</h2>
+          <p className="text-sm text-slate-500 mt-0.5">扫描文件夹并批量处理多种报表</p>
         </div>
       </div>
 
@@ -418,17 +524,13 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
             value={folderPath}
             onChange={(e) => { setFolderPath(e.target.value); setScanResult(null); }}
             placeholder="选择包含报表的文件夹"
-            className={`flex-1 text-sm border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500 ${
-              folderPath === "" ? "border-amber-300 bg-amber-50/30" : "border-slate-200"
-            }`}
+            className={`input flex-1 ${folderPath === "" ? "border-amber-300 bg-amber-50/30" : ""}`}
           />
           <button
             onClick={browse}
             className="shrink-0 flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-lg transition-colors"
           >
-            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-            </svg>
+            <FolderSvgIcon />
             浏览
           </button>
           <button
@@ -450,20 +552,14 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
               </>
             ) : (
               <>
-                <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                  <path
-                    fillRule="evenodd"
-                    d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-                    clipRule="evenodd"
-                  />
-                </svg>
+                <SearchSvgIcon />
                 扫描文件
               </>
             )}
           </button>
         </div>
 
-        {/* ── Scan results as card grid ── */}
+        {/* ── Scan results as status cards ── */}
         {scanResult && (
           <div className="mt-4">
             <p className="text-xs font-medium text-slate-500 mb-3">扫描结果</p>
@@ -475,18 +571,12 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
                     key={type}
                     className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border ${cfg.bg} ${cfg.border} transition-colors`}
                   >
-                    <span className="text-base shrink-0">{cfg.icon}</span>
+                    <span className={`shrink-0 ${cfg.color}`}>{cfg.icon}</span>
                     <div className="min-w-0">
                       <p className={`text-xs font-semibold ${cfg.color} truncate`}>{cfg.label || type}</p>
                       <p className="text-[11px] text-slate-400">{(files as string[]).length} 个文件</p>
                     </div>
-                    <svg className={`w-4 h-4 ml-auto shrink-0 text-green-500`} viewBox="0 0 20 20" fill="currentColor">
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
+                    <CheckCircleSvgIcon className="w-4 h-4 ml-auto shrink-0 text-green-500" />
                   </div>
                 );
               })}
@@ -495,18 +585,12 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
                   key={type}
                   className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border bg-orange-50 border-orange-200"
                 >
-                  <span className="text-base shrink-0">❓</span>
+                  <span className="shrink-0 text-orange-500"><QuestionSvgIcon /></span>
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-orange-600 truncate">{type}</p>
                     <p className="text-[11px] text-orange-400">未找到</p>
                   </div>
-                  <svg className="w-4 h-4 ml-auto shrink-0 text-orange-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
+                  <XCircleSvgIcon />
                 </div>
               ))}
             </div>
@@ -519,13 +603,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
           ════════════════════════════════════ */}
       <div className="bg-white rounded-xl border border-slate-200 p-5">
         <h3 className="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
-          <svg className="w-4 h-4 text-slate-400" viewBox="0 0 20 20" fill="currentColor">
-            <path
-              fillRule="evenodd"
-              d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z"
-              clipRule="evenodd"
-            />
-          </svg>
+          <span className="text-slate-400"><SettingsSvgIcon /></span>
           参数配置
         </h3>
 
@@ -537,7 +615,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
               type="number"
               value={year}
               onChange={(e) => setYear(e.target.value)}
-              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500"
+              className="input"
             />
           </div>
           <div>
@@ -548,7 +626,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
               onChange={(e) => setMonth(e.target.value)}
               min={1}
               max={12}
-              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500"
+              className="input"
             />
           </div>
           <div>
@@ -557,22 +635,22 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
               type="number"
               value={rawStart}
               onChange={(e) => setRawStart(e.target.value)}
-              className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500"
+              className="input"
             />
           </div>
           <div className="flex items-end">
-            <label className="flex items-center gap-2 cursor-pointer select-none group pb-2">
+            <label className="flex items-center gap-2.5 cursor-pointer select-none group pb-2">
               <button
                 role="switch"
                 aria-checked={useLedger}
                 onClick={() => setUseLedger(!useLedger)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  useLedger ? "bg-cyan-500" : "bg-slate-300"
+                className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${
+                  useLedger ? "bg-emerald-500" : "bg-slate-200"
                 }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                    useLedger ? "translate-x-6" : "translate-x-1"
+                  className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                    useLedger ? "translate-x-5" : "translate-x-1"
                   }`}
                 />
               </button>
@@ -617,20 +695,20 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
           ════════════════════════════════════ */}
 
       {/* ── Date filter ── */}
-      <Collapsible title="日期过滤" icon="📅">
+      <Collapsible title="日期过滤" icon={<CalendarSvgIcon />}>
         <div className="mt-3 space-y-3">
           <label className="flex items-center gap-2.5 cursor-pointer select-none group">
             <button
               role="switch"
               aria-checked={dateFilterEnabled}
               onClick={() => setDateFilterEnabled(!dateFilterEnabled)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                dateFilterEnabled ? "bg-cyan-500" : "bg-slate-300"
+              className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${
+                dateFilterEnabled ? "bg-emerald-500" : "bg-slate-200"
               }`}
             >
               <span
-                className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                  dateFilterEnabled ? "translate-x-6" : "translate-x-1"
+                className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                  dateFilterEnabled ? "translate-x-5" : "translate-x-1"
                 }`}
               />
             </button>
@@ -659,8 +737,9 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
                     const el = document.getElementById("batch-filter-date") as HTMLInputElement | null;
                     el?.showPicker?.();
                   }}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-cyan-200 text-cyan-600 hover:bg-cyan-50 transition-colors"
+                  className="text-xs px-3 py-1.5 rounded-lg border border-cyan-200 text-cyan-600 hover:bg-cyan-50 transition-colors flex items-center gap-1"
                 >
+                  <CalendarSvgIcon />
                   选择日期
                 </button>
               </div>
@@ -671,7 +750,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
                   type="date"
                   value={filterDate}
                   onChange={(e) => setFilterDate(e.target.value)}
-                  className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 focus:border-cyan-500"
+                  className="input !w-auto"
                 />
                 <span className="text-xs text-slate-400 font-mono">{filterDate}</span>
               </div>
@@ -681,20 +760,20 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
       </Collapsible>
 
       {/* ── Header mapping ── */}
-      <Collapsible title="工时表头映射" icon="📐">
+      <Collapsible title="工时表头映射" icon={<RulerSvgIcon />}>
         <div className="mt-3 space-y-3">
           <label className="flex items-center gap-2.5 cursor-pointer select-none group">
             <button
               role="switch"
               aria-checked={useHeaderMapping}
               onClick={() => setUseHeaderMapping(!useHeaderMapping)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                useHeaderMapping ? "bg-cyan-500" : "bg-slate-300"
+              className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors ${
+                useHeaderMapping ? "bg-emerald-500" : "bg-slate-200"
               }`}
             >
               <span
-                className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                  useHeaderMapping ? "translate-x-6" : "translate-x-1"
+                className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
+                  useHeaderMapping ? "translate-x-5" : "translate-x-1"
                 }`}
               />
             </button>
@@ -751,21 +830,13 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
         <button
           onClick={handleProcess}
           disabled={!scanResult || processing}
-          className={`flex items-center gap-2 text-sm font-medium px-6 py-2.5 rounded-lg transition-colors ${
+          className={`btn-primary flex items-center gap-2 ${
             !scanResult || processing
-              ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+              ? "!bg-slate-100 !text-slate-400 cursor-not-allowed"
               : "bg-cyan-600 hover:bg-cyan-700 text-white"
           }`}
         >
-          {!processing && (
-            <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
-                clipRule="evenodd"
-              />
-            </svg>
-          )}
+          {!processing && <PlaySvgIcon />}
           {processing ? "处理中..." : "开始批量处理"}
         </button>
         {processing && <PulsingCancelButton onClick={handleCancel} />}
@@ -773,26 +844,14 @@ export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
 
       {/* ── Result / Error ── */}
       {result && (
-        <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
-          <svg className="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-              clipRule="evenodd"
-            />
-          </svg>
+        <div className="flex items-center gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 animate-fade-in">
+          <CheckCircleSvgIcon />
           {result}
         </div>
       )}
       {error && (
-        <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-          <svg className="w-4 h-4 shrink-0" viewBox="0 0 20 20" fill="currentColor">
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-              clipRule="evenodd"
-            />
-          </svg>
+        <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3 animate-fade-in">
+          <XCircleSvgIcon />
           {error}
         </div>
       )}

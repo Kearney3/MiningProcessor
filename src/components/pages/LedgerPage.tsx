@@ -12,6 +12,8 @@ interface BridgeProp {
 export interface LedgerPageConfig {
   /** Page title, e.g. "设备台账" */
   title: string;
+  /** Page icon: JSX element (SVG) rendered next to the title */
+  icon?: React.ReactNode;
   /** Standard column names for the ledger, e.g. ["设备名称", ...] */
   standardColumns: string[];
   /** Bridge method to load rows */
@@ -40,6 +42,88 @@ interface SortState {
   column: string;
   direction: "asc" | "desc";
 }
+
+// ---------------------------------------------------------------------------
+// SVG Icons
+// ---------------------------------------------------------------------------
+
+const IconImport = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+  </svg>
+);
+
+const IconExport = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+  </svg>
+);
+
+const IconStar = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+  </svg>
+);
+
+const IconStarFilled = () => (
+  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+  </svg>
+);
+
+const IconTrash = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+);
+
+const IconRefresh = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+  </svg>
+);
+
+const IconSearch = () => (
+  <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+  </svg>
+);
+
+const IconChevronUp = () => (
+  <svg className="w-3 h-2" viewBox="0 0 12 8" fill="currentColor">
+    <path d="M6 0l6 8H0z" />
+  </svg>
+);
+
+const IconChevronDown = () => (
+  <svg className="w-3 h-2" viewBox="0 0 12 8" fill="currentColor">
+    <path d="M6 8L0 0h12z" />
+  </svg>
+);
+
+const IconChevronLeft = () => (
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+  </svg>
+);
+
+const IconChevronRight = () => (
+  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+  </svg>
+);
+
+const IconClose = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+  </svg>
+);
+
+const IconArrowRight = () => (
+  <svg className="w-4 h-4 text-slate-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+  </svg>
+);
 
 // ---------------------------------------------------------------------------
 // Column Mapping Modal
@@ -77,10 +161,15 @@ function ColumnMappingModal({
   const usedFileCols = new Set(Object.values(mapping).filter(Boolean));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100">
-          <h3 className="text-base font-semibold text-slate-800">列映射</h3>
+          <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
+            <svg className="w-5 h-5 text-cyan-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" />
+            </svg>
+            列映射
+          </h3>
           <p className="text-xs text-slate-400 mt-1">
             将文件中的列映射到台账标准列
           </p>
@@ -89,18 +178,16 @@ function ColumnMappingModal({
         <div className="px-6 py-4 max-h-80 overflow-y-auto space-y-3">
           {standardColumns.map((stdCol) => (
             <div key={stdCol} className="flex items-center gap-3">
-              <span className="w-32 text-sm text-slate-700 truncate" title={stdCol}>
+              <span className="w-32 text-sm text-slate-700 font-medium truncate" title={stdCol}>
                 {stdCol}
               </span>
-              <svg className="w-4 h-4 text-slate-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
+              <IconArrowRight />
               <select
                 value={mapping[stdCol] || ""}
                 onChange={(e) =>
                   setMapping((prev) => ({ ...prev, [stdCol]: e.target.value }))
                 }
-                className="flex-1 text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+                className="input flex-1 text-sm"
               >
                 <option value="">-- 跳过 --</option>
                 {fileColumns.map((fc) => (
@@ -113,10 +200,10 @@ function ColumnMappingModal({
           ))}
         </div>
 
-        <div className="px-6 py-3 border-t border-slate-100 flex justify-end gap-2">
+        <div className="px-6 py-3 border-t border-slate-100 flex justify-end gap-2 bg-slate-50/50">
           <button
             onClick={onCancel}
-            className="text-sm px-4 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100"
+            className="btn-secondary text-sm px-4 py-1.5"
           >
             取消
           </button>
@@ -129,7 +216,7 @@ function ColumnMappingModal({
               }
               onConfirm(clean);
             }}
-            className="text-sm px-4 py-1.5 rounded-lg bg-cyan-600 text-white hover:bg-cyan-700"
+            className="btn-primary text-sm px-4 py-1.5"
           >
             确认导入
           </button>
@@ -163,26 +250,22 @@ function ConfirmDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
-        <div className="px-6 py-4">
+        <div className="px-6 py-5">
           <h3 className="text-base font-semibold text-slate-800">{title}</h3>
           <p className="text-sm text-slate-500 mt-2">{message}</p>
         </div>
-        <div className="px-6 py-3 border-t border-slate-100 flex justify-end gap-2">
+        <div className="px-6 py-3 border-t border-slate-100 flex justify-end gap-2 bg-slate-50/50">
           <button
             onClick={onCancel}
-            className="text-sm px-4 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100"
+            className="btn-secondary text-sm px-4 py-1.5"
           >
             取消
           </button>
           <button
             onClick={onConfirm}
-            className={`text-sm px-4 py-1.5 rounded-lg text-white ${
-              danger
-                ? "bg-red-600 hover:bg-red-700"
-                : "bg-cyan-600 hover:bg-cyan-700"
-            }`}
+            className={`${danger ? "btn-danger" : "btn-primary"} text-sm px-4 py-1.5`}
           >
             {confirmLabel}
           </button>
@@ -191,52 +274,6 @@ function ConfirmDialog({
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// SVG Icons
-// ---------------------------------------------------------------------------
-
-const IconImport = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-  </svg>
-);
-
-const IconExport = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-  </svg>
-);
-
-const IconStar = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-  </svg>
-);
-
-const IconStarFilled = () => (
-  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-  </svg>
-);
-
-const IconTrash = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-  </svg>
-);
-
-const IconRefresh = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-  </svg>
-);
-
-const IconSearch = () => (
-  <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-  </svg>
-);
 
 // ---------------------------------------------------------------------------
 // Main Component
@@ -323,8 +360,9 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
     });
   }
 
-  const totalPages = Math.ceil(displayRows.length / PAGE_SIZE);
-  const paged = displayRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(displayRows.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages - 1);
+  const paged = displayRows.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
 
   // ---- Actions ----
 
@@ -433,10 +471,13 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
     <div className="flex flex-col h-full">
       {/* Title + Toolbar */}
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
+          {config.icon && (
+            <span className="text-slate-600">{config.icon}</span>
+          )}
           <h2 className="text-lg font-semibold text-slate-800">{config.title}</h2>
           {isDefault && (
-            <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+            <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
               <IconStarFilled /> 默认
             </span>
           )}
@@ -444,7 +485,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
 
         {/* Toolbar */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Search */}
+          {/* Search with filter icon */}
           <div className="relative">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2">
               <IconSearch />
@@ -454,7 +495,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
               placeholder="搜索..."
-              className="text-sm border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 w-44 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+              className="input text-sm pl-8 pr-3 py-1.5 w-44"
             />
             {searchTerm && (
               <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
@@ -469,7 +510,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           <button
             onClick={handleImport}
             disabled={importing}
-            className="flex items-center gap-1.5 text-sm bg-cyan-50 hover:bg-cyan-100 text-cyan-700 px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors"
+            className="btn-secondary inline-flex items-center gap-1.5 text-sm"
             title="导入台账"
           >
             <IconImport />
@@ -479,7 +520,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           {/* Export template */}
           <button
             onClick={handleExportTemplate}
-            className="flex items-center gap-1.5 text-sm bg-slate-50 hover:bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg transition-colors"
+            className="btn-secondary inline-flex items-center gap-1.5 text-sm"
             title="导出模板"
           >
             <IconExport />
@@ -492,7 +533,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           {isDefault ? (
             <button
               onClick={() => setShowCancelDefaultDialog(true)}
-              className="flex items-center gap-1.5 text-sm bg-amber-50 hover:bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg transition-colors"
+              className="btn-secondary inline-flex items-center gap-1.5 text-sm text-amber-700"
               title="取消默认"
             >
               <IconStarFilled />
@@ -501,7 +542,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           ) : (
             <button
               onClick={() => setShowSetDefaultDialog(true)}
-              className="flex items-center gap-1.5 text-sm bg-slate-50 hover:bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg transition-colors"
+              className="btn-secondary inline-flex items-center gap-1.5 text-sm"
               title="设为默认"
             >
               <IconStar />
@@ -512,7 +553,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           {/* Clear */}
           <button
             onClick={() => setShowClearDialog(true)}
-            className="flex items-center gap-1.5 text-sm bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg transition-colors"
+            className="btn-danger inline-flex items-center gap-1.5 text-sm"
             title="清空台账"
           >
             <IconTrash />
@@ -522,7 +563,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           {/* Refresh */}
           <button
             onClick={loadData}
-            className="flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg transition-colors"
+            className="btn-secondary inline-flex items-center gap-1.5 text-sm"
             title="刷新"
           >
             <IconRefresh />
@@ -533,32 +574,36 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
       {/* Error */}
       {error && (
         <div className="mb-4 text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-4 py-3 flex items-center justify-between">
-          <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <span className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
+            {error}
+          </span>
+          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600">
+            <IconClose />
           </button>
         </div>
       )}
 
       {/* Empty state */}
       {rows.length === 0 ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-16 text-center">
-          <svg className="w-16 h-16 mx-auto text-slate-200 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        <div className="bg-white rounded-xl border border-slate-200 p-16 text-center shadow-sm">
+          <svg className="w-20 h-20 mx-auto text-slate-200 mb-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          <p className="text-slate-400 mb-4">{config.emptyMessage}</p>
+          <p className="text-slate-500 text-base mb-2">暂无数据</p>
+          <p className="text-slate-400 text-sm mb-6">{config.emptyMessage}</p>
           <button
             onClick={handleImport}
-            className="inline-flex items-center gap-2 text-sm bg-cyan-600 hover:bg-cyan-700 text-white px-5 py-2 rounded-lg transition-colors"
+            className="btn-primary inline-flex items-center gap-2 text-sm px-5 py-2"
           >
             <IconImport />
             导入台账
           </button>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex-1 flex flex-col min-h-0">
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex-1 flex flex-col min-h-0 shadow-sm">
           <div className="overflow-auto flex-1">
             <table className="w-full text-sm">
               <thead className="sticky top-0 z-10">
@@ -569,19 +614,21 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
                       <th
                         key={col}
                         onClick={() => handleSort(col)}
-                        className={`text-left px-4 py-2.5 text-xs font-medium whitespace-nowrap cursor-pointer select-none group transition-colors ${
-                          active ? "text-cyan-700 bg-cyan-50/50" : "text-slate-500 hover:text-slate-700"
+                        className={`text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none transition-colors ${
+                          active
+                            ? "text-cyan-700 bg-cyan-50/50"
+                            : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                         }`}
                       >
-                        <span className="inline-flex items-center gap-1">
+                        <span className="inline-flex items-center gap-1.5">
                           {col}
-                          <span className={`inline-flex flex-col -space-y-0.5 ${active ? "text-cyan-600" : "text-slate-300 group-hover:text-slate-400"}`}>
-                            <svg className={`w-3 h-2 ${active && sort?.direction === "asc" ? "text-cyan-600" : ""}`} viewBox="0 0 12 8" fill="currentColor">
-                              <path d="M6 0l6 8H0z" />
-                            </svg>
-                            <svg className={`w-3 h-2 ${active && sort?.direction === "desc" ? "text-cyan-600" : ""}`} viewBox="0 0 12 8" fill="currentColor">
-                              <path d="M6 8L0 0h12z" />
-                            </svg>
+                          <span className={`inline-flex flex-col -space-y-0.5 ${active ? "text-cyan-600" : "text-slate-300"}`}>
+                            <span className={active && sort?.direction === "asc" ? "text-cyan-600" : "opacity-40"}>
+                              <IconChevronUp />
+                            </span>
+                            <span className={active && sort?.direction === "desc" ? "text-cyan-600" : "opacity-40"}>
+                              <IconChevronDown />
+                            </span>
                           </span>
                         </span>
                       </th>
@@ -593,12 +640,12 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
                 {paged.map((row, i) => (
                   <tr
                     key={i}
-                    className={`border-b border-slate-50 transition-colors ${
+                    className={`border-b border-slate-100 transition-colors ${
                       i % 2 === 0 ? "bg-white" : "bg-slate-50/40"
                     } hover:bg-cyan-50/30`}
                   >
                     {columns.map((col) => (
-                      <td key={col} className="px-4 py-2 text-slate-600 whitespace-nowrap">
+                      <td key={col} className="px-4 py-2.5 text-slate-600 whitespace-nowrap">
                         {row[col] != null ? String(row[col]) : ""}
                       </td>
                     ))}
@@ -609,7 +656,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           </div>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between px-4 py-2.5 border-t border-slate-100 bg-slate-50/50 shrink-0">
+          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/30 shrink-0">
             <span className="text-xs text-slate-400">
               {searchTerm ? `${displayRows.length} / ${rows.length} 条` : `共 ${rows.length} 条`}
               {sort && (
@@ -620,21 +667,23 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
             </span>
             <div className="flex items-center gap-1">
               <button
-                disabled={page === 0}
+                disabled={safePage === 0}
                 onClick={() => setPage((p) => p - 1)}
-                className="text-xs px-2.5 py-1 rounded hover:bg-slate-100 disabled:text-slate-300 transition-colors"
+                className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors"
               >
+                <IconChevronLeft />
                 上一页
               </button>
               <span className="text-xs text-slate-400 min-w-[4rem] text-center">
-                {page + 1} / {totalPages || 1}
+                {safePage + 1} / {totalPages}
               </span>
               <button
-                disabled={page >= totalPages - 1}
+                disabled={safePage >= totalPages - 1}
                 onClick={() => setPage((p) => p + 1)}
-                className="text-xs px-2.5 py-1 rounded hover:bg-slate-100 disabled:text-slate-300 transition-colors"
+                className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors"
               >
                 下一页
+                <IconChevronRight />
               </button>
             </div>
           </div>
@@ -677,7 +726,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
 
       {/* Import overlay */}
       {importing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl px-8 py-6 flex items-center gap-3">
             <svg className="w-6 h-6 animate-spin text-cyan-600" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
