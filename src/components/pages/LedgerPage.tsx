@@ -44,7 +44,7 @@ interface SortState {
 }
 
 // ---------------------------------------------------------------------------
-// SVG Icons
+// SVG Icons (16x16)
 // ---------------------------------------------------------------------------
 
 const IconImport = () => (
@@ -125,6 +125,12 @@ const IconArrowRight = () => (
   </svg>
 );
 
+const IconTable = () => (
+  <svg className="w-5 h-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+  </svg>
+);
+
 // ---------------------------------------------------------------------------
 // Column Mapping Modal
 // ---------------------------------------------------------------------------
@@ -161,21 +167,21 @@ function ColumnMappingModal({
   const usedFileCols = new Set(Object.values(mapping).filter(Boolean));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100">
-          <h3 className="text-base font-semibold text-slate-800 flex items-center gap-2">
-            <svg className="w-5 h-5 text-cyan-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div className="bg-white rounded-lg border border-slate-200 w-full max-w-lg mx-4 overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100">
+          <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+            <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" />
             </svg>
             列映射
           </h3>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-slate-500 mt-0.5">
             将文件中的列映射到台账标准列
           </p>
         </div>
 
-        <div className="px-6 py-4 max-h-80 overflow-y-auto space-y-3">
+        <div className="px-5 py-3 max-h-80 overflow-y-auto space-y-2.5">
           {standardColumns.map((stdCol) => (
             <div key={stdCol} className="flex items-center gap-3">
               <span className="w-32 text-sm text-slate-700 font-medium truncate" title={stdCol}>
@@ -187,7 +193,7 @@ function ColumnMappingModal({
                 onChange={(e) =>
                   setMapping((prev) => ({ ...prev, [stdCol]: e.target.value }))
                 }
-                className="input flex-1 text-sm"
+                className="input flex-1"
               >
                 <option value="">-- 跳过 --</option>
                 {fileColumns.map((fc) => (
@@ -200,7 +206,7 @@ function ColumnMappingModal({
           ))}
         </div>
 
-        <div className="px-6 py-3 border-t border-slate-100 flex justify-end gap-2 bg-slate-50/50">
+        <div className="px-5 py-3 border-t border-slate-100 flex justify-end gap-2">
           <button
             onClick={onCancel}
             className="btn-secondary text-sm px-4 py-1.5"
@@ -250,13 +256,13 @@ function ConfirmDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
-        <div className="px-6 py-5">
-          <h3 className="text-base font-semibold text-slate-800">{title}</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div className="bg-white rounded-lg border border-slate-200 w-full max-w-sm mx-4 overflow-hidden">
+        <div className="px-5 py-5">
+          <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
           <p className="text-sm text-slate-500 mt-2">{message}</p>
         </div>
-        <div className="px-6 py-3 border-t border-slate-100 flex justify-end gap-2 bg-slate-50/50">
+        <div className="px-5 py-3 border-t border-slate-100 flex justify-end gap-2">
           <button
             onClick={onCancel}
             className="btn-secondary text-sm px-4 py-1.5"
@@ -471,21 +477,21 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
     <div className="flex flex-col h-full">
       {/* Title + Toolbar */}
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           {config.icon && (
-            <span className="text-slate-600">{config.icon}</span>
+            <span className="text-slate-500">{config.icon}</span>
           )}
-          <h2 className="text-lg font-semibold text-slate-800">{config.title}</h2>
+          <h2 className="text-base font-semibold text-slate-800">{config.title}</h2>
           {isDefault && (
-            <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+            <span className="text-xs bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
               <IconStarFilled /> 默认
             </span>
           )}
         </div>
 
         {/* Toolbar */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Search with filter icon */}
+        <div className="flex items-center gap-2">
+          {/* Search */}
           <div className="relative">
             <span className="absolute left-2.5 top-1/2 -translate-y-1/2">
               <IconSearch />
@@ -495,45 +501,45 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
               placeholder="搜索..."
-              className="input text-sm pl-8 pr-3 py-1.5 w-44"
+              className="input text-sm pl-8 pr-3 py-1.5 w-44 border-slate-300"
             />
             {searchTerm && (
-              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
                 {displayRows.length}
               </span>
             )}
           </div>
 
-          <div className="w-px h-6 bg-slate-200 mx-1" />
+          <div className="w-px h-5 bg-slate-200 mx-0.5" />
 
           {/* Import */}
           <button
             onClick={handleImport}
             disabled={importing}
-            className="btn-secondary inline-flex items-center gap-1.5 text-sm"
+            className="btn-secondary"
             title="导入台账"
           >
             <IconImport />
-            <span className="hidden sm:inline">导入台账</span>
+            <span className="hidden sm:inline">导入</span>
           </button>
 
           {/* Export template */}
           <button
             onClick={handleExportTemplate}
-            className="btn-secondary inline-flex items-center gap-1.5 text-sm"
+            className="btn-secondary"
             title="导出模板"
           >
             <IconExport />
             <span className="hidden sm:inline">导出模板</span>
           </button>
 
-          <div className="w-px h-6 bg-slate-200 mx-1" />
+          <div className="w-px h-5 bg-slate-200 mx-0.5" />
 
           {/* Set / Cancel default */}
           {isDefault ? (
             <button
               onClick={() => setShowCancelDefaultDialog(true)}
-              className="btn-secondary inline-flex items-center gap-1.5 text-sm text-amber-700"
+              className="btn-secondary"
               title="取消默认"
             >
               <IconStarFilled />
@@ -542,7 +548,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           ) : (
             <button
               onClick={() => setShowSetDefaultDialog(true)}
-              className="btn-secondary inline-flex items-center gap-1.5 text-sm"
+              className="btn-secondary"
               title="设为默认"
             >
               <IconStar />
@@ -553,7 +559,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           {/* Clear */}
           <button
             onClick={() => setShowClearDialog(true)}
-            className="btn-danger inline-flex items-center gap-1.5 text-sm"
+            className="btn-danger"
             title="清空台账"
           >
             <IconTrash />
@@ -563,7 +569,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           {/* Refresh */}
           <button
             onClick={loadData}
-            className="btn-secondary inline-flex items-center gap-1.5 text-sm"
+            className="btn-secondary"
             title="刷新"
           >
             <IconRefresh />
@@ -573,7 +579,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
 
       {/* Error */}
       {error && (
-        <div className="mb-4 text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-4 py-3 flex items-center justify-between">
+        <div className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-4 py-3 flex items-center justify-between">
           <span className="flex items-center gap-2">
             <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -588,12 +594,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
 
       {/* Empty state */}
       {rows.length === 0 ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-16 text-center shadow-sm">
-          <svg className="w-20 h-20 mx-auto text-slate-200 mb-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <p className="text-slate-500 text-base mb-2">暂无数据</p>
-          <p className="text-slate-400 text-sm mb-6">{config.emptyMessage}</p>
+        <div className="bg-white rounded-lg border border-slate-200 p-16 text-center">
+          <IconTable />
+          <p className="text-slate-400 text-sm mt-4 mb-1">暂无数据</p>
+          <p className="text-slate-400 text-xs mb-6">{config.emptyMessage}</p>
           <button
             onClick={handleImport}
             className="btn-primary inline-flex items-center gap-2 text-sm px-5 py-2"
@@ -603,30 +607,30 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           </button>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex-1 flex flex-col min-h-0 shadow-sm">
+        <div className="bg-white rounded-lg border border-slate-200 overflow-hidden flex-1 flex flex-col min-h-0">
           <div className="overflow-auto flex-1">
             <table className="w-full text-sm">
               <thead className="sticky top-0 z-10">
-                <tr className="bg-slate-50 border-b border-slate-200">
+                <tr className="bg-slate-50">
                   {columns.map((col) => {
                     const active = sort?.column === col;
                     return (
                       <th
                         key={col}
                         onClick={() => handleSort(col)}
-                        className={`text-left px-4 py-3 text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap cursor-pointer select-none transition-colors ${
+                        className={`text-left px-3 py-2 text-xs font-medium uppercase tracking-wider whitespace-nowrap cursor-pointer select-none transition-colors ${
                           active
-                            ? "text-cyan-700 bg-cyan-50/50"
-                            : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                            ? "text-slate-700 bg-slate-100"
+                            : "text-slate-500 hover:bg-slate-100"
                         }`}
                       >
                         <span className="inline-flex items-center gap-1.5">
                           {col}
-                          <span className={`inline-flex flex-col -space-y-0.5 ${active ? "text-cyan-600" : "text-slate-300"}`}>
-                            <span className={active && sort?.direction === "asc" ? "text-cyan-600" : "opacity-40"}>
+                          <span className={`inline-flex flex-col -space-y-0.5 ${active ? "text-slate-600" : "text-slate-300"}`}>
+                            <span className={active && sort?.direction === "asc" ? "text-slate-600" : "opacity-40"}>
                               <IconChevronUp />
                             </span>
-                            <span className={active && sort?.direction === "desc" ? "text-cyan-600" : "opacity-40"}>
+                            <span className={active && sort?.direction === "desc" ? "text-slate-600" : "opacity-40"}>
                               <IconChevronDown />
                             </span>
                           </span>
@@ -640,12 +644,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
                 {paged.map((row, i) => (
                   <tr
                     key={i}
-                    className={`border-b border-slate-100 transition-colors ${
-                      i % 2 === 0 ? "bg-white" : "bg-slate-50/40"
-                    } hover:bg-cyan-50/30`}
+                    className="h-9 border-b border-slate-100 transition-colors hover:bg-slate-50"
                   >
                     {columns.map((col) => (
-                      <td key={col} className="px-4 py-2.5 text-slate-600 whitespace-nowrap">
+                      <td key={col} className="px-3 text-slate-700 whitespace-nowrap text-sm">
                         {row[col] != null ? String(row[col]) : ""}
                       </td>
                     ))}
@@ -656,31 +658,31 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           </div>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/30 shrink-0">
-            <span className="text-xs text-slate-400">
+          <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 shrink-0">
+            <span className="text-xs text-slate-500">
               {searchTerm ? `${displayRows.length} / ${rows.length} 条` : `共 ${rows.length} 条`}
               {sort && (
-                <span className="ml-2 text-cyan-500">
-                  排序: {sort.column} {sort.direction === "asc" ? "升序" : "降序"}
+                <span className="ml-2 text-slate-400">
+                  {sort.column} {sort.direction === "asc" ? "升序" : "降序"}
                 </span>
               )}
             </span>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
               <button
                 disabled={safePage === 0}
                 onClick={() => setPage((p) => p - 1)}
-                className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors"
+                className="text-xs text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-0.5"
               >
                 <IconChevronLeft />
                 上一页
               </button>
-              <span className="text-xs text-slate-400 min-w-[4rem] text-center">
+              <span className="text-xs text-slate-500 min-w-[4rem] text-center">
                 {safePage + 1} / {totalPages}
               </span>
               <button
                 disabled={safePage >= totalPages - 1}
                 onClick={() => setPage((p) => p + 1)}
-                className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors"
+                className="text-xs text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-0.5"
               >
                 下一页
                 <IconChevronRight />
@@ -726,9 +728,9 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
 
       {/* Import overlay */}
       {importing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl px-8 py-6 flex items-center gap-3">
-            <svg className="w-6 h-6 animate-spin text-cyan-600" fill="none" viewBox="0 0 24 24">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-lg border border-slate-200 px-8 py-6 flex items-center gap-3">
+            <svg className="w-6 h-6 animate-spin text-slate-500" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
