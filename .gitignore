@@ -15,6 +15,7 @@ __pypackages__/
 
 # IDE
 .idea/
+.vscode/
 
 # Agent configs
 .claude/
@@ -49,3 +50,28 @@ config.user.json
 
 # CodeGraph
 .codegraph/
+
+# Node.js
+node_modules/
+
+# Tauri build output
+src-tauri/target/
+src-tauri/gen/
+src-tauri/binaries/
+
+# PyInstaller
+build-sidecar/
+build/*.toc
+*.spec.bak
+tauri_bridge.spec
+
+# GitHub Copilot / 第三方 Skills（非项目源码）
+.github/skills/
+.github/instructions/
+.github/copilot-instructions.md
+
+# 重复的二进制资源（实际使用 public/fonts/）
+assets/fonts/
+
+# Vite
+dist/

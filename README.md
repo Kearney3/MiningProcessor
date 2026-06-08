@@ -1,8 +1,8 @@
 # MiningProcessor
 
-矿山运营 Excel 报表批量处理工具。支持 CLI 命令行和 Flet 桌面 GUI 两种使用方式，自动解析矿山各类生产、油耗、电耗、工时报表，提取结构化数据并输出标准化 Excel。
+矿山运营 Excel 报表批量处理工具。支持 CLI 命令行和桌面 GUI 两种使用方式，自动解析矿山各类生产、油耗、电耗、工时报表，提取结构化数据并输出标准化 Excel。
 
-> **Python** ≥ 3.12（开发环境 3.14） · **依赖管理** [uv](https://docs.astral.sh/uv/) · **GUI 框架** [Flet](https://flet.dev/)
+> **Python** ≥ 3.12（开发环境 3.14） · **依赖管理** [uv](https://docs.astral.sh/uv/) · **GUI 框架** [Tauri v2](https://v2.tauri.app/) + React + TypeScript（前端） + Python（后端）
 
 ---
 
@@ -31,19 +31,21 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # 克隆仓库
 git clone <repo-url> && cd MiningProcessor
 
-# 安装依赖（含 dev 工具）
+# 安装 Python 依赖（含 dev 工具）
 uv sync
+
+# 安装前端依赖
+pnpm install
 ```
 
-### 启动 GUI
+### 启动开发环境
 
 ```bash
-# 推荐方式
-uv run main.py
+# 一键启动（Python sidecar + Vite 前端 + Tauri 窗口）
+pnpm tauri dev
 
-# 其他等效方式
-uv run python gui/main.py
-uv run python -m gui
+# 仅启动 Python sidecar
+pnpm dev:bridge
 ```
 
 GUI 提供完整的处理流程入口：
@@ -84,24 +86,23 @@ uv run merge <输入文件夹> <关键字> [--strip-time] [--sort '<json>']
 
 ```
 MiningProcessor/
-├── main.py                     # GUI 入口
-├── gui/                        # Flet 桌面 GUI 编排层
-│   ├── main.py                 # 页面组装、全局日志初始化
-│   ├── components/             # UI 控件创建（模块化拆分）
-│   │   ├── modules.py          # 报表处理模块面板
-│   │   ├── config.py           # 配置编辑面板
-│   │   ├── batch.py            # 批量处理面板
-│   │   ├── ledger_base.py      # 台账组件通用工厂（消除重复代码）
-│   │   ├── ledger.py           # 设备台账面板
-│   │   ├── ledger_match.py     # 台账匹配面板
-│   │   ├── oil_ledger.py       # 油品台账面板
-│   │   ├── user_config.py      # 用户配置面板
-│   │   ├── log_view.py         # 日志视图
-│   │   ├── common.py           # 公共组件
-│   │   └── types.py            # 类型定义
-│   ├── logic.py                # 按钮事件 → 后台线程调度
-│   └── theme.py                # 主题配置
-├── func/                       # 核心处理引擎
+├── src/                        # React 前端
+│   ├── main.tsx                # 前端入口
+│   ├── App.tsx                 # 主应用（数据处理页）
+│   ├── hooks/usePythonBridge.ts  # 与 Python sidecar 的通信桥接
+│   ├── lib/types.ts            # TypeScript 类型定义
+│   ├── components/             # UI 组件（MUI + TailwindCSS）
+│   │   ├── Sidebar.tsx         # 左侧导航栏
+│   │   ├── LogPanel.tsx        # 底部日志面板
+│   │   └── pages/              # 各功能页面
+│   └── styles.css              # 全局样式（MiSans 字体）
+├── src-tauri/                  # Rust 壳进程
+│   ├── src/main.rs             # Tauri 入口
+│   ├── src/lib.rs              # 窗口配置与日志初始化
+│   ├── src/python_bridge.rs    # Python sidecar 管理（spawn/poll/restart）
+│   └── Cargo.toml
+├── func/                       # 核心处理引擎（Python）
+│   ├── bridge.py               # JSON-RPC over stdio 服务端（GUI 入口）
 │   ├── config_loader.py        # 配置读写与运行时管理
 │   ├── equipment_ledger.py     # 设备台账与模糊匹配
 │   ├── oil_ledger.py           # 油品台账管理
@@ -109,12 +110,18 @@ MiningProcessor/
 │   ├── string_utils.py         # 字符串清理工具
 │   ├── excel_utils.py          # Excel 共享工具（日期标准化、排序、班次分割）
 │   └── excel_*.py              # 各报表处理器
+├── gui/                        # Flet 桌面 GUI（保留，仍可独立运行）
+├── public/fonts/               # 静态资源（MiSans 字体）
+├── pyproject.toml              # Python 项目配置
+├── package.json                # Node.js 项目配置
+├── vite.config.ts              # Vite 构建配置
+├── tauri.conf.json             # Tauri 应用配置
 ├── config.json                 # 持久化配置
 ├── tests/                      # pytest 测试（277 个用例）
-├── assets/fonts/               # GUI 字体资源（MiSans 可变字体）
-├── Notebook/                   # Jupyter 探索性分析笔记本
-├── docs/                       # 文档目录
-└── .github/workflows/          # CI：Flet 桌面应用构建
+├── .github/workflows/          # CI 构建（Flet + Tauri）
+│   ├── build-flet-client.yml   # Flet 桌面应用构建
+│   └── build-tauri.yml         # Tauri 桌面应用构建
+└── DESIGN.md                   # 详细技术架构文档
 ```
 
 ---
@@ -151,22 +158,35 @@ MiningProcessor/
 
 ## 架构设计
 
-### 两层架构
+### 三层架构
 
-- **`func/`**：业务处理引擎，负责 Excel 解析、数据提取、日志、配置管理。
-- **`gui/`**：薄编排层，负责 UI 控件创建、用户输入收集、后台任务调度，不包含 Excel 解析逻辑。
+```
+┌─────────────────────────────────────────┐
+│          Tauri GUI 前端（React/TS）       │  展示层
+├─────────────────────────────────────────┤
+│          Rust 壳进程 + Python sidecar     │  桥接层
+├─────────────────────────────────────────┤
+│          Python 处理引擎（func/）          │  业务层
+└─────────────────────────────────────────┘
+```
+
+- **展示层**（`src/`）：React + TypeScript + MUI，负责 UI 控件创建、用户输入收集、日志渲染。不含业务逻辑。
+- **桥接层**（`src-tauri/`）：Rust 管理 Python sidecar 生命周期；`func/bridge.py` 实现 JSON-RPC over stdio 协议。
+- **业务层**（`func/`）：Excel 解析、数据提取、配置管理、日志。CLI 与 GUI 共享同一套处理逻辑。
+
+详细架构说明见 [DESIGN.md](DESIGN.md)。
 
 ### 独立处理器
 
 各 `excel_*.py` 模块相互独立，各自解析特定报表结构，不共享统一领域模型。新增处理模块时：
 
 1. 在 `func/` 下编写处理函数，使用 `logging` / `get_logger()` 打日志；
-2. 在 `gui/components/` 增加输入控件；
-3. 在 `gui/logic.py` 的 `_execute_task()` 和按钮回调中接入处理函数。
+2. 在 `gui/components/` 增加输入控件（Flet）或在 `src/components/pages/` 增加页面（React）；
+3. 在 `gui/logic.py` 中接入处理函数（Flet），或在 `func/bridge.py` 注册新方法（Tauri）。
 
 ### 统一日志
 
-`func/logger.py` 提供 `logging` + `get_logger()`，CLI 直接输出控制台，GUI 通过 `QueueHandler` 推送到页面日志列表。新增处理逻辑请使用 `logging` 而非 `print()`。
+`func/logger.py` 提供 `logging` + `get_logger()`，CLI 直接输出控制台，GUI 通过 `QueueHandler`（Flet）或 JSON-RPC 事件（Tauri）推送到页面日志列表。新增处理逻辑请使用 `logging` 而非 `print()`。
 
 ### 设备台账
 
@@ -215,6 +235,19 @@ uv run pytest -v
 ---
 
 ## 构建桌面应用
+
+### Tauri 构建（推荐）
+
+项目配置了 GitHub Actions 自动构建 Tauri 桌面应用，详见 `.github/workflows/build-tauri.yml`。
+
+本地构建：
+
+```bash
+uv run pyinstaller tauri_bridge.spec
+pnpm tauri build
+```
+
+### Flet 构建（保留）
 
 项目配置了 GitHub Actions 自动构建 Flet 桌面应用（macOS / Windows），详见 `.github/workflows/build-flet-client.yml`。
 

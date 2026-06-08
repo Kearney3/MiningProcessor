@@ -26,6 +26,7 @@ sync-minebase = "func.sync_to_minebase:main"
 
 [dependency-groups]
 dev = [
+    "pyinstaller>=6.20.0",
     "pytest>=9.0.3",
 ]
 
