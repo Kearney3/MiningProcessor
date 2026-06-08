@@ -60,8 +60,7 @@ src-tauri/gen/
 src-tauri/binaries/
 
 # PyInstaller
-dist/
-build/*.warn
+build-sidecar/
 build/*.toc
 *.spec.bak
 

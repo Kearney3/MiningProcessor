@@ -3,10 +3,12 @@
 # build.sh — 构建 Tauri + PyInstaller 打包
 #
 # 流程：
-#   1. uv 同步 Python 依赖
-#   2. PyInstaller 打包 Python → dist/tauri-bridge
-#   3. pnpm tauri build
-#   4. 将 sidecar 嵌入 macOS .app bundle
+#   1. PyInstaller 打包 Python → build-sidecar/tauri-bridge
+#   2. pnpm tauri build（前端 + Rust）
+#   3. 将 sidecar 嵌入 macOS .app bundle
+#
+# 注意：PyInstaller 输出目录用 build-sidecar/ 而非 dist/，
+#       因为 Vite 的 pnpm build 会清空 dist/ 目录。
 # ═══════════════════════════════════════════════════════════
 
 set -e
@@ -14,54 +16,58 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
+SIDECAR_DIR="build-sidecar"
+SIDECAR_BIN="$SIDECAR_DIR/tauri-bridge"
+
 echo "═══ MiningProcessor Tauri Build ═══"
 
-# ─── 1. Python 依赖 ───
-echo "[1/4] Syncing Python dependencies..."
-uv sync --dev
+# ─── 1. PyInstaller ───
+echo "[1/3] Building Python sidecar with PyInstaller..."
+uv run pyinstaller tauri_bridge.spec \
+    --distpath "$SIDECAR_DIR" \
+    --clean --noconfirm 2>&1 | tail -5
 
-# ─── 2. PyInstaller ───
-echo "[2/4] Building Python sidecar with PyInstaller..."
-uv run pyinstaller tauri_bridge.spec --clean --noconfirm 2>&1 | tail -5
-
-SIDECAR_SRC="dist/tauri-bridge"
-if [ ! -f "$SIDECAR_SRC" ]; then
-    echo "ERROR: PyInstaller output not found at $SIDECAR_SRC"
+if [ ! -f "$SIDECAR_BIN" ]; then
+    echo "ERROR: PyInstaller output not found at $SIDECAR_BIN"
     exit 1
 fi
-echo "  → $SIDECAR_SRC ($(du -h "$SIDECAR_SRC" | cut -f1))"
+echo "  → $SIDECAR_BIN ($(du -h "$SIDECAR_BIN" | cut -f1))"
 
-# ─── 3. Tauri build ───
-echo "[3/4] Building Tauri application..."
+# ─── 2. Tauri build ───
+echo "[2/3] Building Tauri application..."
 source "$HOME/.cargo/env"
 pnpm tauri build
 
-# ─── 4. 嵌入 sidecar 到 .app bundle ───
-echo "[4/4] Embedding sidecar into app bundle..."
+# ─── 3. 嵌入 sidecar 到 .app bundle ───
+echo "[3/3] Embedding sidecar into app bundle..."
 
-BUNDLE_DIR="src-tauri/target/release/bundle"
+BUNDLE_DIR="src-tauri/target/release/bundle/macos"
 
-# macOS
-if [ -d "$BUNDLE_DIR/macos" ]; then
-    APP_DIR=$(find "$BUNDLE_DIR/macos" -name "*.app" -maxdepth 1 | head -1)
-    if [ -n "$APP_DIR" ]; then
-        cp "$SIDECAR_SRC" "$APP_DIR/Contents/MacOS/tauri-bridge"
-        chmod +x "$APP_DIR/Contents/MacOS/tauri-bridge"
-        echo "  → Embedded in $APP_DIR/Contents/MacOS/tauri-bridge"
+# 查找 .app（支持中文名）
+APP_DIR=$(find "$BUNDLE_DIR" -name "*.app" -maxdepth 1 | head -1)
 
-        # 重新签名（ad-hoc）
-        codesign --force --sign - "$APP_DIR/Contents/MacOS/tauri-bridge" 2>/dev/null || true
-        codesign --force --sign - "$APP_DIR" 2>/dev/null || true
-        echo "  → Re-signed app bundle"
-    fi
+if [ -z "$APP_DIR" ]; then
+    echo "ERROR: .app bundle not found in $BUNDLE_DIR"
+    exit 1
 fi
 
-# Linux
-if [ -d "$BUNDLE_DIR/deb" ] || [ -d "$BUNDLE_DIR/appimage" ]; then
-    echo "  → Linux bundle detected, sidecar should be placed manually"
-fi
+MACOS_DIR="$APP_DIR/Contents/MacOS"
+cp "$SIDECAR_BIN" "$MACOS_DIR/tauri-bridge"
+chmod +x "$MACOS_DIR/tauri-bridge"
+
+# 重新签名
+codesign --force --sign - "$MACOS_DIR/tauri-bridge" 2>/dev/null || true
+codesign --force --sign - "$APP_DIR" 2>/dev/null || true
+
+echo "  → Embedded: $MACOS_DIR/tauri-bridge"
+echo "  → App bundle: $APP_DIR"
+
+# 验证
+echo ""
+echo "═══ Bundle Contents ═══"
+ls -lh "$MACOS_DIR/"
 
 echo ""
-echo "═══ Build complete ═══"
-echo "macOS app: $BUNDLE_DIR/macos/"
-echo "DMG:       $BUNDLE_DIR/dmg/"
+echo "═══ Build Complete ═══"
+echo "App: $APP_DIR"
+echo "DMG: $BUNDLE_DIR/*.dmg"
