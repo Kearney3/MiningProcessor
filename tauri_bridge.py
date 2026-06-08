@@ -415,6 +415,118 @@ def _get_oil_ledger_data(params: dict) -> dict:
     return {"rows": rows, "columns": list(rows[0].keys()) if rows else []}
 
 
+# ─── 台账文件操作方法 ───
+
+@_register("load_ledger_file_columns")
+def _load_ledger_file_columns(params: dict) -> dict:
+    """读取 Excel 文件的列名（用于列映射）。"""
+    import pandas as pd
+    df = pd.read_excel(params["file_path"], nrows=0)
+    return {"columns": [str(c) for c in df.columns]}
+
+
+@_register("load_oil_ledger_file_columns")
+def _load_oil_ledger_file_columns(params: dict) -> dict:
+    """读取 Excel 文件的列名（油品台账，用于列映射）。"""
+    import pandas as pd
+    df = pd.read_excel(params["file_path"], nrows=0)
+    return {"columns": [str(c) for c in df.columns]}
+
+
+@_register("import_equipment_ledger")
+def _import_equipment_ledger(params: dict) -> dict:
+    """导入设备台账 Excel，应用列映射后保存到缓存。"""
+    from func.equipment_ledger import EquipmentLedger
+    from func.config_loader import save_equipment_ledger_cache
+
+    ledger = EquipmentLedger()
+    ledger.load(params["file_path"], column_mapping=params.get("column_mapping"))
+    records = ledger.to_dict()
+    save_equipment_ledger_cache(records)
+    return {"ok": True, "count": len(records)}
+
+
+@_register("import_oil_ledger")
+def _import_oil_ledger(params: dict) -> dict:
+    """导入油品台账 Excel，应用列映射后保存到缓存。"""
+    from func.oil_ledger import OilLedger
+    from func.config_loader import save_oil_ledger_cache
+
+    ledger = OilLedger()
+    ledger.load(params["file_path"], column_mapping=params.get("column_mapping"))
+    records = ledger.to_dict()
+    save_oil_ledger_cache(records)
+    return {"ok": True, "count": len(records)}
+
+
+@_register("export_equipment_ledger_template")
+def _export_equipment_ledger_template(params: dict) -> dict:
+    """导出设备台账模板 Excel。"""
+    from func.equipment_ledger import EquipmentLedger
+    ledger = EquipmentLedger()
+    ledger.export_template(params["output_path"])
+    return {"ok": True, "output_file": params["output_path"]}
+
+
+@_register("export_oil_ledger_template")
+def _export_oil_ledger_template(params: dict) -> dict:
+    """导出油品台账模板 Excel。"""
+    from func.oil_ledger import OilLedger
+    ledger = OilLedger()
+    ledger.export_template(params["output_path"])
+    return {"ok": True, "output_file": params["output_path"]}
+
+
+@_register("set_default_equipment_ledger")
+def _set_default_equipment_ledger(params: dict) -> dict:
+    """将当前设备台账数据保存为默认（写入缓存）。"""
+    from func.config_loader import has_equipment_ledger_cache
+    if has_equipment_ledger_cache():
+        return {"ok": True, "message": "已是默认台账"}
+    return {"ok": False, "message": "无台账数据可保存"}
+
+
+@_register("set_default_oil_ledger")
+def _set_default_oil_ledger(params: dict) -> dict:
+    """将当前油品台账数据保存为默认（写入缓存）。"""
+    from func.config_loader import has_oil_ledger_cache
+    if has_oil_ledger_cache():
+        return {"ok": True, "message": "已是默认台账"}
+    return {"ok": False, "message": "无台账数据可保存"}
+
+
+@_register("cancel_default_equipment_ledger")
+def _cancel_default_equipment_ledger(params: dict) -> dict:
+    """清除设备台账默认缓存。"""
+    from func.config_loader import clear_equipment_ledger_cache
+    clear_equipment_ledger_cache()
+    return {"ok": True}
+
+
+@_register("cancel_default_oil_ledger")
+def _cancel_default_oil_ledger(params: dict) -> dict:
+    """清除油品台账默认缓存。"""
+    from func.config_loader import clear_oil_ledger_cache
+    clear_oil_ledger_cache()
+    return {"ok": True}
+
+
+@_register("clear_equipment_ledger")
+def _clear_equipment_ledger(params: dict) -> dict:
+    """清空设备台账数据和缓存。"""
+    from func.config_loader import clear_equipment_ledger_cache
+    clear_equipment_ledger_cache()
+    return {"ok": True}
+
+
+@_register("clear_oil_ledger")
+def _clear_oil_ledger(params: dict) -> dict:
+    """清空油品台账数据和缓存。"""
+    from func.config_loader import clear_oil_ledger_cache
+    clear_oil_ledger_cache()
+    return {"ok": True}
+
+
 @_register("list_directory")
 def _list_directory(params: dict) -> dict:
     """列出目录内容，返回文件和子目录。"""
