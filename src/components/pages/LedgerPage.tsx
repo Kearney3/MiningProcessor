@@ -1,0 +1,692 @@
+import { useState, useEffect, useCallback } from "react";
+import { open, save } from "@tauri-apps/plugin-dialog";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface BridgeProp {
+  call: <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>;
+}
+
+export interface LedgerPageConfig {
+  /** Page title, e.g. "设备台账" */
+  title: string;
+  /** Standard column names for the ledger, e.g. ["设备名称", ...] */
+  standardColumns: string[];
+  /** Bridge method to load rows */
+  loadDataMethod: string;
+  /** Bridge method to import from Excel with column mapping */
+  importMethod: string;
+  /** Bridge method to export a blank template */
+  exportTemplateMethod: string;
+  /** Bridge method to set as default */
+  setDefaultMethod: string;
+  /** Bridge method to cancel default */
+  cancelDefaultMethod: string;
+  /** Bridge method to clear all data */
+  clearMethod: string;
+  /** Bridge method to load file columns for mapping */
+  loadFileColumnsMethod: string;
+  /** Empty-state message when no rows exist */
+  emptyMessage: string;
+}
+
+interface LedgerRow {
+  [key: string]: unknown;
+}
+
+interface SortState {
+  column: string;
+  direction: "asc" | "desc";
+}
+
+// ---------------------------------------------------------------------------
+// Column Mapping Modal
+// ---------------------------------------------------------------------------
+
+function ColumnMappingModal({
+  open: isOpen,
+  fileColumns,
+  standardColumns,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  fileColumns: string[];
+  standardColumns: string[];
+  onConfirm: (mapping: Record<string, string>) => void;
+  onCancel: () => void;
+}) {
+  const [mapping, setMapping] = useState<Record<string, string>>({});
+
+  // Auto-detect: if a file column matches a standard column name, pre-fill
+  useEffect(() => {
+    if (!isOpen) return;
+    const auto: Record<string, string> = {};
+    for (const std of standardColumns) {
+      if (fileColumns.includes(std)) {
+        auto[std] = std;
+      }
+    }
+    setMapping(auto);
+  }, [isOpen, fileColumns, standardColumns]);
+
+  if (!isOpen) return null;
+
+  const usedFileCols = new Set(Object.values(mapping).filter(Boolean));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100">
+          <h3 className="text-base font-semibold text-slate-800">列映射</h3>
+          <p className="text-xs text-slate-400 mt-1">
+            将文件中的列映射到台账标准列
+          </p>
+        </div>
+
+        <div className="px-6 py-4 max-h-80 overflow-y-auto space-y-3">
+          {standardColumns.map((stdCol) => (
+            <div key={stdCol} className="flex items-center gap-3">
+              <span className="w-32 text-sm text-slate-700 truncate" title={stdCol}>
+                {stdCol}
+              </span>
+              <svg className="w-4 h-4 text-slate-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+              <select
+                value={mapping[stdCol] || ""}
+                onChange={(e) =>
+                  setMapping((prev) => ({ ...prev, [stdCol]: e.target.value }))
+                }
+                className="flex-1 text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+              >
+                <option value="">-- 跳过 --</option>
+                {fileColumns.map((fc) => (
+                  <option key={fc} value={fc} disabled={usedFileCols.has(fc) && mapping[stdCol] !== fc}>
+                    {fc}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ))}
+        </div>
+
+        <div className="px-6 py-3 border-t border-slate-100 flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="text-sm px-4 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100"
+          >
+            取消
+          </button>
+          <button
+            onClick={() => {
+              // Strip empty mappings
+              const clean: Record<string, string> = {};
+              for (const [k, v] of Object.entries(mapping)) {
+                if (v) clean[k] = v;
+              }
+              onConfirm(clean);
+            }}
+            className="text-sm px-4 py-1.5 rounded-lg bg-cyan-600 text-white hover:bg-cyan-700"
+          >
+            确认导入
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Confirm Dialog
+// ---------------------------------------------------------------------------
+
+function ConfirmDialog({
+  open: isOpen,
+  title,
+  message,
+  confirmLabel = "确认",
+  danger = false,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  danger?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+        <div className="px-6 py-4">
+          <h3 className="text-base font-semibold text-slate-800">{title}</h3>
+          <p className="text-sm text-slate-500 mt-2">{message}</p>
+        </div>
+        <div className="px-6 py-3 border-t border-slate-100 flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="text-sm px-4 py-1.5 rounded-lg text-slate-600 hover:bg-slate-100"
+          >
+            取消
+          </button>
+          <button
+            onClick={onConfirm}
+            className={`text-sm px-4 py-1.5 rounded-lg text-white ${
+              danger
+                ? "bg-red-600 hover:bg-red-700"
+                : "bg-cyan-600 hover:bg-cyan-700"
+            }`}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SVG Icons
+// ---------------------------------------------------------------------------
+
+const IconImport = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+  </svg>
+);
+
+const IconExport = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+  </svg>
+);
+
+const IconStar = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+  </svg>
+);
+
+const IconStarFilled = () => (
+  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+  </svg>
+);
+
+const IconTrash = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+);
+
+const IconRefresh = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+  </svg>
+);
+
+const IconSearch = () => (
+  <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+  </svg>
+);
+
+// ---------------------------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------------------------
+
+export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: LedgerPageConfig }) {
+  const [rows, setRows] = useState<LedgerRow[]>([]);
+  const [columns, setColumns] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sort, setSort] = useState<SortState | null>(null);
+  const [isDefault, setIsDefault] = useState(false);
+
+  // Modal state
+  const [showMapping, setShowMapping] = useState(false);
+  const [pendingFileColumns, setPendingFileColumns] = useState<string[]>([]);
+  const [pendingFilePath, setPendingFilePath] = useState("");
+  const [showClearDialog, setShowClearDialog] = useState(false);
+  const [showSetDefaultDialog, setShowSetDefaultDialog] = useState(false);
+  const [showCancelDefaultDialog, setShowCancelDefaultDialog] = useState(false);
+  const [importing, setImporting] = useState(false);
+
+  const PAGE_SIZE = 20;
+
+  // ---- Data loading ----
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await bridge.call<{ rows: LedgerRow[]; columns: string[]; is_default?: boolean }>(
+        config.loadDataMethod,
+        { from_cache: true }
+      );
+      setRows(res.rows || []);
+      setColumns(res.columns || []);
+      setIsDefault(!!res.is_default);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [bridge, config.loadDataMethod]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  // ---- Sorting ----
+
+  const handleSort = (col: string) => {
+    setSort((prev) => {
+      if (prev?.column !== col) return { column: col, direction: "asc" };
+      if (prev.direction === "asc") return { column: col, direction: "desc" };
+      return null; // third click clears sort
+    });
+    setPage(0);
+  };
+
+  // ---- Filtering + sorting pipeline ----
+
+  let displayRows = searchTerm
+    ? rows.filter((r) =>
+        Object.values(r).some((v) =>
+          String(v ?? "").toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      )
+    : rows;
+
+  if (sort) {
+    const { column, direction } = sort;
+    const dir = direction === "asc" ? 1 : -1;
+    displayRows = [...displayRows].sort((a, b) => {
+      const va = a[column];
+      const vb = b[column];
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      // Try numeric compare
+      const na = Number(va);
+      const nb = Number(vb);
+      if (!isNaN(na) && !isNaN(nb)) return (na - nb) * dir;
+      return String(va).localeCompare(String(vb), "zh-CN") * dir;
+    });
+  }
+
+  const totalPages = Math.ceil(displayRows.length / PAGE_SIZE);
+  const paged = displayRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  // ---- Actions ----
+
+  const handleImport = async () => {
+    try {
+      const filePath = await open({
+        multiple: false,
+        filters: [{ name: "Excel", extensions: ["xlsx", "xls"] }],
+      });
+      if (!filePath) return;
+      const path = typeof filePath === "string" ? filePath : filePath;
+
+      // Ask backend for file columns
+      const res = await bridge.call<{ columns: string[] }>(
+        config.loadFileColumnsMethod,
+        { file_path: path }
+      );
+      setPendingFileColumns(res.columns || []);
+      setPendingFilePath(path);
+      setShowMapping(true);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const handleMappingConfirm = async (mapping: Record<string, string>) => {
+    setShowMapping(false);
+    setImporting(true);
+    setError(null);
+    try {
+      await bridge.call(config.importMethod, {
+        file_path: pendingFilePath,
+        column_mapping: mapping,
+      });
+      await loadData();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setImporting(false);
+      setPendingFilePath("");
+      setPendingFileColumns([]);
+    }
+  };
+
+  const handleExportTemplate = async () => {
+    try {
+      const filePath = await save({
+        filters: [{ name: "Excel", extensions: ["xlsx"] }],
+        defaultPath: `${config.title}模板.xlsx`,
+      });
+      if (!filePath) return;
+      await bridge.call(config.exportTemplateMethod, { output_path: filePath });
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const handleSetDefault = async () => {
+    setShowSetDefaultDialog(false);
+    try {
+      await bridge.call(config.setDefaultMethod);
+      setIsDefault(true);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const handleCancelDefault = async () => {
+    setShowCancelDefaultDialog(false);
+    try {
+      await bridge.call(config.cancelDefaultMethod);
+      setIsDefault(false);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const handleClear = async () => {
+    setShowClearDialog(false);
+    try {
+      await bridge.call(config.clearMethod);
+      setRows([]);
+      setColumns([]);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  // ---- Loading state ----
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-3">
+        <svg className="w-8 h-8 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+        </svg>
+        <span className="text-sm">加载中...</span>
+      </div>
+    );
+  }
+
+  // ---- Render ----
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Title + Toolbar */}
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-slate-800">{config.title}</h2>
+          {isDefault && (
+            <span className="text-xs bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <IconStarFilled /> 默认
+            </span>
+          )}
+        </div>
+
+        {/* Toolbar */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Search */}
+          <div className="relative">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2">
+              <IconSearch />
+            </span>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
+              placeholder="搜索..."
+              className="text-sm border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 w-44 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+            />
+            {searchTerm && (
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                {displayRows.length}
+              </span>
+            )}
+          </div>
+
+          <div className="w-px h-6 bg-slate-200 mx-1" />
+
+          {/* Import */}
+          <button
+            onClick={handleImport}
+            disabled={importing}
+            className="flex items-center gap-1.5 text-sm bg-cyan-50 hover:bg-cyan-100 text-cyan-700 px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors"
+            title="导入台账"
+          >
+            <IconImport />
+            <span className="hidden sm:inline">导入台账</span>
+          </button>
+
+          {/* Export template */}
+          <button
+            onClick={handleExportTemplate}
+            className="flex items-center gap-1.5 text-sm bg-slate-50 hover:bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg transition-colors"
+            title="导出模板"
+          >
+            <IconExport />
+            <span className="hidden sm:inline">导出模板</span>
+          </button>
+
+          <div className="w-px h-6 bg-slate-200 mx-1" />
+
+          {/* Set / Cancel default */}
+          {isDefault ? (
+            <button
+              onClick={() => setShowCancelDefaultDialog(true)}
+              className="flex items-center gap-1.5 text-sm bg-amber-50 hover:bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg transition-colors"
+              title="取消默认"
+            >
+              <IconStarFilled />
+              <span className="hidden sm:inline">取消默认</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowSetDefaultDialog(true)}
+              className="flex items-center gap-1.5 text-sm bg-slate-50 hover:bg-slate-100 text-slate-600 px-3 py-1.5 rounded-lg transition-colors"
+              title="设为默认"
+            >
+              <IconStar />
+              <span className="hidden sm:inline">设为默认</span>
+            </button>
+          )}
+
+          {/* Clear */}
+          <button
+            onClick={() => setShowClearDialog(true)}
+            className="flex items-center gap-1.5 text-sm bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg transition-colors"
+            title="清空台账"
+          >
+            <IconTrash />
+            <span className="hidden sm:inline">清空</span>
+          </button>
+
+          {/* Refresh */}
+          <button
+            onClick={loadData}
+            className="flex items-center gap-1.5 text-sm bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg transition-colors"
+            title="刷新"
+          >
+            <IconRefresh />
+          </button>
+        </div>
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div className="mb-4 text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-4 py-3 flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Empty state */}
+      {rows.length === 0 ? (
+        <div className="bg-white rounded-xl border border-slate-200 p-16 text-center">
+          <svg className="w-16 h-16 mx-auto text-slate-200 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <p className="text-slate-400 mb-4">{config.emptyMessage}</p>
+          <button
+            onClick={handleImport}
+            className="inline-flex items-center gap-2 text-sm bg-cyan-600 hover:bg-cyan-700 text-white px-5 py-2 rounded-lg transition-colors"
+          >
+            <IconImport />
+            导入台账
+          </button>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex-1 flex flex-col min-h-0">
+          <div className="overflow-auto flex-1">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  {columns.map((col) => {
+                    const active = sort?.column === col;
+                    return (
+                      <th
+                        key={col}
+                        onClick={() => handleSort(col)}
+                        className={`text-left px-4 py-2.5 text-xs font-medium whitespace-nowrap cursor-pointer select-none group transition-colors ${
+                          active ? "text-cyan-700 bg-cyan-50/50" : "text-slate-500 hover:text-slate-700"
+                        }`}
+                      >
+                        <span className="inline-flex items-center gap-1">
+                          {col}
+                          <span className={`inline-flex flex-col -space-y-0.5 ${active ? "text-cyan-600" : "text-slate-300 group-hover:text-slate-400"}`}>
+                            <svg className={`w-3 h-2 ${active && sort?.direction === "asc" ? "text-cyan-600" : ""}`} viewBox="0 0 12 8" fill="currentColor">
+                              <path d="M6 0l6 8H0z" />
+                            </svg>
+                            <svg className={`w-3 h-2 ${active && sort?.direction === "desc" ? "text-cyan-600" : ""}`} viewBox="0 0 12 8" fill="currentColor">
+                              <path d="M6 8L0 0h12z" />
+                            </svg>
+                          </span>
+                        </span>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {paged.map((row, i) => (
+                  <tr
+                    key={i}
+                    className={`border-b border-slate-50 transition-colors ${
+                      i % 2 === 0 ? "bg-white" : "bg-slate-50/40"
+                    } hover:bg-cyan-50/30`}
+                  >
+                    {columns.map((col) => (
+                      <td key={col} className="px-4 py-2 text-slate-600 whitespace-nowrap">
+                        {row[col] != null ? String(row[col]) : ""}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          <div className="flex items-center justify-between px-4 py-2.5 border-t border-slate-100 bg-slate-50/50 shrink-0">
+            <span className="text-xs text-slate-400">
+              {searchTerm ? `${displayRows.length} / ${rows.length} 条` : `共 ${rows.length} 条`}
+              {sort && (
+                <span className="ml-2 text-cyan-500">
+                  排序: {sort.column} {sort.direction === "asc" ? "升序" : "降序"}
+                </span>
+              )}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                disabled={page === 0}
+                onClick={() => setPage((p) => p - 1)}
+                className="text-xs px-2.5 py-1 rounded hover:bg-slate-100 disabled:text-slate-300 transition-colors"
+              >
+                上一页
+              </button>
+              <span className="text-xs text-slate-400 min-w-[4rem] text-center">
+                {page + 1} / {totalPages || 1}
+              </span>
+              <button
+                disabled={page >= totalPages - 1}
+                onClick={() => setPage((p) => p + 1)}
+                className="text-xs px-2.5 py-1 rounded hover:bg-slate-100 disabled:text-slate-300 transition-colors"
+              >
+                下一页
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Column Mapping Modal */}
+      <ColumnMappingModal
+        open={showMapping}
+        fileColumns={pendingFileColumns}
+        standardColumns={config.standardColumns}
+        onConfirm={handleMappingConfirm}
+        onCancel={() => { setShowMapping(false); setPendingFilePath(""); setPendingFileColumns([]); }}
+      />
+
+      {/* Confirm dialogs */}
+      <ConfirmDialog
+        open={showClearDialog}
+        title="清空台账"
+        message={`确定要清空所有${config.title}数据吗？此操作不可撤销。`}
+        confirmLabel="清空"
+        danger
+        onConfirm={handleClear}
+        onCancel={() => setShowClearDialog(false)}
+      />
+      <ConfirmDialog
+        open={showSetDefaultDialog}
+        title="设为默认"
+        message={`将当前${config.title}设为默认，后续处理将自动使用此台账。`}
+        onConfirm={handleSetDefault}
+        onCancel={() => setShowSetDefaultDialog(false)}
+      />
+      <ConfirmDialog
+        open={showCancelDefaultDialog}
+        title="取消默认"
+        message={`取消当前${config.title}的默认状态。`}
+        onConfirm={handleCancelDefault}
+        onCancel={() => setShowCancelDefaultDialog(false)}
+      />
+
+      {/* Import overlay */}
+      {importing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-xl shadow-2xl px-8 py-6 flex items-center gap-3">
+            <svg className="w-6 h-6 animate-spin text-cyan-600" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <span className="text-sm text-slate-600">正在导入...</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
