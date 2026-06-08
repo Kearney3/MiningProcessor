@@ -152,7 +152,21 @@ pub fn run() {
                 return Ok(());
             }
 
-            eprintln!("Warning: Python bridge could not be started in any mode");
+            // 两种模式都失败，向前端发送错误事件
+            let exe_dir = std::env::current_exe()
+                .ok()
+                .and_then(|p| p.parent().map(|d| d.to_string_lossy().to_string()))
+                .unwrap_or_else(|| "unknown".into());
+            let msg = format!(
+                "Python bridge 未找到。已搜索：{}/tauri-bridge（sidecar）和系统 Python（dev 模式）。\
+                 请确保已运行 build.sh 打包 sidecar，或在开发模式下运行 pnpm tauri dev。",
+                exe_dir
+            );
+            eprintln!("Warning: {}", msg);
+            let _ = app.handle().emit("python-log", &serde_json::json!({
+                "event": "log",
+                "data": { "level": "ERROR", "message": msg }
+            }));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![invoke_python, cancel_task])
