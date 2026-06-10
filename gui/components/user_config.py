@@ -570,7 +570,7 @@ def _create_column_mapping_section(page: ft.Page, log):
     # 每种数据类型对应的 MineBase 目标字段选项（camelCase API 字段名）
     _MINEBASE_FIELD_OPTIONS: dict[str, list[str]] = {
         "work_efficiency": [
-            "equipmentName", "equipmentCode", "brand", "plannedMinutes", "plannedHours",
+            "equipmentName", "equipmentCode", "company", "plannedMinutes", "plannedHours",
             "parkShift", "transfer", "auxiliaryWork", "waitingLoad", "blasting",
             "mealBreak", "refueling", "plannedMaintenance", "unplannedFault", "standby",
             "weatherSnow", "weatherDust", "fillWater", "totalProductionMinutes",
