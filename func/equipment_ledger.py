@@ -34,6 +34,7 @@ class EquipmentLedger:
         self._df: Optional[pd.DataFrame] = None
         self._search_cache: dict[str, list[str]] = {}  # 缓存：原始名称 -> 匹配列表
         self._id_cache: dict[str, dict] = {}  # 缓存：设备编号 -> 标准信息
+        self._name_to_info: dict[str, dict] = {}  # 反向索引：标准设备名称 -> 完整信息 (H7)
 
         if ledger_path and Path(ledger_path).exists():
             self.load(ledger_path)
@@ -116,6 +117,11 @@ class EquipmentLedger:
             if device_id and device_id not in self._id_cache:
                 self._id_cache[device_id] = std_info
 
+        # 构建标准设备名称 -> 完整信息的反向索引 (H7)
+        self._name_to_info = {}
+        for _, info in self._id_cache.items():
+            self._name_to_info[info["标准设备名称"]] = info
+
     def export_template(self, output_path: str) -> None:
         """导出设备台账模板 Excel"""
         df = pd.DataFrame(columns=LEDGER_COLUMNS)
@@ -143,15 +149,15 @@ class EquipmentLedger:
         if not raw_name:
             return None
 
-        # 1. 精确匹配缓存中的关键词
-        for keyword, matched_standards in self._search_cache.items():
-            if raw_name == keyword:
-                return {
-                    "标准名称": matched_standards[0],
-                    "原始名称": raw_name,
-                    "匹配方式": "精确",
-                    "相似度": 100,
-                }
+        # 精确匹配：O(1) 字典查找替代遍历 (H6)
+        matched_standards = self._search_cache.get(raw_name)
+        if matched_standards:
+            return {
+                "标准名称": matched_standards[0],
+                "原始名称": raw_name,
+                "匹配方式": "精确",
+                "相似度": 100,
+            }
 
         # 2. 前缀匹配
         for keyword, matched_standards in self._search_cache.items():
@@ -215,12 +221,11 @@ class EquipmentLedger:
         if name:
             name_result = self.match(clean_string(name))
             if name_result:
-                # 补充编号和公司信息（如果编号缓存中有）
+                # 补充编号和公司信息：O(1) 反向索引查找 (H7)
                 std_name = name_result["标准名称"]
-                # 尝试从 _id_cache 找完整信息
-                for _, info in self._id_cache.items():
-                    if info["标准设备名称"] == std_name:
-                        return info
+                info = self._name_to_info.get(std_name)
+                if info:
+                    return info
                 # 没有完整信息，返回部分
                 return {
                     "标准设备名称": std_name,

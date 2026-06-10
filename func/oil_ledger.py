@@ -120,15 +120,15 @@ class OilLedger:
         if not raw_name:
             return None
 
-        # 1. 精确匹配缓存中的关键词
-        for keyword, matched_standards in self._search_cache.items():
-            if raw_name == keyword:
-                return {
-                    "标准名称": matched_standards[0],
-                    "原始名称": raw_name,
-                    "匹配方式": "精确",
-                    "相似度": 100,
-                }
+        # 精确匹配：O(1) 字典查找替代遍历 (H6)
+        matched_standards = self._search_cache.get(raw_name)
+        if matched_standards:
+            return {
+                "标准名称": matched_standards[0],
+                "原始名称": raw_name,
+                "匹配方式": "精确",
+                "相似度": 100,
+            }
 
         # 2. 前缀匹配
         for keyword, matched_standards in self._search_cache.items():
