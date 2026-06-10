@@ -492,7 +492,7 @@ FIELD_TO_COLUMN_MAP: dict[str, str] = {
     "equipmentId": "equipment_id",
     "fuelName": "fuel_name",
     "consumption": "consumption",
-    "brand": "brand",
+    "company": "company",
     "plannedMinutes": "planned_minutes",
     "plannedHours": "planned_hours",
     "parkShift": "park_shift",
