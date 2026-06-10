@@ -1,8 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-
-interface BridgeProp {
-  call: <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>;
-}
+import type { BridgeProp } from "../../lib/types";
 
 interface FileKeywords {
   fuel: string[];

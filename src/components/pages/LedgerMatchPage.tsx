@@ -1,13 +1,11 @@
 import { useState, useRef } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import type { BridgeProp } from "../../lib/types";
+import { inputClass, btnPrimaryClass, btnSecondaryClass } from "../../lib/ui-classes";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-interface BridgeProp {
-  call: <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>;
-}
 
 type ViewMode = "all" | "matched" | "unmatched";
 
@@ -20,17 +18,6 @@ interface SortState {
   column: string;
   direction: "asc" | "desc";
 }
-
-// ---------------------------------------------------------------------------
-// Design-system tokens (consistent with LedgerPage / DataSyncPage)
-// ---------------------------------------------------------------------------
-
-const inputClass =
-  "border border-slate-300 rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors";
-const btnPrimaryClass =
-  "flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed";
-const btnSecondaryClass =
-  "flex items-center gap-1.5 text-sm border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-3.5 py-1.5 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed";
 
 // ---------------------------------------------------------------------------
 // SVG Icons (Lucide-style, no emoji)

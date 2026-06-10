@@ -1,13 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import type { BridgeProp } from "../../lib/types";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-interface BridgeProp {
-  call: <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>;
-}
 
 export interface LedgerPageConfig {
   /** Page title, e.g. "设备台账" */

@@ -1,8 +1,5 @@
 import { LedgerPage, type LedgerPageConfig } from "./LedgerPage";
-
-interface BridgeProp {
-  call: <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>;
-}
+import type { BridgeProp } from "../../lib/types";
 
 const IconTruck = () => (
   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

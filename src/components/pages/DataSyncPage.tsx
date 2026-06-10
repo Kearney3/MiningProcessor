@@ -1,18 +1,8 @@
 import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { SyncResult } from "../../lib/types";
-
-interface BridgeProp {
-  call: <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>;
-}
-
-// ═══════════════════════════════════════
-// Design-system tokens
-// ═══════════════════════════════════════
-
-const inputClass = "border border-slate-300 rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors";
-const btnSecondaryClass = "shrink-0 flex items-center gap-1.5 text-sm border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-md transition-colors";
-const btnPrimaryClass = "flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed";
+import type { BridgeProp, SyncResult } from "../../lib/types";
+import { FolderIcon } from "../../lib/icons";
+import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 
 // ═══════════════════════════════════════
 // Lucide-style SVG Icons (16x16, stroke-width 2)
@@ -48,12 +38,6 @@ const WorktimeIcon = () => (
 const OperationIcon = () => (
   <svg className="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z" />
-  </svg>
-);
-
-const FolderIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
   </svg>
 );
 
