@@ -149,9 +149,13 @@ dependencies = [
     { name = "flet" },
     { name = "openpyxl" },
     { name = "pandas" },
-    { name = "psycopg2-binary" },
     { name = "rapidfuzz" },
     { name = "xlsxwriter" },
+]
+
+[package.optional-dependencies]
+db = [
+    { name = "psycopg2-binary" },
 ]
 
 [package.dev-dependencies]
@@ -165,10 +169,11 @@ requires-dist = [
     { name = "flet", specifier = ">=0.21.0" },
     { name = "openpyxl", specifier = ">=3.1.2" },
     { name = "pandas", specifier = ">=3.0.2" },
-    { name = "psycopg2-binary", specifier = ">=2.9.9" },
+    { name = "psycopg2-binary", marker = "extra == 'db'", specifier = ">=2.9.9" },
     { name = "rapidfuzz", specifier = ">=3.0.0" },
     { name = "xlsxwriter", specifier = ">=3.0.0" },
 ]
+provides-extras = ["db"]
 
 [package.metadata.requires-dev]
 dev = [

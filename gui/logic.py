@@ -15,6 +15,8 @@ from func.excel_worktime import process_excel_data
 from func.excel_merger import merge_excel_files
 from func.excel_batch import scan_files, process_files, MODULE_LABELS
 from func.sync_to_minebase import sync as sync_to_minebase
+from func.sync_to_minebase import test_db_connection
+from func.sync_to_minebase import test_api_connection
 
 
 from gui.components.common import _log_message
@@ -866,6 +868,99 @@ def wire_sync_button(sync_refs: dict, page: ft.Page, log):
     async def handle_sync_click(e: ft.ControlEvent):
         await on_sync_process(page, sync_refs, log)
     sync_refs["btn"].on_click = handle_sync_click
+
+
+async def on_test_db_connection(page: ft.Page, config_refs: dict, log):
+    """测试数据库连接"""
+    btn = config_refs["mb_test_btn"]
+    result = config_refs["mb_test_result"]
+
+    host = (config_refs["mb_db_host"].value or "").strip()
+    port_str = (config_refs["mb_db_port"].value or "").strip()
+    database = (config_refs["mb_db_name"].value or "").strip()
+    user = (config_refs["mb_db_user"].value or "").strip()
+    password = config_refs["mb_db_pass"].value or ""
+
+    if not port_str.isdigit():
+        _show_snackbar(page, "端口必须是数字", is_error=True)
+        return
+    port = int(port_str)
+
+    set_btn_state(btn, False, "测试中...")
+    result.visible = False
+    result.update()
+
+    try:
+        success, msg = await asyncio.to_thread(
+            test_db_connection, host, port, database, user, password,
+        )
+        result.value = msg
+        result.color = "#10B981" if success else "#EF4444"
+        result.visible = True
+        result.update()
+
+        _log_message(log, f"数据库连接测试: {msg}", level=logging.INFO if success else logging.WARNING)
+        _show_snackbar(page, "连接成功" if success else "连接失败", is_error=not success)
+    except Exception as exc:
+        result.value = str(exc)
+        result.color = "#EF4444"
+        result.visible = True
+        result.update()
+        _show_snackbar(page, "测试异常", is_error=True)
+    finally:
+        set_btn_state(btn, True, "测试连接")
+
+
+def wire_test_db_button(config_refs: dict, page: ft.Page, log):
+    """绑定数据库测试连接按钮"""
+    async def handle_test_click(e: ft.ControlEvent):
+        await on_test_db_connection(page, config_refs, log)
+    config_refs["mb_test_btn"].on_click = handle_test_click
+
+
+async def on_test_api_connection(page: ft.Page, config_refs: dict, log):
+    """测试 API 连接"""
+    btn = config_refs["mb_api_test_btn"]
+    result = config_refs["mb_api_test_result"]
+
+    url = (config_refs["mb_api_url"].value or "").strip()
+    username = (config_refs["mb_api_user"].value or "").strip()
+    password = config_refs["mb_api_pass"].value or ""
+
+    if not url:
+        _show_snackbar(page, "请填写 API 地址", is_error=True)
+        return
+
+    set_btn_state(btn, False, "测试中...")
+    result.visible = False
+    result.update()
+
+    try:
+        success, msg = await asyncio.to_thread(
+            test_api_connection, url, username, password,
+        )
+        result.value = msg
+        result.color = "#10B981" if success else "#EF4444"
+        result.visible = True
+        result.update()
+
+        _log_message(log, f"API 连接测试: {msg}", level=logging.INFO if success else logging.WARNING)
+        _show_snackbar(page, "连接成功" if success else "连接失败", is_error=not success)
+    except Exception as exc:
+        result.value = str(exc)
+        result.color = "#EF4444"
+        result.visible = True
+        result.update()
+        _show_snackbar(page, "测试异常", is_error=True)
+    finally:
+        set_btn_state(btn, True, "测试连接")
+
+
+def wire_test_api_button(config_refs: dict, page: ft.Page, log):
+    """绑定 API 测试连接按钮"""
+    async def handle_test_click(e: ft.ControlEvent):
+        await on_test_api_connection(page, config_refs, log)
+    config_refs["mb_api_test_btn"].on_click = handle_test_click
 
 
 def init(config_section_refs: dict):

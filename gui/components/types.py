@@ -105,6 +105,9 @@ class SyncRefs(TypedDict):
 
 class UserConfigRefs(TypedDict):
     mb_mode: ft.Dropdown
+    mb_api_url: ft.TextField
+    mb_api_user: ft.TextField
+    mb_api_pass: ft.TextField
     mb_db_host: ft.TextField
     mb_db_port: ft.TextField
     mb_db_name: ft.TextField
@@ -112,6 +115,10 @@ class UserConfigRefs(TypedDict):
     mb_db_pass: ft.TextField
     mb_status_text: ft.Text
     mb_action_buttons: list[ft.Button]
+    mb_api_test_btn: ft.Button
+    mb_api_test_result: ft.Text
+    mb_test_btn: ft.Button
+    mb_test_result: ft.Text
     reload_mb_config: Callable[[], None]
     save_mb_config: Callable[[Any], None]
     reset_mb_config: Callable[[Any], None]

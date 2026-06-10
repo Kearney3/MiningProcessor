@@ -351,6 +351,38 @@ def sync_via_api(
 # ---------------------------------------------------------------------------
 
 
+def test_api_connection(url: str, username: str, password: str) -> tuple[bool, str]:
+    """测试 API 连接（尝试登录），返回 (成功, 描述信息)。"""
+    try:
+        client = MineBaseAPIClient(url, username, password)
+        client.login()
+        return True, f"连接成功: {url}"
+    except RuntimeError as e:
+        return False, str(e)
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"
+
+
+def test_db_connection(
+    host: str, port: int, database: str, user: str, password: str,
+) -> tuple[bool, str]:
+    """测试数据库连接，返回 (成功, 描述信息)。"""
+    import psycopg2
+    try:
+        conn = psycopg2.connect(
+            host=host, port=port, dbname=database,
+            user=user, password=password, connect_timeout=5,
+        )
+        with conn.cursor() as cur:
+            cur.execute("SELECT 1")
+        conn.close()
+        return True, f"连接成功: {user}@{host}:{port}/{database}"
+    except psycopg2.OperationalError as e:
+        return False, str(e)
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"
+
+
 class MineBaseDBClient:
     """MineBase PostgreSQL 直连客户端。"""
 

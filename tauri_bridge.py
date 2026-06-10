@@ -20,6 +20,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+logger = logging.getLogger(__name__)
+
 # ─── 项目路径注册 ───
 # PyInstaller 打包模式：从临时解压目录加载
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
@@ -168,6 +170,121 @@ def _register(name: str):
 
 
 # ═══════════════════════════════════════════════════════════
+# 台账匹配后处理（各模块共用）
+# ═══════════════════════════════════════════════════════════
+
+
+def _post_process_ledger(output_file: str, use_ledger: bool) -> None:
+    """对输出 Excel 文件进行台账匹配后处理。"""
+    if not use_ledger:
+        return
+    import pandas as pd
+    from func.equipment_ledger import EquipmentLedger
+    from func.oil_ledger import OilLedger
+    from func.config_loader import (
+        has_equipment_ledger_cache, load_equipment_ledger_cache,
+        has_oil_ledger_cache, load_oil_ledger_cache,
+    )
+
+    equipment_ledger = None
+    oil_ledger = None
+    try:
+        if has_equipment_ledger_cache():
+            cached = load_equipment_ledger_cache()
+            if cached:
+                equipment_ledger = EquipmentLedger()
+                equipment_ledger._df = pd.DataFrame(cached)
+                equipment_ledger._build_search_cache()
+    except Exception:
+        pass
+    try:
+        if has_oil_ledger_cache():
+            cached = load_oil_ledger_cache()
+            if cached:
+                oil_ledger = OilLedger()
+                oil_ledger._df = pd.DataFrame(cached)
+                oil_ledger._build_search_cache()
+    except Exception:
+        pass
+
+    if not equipment_ledger and not oil_ledger:
+        return
+
+    try:
+        xl = pd.ExcelFile(output_file)
+    except Exception as ex:
+        logger.warning("无法读取输出文件进行台账匹配: %s", ex)
+        return
+
+    sheets_to_match = {name: xl.parse(name) for name in xl.sheet_names}
+    sheet_data = {}
+    matched_any = False
+
+    for sheet_name, df in sheets_to_match.items():
+        cols = set(df.columns)
+
+        if equipment_ledger:
+            has_truck = "矿卡名称" in cols
+            has_excavator = "挖机名称" in cols
+
+            if has_truck and has_excavator:
+                for label, col_name in [("矿卡", "矿卡名称"), ("挖机", "挖机名称")]:
+                    id_col = "设备编号" if label == "矿卡" and "设备编号" in cols else None
+                    names, ids, companies = [], [], []
+                    for _, row in df.iterrows():
+                        name_str = str(row.get(col_name, "")) if pd.notna(row.get(col_name)) else None
+                        id_str = str(row.get(id_col)) if id_col and pd.notna(row.get(id_col)) else None
+                        r = equipment_ledger.match_device(name=name_str, device_id=id_str) if name_str else None
+                        names.append(r.get("标准设备名称", "") if r else "")
+                        ids.append(r.get("标准设备编号", "") if r else "")
+                        companies.append(r.get("标准公司名称", "") if r else "")
+                    df[f"标准设备名称（{label}）"] = names
+                    df[f"标准设备编号（{label}）"] = ids
+                    df[f"标准公司名称（{label}）"] = companies
+                matched_any = True
+            else:
+                name_col = next((c for c in ["设备名称", "矿卡名称"] if c in cols), None)
+                id_col = "设备编号" if "设备编号" in cols else None
+                if name_col:
+                    names, ids, companies = [], [], []
+                    for _, row in df.iterrows():
+                        name_str = str(row.get(name_col, "")) if pd.notna(row.get(name_col)) else None
+                        id_str = str(row.get(id_col)) if id_col and pd.notna(row.get(id_col)) else None
+                        r = equipment_ledger.match_device(name=name_str, device_id=id_str) if name_str else None
+                        names.append(r.get("标准设备名称", "") if r else "")
+                        ids.append(r.get("标准设备编号", "") if r else "")
+                        companies.append(r.get("标准公司名称", "") if r else "")
+                    df["标准设备名称"] = names
+                    df["标准设备编号"] = ids
+                    df["标准公司名称"] = companies
+                    matched_any = True
+
+        if oil_ledger:
+            oil_col = next((c for c in ["油品种类", "油品名称"] if c in cols), None)
+            if oil_col:
+                std_oils = []
+                for _, row in df.iterrows():
+                    val = row[oil_col]
+                    if pd.isna(val):
+                        std_oils.append("")
+                    else:
+                        r = oil_ledger.match(str(val))
+                        std_oils.append(r["标准名称"] if r else "")
+                df["标准油品名称"] = std_oils
+                matched_any = True
+
+        sheet_data[sheet_name] = df
+
+    if not matched_any:
+        return
+
+    with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
+        for sheet_name, df in sheet_data.items():
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+    logger.info("台账匹配完成，已更新: %s", output_file)
+
+
+# ═══════════════════════════════════════════════════════════
 # RPC 方法实现
 # ═══════════════════════════════════════════════════════════
 
@@ -177,7 +294,10 @@ def _process_fuel(params: dict) -> dict:
     from func.excel_fuel import process_diesel_data
 
     result = process_diesel_data(params["path"], target_year=params.get("year"))
-    return {"output_file": str(result) if result else None}
+    output_file = str(result) if result else None
+    if output_file:
+        _post_process_ledger(output_file, params.get("use_ledger", False))
+    return {"output_file": output_file}
 
 
 @_register("process_production")
@@ -193,9 +313,13 @@ def _process_production(params: dict) -> dict:
     p = Path(path)
     if p.is_dir():
         processor.process_folder(path)
+        output_file = str(p / "合并产量.xlsx")
     else:
         processor.process_single_file(path)
-    return {"output_file": str(p / "合并产量.xlsx") if p.is_dir() else None}
+        output_file = None
+    if output_file:
+        _post_process_ledger(output_file, params.get("use_ledger", False))
+    return {"output_file": output_file}
 
 
 @_register("process_electrical")
@@ -208,7 +332,9 @@ def _process_electrical(params: dict) -> dict:
         add_shift_column=params.get("add_shift_column", False),
         default_shift=params.get("default_shift", "Day"),
     )
-    return {"output_file": str(Path(params["path"]).parent / "电力消耗统计.xlsx")}
+    output_file = str(Path(params["path"]).parent / "电力消耗统计.xlsx")
+    _post_process_ledger(output_file, params.get("use_ledger", False))
+    return {"output_file": output_file}
 
 
 @_register("process_worktime")
@@ -219,16 +345,23 @@ def _process_worktime(params: dict) -> dict:
     header_mapping = None
     if params.get("use_header_mapping"):
         header_mapping = get_worktime_header_mapping()
+        if params.get("header_mode"):
+            header_mapping["mode"] = params["header_mode"]
+        if params.get("header_fuzzy") is not None:
+            header_mapping["fuzzy"] = params["header_fuzzy"]
 
-    result = process_excel_data(
+    year, month = params["year"], params["month"]
+    output_file = str(Path(params["path"]).parent / f"{year}{month:02d}_工作效率表.xlsx")
+    process_excel_data(
         params["path"],
-        year=params["year"],
-        month=params["month"],
+        year=year,
+        month=month,
+        output_file=output_file,
         return_sheets=False,
         header_mapping=header_mapping,
     )
-    year, month = params["year"], params["month"]
-    return {"output_file": str(Path(params["path"]).parent / f"{year}{month:02d}_工作效率表.xlsx")}
+    _post_process_ledger(output_file, params.get("use_ledger", False))
+    return {"output_file": output_file}
 
 
 @_register("process_merge")
@@ -241,6 +374,8 @@ def _process_merge(params: dict) -> dict:
         strip_time=params.get("strip_time", False),
         sort_configs=params.get("sort_configs"),
     )
+    if output:
+        _post_process_ledger(output, params.get("use_ledger", False))
     return {"output_file": output}
 
 
@@ -301,6 +436,10 @@ def _batch_process(params: dict) -> dict:
     worktime_header_mapping = None
     if params.get("use_worktime_header_mapping"):
         worktime_header_mapping = get_worktime_header_mapping()
+        if params.get("header_mode"):
+            worktime_header_mapping["mode"] = params["header_mode"]
+        if params.get("header_fuzzy") is not None:
+            worktime_header_mapping["fuzzy"] = params["header_fuzzy"]
 
     # 重置取消标记
     _cancel_event.clear()
@@ -310,6 +449,14 @@ def _batch_process(params: dict) -> dict:
         from func.excel_batch import scan_files
 
         matched, _ = scan_files(params["folder_path"])
+
+    # 表合并基础表校验
+    table_merge_config = params.get("table_merge_config")
+    if table_merge_config:
+        base_type = table_merge_config.get("base_type", "fuel")
+        required = "fuel" if base_type == "fuel" else "worktime"
+        if required not in (matched or {}):
+            return {"error": f"表内合并需要 {required} 数据，但未在目录中找到"}
 
     result = process_files(
         folder_path=params["folder_path"],
@@ -351,16 +498,33 @@ def _sync_minebase(params: dict) -> dict:
 
 @_register("get_config")
 def _get_config(params: dict) -> dict:
-    from func.config_loader import load_config
+    from func.config_loader import (
+        load_config, get_minebase_config,
+        get_file_keywords, get_worktime_header_mapping,
+    )
 
-    return load_config()
+    key = params.get("key")
+    if key == "minebase":
+        return get_minebase_config()
+    if key == "file_keywords":
+        return get_file_keywords()
+    if key == "worktime_header_mapping":
+        return get_worktime_header_mapping()
+    config = load_config()
+    if key:
+        return config.get(key, {})
+    return config
 
 
 @_register("save_config")
 def _save_config(params: dict) -> dict:
-    from func.config_loader import save_config
+    from func.config_loader import save_config, update_user_config
 
-    save_config(params["data"], target=params.get("target", "user"))
+    target = params.get("target", "default")
+    if target == "user":
+        update_user_config(params["data"])
+    else:
+        save_config(params["data"])
     return {"ok": True}
 
 
@@ -377,6 +541,21 @@ def _update_device_load_map(params: dict) -> dict:
 
     update_device_load_map(params["map_data"])
     return {"ok": True}
+
+
+@_register("apply_device_load_map")
+def _apply_device_load_map(params: dict) -> dict:
+    from func.config_loader import apply_device_load_map
+
+    apply_device_load_map(params["map_data"])
+    return {"ok": True}
+
+
+@_register("get_default_load_map")
+def _get_default_load_map(params: dict) -> dict:
+    from func.config_loader import get_default_load_map
+
+    return get_default_load_map(params.get("version", "new"))
 
 
 # ─── 列映射配置方法 ───
@@ -604,9 +783,15 @@ def _ledger_match_preview(params: dict) -> dict:
     )
 
     rows = params["rows"]
-    name_col = params["name_column"]
+    name_col = params.get("name_column")
+    id_col = params.get("id_column")
     oil_col = params.get("oil_column")
     mode = params.get("mode", "name")
+    suffix = params.get("result_suffix", "")
+
+    # 根据 suffix 生成带后缀的字段名
+    def _key(base: str) -> str:
+        return f"{base}_{suffix}" if suffix else base
 
     # 加载台账
     equipment_ledger = None
@@ -632,19 +817,31 @@ def _ledger_match_preview(params: dict) -> dict:
 
     matched_count = 0
     for row in rows:
-        device_name = str(row.get(name_col, "")).strip()
         matched = False
 
-        if device_name and equipment_ledger:
-            if mode == "id":
-                result = equipment_ledger.match_by_id(device_name)
-            else:
-                result = equipment_ledger.match_device(device_name)
-            if result:
-                row["标准设备名称"] = result.get("标准设备名称", result.get("标准名称", ""))
-                row["标准设备编号"] = result.get("标准设备编号", "")
-                row["标准公司名称"] = result.get("标准公司名称", "")
-                matched = True
+        # 设备匹配：优先 ID，其次名称
+        if id_col and equipment_ledger:
+            device_id = str(row.get(id_col, "")).strip()
+            if device_id:
+                result = equipment_ledger.match_by_id(device_id)
+                if result:
+                    row[_key("标准设备名称")] = result.get("标准设备名称", result.get("标准名称", ""))
+                    row[_key("标准设备编号")] = result.get("标准设备编号", "")
+                    row[_key("标准公司名称")] = result.get("标准公司名称", "")
+                    matched = True
+
+        if not matched and name_col and equipment_ledger:
+            device_name = str(row.get(name_col, "")).strip()
+            if device_name:
+                if mode == "id":
+                    result = equipment_ledger.match_by_id(device_name)
+                else:
+                    result = equipment_ledger.match_device(device_name)
+                if result:
+                    row[_key("标准设备名称")] = result.get("标准设备名称", result.get("标准名称", ""))
+                    row[_key("标准设备编号")] = result.get("标准设备编号", "")
+                    row[_key("标准公司名称")] = result.get("标准公司名称", "")
+                    matched = True
 
         if oil_col:
             oil_name = str(row.get(oil_col, "")).strip()
@@ -656,7 +853,7 @@ def _ledger_match_preview(params: dict) -> dict:
                     row["相似度"] = oil_result.get("相似度", "")
                     matched = True
 
-        row["__matched"] = matched
+        row[_key("__matched")] = matched
         if matched:
             matched_count += 1
 
@@ -690,6 +887,29 @@ def _export_matched_data(params: dict) -> dict:
 @_register("ping")
 def _ping(params: dict) -> dict:
     return {"pong": True, "pid": __import__("os").getpid()}
+
+
+@_register("test_minebase_connection")
+def _test_minebase_connection(params: dict) -> dict:
+    """测试 MineBase 连接（API 或数据库模式）。"""
+    from func.sync_to_minebase import test_api_connection, test_db_connection
+
+    mode = params.get("mode", "api")
+    if mode == "api":
+        ok, msg = test_api_connection(
+            url=params.get("url", "http://localhost:3000"),
+            username=params.get("username", ""),
+            password=params.get("password", ""),
+        )
+    else:
+        ok, msg = test_db_connection(
+            host=params.get("host", "localhost"),
+            port=int(params.get("port", 5432)),
+            database=params.get("database", "minebase"),
+            user=params.get("user", "postgres"),
+            password=params.get("password", ""),
+        )
+    return {"success": ok, "message": msg}
 
 
 # ═══════════════════════════════════════════════════════════
