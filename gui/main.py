@@ -364,6 +364,8 @@ def main(page: ft.Page):
     # ---- 绑定处理按钮 ----
     logic.wire_processing_buttons(module_refs, page, log, ledger_refs, oil_ledger_refs)
     logic.wire_sync_button(sync_refs, page, log)
+    logic.wire_test_db_button(user_config_refs, page, log)
+    logic.wire_test_api_button(user_config_refs, page, log)
 
     # ---- 侧边栏导航（分组） ----
     nav_groups = [

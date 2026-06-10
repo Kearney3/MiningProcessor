@@ -604,6 +604,8 @@ function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
 function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ msg: string; ok: boolean } | null>(null);
   const [status, setStatus] = useState<{ msg: string; kind: "success" | "error" | "info" }>({ msg: "", kind: "info" });
   const [config, setConfig] = useState<MineBaseConfig>({ ...DEFAULT_MINEBASE_CONFIG });
   const [showPassword, setShowPassword] = useState(false);
@@ -674,6 +676,23 @@ function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
   const resetToDefault = () => {
     setConfig({ ...DEFAULT_MINEBASE_CONFIG });
     setStatus({ msg: "已恢复默认配置（需点击保存生效）", kind: "info" });
+    setTestResult(null);
+  };
+
+  const testConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const params = config.mode === "api"
+        ? { mode: "api", url: config.api.url, username: config.api.username, password: config.api.password }
+        : { mode: "database", ...config.database };
+      const res = await bridge.call<{ success: boolean; message: string }>("test_minebase_connection", params);
+      setTestResult({ msg: res.message, ok: res.success });
+    } catch (e) {
+      setTestResult({ msg: `测试异常: ${String(e)}`, ok: false });
+    } finally {
+      setTesting(false);
+    }
   };
 
   const passwordType = showPassword ? "text" : "password";
@@ -740,6 +759,7 @@ function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
                   value={config.api.password}
                   onChange={(e) => updateApi("password", e.target.value)}
                   className="input w-full pr-10"
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
@@ -814,6 +834,7 @@ function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
                   value={config.database.password}
                   onChange={(e) => updateDb("password", e.target.value)}
                   className="input w-full pr-10"
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
@@ -828,6 +849,24 @@ function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
           </div>
         </div>
       )}
+
+      {/* Test connection button */}
+      <div className="mt-3 flex items-center gap-2">
+        <button
+          onClick={testConnection}
+          disabled={testing}
+          className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors ${
+            testing ? "opacity-50 cursor-not-allowed" : ""
+          }`}
+        >
+          {testing ? "测试中..." : "测试连接"}
+        </button>
+        {testResult && (
+          <span className={`text-xs ${testResult.ok ? "text-emerald-600" : "text-red-600"}`}>
+            {testResult.msg}
+          </span>
+        )}
+      </div>
 
       <ActionButtons
         saving={saving}

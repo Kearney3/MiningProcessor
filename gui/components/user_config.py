@@ -413,10 +413,15 @@ def _create_minebase_section(page: ft.Page, log):
     mb_db_user = ft.TextField(label="用户名", expand=True, color=theme.TEXT_PRIMARY)
     mb_db_pass = ft.TextField(label="密码", password=True, can_reveal_password=True, expand=True)
     mb_status_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
+    mb_api_test_btn = theme.secondary_btn("测试连接", icon=ft.Icons.LAN)
+    mb_api_test_result = ft.Text("", size=13, visible=False)
+    mb_test_btn = theme.secondary_btn("测试连接", icon=ft.Icons.LAN)
+    mb_test_result = ft.Text("", size=13, visible=False)
 
     # API / 数据库字段分组容器，按模式显示
     mb_api_fields = ft.Column(
-        [mb_api_url, ft.Row([mb_api_user, mb_api_pass], spacing=8)],
+        [mb_api_url, ft.Row([mb_api_user, mb_api_pass], spacing=8),
+         ft.Row([mb_api_test_btn, mb_api_test_result], spacing=8, alignment=ft.MainAxisAlignment.START)],
         spacing=8,
     )
     mb_db_fields = ft.Column(
@@ -424,6 +429,7 @@ def _create_minebase_section(page: ft.Page, log):
             ft.Row([mb_db_host, mb_db_port], spacing=8),
             mb_db_name,
             ft.Row([mb_db_user, mb_db_pass], spacing=8),
+            ft.Row([mb_test_btn, mb_test_result], spacing=8, alignment=ft.MainAxisAlignment.START),
         ],
         spacing=8,
     )
@@ -525,6 +531,9 @@ def _create_minebase_section(page: ft.Page, log):
 
     return minebase_card, {
         "mb_mode": mb_mode,
+        "mb_api_url": mb_api_url,
+        "mb_api_user": mb_api_user,
+        "mb_api_pass": mb_api_pass,
         "mb_db_host": mb_db_host,
         "mb_db_port": mb_db_port,
         "mb_db_name": mb_db_name,
@@ -532,6 +541,10 @@ def _create_minebase_section(page: ft.Page, log):
         "mb_db_pass": mb_db_pass,
         "mb_status_text": mb_status_text,
         "mb_action_buttons": mb_action_buttons,
+        "mb_api_test_btn": mb_api_test_btn,
+        "mb_api_test_result": mb_api_test_result,
+        "mb_test_btn": mb_test_btn,
+        "mb_test_result": mb_test_result,
         "reload": _reload_mb_config,
         "save": _save_mb_config,
         "reset": _reset_mb_config,
@@ -822,6 +835,9 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
 
     refs: UserConfigRefs = {
         "mb_mode": mb_refs["mb_mode"],
+        "mb_api_url": mb_refs["mb_api_url"],
+        "mb_api_user": mb_refs["mb_api_user"],
+        "mb_api_pass": mb_refs["mb_api_pass"],
         "mb_db_host": mb_refs["mb_db_host"],
         "mb_db_port": mb_refs["mb_db_port"],
         "mb_db_name": mb_refs["mb_db_name"],
@@ -829,6 +845,10 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
         "mb_db_pass": mb_refs["mb_db_pass"],
         "mb_status_text": mb_refs["mb_status_text"],
         "mb_action_buttons": mb_refs["mb_action_buttons"],
+        "mb_api_test_btn": mb_refs["mb_api_test_btn"],
+        "mb_api_test_result": mb_refs["mb_api_test_result"],
+        "mb_test_btn": mb_refs["mb_test_btn"],
+        "mb_test_result": mb_refs["mb_test_result"],
         "reload_mb_config": mb_refs["reload"],
         "save_mb_config": mb_refs["save"],
         "reset_mb_config": mb_refs["reset"],
