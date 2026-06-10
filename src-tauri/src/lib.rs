@@ -1,11 +1,12 @@
 mod python_bridge;
 
 use python_bridge::PythonBridge;
-use std::sync::Mutex;
 use tauri::{Emitter, Manager, State};
 
+/// 应用状态，PythonBridge 自身的内部锁已保证线程安全。
+/// 不再需要外层 Mutex<Option<PythonBridge>>，避免 cancel_task 与 invoke_python 的死锁 (H1)。
 struct AppState {
-    bridge: Mutex<Option<PythonBridge>>,
+    bridge: PythonBridge,
 }
 
 #[tauri::command]
@@ -14,16 +15,12 @@ async fn invoke_python(
     params: serde_json::Value,
     state: State<'_, AppState>,
 ) -> Result<serde_json::Value, String> {
-    let bridge_guard = state.bridge.lock().map_err(|e| e.to_string())?;
-    let bridge = bridge_guard.as_ref().ok_or("Python bridge not initialized")?;
-    bridge.call(&method, &params)
+    state.bridge.call(&method, &params)
 }
 
 #[tauri::command]
 async fn cancel_task(state: State<'_, AppState>) -> Result<(), String> {
-    let bridge_guard = state.bridge.lock().map_err(|e| e.to_string())?;
-    let bridge = bridge_guard.as_ref().ok_or("Python bridge not initialized")?;
-    bridge.call("cancel", &serde_json::json!({}))?;
+    state.bridge.cancel();
     Ok(())
 }
 
@@ -122,51 +119,50 @@ fn spawn_stderr_logger(bridge: &PythonBridge, handle: &tauri::AppHandle) {
     }
 }
 
+/// 初始化 PythonBridge，优先 sidecar 模式，回退 dev 模式。
+/// 在 setup 中调用，直接写入 AppState。
+fn init_bridge(app: &tauri::App) -> Result<(), String> {
+    // 优先尝试 sidecar 模式（打包后）
+    if let Some(bridge) = try_start_sidecar() {
+        spawn_stderr_logger(&bridge, app.handle());
+        app.manage(AppState { bridge });
+        println!("Python bridge started (sidecar mode)");
+        return Ok(());
+    }
+
+    // 回退到 dev 模式（直接调 Python）
+    if let Some((bridge, info)) = try_start_dev() {
+        spawn_stderr_logger(&bridge, app.handle());
+        app.manage(AppState { bridge });
+        println!("Python bridge started (dev mode): {}", info);
+        return Ok(());
+    }
+
+    // 两种模式都失败，向前端发送错误事件
+    let exe_dir = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.to_string_lossy().to_string()))
+        .unwrap_or_else(|| "unknown".into());
+    let msg = format!(
+        "Python bridge 未找到。已搜索：{}/tauri-bridge（sidecar）和系统 Python（dev 模式）。\
+         请确保已运行 build.sh 打包 sidecar，或在开发模式下运行 pnpm tauri dev。",
+        exe_dir
+    );
+    eprintln!("Warning: {}", msg);
+    let _ = app.handle().emit("python-log", &serde_json::json!({
+        "event": "log",
+        "data": { "level": "ERROR", "message": msg }
+    }));
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
-        .manage(AppState {
-            bridge: Mutex::new(None),
-        })
         .setup(|app| {
-            // 优先尝试 sidecar 模式（打包后）
-            if let Some(bridge) = try_start_sidecar() {
-                spawn_stderr_logger(&bridge, app.handle());
-                let state: State<AppState> = app.state();
-                let mut guard = state.bridge.lock().unwrap();
-                *guard = Some(bridge);
-                println!("Python bridge started (sidecar mode)");
-                return Ok(());
-            }
-
-            // 回退到 dev 模式（直接调 Python）
-            if let Some((bridge, info)) = try_start_dev() {
-                spawn_stderr_logger(&bridge, app.handle());
-                let state: State<AppState> = app.state();
-                let mut guard = state.bridge.lock().unwrap();
-                *guard = Some(bridge);
-                println!("Python bridge started (dev mode): {}", info);
-                return Ok(());
-            }
-
-            // 两种模式都失败，向前端发送错误事件
-            let exe_dir = std::env::current_exe()
-                .ok()
-                .and_then(|p| p.parent().map(|d| d.to_string_lossy().to_string()))
-                .unwrap_or_else(|| "unknown".into());
-            let msg = format!(
-                "Python bridge 未找到。已搜索：{}/tauri-bridge（sidecar）和系统 Python（dev 模式）。\
-                 请确保已运行 build.sh 打包 sidecar，或在开发模式下运行 pnpm tauri dev。",
-                exe_dir
-            );
-            eprintln!("Warning: {}", msg);
-            let _ = app.handle().emit("python-log", &serde_json::json!({
-                "event": "log",
-                "data": { "level": "ERROR", "message": msg }
-            }));
+            init_bridge(app).unwrap_or_else(|e| eprintln!("Bridge init warning: {}", e));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![invoke_python, cancel_task])

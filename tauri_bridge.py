@@ -170,6 +170,47 @@ def _register(name: str):
 
 
 # ═══════════════════════════════════════════════════════════
+# 台账缓存加载（公共工具，消除重复代码 M6）
+# ═══════════════════════════════════════════════════════════
+
+
+def _load_equipment_ledger_from_cache():
+    """从缓存加载设备台账实例，失败返回 None。"""
+    import pandas as pd
+    from func.equipment_ledger import EquipmentLedger
+    from func.config_loader import has_equipment_ledger_cache, load_equipment_ledger_cache
+    try:
+        if has_equipment_ledger_cache():
+            cached = load_equipment_ledger_cache()
+            if cached:
+                ledger = EquipmentLedger()
+                ledger._df = pd.DataFrame(cached)
+                ledger._build_search_cache()
+                return ledger
+    except Exception:
+        pass
+    return None
+
+
+def _load_oil_ledger_from_cache():
+    """从缓存加载油品台账实例，失败返回 None。"""
+    import pandas as pd
+    from func.oil_ledger import OilLedger
+    from func.config_loader import has_oil_ledger_cache, load_oil_ledger_cache
+    try:
+        if has_oil_ledger_cache():
+            cached = load_oil_ledger_cache()
+            if cached:
+                ledger = OilLedger()
+                ledger._df = pd.DataFrame(cached)
+                ledger._build_search_cache()
+                return ledger
+    except Exception:
+        pass
+    return None
+
+
+# ═══════════════════════════════════════════════════════════
 # 台账匹配后处理（各模块共用）
 # ═══════════════════════════════════════════════════════════
 
@@ -178,110 +219,12 @@ def _post_process_ledger(output_file: str, use_ledger: bool) -> None:
     """对输出 Excel 文件进行台账匹配后处理。"""
     if not use_ledger:
         return
-    import pandas as pd
-    from func.equipment_ledger import EquipmentLedger
-    from func.oil_ledger import OilLedger
-    from func.config_loader import (
-        has_equipment_ledger_cache, load_equipment_ledger_cache,
-        has_oil_ledger_cache, load_oil_ledger_cache,
-    )
+    from func.ledger_postprocess import apply_ledger_matching
 
-    equipment_ledger = None
-    oil_ledger = None
-    try:
-        if has_equipment_ledger_cache():
-            cached = load_equipment_ledger_cache()
-            if cached:
-                equipment_ledger = EquipmentLedger()
-                equipment_ledger._df = pd.DataFrame(cached)
-                equipment_ledger._build_search_cache()
-    except Exception:
-        pass
-    try:
-        if has_oil_ledger_cache():
-            cached = load_oil_ledger_cache()
-            if cached:
-                oil_ledger = OilLedger()
-                oil_ledger._df = pd.DataFrame(cached)
-                oil_ledger._build_search_cache()
-    except Exception:
-        pass
+    equipment_ledger = _load_equipment_ledger_from_cache()
+    oil_ledger = _load_oil_ledger_from_cache()
 
-    if not equipment_ledger and not oil_ledger:
-        return
-
-    try:
-        xl = pd.ExcelFile(output_file)
-    except Exception as ex:
-        logger.warning("无法读取输出文件进行台账匹配: %s", ex)
-        return
-
-    sheets_to_match = {name: xl.parse(name) for name in xl.sheet_names}
-    sheet_data = {}
-    matched_any = False
-
-    for sheet_name, df in sheets_to_match.items():
-        cols = set(df.columns)
-
-        if equipment_ledger:
-            has_truck = "矿卡名称" in cols
-            has_excavator = "挖机名称" in cols
-
-            if has_truck and has_excavator:
-                for label, col_name in [("矿卡", "矿卡名称"), ("挖机", "挖机名称")]:
-                    id_col = "设备编号" if label == "矿卡" and "设备编号" in cols else None
-                    names, ids, companies = [], [], []
-                    for _, row in df.iterrows():
-                        name_str = str(row.get(col_name, "")) if pd.notna(row.get(col_name)) else None
-                        id_str = str(row.get(id_col)) if id_col and pd.notna(row.get(id_col)) else None
-                        r = equipment_ledger.match_device(name=name_str, device_id=id_str) if name_str else None
-                        names.append(r.get("标准设备名称", "") if r else "")
-                        ids.append(r.get("标准设备编号", "") if r else "")
-                        companies.append(r.get("标准公司名称", "") if r else "")
-                    df[f"标准设备名称（{label}）"] = names
-                    df[f"标准设备编号（{label}）"] = ids
-                    df[f"标准公司名称（{label}）"] = companies
-                matched_any = True
-            else:
-                name_col = next((c for c in ["设备名称", "矿卡名称"] if c in cols), None)
-                id_col = "设备编号" if "设备编号" in cols else None
-                if name_col:
-                    names, ids, companies = [], [], []
-                    for _, row in df.iterrows():
-                        name_str = str(row.get(name_col, "")) if pd.notna(row.get(name_col)) else None
-                        id_str = str(row.get(id_col)) if id_col and pd.notna(row.get(id_col)) else None
-                        r = equipment_ledger.match_device(name=name_str, device_id=id_str) if name_str else None
-                        names.append(r.get("标准设备名称", "") if r else "")
-                        ids.append(r.get("标准设备编号", "") if r else "")
-                        companies.append(r.get("标准公司名称", "") if r else "")
-                    df["标准设备名称"] = names
-                    df["标准设备编号"] = ids
-                    df["标准公司名称"] = companies
-                    matched_any = True
-
-        if oil_ledger:
-            oil_col = next((c for c in ["油品种类", "油品名称"] if c in cols), None)
-            if oil_col:
-                std_oils = []
-                for _, row in df.iterrows():
-                    val = row[oil_col]
-                    if pd.isna(val):
-                        std_oils.append("")
-                    else:
-                        r = oil_ledger.match(str(val))
-                        std_oils.append(r["标准名称"] if r else "")
-                df["标准油品名称"] = std_oils
-                matched_any = True
-
-        sheet_data[sheet_name] = df
-
-    if not matched_any:
-        return
-
-    with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
-        for sheet_name, df in sheet_data.items():
-            df.to_excel(writer, sheet_name=sheet_name, index=False)
-    logger.info("台账匹配完成，已更新: %s", output_file)
+    apply_ledger_matching(output_file, equipment_ledger, oil_ledger)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -349,6 +292,8 @@ def _process_worktime(params: dict) -> dict:
             header_mapping["mode"] = params["header_mode"]
         if params.get("header_fuzzy") is not None:
             header_mapping["fuzzy"] = params["header_fuzzy"]
+        elif params.get("fuzzy_match") is not None:  # H8: 兼容前端 fuzzy_match 参数名
+            header_mapping["fuzzy"] = params["fuzzy_match"]
 
     year, month = params["year"], params["month"]
     output_file = str(Path(params["path"]).parent / f"{year}{month:02d}_工作效率表.xlsx")
@@ -393,35 +338,8 @@ def _batch_process(params: dict) -> dict:
     from func.config_loader import get_worktime_header_mapping
 
     # 台账
-    equipment_ledger = None
-    oil_ledger = None
-    if params.get("use_ledger"):
-        try:
-            import pandas as pd
-            from func.equipment_ledger import EquipmentLedger
-            from func.config_loader import load_equipment_ledger_cache, has_equipment_ledger_cache
-
-            if has_equipment_ledger_cache():
-                cached = load_equipment_ledger_cache()
-                if cached:
-                    equipment_ledger = EquipmentLedger()
-                    equipment_ledger._df = pd.DataFrame(cached)
-                    equipment_ledger._build_search_cache()
-        except Exception:
-            pass
-        try:
-            import pandas as pd
-            from func.oil_ledger import OilLedger
-            from func.config_loader import load_oil_ledger_cache, has_oil_ledger_cache
-
-            if has_oil_ledger_cache():
-                cached = load_oil_ledger_cache()
-                if cached:
-                    oil_ledger = OilLedger()
-                    oil_ledger._df = pd.DataFrame(cached)
-                    oil_ledger._build_search_cache()
-        except Exception:
-            pass
+    equipment_ledger = _load_equipment_ledger_from_cache() if params.get("use_ledger") else None
+    oil_ledger = _load_oil_ledger_from_cache() if params.get("use_ledger") else None
 
     # 进度回调 → 事件推送
     def progress_cb(payload):
@@ -440,6 +358,8 @@ def _batch_process(params: dict) -> dict:
             worktime_header_mapping["mode"] = params["header_mode"]
         if params.get("header_fuzzy") is not None:
             worktime_header_mapping["fuzzy"] = params["header_fuzzy"]
+        elif params.get("fuzzy_match") is not None:  # H8: 兼容前端 fuzzy_match 参数名
+            worktime_header_mapping["fuzzy"] = params["fuzzy_match"]
 
     # 重置取消标记
     _cancel_event.clear()
@@ -585,36 +505,18 @@ def _reset_minebase_column_mapping(params: dict) -> dict:
 
 @_register("get_equipment_ledger_data")
 def _get_equipment_ledger_data(params: dict) -> dict:
-    import pandas as pd
-    from func.equipment_ledger import EquipmentLedger
-    from func.config_loader import load_equipment_ledger_cache, has_equipment_ledger_cache
-
-    if not has_equipment_ledger_cache():
+    ledger = _load_equipment_ledger_from_cache()
+    if not ledger:
         return {"rows": [], "columns": []}
-    cached = load_equipment_ledger_cache()
-    if not cached:
-        return {"rows": [], "columns": []}
-    ledger = EquipmentLedger()
-    ledger._df = pd.DataFrame(cached)
-    ledger._build_search_cache()
     rows = _sanitize_rows(ledger.to_dict())
     return {"rows": rows, "columns": list(rows[0].keys()) if rows else []}
 
 
 @_register("get_oil_ledger_data")
 def _get_oil_ledger_data(params: dict) -> dict:
-    import pandas as pd
-    from func.oil_ledger import OilLedger
-    from func.config_loader import load_oil_ledger_cache, has_oil_ledger_cache
-
-    if not has_oil_ledger_cache():
+    ledger = _load_oil_ledger_from_cache()
+    if not ledger:
         return {"rows": [], "columns": []}
-    cached = load_oil_ledger_cache()
-    if not cached:
-        return {"rows": [], "columns": []}
-    ledger = OilLedger()
-    ledger._df = pd.DataFrame(cached)
-    ledger._build_search_cache()
     rows = _sanitize_rows(ledger.to_dict())
     return {"rows": rows, "columns": list(rows[0].keys()) if rows else []}
 
@@ -774,14 +676,6 @@ def _read_excel_sheet(params: dict) -> dict:
 @_register("ledger_match_preview")
 def _ledger_match_preview(params: dict) -> dict:
     """对数据行进行台账匹配预览。"""
-    import pandas as pd
-    from func.equipment_ledger import EquipmentLedger
-    from func.oil_ledger import OilLedger
-    from func.config_loader import (
-        load_equipment_ledger_cache, has_equipment_ledger_cache,
-        load_oil_ledger_cache, has_oil_ledger_cache,
-    )
-
     rows = params["rows"]
     name_col = params.get("name_column")
     id_col = params.get("id_column")
@@ -794,26 +688,8 @@ def _ledger_match_preview(params: dict) -> dict:
         return f"{base}_{suffix}" if suffix else base
 
     # 加载台账
-    equipment_ledger = None
-    oil_ledger = None
-    try:
-        if has_equipment_ledger_cache():
-            cached = load_equipment_ledger_cache()
-            if cached:
-                equipment_ledger = EquipmentLedger()
-                equipment_ledger._df = pd.DataFrame(cached)
-                equipment_ledger._build_search_cache()
-    except Exception:
-        pass
-    try:
-        if has_oil_ledger_cache():
-            cached = load_oil_ledger_cache()
-            if cached:
-                oil_ledger = OilLedger()
-                oil_ledger._df = pd.DataFrame(cached)
-                oil_ledger._build_search_cache()
-    except Exception:
-        pass
+    equipment_ledger = _load_equipment_ledger_from_cache()
+    oil_ledger = _load_oil_ledger_from_cache()
 
     matched_count = 0
     for row in rows:

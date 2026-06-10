@@ -17,6 +17,7 @@ from func.excel_batch import scan_files, process_files, MODULE_LABELS
 from func.sync_to_minebase import sync as sync_to_minebase
 from func.sync_to_minebase import test_db_connection
 from func.sync_to_minebase import test_api_connection
+from func.ledger_postprocess import apply_ledger_matching, _find_col
 
 
 from gui.components.common import _log_message
@@ -110,146 +111,13 @@ def set_btn_state(btn: ft.Button, enabled: bool, label: str = "处理"):
 
 
 # ---------------------------------------------------------------------------
-# 台账匹配后处理
+# 台账匹配后处理（委托给 func/ledger_postprocess.py 共享模块）
 # ---------------------------------------------------------------------------
-def _find_col(columns, candidates):
-    """在列名列表中查找第一个匹配的候选列名（支持 strip 匹配）"""
-    # 先尝试精确匹配
-    for c in candidates:
-        if c in columns:
-            return c
-    # 再尝试 strip 后匹配
-    stripped_map = {col.strip(): col for col in columns}
-    for c in candidates:
-        if c in stripped_map:
-            return stripped_map[c]
-    return None
 
 
 def _apply_ledger_matching(output_file: str, equipment_ledger=None, oil_ledger=None, preloaded_sheets=None):
-    """
-    对已写入的 Excel 文件进行台账匹配后处理。
-    读取每个 sheet，检测列名，追加匹配字段，重新写回。
-    对于生产数据（同时包含矿卡名称和挖机名称），匹配列名会添加（矿卡）或（挖机）后缀。
-    """
-    if not equipment_ledger and not oil_ledger:
-        return
-
-    if preloaded_sheets:
-        sheets_to_match = dict(preloaded_sheets)
-    else:
-        try:
-            xl = pd.ExcelFile(output_file)
-        except Exception as ex:
-            logging.warning(f"无法读取输出文件进行台账匹配: {ex}")
-            return
-        sheets_to_match = {name: xl.parse(name) for name in xl.sheet_names}
-
-    sheet_data = {}
-    matched_any = False
-
-    for sheet_name, df in sheets_to_match.items():
-        cols = set(df.columns)
-
-        # 设备匹配
-        if equipment_ledger:
-            # 检测是否同时存在矿卡名称和挖机名称（生产数据场景）
-            has_truck_col = "矿卡名称" in cols
-            has_excavator_col = "挖机名称" in cols
-            
-            # 如果同时存在两个列，则分别匹配并添加后缀
-            if has_truck_col and has_excavator_col:
-                # 匹配矿卡名称
-                name_col = "矿卡名称"
-                id_col = "设备编号" if "设备编号" in cols else None
-                std_names, std_ids, std_companies = [], [], []
-                for _, row in df.iterrows():
-                    name_val = row.get(name_col)
-                    id_val = row.get(id_col) if id_col else None
-                    name_str = str(name_val) if not pd.isna(name_val) else None
-                    id_str = str(id_val) if id_val is not None and not pd.isna(id_val) else None
-                    result = equipment_ledger.match_device(name=name_str, device_id=id_str)
-                    if result:
-                        std_names.append(result.get("标准设备名称", ""))
-                        std_ids.append(result.get("标准设备编号", ""))
-                        std_companies.append(result.get("标准公司名称", ""))
-                    else:
-                        std_names.append("")
-                        std_ids.append("")
-                        std_companies.append("")
-                df["标准设备名称（矿卡）"] = std_names
-                df["标准设备编号（矿卡）"] = std_ids
-                df["标准公司名称（矿卡）"] = std_companies
-                
-                # 匹配挖机名称
-                excavator_col = "挖机名称"
-                std_names_ex, std_ids_ex, std_companies_ex = [], [], []
-                for _, row in df.iterrows():
-                    name_val = row.get(excavator_col)
-                    name_str = str(name_val) if not pd.isna(name_val) else None
-                    result = equipment_ledger.match_device(name=name_str, device_id=None)
-                    if result:
-                        std_names_ex.append(result.get("标准设备名称", ""))
-                        std_ids_ex.append(result.get("标准设备编号", ""))
-                        std_companies_ex.append(result.get("标准公司名称", ""))
-                    else:
-                        std_names_ex.append("")
-                        std_ids_ex.append("")
-                        std_companies_ex.append("")
-                df["标准设备名称（挖机）"] = std_names_ex
-                df["标准设备编号（挖机）"] = std_ids_ex
-                df["标准公司名称（挖机）"] = std_companies_ex
-                matched_any = True
-            else:
-                # 原有逻辑：单列匹配（非生产数据场景）
-                name_col = _find_col(cols, ["设备名称", "矿卡名称"])
-                id_col = "设备编号" if "设备编号" in cols else None
-                if name_col:
-                    std_names, std_ids, std_companies = [], [], []
-                    for _, row in df.iterrows():
-                        name_val = row.get(name_col)
-                        id_val = row.get(id_col) if id_col else None
-                        name_str = str(name_val) if not pd.isna(name_val) else None
-                        id_str = str(id_val) if id_val is not None and not pd.isna(id_val) else None
-                        result = equipment_ledger.match_device(name=name_str, device_id=id_str)
-                        if result:
-                            std_names.append(result.get("标准设备名称", ""))
-                            std_ids.append(result.get("标准设备编号", ""))
-                            std_companies.append(result.get("标准公司名称", ""))
-                        else:
-                            std_names.append("")
-                            std_ids.append("")
-                            std_companies.append("")
-                    df["标准设备名称"] = std_names
-                    df["标准设备编号"] = std_ids
-                    df["标准公司名称"] = std_companies
-                    matched_any = True
-
-        # 油品匹配
-        if oil_ledger:
-            oil_col = _find_col(cols, ["油品种类", "油品名称"])
-            if oil_col:
-                std_oils = []
-                for _, row in df.iterrows():
-                    oil_val = row[oil_col]
-                    if pd.isna(oil_val):
-                        std_oils.append("")
-                    else:
-                        result = oil_ledger.match(str(oil_val))
-                        std_oils.append(result["标准名称"] if result else "")
-                df["标准油品名称"] = std_oils
-                matched_any = True
-
-        sheet_data[sheet_name] = df
-
-    if not matched_any:
-        return
-
-    # 重写 Excel
-    with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
-        for sheet_name, df in sheet_data.items():
-            df.to_excel(writer, sheet_name=sheet_name, index=False)
-    logging.info(f"台账匹配完成，已更新: {output_file}")
+    """对已写入的 Excel 文件进行台账匹配后处理。"""
+    apply_ledger_matching(output_file, equipment_ledger, oil_ledger, preloaded_sheets)
 
 
 def _get_output_file(module_type: str, path: str, **kwargs) -> str | None:
@@ -345,143 +213,131 @@ async def run_task(page: ft.Page, module_type: str, path: str, btn: ft.Button, l
 
 
 # ---------------------------------------------------------------------------
-# 按钮点击处理
+# 按钮点击处理（通用模板）
+# ---------------------------------------------------------------------------
+async def _safe_run_task(
+    page: ft.Page,
+    btn: ft.Button,
+    label: str,
+    path: str,
+    log,
+    module_type: str,
+    **kwargs,
+):
+    """通用处理回调模板：禁用按钮 → 执行任务 → 恢复按钮 (M4)"""
+    set_btn_state(btn, False, "处理中...")
+    try:
+        await run_task(page, module_type, path, btn, log, **kwargs)
+    finally:
+        set_btn_state(btn, True, label)
+
+
+# ---------------------------------------------------------------------------
+# 各模块按钮回调
 # ---------------------------------------------------------------------------
 async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=None, oil_ledger=None):
     """燃油处理按钮回调"""
     btn = fuel_refs["btn"]
-    set_btn_state(btn, False, "处理中...")
-    try:
-        path = fuel_refs["path"].value
-        if not path:
-            _log_message(log, "请先选择文件", level=logging.WARNING)
-            set_btn_state(btn, True, "处理")
-            return
-        year = int(fuel_refs["year"].value)
-        await run_task(page, "fuel", path, btn, log, year=year, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
-        set_btn_state(btn, True, "处理")
-    except Exception:
-        set_btn_state(btn, True, "处理")
-        raise
+    path = fuel_refs["path"].value
+    if not path:
+        _log_message(log, "请先选择文件", level=logging.WARNING)
+        return
+    year = int(fuel_refs["year"].value)
+    await _safe_run_task(page, btn, "处理", path, log, "fuel",
+                         year=year, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
 
 
 async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=None, oil_ledger=None):
     """生产处理按钮回调"""
     btn = prod_refs["btn"]
-    set_btn_state(btn, False, "处理中...")
+    path = prod_refs["path"].value
+    if not path:
+        _log_message(log, "请先选择 Excel 文件或文件夹", level=logging.WARNING)
+        return
+
+    raw_start_text = (prod_refs["raw_start"].value or "-1").strip()
     try:
-        path = prod_refs["path"].value
-        if not path:
-            _log_message(log, "请先选择 Excel 文件或文件夹", level=logging.WARNING)
-            set_btn_state(btn, True, "处理")
-            return
+        raw_start = int(raw_start_text)
+        if raw_start != -1 and raw_start < 1:
+            raise ValueError
+    except ValueError:
+        _log_message(log, "请输入有效的 raw_start（正整数或-1【自动检测行】）", level=logging.WARNING)
+        return
 
-        raw_start_text = (prod_refs["raw_start"].value or "-1").strip()
-        try:
-            raw_start = int(raw_start_text)
-            if raw_start != -1 and raw_start < 1:
-                raise ValueError
-        except ValueError:
-            _log_message(log, "请输入有效的 raw_start（正整数或-1【自动检测行】）", level=logging.WARNING)
-            set_btn_state(btn, True, "处理")
-            return
-
-        await run_task(page, "production", path, btn, log, raw_start=raw_start, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
-        set_btn_state(btn, True, "处理")
-    except Exception:
-        set_btn_state(btn, True, "处理")
-        raise
+    await _safe_run_task(page, btn, "处理", path, log, "production",
+                         raw_start=raw_start, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
 
 
 async def on_elec_process(page: ft.Page, elec_refs: dict, log, equipment_ledger=None, oil_ledger=None):
     """电力处理按钮回调"""
     btn = elec_refs["btn"]
-    set_btn_state(btn, False, "处理中...")
+    path = elec_refs["path"].value
+    if not path:
+        _log_message(log, "请先选择文件", level=logging.WARNING)
+        return
+
+    year_text = elec_refs["year"].value
     try:
-        path = elec_refs["path"].value
-        if not path:
-            _log_message(log, "请先选择文件", level=logging.WARNING)
-            set_btn_state(btn, True, "处理")
-            return
+        year = int(year_text)
+    except (TypeError, ValueError):
+        _log_message(log, "请输入有效的年份", level=logging.WARNING)
+        return
 
-        year_text = elec_refs["year"].value
-        try:
-            year = int(year_text)
-        except (TypeError, ValueError):
-            _log_message(log, "请输入有效的年份", level=logging.WARNING)
-            set_btn_state(btn, True, "处理")
-            return
-
-        add_shift = elec_refs.get("add_shift")
-        default_shift_ref = elec_refs.get("default_shift")
-        await run_task(page, "electrical", path, btn, log, year=year,
-                       add_shift_column=add_shift.value if add_shift else False,
-                       default_shift=default_shift_ref.value if default_shift_ref else "Day",
-                       equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
-        set_btn_state(btn, True, "处理")
-    except Exception:
-        set_btn_state(btn, True, "处理")
-        raise
+    add_shift = elec_refs.get("add_shift")
+    default_shift_ref = elec_refs.get("default_shift")
+    await _safe_run_task(page, btn, "处理", path, log, "electrical",
+                         year=year,
+                         add_shift_column=add_shift.value if add_shift else False,
+                         default_shift=default_shift_ref.value if default_shift_ref else "Day",
+                         equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
 
 
 async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=None, oil_ledger=None):
     """工时处理按钮回调"""
     btn = work_refs["btn"]
-    set_btn_state(btn, False, "处理中...")
-    try:
-        path = work_refs["path"].value
-        if not path:
-            _log_message(log, "请先选择文件", level=logging.WARNING)
-            set_btn_state(btn, True, "处理")
-            return
-        year = int(work_refs["year"].value)
-        month = int(work_refs["month"].value)
-        # 表头映射：根据开关状态决定是否传入
-        header_mapping = None
-        header_toggle = work_refs.get("header_toggle")
-        if header_toggle and header_toggle.value:
-            mapping_config = config_loader.get_worktime_header_mapping()
-            header_mode = work_refs.get("header_mode")
-            header_fuzzy = work_refs.get("header_fuzzy")
-            mapping_config["mode"] = header_mode.value if header_mode else "position"
-            mapping_config["fuzzy"] = header_fuzzy.value if header_fuzzy else False
-            header_mapping = mapping_config
-        await run_task(page, "worktime", path, btn, log, year=year, month=month,
-                       equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
-                       header_mapping=header_mapping)
-        set_btn_state(btn, True, "处理")
-    except Exception:
-        set_btn_state(btn, True, "处理")
-        raise
+    path = work_refs["path"].value
+    if not path:
+        _log_message(log, "请先选择文件", level=logging.WARNING)
+        return
+    year = int(work_refs["year"].value)
+    month = int(work_refs["month"].value)
+    # 表头映射：根据开关状态决定是否传入
+    header_mapping = None
+    header_toggle = work_refs.get("header_toggle")
+    if header_toggle and header_toggle.value:
+        mapping_config = config_loader.get_worktime_header_mapping()
+        header_mode = work_refs.get("header_mode")
+        header_fuzzy = work_refs.get("header_fuzzy")
+        mapping_config["mode"] = header_mode.value if header_mode else "position"
+        mapping_config["fuzzy"] = header_fuzzy.value if header_fuzzy else False
+        header_mapping = mapping_config
+    await _safe_run_task(page, btn, "处理", path, log, "worktime",
+                         year=year, month=month,
+                         equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
+                         header_mapping=header_mapping)
 
 
 async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledger=None, oil_ledger=None):
     """Excel 合并按钮回调"""
     btn = merge_refs["btn"]
-    set_btn_state(btn, False, "合并中...")
-    try:
-        path = merge_refs["path"].value
-        if not path:
-            _log_message(log, "请先选择文件夹", level=logging.WARNING)
-            set_btn_state(btn, True, "合并")
-            return
-        keyword = (merge_refs["keyword"].value or "").strip()
-        if not keyword:
-            _log_message(log, "请输入文件名关键字", level=logging.WARNING)
-            set_btn_state(btn, True, "合并")
-            return
-        # 收集排序配置
-        sort_configs = []
-        for cfg in merge_refs.get("sort_configs_state", []):
-            col = (cfg.get("column") or "").strip()
-            if col:
-                sort_configs.append({"column": col, "ascending": bool(cfg.get("ascending", True))})
-        strip_time = bool(merge_refs["strip_time"].value)
-        await run_task(page, "merge", path, btn, log, keyword=keyword, strip_time=strip_time, sort_configs=sort_configs, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
-        set_btn_state(btn, True, "合并")
-    except Exception:
-        set_btn_state(btn, True, "合并")
-        raise
+    path = merge_refs["path"].value
+    if not path:
+        _log_message(log, "请先选择文件夹", level=logging.WARNING)
+        return
+    keyword = (merge_refs["keyword"].value or "").strip()
+    if not keyword:
+        _log_message(log, "请输入文件名关键字", level=logging.WARNING)
+        return
+    # 收集排序配置
+    sort_configs = []
+    for cfg in merge_refs.get("sort_configs_state", []):
+        col = (cfg.get("column") or "").strip()
+        if col:
+            sort_configs.append({"column": col, "ascending": bool(cfg.get("ascending", True))})
+    strip_time = bool(merge_refs["strip_time"].value)
+    await _safe_run_task(page, btn, "合并", path, log, "merge",
+                         keyword=keyword, strip_time=strip_time, sort_configs=sort_configs,
+                         equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
 
 
 def _show_batch_progress(progress_row, progress_bar, progress_text, cancel_btn):

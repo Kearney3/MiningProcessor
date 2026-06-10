@@ -10,6 +10,7 @@ load_config() 合并两者返回（user 覆盖 default），save 时按目标分
 import copy
 import json
 import os
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -109,7 +110,13 @@ DEFAULT_WORKTIME_HEADER_MAPPING: dict = {
     ],
 }
 
+# M3: 线程安全锁，保护 _runtime_config 的读写
+_runtime_lock = threading.Lock()
 _runtime_config: dict[str, Any] | None = None
+
+# M1: 基于文件 mtime 的配置缓存，避免 GUI 启动期间重复读盘
+_config_cache: dict[str, Any] | None = None
+_config_cache_mtime: tuple[float, float] = (0.0, 0.0)
 
 
 # ---------------------------------------------------------------------------
@@ -164,22 +171,42 @@ def load_config() -> dict[str, Any]:
 
     先读 config.json，再用 config.user.json 深合并覆盖。
     任何一侧文件不存在都不报错，返回另一侧的内容。
+    使用基于文件 mtime 的缓存，避免重复读盘 (M1)。
     """
+    global _config_cache, _config_cache_mtime
+
+    mt1 = _CONFIG_FILE.stat().st_mtime if _CONFIG_FILE.exists() else 0.0
+    mt2 = _USER_CONFIG_FILE.stat().st_mtime if _USER_CONFIG_FILE.exists() else 0.0
+
+    if _config_cache is not None and (mt1, mt2) == _config_cache_mtime:
+        return _config_cache
+
     base = _load_json(_CONFIG_FILE)
     user = _load_json(_USER_CONFIG_FILE)
-    if user:
-        return _deep_merge(base, user)
-    return base
+    result = _deep_merge(base, user) if user else base
+
+    _config_cache = result
+    _config_cache_mtime = (mt1, mt2)
+    return result
+
+
+def _invalidate_config_cache() -> None:
+    """清除配置缓存，在写入配置文件后调用 (M1)。"""
+    global _config_cache, _config_cache_mtime
+    _config_cache = None
+    _config_cache_mtime = (0.0, 0.0)
 
 
 def save_config(config: dict[str, Any]) -> None:
     """保存系统默认配置到 config.json（不含用户敏感数据）。"""
     _save_json(_CONFIG_FILE, config)
+    _invalidate_config_cache()
 
 
 def save_user_config_file(data: dict[str, Any]) -> None:
     """保存用户配置到 config.user.json。"""
     _save_json(_USER_CONFIG_FILE, data)
+    _invalidate_config_cache()
 
 
 def load_user_config_file() -> dict[str, Any]:
@@ -201,7 +228,8 @@ def get_device_load_map(version: str = "new") -> dict[str, int]:
     获取设备装载量映射
     version: "new" (默认) 或 "old"
     """
-    config = _runtime_config if _runtime_config is not None else load_config()
+    with _runtime_lock:  # M3
+        config = _runtime_config if _runtime_config is not None else load_config()
     key = f"device_load_map_{version}" if version != "new" else "device_load_map"
     return config.get(key, {})
 
@@ -209,19 +237,24 @@ def get_device_load_map(version: str = "new") -> dict[str, int]:
 def apply_device_load_map(device_load_map: dict[str, int]) -> dict[str, int]:
     """仅在当前运行时应用设备装载量映射，不持久化到文件"""
     global _runtime_config
-    config = load_config()
-    config["device_load_map"] = dict(device_load_map)
-    _runtime_config = config
-    return _runtime_config["device_load_map"]
+    with _runtime_lock:  # M3
+        config = load_config()
+        config["device_load_map"] = dict(device_load_map)
+        _runtime_config = config
+        return _runtime_config["device_load_map"]
 
 
 def update_device_load_map(updates: dict[str, int]) -> dict[str, int]:
     """更新设备装载量映射（写入 config.json）"""
+    global _runtime_config
     config = _load_json(_CONFIG_FILE)
     if "device_load_map" not in config:
         config["device_load_map"] = {}
     config["device_load_map"].update(updates)
     _save_json(_CONFIG_FILE, config)
+    _invalidate_config_cache()
+    with _runtime_lock:  # M2: 清除运行时缓存，确保下次读取使用最新值
+        _runtime_config = None
     return config["device_load_map"]
 
 
@@ -246,6 +279,7 @@ def set_default_shift(shift: str) -> None:
     config = _load_json(_CONFIG_FILE)
     config["default_shift"] = shift
     _save_json(_CONFIG_FILE, config)
+    _invalidate_config_cache()
 
 
 def get_default_year() -> int:
@@ -282,6 +316,7 @@ def save_user_config(user_config: dict[str, Any]) -> None:
     user_file = _load_json(_USER_CONFIG_FILE)
     user_file[_USER_CONFIG_SECTION] = dict(user_config)
     _save_json(_USER_CONFIG_FILE, user_file)
+    _invalidate_config_cache()
 
 
 def update_user_config(updates: dict[str, Any]) -> dict[str, Any]:
@@ -293,6 +328,7 @@ def update_user_config(updates: dict[str, Any]) -> dict[str, Any]:
     current.update(updates)
     user_file[_USER_CONFIG_SECTION] = current
     _save_json(_USER_CONFIG_FILE, user_file)
+    _invalidate_config_cache()
     return current
 
 
@@ -312,6 +348,7 @@ def reset_user_config(section: str | None = None) -> None:
         user_config.pop(section, None)
         user_file[_USER_CONFIG_SECTION] = user_config
     _save_json(_USER_CONFIG_FILE, user_file)
+    _invalidate_config_cache()
 
 
 def get_user_config_default(section: str | None = None, default: Any = None) -> Any:
@@ -383,6 +420,7 @@ def set_worktime_header_apply(enabled: bool) -> None:
     config = _load_json(_CONFIG_FILE)
     config["worktime_header_apply"] = bool(enabled)
     _save_json(_CONFIG_FILE, config)
+    _invalidate_config_cache()
 
 
 # ---------------------------------------------------------------------------
