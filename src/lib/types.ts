@@ -1,5 +1,10 @@
 /** Python bridge 类型定义 */
 
+/** Tauri Python bridge 调用接口 (M9) */
+export interface BridgeProp {
+  call: <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>;
+}
+
 /** Python RPC 请求 */
 export interface RpcRequest {
   id: number;
@@ -30,6 +35,7 @@ export interface LogEntry {
   level: string;
   message: string;
   timestamp?: string;
+  seq?: number;  // M13: 用于 React key，保证稳定性
 }
 
 /** 批处理进度事件 */

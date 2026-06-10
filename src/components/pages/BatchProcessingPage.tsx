@@ -1,13 +1,14 @@
 import { useState, useMemo, useCallback } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { BatchProgress, ScanResult } from "../../lib/types";
+import type { BridgeProp, BatchProgress, ScanResult } from "../../lib/types";
+import { FolderIcon } from "../../lib/icons";
+import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 
 // ═══════════════════════════════════════
 // Types
 // ═══════════════════════════════════════
 
-interface BridgeProp {
-  call: <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>;
+interface BatchBridgeProp extends BridgeProp {
   cancel: () => Promise<void>;
   progress: BatchProgress | null;
   setProgress: (p: BatchProgress | null) => void;
@@ -17,14 +18,6 @@ type TableMergeMode = "split" | "merge" | "table_merge";
 type BaseTableType = "fuel" | "worktime";
 
 // ═══════════════════════════════════════
-// Design-system tokens
-// ═══════════════════════════════════════
-
-const inputClass = "border border-slate-300 rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-colors";
-const btnSecondaryClass = "shrink-0 flex items-center gap-1.5 text-sm border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-3 py-1.5 rounded-md transition-colors";
-const btnPrimaryClass = "flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed";
-
-// ═══════════════════════════════════════
 // Lucide-style SVG Icons (16x16, stroke-width 2)
 // ═══════════════════════════════════════
 
@@ -32,12 +25,6 @@ const SearchIcon = () => (
   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="11" cy="11" r="8" />
     <line x1="21" y1="21" x2="16.65" y2="16.65" />
-  </svg>
-);
-
-const FolderIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" />
   </svg>
 );
 
@@ -403,7 +390,7 @@ function ProgressBar({ percent, stage, detail }: { percent: number; stage: strin
 // Main page component
 // ═══════════════════════════════════════
 
-export function BatchProcessingPage({ bridge }: { bridge: BridgeProp }) {
+export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
   // -- Path & scan --
   const [folderPath, setFolderPath] = useState("");
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);

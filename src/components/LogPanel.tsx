@@ -163,7 +163,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
             const dotColor = LEVEL_DOT[entry.level] || DEFAULT_DOT;
             return (
               <div
-                key={i}
+                key={entry.seq ?? entry.timestamp ?? i}
                 className="py-0.5 flex items-baseline gap-3 hover:bg-slate-50 rounded px-1 -mx-1"
               >
                 <span

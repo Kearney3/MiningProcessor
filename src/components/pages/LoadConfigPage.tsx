@@ -1,8 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-
-interface BridgeProp {
-  call: <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>;
-}
+import type { BridgeProp } from "../../lib/types";
 
 type LoadMap = Record<string, number>;
 
@@ -261,9 +258,22 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
     [],
   );
 
+  // M14: 使用 stable stringify 避免 key 顺序变化导致误判
+  const stableStringify = useCallback(
+    (obj: unknown): string => JSON.stringify(obj, (_key: string, value: unknown) => {
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        return Object.keys(value as Record<string, unknown>).sort().reduce(
+          (sorted: Record<string, unknown>, k) => { sorted[k] = (value as Record<string, unknown>)[k]; return sorted; },
+          {},
+        );
+      }
+      return value;
+    }),
+    [],
+  );
   const isDirty = useMemo(
-    () => JSON.stringify(loadMap) !== JSON.stringify(persistedMap),
-    [loadMap, persistedMap],
+    () => stableStringify(loadMap) !== stableStringify(persistedMap),
+    [loadMap, persistedMap, stableStringify],
   );
 
   /* ---- data loading ---------------------------------------------- */
