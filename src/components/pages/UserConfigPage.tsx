@@ -895,7 +895,7 @@ const DATA_TYPE_LABELS: Record<string, string> = {
 // 每个数据类型可选的 MineBase 目标字段
 const TARGET_FIELDS: Record<string, string[]> = {
   work_efficiency: [
-    "equipmentName", "equipmentCode", "brand", "plannedMinutes", "plannedHours",
+    "equipmentName", "equipmentCode", "company", "plannedMinutes", "plannedHours",
     "parkShift", "transfer", "auxiliaryWork", "waitingLoad", "blasting",
     "mealBreak", "refueling", "plannedMaintenance", "unplannedFault", "standby",
     "weatherSnow", "weatherDust", "fillWater", "totalProductionMinutes",

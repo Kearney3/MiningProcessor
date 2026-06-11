@@ -16,6 +16,7 @@ from func.equipment_ledger import EquipmentLedger
 from func.oil_ledger import OilLedger
 from func import config_loader
 from func.logger import get_logger
+from func.excel_utils import dedup_dataframe
 from func.string_utils import clean_string
 
 
@@ -729,6 +730,7 @@ def _table_merge_and_write(
         _emit_progress(progress_cb, {"stage": "cancelled", "percent": 2/3, "current": 2, "total": 3, "detail": "用户取消，已完成部分输出"})
         return
     merged = _reorder_columns(merged)
+    merged = dedup_dataframe(merged, "表内合并")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_file = os.path.join(folder_path, f"表内合并结果_{year}{month:02d}_{timestamp}.xlsx")
     merged.to_excel(output_file, index=False, sheet_name="合并数据")
@@ -764,6 +766,7 @@ def _write_merged(
                 prefixed_name = f"{prefix}{sheet_name}"
                 if len(prefixed_name) > 31:
                     prefixed_name = prefixed_name[:31]
+                df = dedup_dataframe(df, prefixed_name)
                 df.to_excel(writer, sheet_name=prefixed_name, index=False)
                 current += 1
                 logger.info(f"写入 Sheet: {prefixed_name} ({len(df)} 行)")
@@ -801,6 +804,7 @@ def _write_separate(
         output_file = os.path.join(folder_path, output_files.get(module_type, f"{module_type}.xlsx"))
         with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
             for sheet_name, df in sheets.items():
+                df = dedup_dataframe(df, sheet_name)
                 df.to_excel(writer, sheet_name=sheet_name, index=False)
                 logger.info(f"写入: {output_file} / {sheet_name} ({len(df)} 行)")
         current += 1

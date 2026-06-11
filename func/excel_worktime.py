@@ -5,7 +5,7 @@ import argparse
 # 假设 func.logger 已经正确配置
 from func.logger import get_logger
 from func.string_utils import clean_string
-from func.excel_utils import split_day_night_shifts, clean_split_dataframe, strip_date_column, sort_by_date_shift
+from func.excel_utils import split_day_night_shifts, clean_split_dataframe, strip_date_column, sort_by_date_shift, dedup_dataframe
 
 logger = get_logger(__name__)
 
@@ -163,6 +163,9 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
     # 6. 应用表头映射（数据处理完成后，对最终列结构进行重命名）
     if header_mapping and header_mapping.get('entries'):
         final_df = _apply_header_mapping(final_df, header_mapping)
+
+    # 去重
+    final_df = dedup_dataframe(final_df, "工时数据")
 
     # 7. 输出到Excel
     if output_file is None:

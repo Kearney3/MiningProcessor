@@ -6,7 +6,7 @@ import argparse
 
 from func.logger import get_logger
 from func.string_utils import clean_string
-from func.excel_utils import split_day_night_shifts, clean_split_dataframe, strip_date_column, sort_by_date_shift
+from func.excel_utils import split_day_night_shifts, clean_split_dataframe, strip_date_column, sort_by_date_shift, dedup_dataframe
 logger = get_logger(__name__)
 
 
@@ -144,6 +144,9 @@ def process_directory(base_dir, year, month, output_file):
         if removed_count > 0:
             logger.info(f"自动清理了 {removed_count} 行混入数据的重复表头！")
     # ---------------------------------------------------------
+
+    # 去重
+    final_df = dedup_dataframe(final_df, "多文件工时合并")
 
     # 保存
     final_df.to_excel(output_file, index=False)

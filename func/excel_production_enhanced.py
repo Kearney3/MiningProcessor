@@ -12,6 +12,7 @@ import re
 from func import config_loader
 from func.string_utils import clean_string
 from func.logger import get_logger
+from func.excel_utils import dedup_dataframe
 
 logger = get_logger(__name__)
 
@@ -360,6 +361,10 @@ class MiningDataProcessor:
         # 合并运行数据
         running_df = pd.concat([running_df_1, running_df_2], ignore_index=True)
 
+        # 去重
+        running_df = dedup_dataframe(running_df, "运行数据")
+        production_df = dedup_dataframe(production_df, "生产数据")
+
         # 输出单文件结果
         if output_file:
             with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
@@ -455,6 +460,10 @@ class MiningDataProcessor:
             final_running = final_running.sort_values(by=["日期", "班次"], kind="stable")
         if not final_production.empty:
             final_production = final_production.sort_values(by=["日期", "班次"], kind="stable")
+
+        # 去重
+        final_running = dedup_dataframe(final_running, "合并运行数据")
+        final_production = dedup_dataframe(final_production, "合并生产数据")
 
         if return_sheets:
             sheets = {}

@@ -6,6 +6,7 @@ import numpy as np
 
 from func.logger import get_logger
 from func.string_utils import clean_string
+from func.excel_utils import dedup_dataframe
 
 logger = get_logger(__name__)
 
@@ -204,6 +205,10 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False):
         df_engine = df_engine.drop(columns=['shift_rank'])
     if not df_fuel.empty and 'shift_rank' in df_fuel.columns:
         df_fuel = df_fuel.drop(columns=['shift_rank'])
+
+    # 去重
+    df_engine = dedup_dataframe(df_engine, "设备信息")
+    df_fuel = dedup_dataframe(df_fuel, "油耗信息")
 
     if return_sheets:
         sheets = {}
