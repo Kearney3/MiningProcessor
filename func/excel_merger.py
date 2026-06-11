@@ -7,6 +7,7 @@ from typing import List, Tuple
 import pandas as pd
 from func.logger import get_logger
 from func.string_utils import clean_string
+from func.excel_utils import dedup_dataframe
 
 logger = get_logger(__name__)
 
@@ -203,6 +204,7 @@ def merge_excel_files(
 
     with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
         for sname, df in merged_sheets.items():
+            df = dedup_dataframe(df, f"合并-{sname}")
             df.to_excel(writer, sheet_name=sname, index=False)
 
     logger.info(f"\n合并完成！输出文件: {output_file}")

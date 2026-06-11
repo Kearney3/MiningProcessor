@@ -10,6 +10,7 @@ import pandas as pd
 
 from func.equipment_ledger import EquipmentLedger
 from func.oil_ledger import OilLedger
+from func.excel_utils import dedup_dataframe
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +165,7 @@ def apply_ledger_matching(
     # 重写 Excel
     with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
         for sheet_name, df in sheet_data.items():
+            df = dedup_dataframe(df, f"台账匹配-{sheet_name}")
             df.to_excel(writer, sheet_name=sheet_name, index=False)
     logger.info("台账匹配完成，已更新: %s", output_file)
     return True

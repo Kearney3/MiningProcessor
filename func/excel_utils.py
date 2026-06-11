@@ -5,11 +5,16 @@ Excel 处理共享工具函数
 - 日期列标准化（去时间、可选覆盖年份）
 - 按日期+班次排序
 - 工时报表 Day/Night 班次分割与清洗
+- 最终 DataFrame 全列去重
 """
+
+import logging
 
 import pandas as pd
 
 from func.string_utils import clean_string
+
+logger = logging.getLogger(__name__)
 
 
 def strip_date_column(
@@ -160,4 +165,30 @@ def clean_split_dataframe(
     subset_cols = [c for c in df.columns if c not in skip_columns]
     df.dropna(how="all", subset=subset_cols, inplace=True)
 
+    return df
+
+
+def dedup_dataframe(
+    df: pd.DataFrame,
+    label: str = "",
+) -> pd.DataFrame:
+    """对 DataFrame 进行全列去重，保留首次出现的行。
+
+    在各处理器最终写出前调用，消除源数据中的完全重复行。
+
+    Args:
+        df: 待去重的 DataFrame。
+        label: 可选标签，用于日志中标识数据来源。
+
+    Returns:
+        去重后的 DataFrame（新对象）。
+    """
+    if df.empty:
+        return df
+    before = len(df)
+    df = df.drop_duplicates()
+    removed = before - len(df)
+    if removed > 0:
+        tag = f"[{label}] " if label else ""
+        logger.info("%s去重: %d → %d 行，移除 %d 条重复记录", tag, before, len(df), removed)
     return df

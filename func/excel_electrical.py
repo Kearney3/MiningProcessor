@@ -8,6 +8,7 @@ import re
 import argparse
 
 from func.logger import get_logger
+from func.excel_utils import dedup_dataframe
 from func.string_utils import clean_string
 
 logger = get_logger(__name__)
@@ -130,6 +131,9 @@ def parse_excel_data(file_path, target_year=None, return_sheets=False, add_shift
         result_df = result_df[["日期", "班次", "设备名称", "电力消耗"]]
     else:
         result_df = result_df.sort_values(by="日期").reset_index(drop=True)
+
+    # 去重
+    result_df = dedup_dataframe(result_df, "电力消耗")
 
     if return_sheets:
         return {"电力消耗": result_df}
