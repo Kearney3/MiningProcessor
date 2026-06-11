@@ -902,7 +902,7 @@ const TARGET_FIELDS: Record<string, string[]> = {
     "powerIssuePlanned", "powerIssueUnplanned", "totalProductionHours", "remark",
   ],
   fuel_consumption: ["date", "shiftType", "equipmentName", "equipmentCode", "fuelName", "consumption"],
-  electricity_consumption: ["date", "shiftType", "equipmentName", "consumption"],
+  electricity_consumption: ["date", "shiftType", "equipmentName", "equipmentCode", "consumption"],
   equipment_operation: [
     "date", "shiftType", "equipmentName", "company", "engineHoursStart",
     "engineHoursEnd", "runningHours", "milemeterStart", "milemeterEnd", "mileage", "tripCount",

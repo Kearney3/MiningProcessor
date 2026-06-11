@@ -86,7 +86,7 @@
     },
     "minebase_column_mapping": {
         "work_efficiency": {
-            "设备名称": "equipmentName", "设备编号": "equipmentCode",
+            "设备名称": "equipmentName", "设备编号": "equipmentCode", "公司": "company",
             "应运行分钟": "plannedMinutes", "应运行小时数": "plannedHours",
             "停车/换班": "parkShift", "转移": "transfer", "挖机场地推土/清理墙壁": "auxiliaryWork",
             "等待装货": "waitingLoad", "爆破": "blasting", "就餐/休息时间": "mealBreak",
@@ -102,7 +102,8 @@
             "设备编号": "equipmentCode", "油品种类": "fuelName", "油品消耗": "consumption"
         },
         "electricity_consumption": {
-            "日期": "date", "班次": "shiftType", "设备名称": "equipmentName", "电力消耗": "consumption"
+            "日期": "date", "班次": "shiftType", "设备名称": "equipmentName",
+            "设备编号": "equipmentCode", "电力消耗": "consumption"
         },
         "equipment_operation": {
             "日期": "date", "班次": "shiftType", "设备名称": "equipmentName", "公司": "company",

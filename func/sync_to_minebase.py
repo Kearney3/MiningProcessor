@@ -475,11 +475,12 @@ class MineBaseDBClient:
 
 
 # 各表的 dedup 字段定义（PostgreSQL 列名）
+# 与 MineBase UNIQUE 约束保持一致
 DEDUP_FIELDS_MAP: dict[str, list[str]] = {
-    "fuel_consumption": ["date", "shift_type", "equipment_name", "fuel_name"],
-    "electricity_consumption": ["date", "shift_type", "equipment_name"],
-    "work_efficiency": ["date", "shift_type", "equipment_name"],
-    "equipment_operation": ["date", "shift_type", "equipment_name"],
+    "fuel_consumption": ["date", "shift_type", "equipment_name", "equipment_code", "fuel_name"],
+    "electricity_consumption": ["date", "shift_type", "equipment_name", "equipment_code"],
+    "work_efficiency": ["date", "shift_type", "equipment_name", "equipment_code", "company"],
+    "equipment_operation": ["date", "shift_type", "equipment_name", "equipment_code"],
     "production_record": ["date", "shift_type", "truck_name", "excavator_name", "material_type_name"],
 }
 
@@ -513,7 +514,6 @@ FIELD_TO_COLUMN_MAP: dict[str, str] = {
     "totalProductionMinutes": "total_production_minutes",
     "totalProductionHours": "total_production_hours",
     "remark": "remark",
-    "company": "company",
     "engineHoursStart": "engine_hours_start",
     "engineHoursEnd": "engine_hours_end",
     "runningHours": "running_hours",
