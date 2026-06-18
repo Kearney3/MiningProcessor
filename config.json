@@ -109,12 +109,14 @@
             "日期": "date", "班次": "shiftType", "设备名称": "equipmentName", "公司": "company",
             "小时数仪表开始": "engineHoursStart", "小时数仪表结束": "engineHoursEnd",
             "运行小时数": "runningHours", "公里数仪表开始": "milemeterStart",
-            "公里数仪表结束": "milemeterEnd", "运行里程": "mileage", "趟数": "tripCount"
+            "公里数仪表结束": "milemeterEnd", "运行里程": "mileage", "趟数": "tripCount",
+            "备注": "remark"
         },
         "production_record": {
             "日期": "date", "班次": "shiftType", "矿卡名称": "truckName",
             "挖机名称": "excavatorName", "矿石类型": "materialTypeName",
-            "运次": "tripCount", "产量": "production"
+            "运次": "tripCount", "产量": "production",
+            "备注": "remark"
         }
     },
     "minebase": {

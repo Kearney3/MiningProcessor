@@ -13,6 +13,7 @@ sys.path.insert(0, str(ROOT))
 
 from func.sync_to_minebase import (
     MineBaseAPIClient,
+    _apply_defaults,
     _build_field_mappings,
     _map_row_to_db_columns,
     discover_files,
@@ -177,6 +178,18 @@ class TestLoadColumnMapping:
         assert "production_record" in result
         assert "work_efficiency" in result
 
+    def test_default_mapping_has_remark_fields(self):
+        """默认映射应包含 remark 字段映射（有备注列的数据类型）。"""
+        result = load_column_mapping()
+        assert result["equipment_operation"].get("备注") == "remark"
+        assert result["production_record"].get("备注") == "remark"
+        assert result["work_efficiency"].get("注释") == "remark"
+
+    def test_default_mapping_has_company_for_operation(self):
+        """equipment_operation 映射应包含公司 → company。"""
+        result = load_column_mapping()
+        assert result["equipment_operation"].get("公司") == "company"
+
 
 # ---------------------------------------------------------------------------
 # read_and_map_excel
@@ -295,6 +308,48 @@ class TestMapRowToDbColumns:
         columns, values = _map_row_to_db_columns(row)
         assert "unknownField" not in columns
         assert len(columns) == 1
+
+
+# ---------------------------------------------------------------------------
+# _apply_defaults
+# ---------------------------------------------------------------------------
+
+
+class TestApplyDefaults:
+    def test_electrical_no_shift_gets_night(self):
+        rows = [
+            {"date": "2025-06-01", "equipmentName": "EX-001", "consumption": 500.0},
+            {"date": "2025-06-02", "equipmentName": "EX-002", "consumption": 600.0},
+        ]
+        result = _apply_defaults(rows, "electrical")
+        assert all(r["shiftType"] == "Night" for r in result)
+        assert len(result) == 2
+
+    def test_electrical_with_shift_not_overridden(self):
+        rows = [
+            {"date": "2025-06-01", "shiftType": "Day", "equipmentName": "EX-001", "consumption": 500.0},
+        ]
+        result = _apply_defaults(rows, "electrical")
+        assert result[0]["shiftType"] == "Day"
+
+    def test_non_electrical_not_affected(self):
+        rows = [
+            {"date": "2025-06-01", "equipmentName": "CAT785D-01", "consumption": 150.0},
+        ]
+        result = _apply_defaults(rows, "fuel")
+        assert "shiftType" not in result[0]
+
+    def test_empty_rows(self):
+        result = _apply_defaults([], "electrical")
+        assert result == []
+
+    def test_returns_new_list(self):
+        """不修改原始列表（不可变性）。"""
+        rows = [{"date": "2025-06-01", "consumption": 500.0}]
+        result = _apply_defaults(rows, "electrical")
+        assert result is not rows
+        assert "shiftType" not in rows[0]
+        assert result[0]["shiftType"] == "Night"
 
 
 # ---------------------------------------------------------------------------
