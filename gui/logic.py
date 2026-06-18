@@ -658,12 +658,24 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log):
     btn = sync_refs["btn"]
     result_text = sync_refs["result_text"]
 
+    # 年份/月份
+    year_val = sync_refs.get("year")
+    month_val = sync_refs.get("month")
+    year = int(year_val.value) if year_val and year_val.value else None
+    month = int(month_val.value) if month_val and month_val.value else None
+
+    # 日期范围
+    date_start_val = sync_refs.get("date_start")
+    date_end_val = sync_refs.get("date_end")
+    date_start = date_start_val.value.strip() if date_start_val and date_start_val.value else None
+    date_end = date_end_val.value.strip() if date_end_val and date_end_val.value else None
+
     set_btn_state(btn, False, "同步中...")
     result_text.visible = False
     result_text.update()
 
     try:
-        _log_message(log, f"[数据同步] 开始同步 (模式={mode}, 类型={selected_types}, 预览={dry_run})")
+        _log_message(log, f"[数据同步] 开始同步 (模式={mode}, 类型={selected_types}, 预览={dry_run}, 年={year}, 月={month}, 日期={date_start}~{date_end})")
 
         def _do_sync():
             return sync_to_minebase(
@@ -671,6 +683,10 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log):
                 mode=mode,
                 data_types=selected_types,
                 dry_run=dry_run,
+                year=year,
+                month=month,
+                date_start=date_start,
+                date_end=date_end,
             )
 
         results = await asyncio.to_thread(_do_sync)

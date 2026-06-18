@@ -15,6 +15,7 @@ from func.sync_to_minebase import (
     MineBaseAPIClient,
     _apply_defaults,
     _build_field_mappings,
+    _filter_by_date_range,
     _map_row_to_db_columns,
     discover_files,
     load_column_mapping,
@@ -353,7 +354,63 @@ class TestApplyDefaults:
 
 
 # ---------------------------------------------------------------------------
-# discover_files
+# _filter_by_date_range
+# ---------------------------------------------------------------------------
+
+
+class TestFilterByDateRange:
+    SAMPLE_ROWS = [
+        {"date": "2025-06-01", "equipmentName": "A", "consumption": 100},
+        {"date": "2025-06-02", "equipmentName": "B", "consumption": 200},
+        {"date": "2025-06-03", "equipmentName": "C", "consumption": 300},
+        {"date": "2025-06-04", "equipmentName": "D", "consumption": 400},
+    ]
+
+    def test_no_filter_returns_all(self):
+        result = _filter_by_date_range(self.SAMPLE_ROWS, None, None)
+        assert len(result) == 4
+
+    def test_start_date_filter(self):
+        result = _filter_by_date_range(self.SAMPLE_ROWS, "2025-06-02", None)
+        assert len(result) == 3
+        assert result[0]["date"] == "2025-06-02"
+
+    def test_end_date_filter(self):
+        result = _filter_by_date_range(self.SAMPLE_ROWS, None, "2025-06-03")
+        assert len(result) == 3
+        assert result[-1]["date"] == "2025-06-03"
+
+    def test_both_dates_filter(self):
+        result = _filter_by_date_range(self.SAMPLE_ROWS, "2025-06-02", "2025-06-03")
+        assert len(result) == 2
+        assert result[0]["date"] == "2025-06-02"
+        assert result[1]["date"] == "2025-06-03"
+
+    def test_exact_date_match(self):
+        result = _filter_by_date_range(self.SAMPLE_ROWS, "2025-06-03", "2025-06-03")
+        assert len(result) == 1
+        assert result[0]["date"] == "2025-06-03"
+
+    def test_no_match(self):
+        result = _filter_by_date_range(self.SAMPLE_ROWS, "2025-07-01", "2025-07-31")
+        assert len(result) == 0
+
+    def test_rows_without_date_kept(self):
+        rows = [{"equipmentName": "X"}, {"date": "2025-06-01"}]
+        result = _filter_by_date_range(rows, "2025-06-02", None)
+        assert len(result) == 1  # 无 date 的行保留
+
+    def test_returns_new_list(self):
+        result = _filter_by_date_range(self.SAMPLE_ROWS, "2025-06-02", None)
+        assert result is not self.SAMPLE_ROWS
+
+    def test_empty_rows(self):
+        result = _filter_by_date_range([], "2025-06-01", "2025-06-30")
+        assert result == []
+
+
+# ---------------------------------------------------------------------------
+# discover_files (keyword-based)
 # ---------------------------------------------------------------------------
 
 
@@ -379,6 +436,31 @@ class TestDiscoverFiles:
         found = discover_files(tmp_path)
         assert "fuel" in found
         assert "electrical" not in found
+
+    def test_discover_with_keywords(self, tmp_path):
+        """关键字匹配模式与 excel_batch 一致。"""
+        import shutil
+        # 创建带有关键字的文件
+        (tmp_path / "Fuel report 2025.xlsx").write_bytes(b"")
+        (tmp_path / "工作效率表_2025.xlsx").write_bytes(b"")
+
+        keywords = {
+            "fuel": ["Fuel report"],
+            "worktime": ["工作效率表"],
+        }
+        found = discover_files(tmp_path, keywords=keywords)
+        assert "fuel" in found
+        assert found["fuel"].name == "Fuel report 2025.xlsx"
+        assert "work_efficiency" in found
+
+    def test_discover_with_year_month(self, tmp_path):
+        """year/month 用于 work_efficiency 文件名匹配。"""
+        (tmp_path / "202501_工作效率表.xlsx").write_bytes(b"")
+        (tmp_path / "202506_工作效率表.xlsx").write_bytes(b"")
+
+        found = discover_files(tmp_path, year=2025, month=6, keywords={})
+        assert "work_efficiency" in found
+        assert "202506" in found["work_efficiency"].name
 
 
 # ---------------------------------------------------------------------------

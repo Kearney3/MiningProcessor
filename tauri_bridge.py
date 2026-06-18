@@ -412,6 +412,10 @@ def _sync_minebase(params: dict) -> dict:
         data_types=params.get("data_types"),
         dry_run=params.get("dry_run", False),
         mapping_file=params.get("mapping_file"),
+        year=params.get("year"),
+        month=params.get("month"),
+        date_start=params.get("date_start"),
+        date_end=params.get("date_end"),
     )
     return {"results": results}
 
