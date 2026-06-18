@@ -5,6 +5,20 @@ import { FolderIcon } from "../../lib/icons";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 
 // ═══════════════════════════════════════
+// Date helpers
+// ═══════════════════════════════════════
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function yesterdayISO(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+// ═══════════════════════════════════════
 // Lucide-style SVG Icons (16x16, stroke-width 2)
 // ═══════════════════════════════════════
 
@@ -140,6 +154,17 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const [result, setResult] = useState<SyncResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // 处理参数
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
+  const [year, setYear] = useState(String(currentYear));
+  const [month, setMonth] = useState(String(currentMonth));
+  const [headerRow, setHeaderRow] = useState("");
+
+  // 日期范围
+  const [dateStart, setDateStart] = useState(yesterdayISO());
+  const [dateEnd, setDateEnd] = useState(todayISO());
+
   const allSelected = ALL_TYPES.length === dataTypes.length;
   const someSelected = dataTypes.length > 0 && !allSelected;
 
@@ -161,6 +186,10 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
         mode,
         data_types: dataTypes,
         dry_run: dryRun,
+        year: year ? Number(year) : undefined,
+        month: month ? Number(month) : undefined,
+        date_start: dateStart || undefined,
+        date_end: dateEnd || undefined,
       });
       setResult(res);
     } catch (e) {
@@ -287,6 +316,87 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
           <div>
             <div className="text-sm text-slate-700">试运行</div>
             <div className="text-xs text-slate-400 mt-0.5">仅预览同步内容，不实际推送到 MineBase</div>
+          </div>
+        </div>
+
+        {/* Processing params — year / month / header row */}
+        <div className="border-t border-slate-100 pt-4">
+          <label className="text-xs font-medium text-slate-500 mb-2 block">处理参数</label>
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">年份</label>
+              <select
+                value={year}
+                onChange={(e) => setYear(e.target.value)}
+                className={`${inputClass} w-full`}
+              >
+                {Array.from({ length: 5 }, (_, i) => currentYear - 2 + i).map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">月份</label>
+              <select
+                value={month}
+                onChange={(e) => setMonth(e.target.value)}
+                className={`${inputClass} w-full`}
+              >
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                  <option key={m} value={m}>{m}月</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">表头起始行</label>
+              <input
+                type="number"
+                value={headerRow}
+                onChange={(e) => setHeaderRow(e.target.value)}
+                placeholder="自动检测"
+                min="1"
+                className={`${inputClass} w-full`}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Date range filter */}
+        <div className="border-t border-slate-100 pt-4">
+          <label className="text-xs font-medium text-slate-500 mb-2 block">日期范围过滤</label>
+          <div className="flex items-end gap-3">
+            <div className="flex-1">
+              <label className="text-xs text-slate-400 mb-1 block">起始日期</label>
+              <input
+                type="date"
+                value={dateStart}
+                onChange={(e) => setDateStart(e.target.value)}
+                className={`${inputClass} w-full`}
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-xs text-slate-400 mb-1 block">结束日期</label>
+              <input
+                type="date"
+                value={dateEnd}
+                onChange={(e) => setDateEnd(e.target.value)}
+                className={`${inputClass} w-full`}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => { setDateStart(yesterdayISO()); setDateEnd(yesterdayISO()); }}
+              className={btnSecondaryClass}
+            >
+              昨日
+            </button>
+            <button
+              type="button"
+              onClick={() => { setDateStart(""); setDateEnd(""); }}
+              className={btnSecondaryClass}
+            >
+              清除
+            </button>
           </div>
         </div>
       </div>
