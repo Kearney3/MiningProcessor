@@ -247,6 +247,22 @@ class MineBaseAPIClient:
         return self._request("POST", f"/api/import/{table}/cancel", {"sessionId": session_id})
 
 
+def _apply_defaults(rows: list[dict[str, Any]], data_type: str) -> list[dict[str, Any]]:
+    """为特定数据类型填充缺失字段的默认值。
+
+    - electrical: 若缺少 shiftType，默认填充 "Night"。
+    """
+    if data_type != "electrical":
+        return rows
+
+    result = []
+    for row in rows:
+        if "shiftType" not in row:
+            row = {**row, "shiftType": "Night"}
+        result.append(row)
+    return result
+
+
 def _build_field_mappings(column_mapping: dict[str, str], table: str) -> list[dict]:
     """构建 MineBase API 所需的 fieldMappings 数组。"""
     # 定义哪些字段需要 FK 解析
@@ -795,6 +811,7 @@ def sync(
 
             sheet = DATA_TYPE_REGISTRY[data_type]["sheet"]
             rows = read_and_map_excel(file_path, sheet, mapping)
+            rows = _apply_defaults(rows, data_type)
 
             if sync_mode == "api":
                 results[data_type] = sync_via_api(data_type, rows, mapping, api_client, dry_run)
