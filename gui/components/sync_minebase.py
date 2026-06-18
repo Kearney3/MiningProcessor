@@ -1,5 +1,5 @@
 """MineBase 数据同步区域组件"""
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import flet as ft
 
@@ -115,7 +115,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     ledger_match_check = ft.Checkbox(
         label="应用台账匹配",
-        value=False,
+        value=True,
         active_color=theme.PRIMARY,
         tooltip="使用设备台账标准化设备名称",
     )
@@ -150,27 +150,71 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     today = date.today()
     yesterday = today - timedelta(days=1)
 
-    date_start_field = ft.TextField(
-        label="起始日期",
-        value=yesterday.isoformat(),
-        width=140,
-        dense=True,
-        hint_text="YYYY-MM-DD",
+    date_filter_check = ft.Checkbox(
+        label="日期范围过滤",
+        value=True,
+        active_color=theme.PRIMARY,
+        tooltip="开启后只同步所选日期范围内的数据",
     )
 
-    date_end_field = ft.TextField(
-        label="结束日期",
-        value=today.isoformat(),
-        width=140,
-        dense=True,
-        hint_text="YYYY-MM-DD",
+    class _DateValue:
+        """简单的值容器，兼容 logic.py 中 refs['date_start'].value 的读取方式"""
+        def __init__(self, init: str = ""):
+            self.value = init
+
+    _date_start_val = _DateValue(yesterday.isoformat())
+    _date_end_val = _DateValue(yesterday.isoformat())
+
+    _start_display = ft.Text(
+        _date_start_val.value, size=13, weight=ft.FontWeight.W_500,
     )
+    _end_display = ft.Text(
+        _date_end_val.value, size=13, weight=ft.FontWeight.W_500,
+    )
+
+    def _update_displays():
+        _start_display.value = _date_start_val.value or "未设置"
+        _end_display.value = _date_end_val.value or "未设置"
+        try:
+            _start_display.update()
+            _end_display.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    def _make_on_pick(target_val: _DateValue):
+        async def _on_pick(e):
+            dp = ft.DatePicker(
+                first_date=datetime(2015, 1, 1),
+                last_date=datetime(2040, 12, 31),
+                current_date=datetime.combine(
+                    date.fromisoformat(target_val.value) if target_val.value else yesterday,
+                    datetime.min.time(),
+                ),
+            )
+            def _on_picked(ev):
+                if dp.value:
+                    target_val.value = dp.value.date().isoformat()
+                    _update_displays()
+                page.pop_dialog()
+            dp.on_change = _on_picked
+            dp.on_dismiss = lambda ev: page.pop_dialog()
+            page.show_dialog(dp)
+        return _on_pick
+
+    _pick_start_btn = theme.secondary_btn(
+        "选择", icon=ft.Icons.CALENDAR_MONTH, height=32,
+    )
+    _pick_start_btn.on_click = _make_on_pick(_date_start_val)
+
+    _pick_end_btn = theme.secondary_btn(
+        "选择", icon=ft.Icons.CALENDAR_MONTH, height=32,
+    )
+    _pick_end_btn.on_click = _make_on_pick(_date_end_val)
 
     def on_yesterday_click(e):
-        date_start_field.value = yesterday.isoformat()
-        date_end_field.value = yesterday.isoformat()
-        date_start_field.update()
-        date_end_field.update()
+        _date_start_val.value = yesterday.isoformat()
+        _date_end_val.value = yesterday.isoformat()
+        _update_displays()
 
     yesterday_btn = ft.ElevatedButton(
         "昨日",
@@ -182,10 +226,9 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     )
 
     def on_clear_date(e):
-        date_start_field.value = ""
-        date_end_field.value = ""
-        date_start_field.update()
-        date_end_field.update()
+        _date_start_val.value = ""
+        _date_end_val.value = ""
+        _update_displays()
 
     clear_date_btn = ft.ElevatedButton(
         "清除",
@@ -195,6 +238,36 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
             shape=ft.RoundedRectangleBorder(radius=theme.RADIUS_SM),
         ),
     )
+
+    date_range_row = ft.ResponsiveRow(
+        [
+            ft.Container(
+                ft.Row([ft.Text("起始", size=12, color=theme.TEXT_SECONDARY), _start_display, _pick_start_btn], spacing=6),
+                col={"xs": 12, "md": 6},
+            ),
+            ft.Container(
+                ft.Row([ft.Text("结束", size=12, color=theme.TEXT_SECONDARY), _end_display, _pick_end_btn], spacing=6),
+                col={"xs": 12, "md": 6},
+            ),
+            ft.Container(
+                ft.Row([yesterday_btn, clear_date_btn], spacing=8),
+                col={"xs": 12},
+            ),
+        ],
+        run_spacing=4,
+        alignment=ft.MainAxisAlignment.START,
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        visible=date_filter_check.value,
+    )
+
+    def _on_date_filter_toggle(e):
+        date_range_row.visible = date_filter_check.value
+        try:
+            date_range_row.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    date_filter_check.on_change = _on_date_filter_toggle
 
     # --- 同步按钮 ---
     sync_btn = theme.primary_btn("同步到 MineBase", icon=ft.Icons.CLOUD_UPLOAD)
@@ -237,20 +310,8 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
                                 run_spacing=4,
                             ),
                             ft.Divider(height=1, color=theme.BORDER),
-                            ft.Text("日期范围过滤", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
-                            ft.ResponsiveRow(
-                                [
-                                    ft.Container(date_start_field, col={"xs": 6, "md": 3}),
-                                    ft.Container(date_end_field, col={"xs": 6, "md": 3}),
-                                    ft.Container(
-                                        ft.Row([yesterday_btn, clear_date_btn], spacing=8),
-                                        col={"xs": 12, "md": 6},
-                                    ),
-                                ],
-                                run_spacing=4,
-                                alignment=ft.MainAxisAlignment.START,
-                                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                            ),
+                            date_filter_check,
+                            date_range_row,
                             ft.Divider(height=1, color=theme.BORDER),
                             ft.Text("数据类型", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
                             type_row,
@@ -288,8 +349,9 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "year": year_dropdown,
         "month": month_dropdown,
         "header_row": header_row_field,
-        "date_start": date_start_field,
-        "date_end": date_end_field,
+        "date_start": _date_start_val,
+        "date_end": _date_end_val,
+        "date_filter_toggle": date_filter_check,
         "apply_header": header_mapping_check,
         "use_ledger": ledger_match_check,
     }

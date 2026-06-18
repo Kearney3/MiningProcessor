@@ -452,7 +452,7 @@ class TestDiscoverFiles:
         }
         found = discover_files(tmp_path, keywords=keywords)
         assert "fuel" in found
-        assert found["fuel"].name == "Fuel report 2025.xlsx"
+        assert found["fuel"][0].name == "Fuel report 2025.xlsx"
         assert "work_efficiency" in found
 
     def test_discover_with_year_month(self, tmp_path):
@@ -462,7 +462,7 @@ class TestDiscoverFiles:
 
         found = discover_files(tmp_path, year=2025, month=6, keywords={})
         assert "work_efficiency" in found
-        assert "202506" in found["work_efficiency"].name
+        assert "202506" in found["work_efficiency"][0].name
 
 
 # ---------------------------------------------------------------------------
@@ -553,7 +553,7 @@ class TestDiscoverFilesGlobPriority:
 
         found = discover_files(tmp_path, keywords={"fuel": ["Fuel report"]})
         assert "fuel" in found
-        assert found["fuel"].name == "Fuel.xlsx"
+        assert found["fuel"][0].name == "Fuel.xlsx"
 
     def test_discover_files_glob_finds_processed_outputs(self, tmp_path):
         """验证 discover_files 通过 DATA_TYPE_REGISTRY pattern 找到所有 processed output。"""
@@ -563,11 +563,11 @@ class TestDiscoverFilesGlobPriority:
         (tmp_path / "202506_工作效率表.xlsx").write_bytes(b"")
 
         found = discover_files(tmp_path, year=2025, month=6, keywords={})
-        assert found["fuel"].name == "Fuel.xlsx"
-        assert found["electrical"].name == "电力消耗统计.xlsx"
-        assert found["production"].name == "合并产量.xlsx"
-        assert found["operation"].name == "合并产量.xlsx"
-        assert found["work_efficiency"].name == "202506_工作效率表.xlsx"
+        assert found["fuel"][0].name == "Fuel.xlsx"
+        assert found["electrical"][0].name == "电力消耗统计.xlsx"
+        assert found["production"][0].name == "合并产量.xlsx"
+        assert found["operation"][0].name == "合并产量.xlsx"
+        assert found["work_efficiency"][0].name == "202506_工作效率表.xlsx"
 
     def test_discover_files_keyword_fallback_when_no_glob_match(self, tmp_path):
         """当不存在 processed output 时，关键字匹配作为回退。"""
@@ -576,7 +576,7 @@ class TestDiscoverFilesGlobPriority:
 
         found = discover_files(tmp_path, keywords={"fuel": ["Fuel report"]})
         assert "fuel" in found
-        assert found["fuel"].name == "Fuel report Normount 6-2026.xlsx"
+        assert found["fuel"][0].name == "Fuel report Normount 6-2026.xlsx"
 
     def test_discover_files_mixed_directory_priority(self, tmp_path):
         """全类型混合目录：所有 data type 都应优先解析到 processed output。"""
@@ -598,11 +598,11 @@ class TestDiscoverFilesGlobPriority:
         }
         found = discover_files(tmp_path, year=2025, month=6, keywords=keywords)
 
-        assert found["fuel"].name == "Fuel.xlsx"
-        assert found["electrical"].name == "电力消耗统计.xlsx"
-        assert found["production"].name == "合并产量.xlsx"
-        assert found["operation"].name == "合并产量.xlsx"
-        assert "202506_工作效率表" in found["work_efficiency"].name
+        assert found["fuel"][0].name == "Fuel.xlsx"
+        assert found["electrical"][0].name == "电力消耗统计.xlsx"
+        assert found["production"][0].name == "合并产量.xlsx"
+        assert found["operation"][0].name == "合并产量.xlsx"
+        assert "202506_工作效率表" in found["work_efficiency"][0].name
 
 
 # ---------------------------------------------------------------------------
@@ -808,7 +808,7 @@ class TestSyncWithProcessors:
     @patch("func.sync_to_minebase.discover_files")
     def test_sync_fuel_via_processor(self, mock_discover, mock_fuel_proc, mock_sync_api, tmp_path):
         """full integration - patch processor AND api client, verify sync() sends fuel data."""
-        mock_discover.return_value = {"fuel": tmp_path / "Fuel.xlsx"}
+        mock_discover.return_value = {"fuel": [tmp_path / "Fuel.xlsx"]}
         mock_fuel_proc.return_value = [
             {"date": "2025-06-01", "shiftType": "Day", "equipmentName": "CAT785D-01", "fuelName": "0#柴油", "consumption": 150.5},
         ]
@@ -830,8 +830,8 @@ class TestSyncWithProcessors:
     def test_sync_processor_failure_continues(self, mock_discover, mock_fuel_proc, mock_elec_proc, mock_sync_api, tmp_path):
         """one type fails, others still sync."""
         mock_discover.return_value = {
-            "fuel": tmp_path / "Fuel.xlsx",
-            "electrical": tmp_path / "电力消耗统计.xlsx",
+            "fuel": [tmp_path / "Fuel.xlsx"],
+            "electrical": [tmp_path / "电力消耗统计.xlsx"],
         }
         mock_fuel_proc.side_effect = RuntimeError("boom")
         mock_elec_proc.return_value = [

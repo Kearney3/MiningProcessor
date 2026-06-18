@@ -3,14 +3,11 @@ import { open } from "@tauri-apps/plugin-dialog";
 import type { BridgeProp, SyncResult } from "../../lib/types";
 import { FolderIcon } from "../../lib/icons";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
+import { DatePicker } from "../DatePicker";
 
 // ═══════════════════════════════════════
 // Date helpers
 // ═══════════════════════════════════════
-
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function yesterdayISO(): string {
   const d = new Date();
@@ -163,9 +160,9 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
 
   // 日期范围
   const [dateStart, setDateStart] = useState(yesterdayISO());
-  const [dateEnd, setDateEnd] = useState(todayISO());
+  const [dateEnd, setDateEnd] = useState(yesterdayISO());
   const [applyHeaderMapping, setApplyHeaderMapping] = useState(true);
-  const [useLedger, setUseLedger] = useState(false);
+  const [useLedger, setUseLedger] = useState(true);
 
   const allSelected = ALL_TYPES.length === dataTypes.length;
   const someSelected = dataTypes.length > 0 && !allSelected;
@@ -369,24 +366,18 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
         <div className="border-t border-slate-100 pt-4">
           <label className="text-xs font-medium text-slate-500 mb-2 block">日期范围过滤</label>
           <div className="flex items-end gap-3">
-            <div className="flex-1">
-              <label className="text-xs text-slate-400 mb-1 block">起始日期</label>
-              <input
-                type="date"
-                value={dateStart}
-                onChange={(e) => setDateStart(e.target.value)}
-                className={`${inputClass} w-full`}
-              />
-            </div>
-            <div className="flex-1">
-              <label className="text-xs text-slate-400 mb-1 block">结束日期</label>
-              <input
-                type="date"
-                value={dateEnd}
-                onChange={(e) => setDateEnd(e.target.value)}
-                className={`${inputClass} w-full`}
-              />
-            </div>
+            <DatePicker
+              label="起始日期"
+              value={dateStart}
+              onChange={setDateStart}
+              className="flex-1"
+            />
+            <DatePicker
+              label="结束日期"
+              value={dateEnd}
+              onChange={setDateEnd}
+              className="flex-1"
+            />
             <button
               type="button"
               onClick={() => { setDateStart(yesterdayISO()); setDateEnd(yesterdayISO()); }}
