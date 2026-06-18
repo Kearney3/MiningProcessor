@@ -327,7 +327,7 @@ function FileKeywordsSection({ bridge }: { bridge: BridgeProp }) {
     } catch {
       setKeywords({ ...DEFAULT_FILE_KEYWORDS });
     }
-  }, [bridge]);
+  }, [bridge.call]);
 
   useEffect(() => { reload(); }, [reload]);
 
@@ -427,7 +427,7 @@ function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
       setFuzzy(DEFAULT_HEADER_MAPPING.fuzzy);
       setEntries(DEFAULT_HEADER_MAPPING.entries.map((e) => ({ ...e })));
     }
-  }, [bridge]);
+  }, [bridge.call]);
 
   useEffect(() => { reload(); }, [reload]);
 
@@ -606,24 +606,34 @@ function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
   const [status, setStatus] = useState<{ msg: string; kind: "success" | "error" | "info" }>({ msg: "", kind: "info" });
   const [config, setConfig] = useState<MineBaseConfig>({ ...DEFAULT_MINEBASE_CONFIG });
   const [showPassword, setShowPassword] = useState(false);
+  const [passSaved, setPassSaved] = useState<{ api: boolean; db: boolean }>({ api: false, db: false });
+
+  const MASKED = "********";
+  const KEYRING_SENTINEL = "__KEYRING_SENTINEL__";
 
   const reload = useCallback(async () => {
     try {
       const raw = await bridge.call<MineBaseConfig>("get_config", { key: "minebase" });
       if (raw && typeof raw === "object") {
+        const apiPass = raw.api?.password ?? "";
+        const dbPass = raw.database?.password ?? "";
+        setPassSaved({
+          api: !!(apiPass && apiPass !== KEYRING_SENTINEL ? apiPass : apiPass === KEYRING_SENTINEL),
+          db: !!(dbPass && dbPass !== KEYRING_SENTINEL ? dbPass : dbPass === KEYRING_SENTINEL),
+        });
         setConfig({
           mode: raw.mode ?? "api",
           api: {
             url: raw.api?.url ?? "",
             username: raw.api?.username ?? "",
-            password: raw.api?.password ?? "",
+            password: (apiPass && apiPass !== KEYRING_SENTINEL) || apiPass === KEYRING_SENTINEL ? MASKED : "",
           },
           database: {
             host: raw.database?.host ?? "localhost",
             port: raw.database?.port ?? 5432,
             database: raw.database?.database ?? "minebase",
             user: raw.database?.user ?? "postgres",
-            password: raw.database?.password ?? "",
+            password: (dbPass && dbPass !== KEYRING_SENTINEL) || dbPass === KEYRING_SENTINEL ? MASKED : "",
           },
         });
       } else {
@@ -633,7 +643,7 @@ function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
     } catch {
       setConfig({ ...DEFAULT_MINEBASE_CONFIG });
     }
-  }, [bridge]);
+  }, [bridge.call]);
 
   useEffect(() => { reload(); }, [reload]);
 
@@ -660,7 +670,14 @@ function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
     }
     setSaving(true);
     try {
-      await bridge.call("save_config", { data: { minebase: config }, target: "user" });
+      const resolvePass = (val: string, saved: boolean) =>
+        saved && val === MASKED ? KEYRING_SENTINEL : val;
+      const toSave = {
+        ...config,
+        api: { ...config.api, password: resolvePass(config.api.password, passSaved.api) },
+        database: { ...config.database, password: resolvePass(config.database.password, passSaved.db) },
+      };
+      await bridge.call("save_config", { data: { minebase: toSave }, target: "user" });
       setStatus({ msg: "MineBase 连接配置已保存", kind: "success" });
       setTimeout(() => setStatus({ msg: "", kind: "info" }), 2500);
     } catch (e) {
@@ -680,9 +697,12 @@ function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
     setTesting(true);
     setTestResult(null);
     try {
+      const resolvePass = (val: string, saved: boolean) =>
+        saved && val === MASKED ? KEYRING_SENTINEL : val;
+
       const params = config.mode === "api"
-        ? { mode: "api", url: config.api.url, username: config.api.username, password: config.api.password }
-        : { mode: "database", ...config.database };
+        ? { mode: "api", url: config.api.url, username: config.api.username, password: resolvePass(config.api.password, passSaved.api) }
+        : { mode: "database", host: config.database.host, port: config.database.port, database: config.database.database, user: config.database.user, password: resolvePass(config.database.password, passSaved.db) };
       const res = await bridge.call<{ success: boolean; message: string }>("test_minebase_connection", params);
       setTestResult({ msg: res.message, ok: res.success });
     } catch (e) {
@@ -929,7 +949,7 @@ function ColumnMappingSection({ bridge }: { bridge: BridgeProp }) {
     } finally {
       setLoading(false);
     }
-  }, [bridge]);
+  }, [bridge.call]);
 
   useEffect(() => { if (expanded) loadMapping(); }, [expanded, loadMapping]);
 
