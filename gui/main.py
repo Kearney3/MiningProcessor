@@ -27,6 +27,12 @@ INITIAL_WINDOW_HEIGHT = 900
 
 def main(page: ft.Page):
     setup_logging()
+    # 一次性迁移：将 config.user.json 中明文密码转入系统 Keychain
+    try:
+        from func.secret_store import migrate_passwords_to_keyring
+        migrate_passwords_to_keyring()
+    except Exception:
+        logging.getLogger(__name__).debug("密钥迁移跳过（keyring 不可用或已完成）")
     page.title = "矿山数据处理工具"
     assets_dir = Path(__file__).resolve().parent.parent / "assets"
     page.assets_dir = str(assets_dir)

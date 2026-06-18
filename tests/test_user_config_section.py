@@ -89,9 +89,9 @@ def test_user_config_save_persists_minebase_config(monkeypatch, tmp_path):
     refs["save_mb_config"](DummyControlEvent())
 
     saved = json.loads(user_file.read_text(encoding="utf-8"))
-    assert saved["user_config"]["minebase"]["mode"] == "database"
-    assert saved["user_config"]["minebase"]["database"]["host"] == "127.0.0.1"
-    assert saved["user_config"]["minebase"]["database"]["port"] == 5432
+    assert saved["minebase"]["mode"] == "database"
+    assert saved["minebase"]["database"]["host"] == "127.0.0.1"
+    assert saved["minebase"]["database"]["port"] == 5432
     assert logs[-1] == "已保存 MineBase 连接配置"
 
 

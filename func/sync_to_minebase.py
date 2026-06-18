@@ -962,6 +962,11 @@ _LEDGER_NAME_FIELDS: dict[str, list[str]] = {
     "production": ["truckName", "excavatorName"],
 }
 
+# 各数据类型的油品名称字段（用于油品台账匹配）
+_OIL_LEDGER_NAME_FIELDS: dict[str, list[str]] = {
+    "fuel": ["fuelName"],
+}
+
 
 def _apply_ledger_matching(
     rows: list[dict[str, Any]],
@@ -1006,6 +1011,49 @@ def _apply_ledger_matching(
     return result
 
 
+def _apply_oil_ledger_matching(
+    rows: list[dict[str, Any]],
+    data_type: str,
+    ledger: Any,
+) -> list[dict[str, Any]]:
+    """使用油品台账标准化行数据中的油品名称。
+
+    Args:
+        rows: 已映射的行数据列表。
+        data_type: 数据类型键。
+        ledger: OilLedger 实例。
+
+    Returns:
+        油品名称标准化后的新列表。
+    """
+    from func.oil_ledger import OilLedger
+
+    if not ledger or not isinstance(ledger, OilLedger):
+        return rows
+
+    name_fields = _OIL_LEDGER_NAME_FIELDS.get(data_type, [])
+    if not name_fields:
+        return rows
+
+    matched_count = 0
+    result = []
+    for row in rows:
+        new_row = dict(row)
+        for field in name_fields:
+            raw_name = row.get(field)
+            if not raw_name:
+                continue
+            match = ledger.match(str(raw_name))
+            if match and match["标准名称"] != raw_name:
+                new_row[field] = match["标准名称"]
+                matched_count += 1
+        result.append(new_row)
+
+    if matched_count:
+        logger.info("[%s] 油品台账匹配: 标准化 %d 个油品名称", data_type, matched_count)
+    return result
+
+
 # ---------------------------------------------------------------------------
 # 文件发现
 # ---------------------------------------------------------------------------
@@ -1016,7 +1064,7 @@ def discover_files(
     year: int | None = None,
     month: int | None = None,
     keywords: dict[str, list[str]] | None = None,
-) -> dict[str, Path]:
+) -> dict[str, list[Path]]:
     """在输入目录中查找各数据类型对应的 Excel 文件。
 
     优先使用 DATA_TYPE_REGISTRY 中的 file_pattern 精确匹配已处理的输出文件，
@@ -1030,7 +1078,7 @@ def discover_files(
         keywords: {模块类型: [关键字]}，默认从配置读取。
 
     Returns:
-        {data_type: file_path} 字典。
+        {data_type: [file_path, ...]} 字典，每个类型可对应多个文件。
     """
     if keywords is None:
         keywords = get_file_keywords()
@@ -1041,7 +1089,7 @@ def discover_files(
         if f.suffix.lower() in (".xlsx", ".xls") and not f.name.startswith("~$")
     )
 
-    found: dict[str, Path] = {}
+    found: dict[str, list[Path]] = {}
 
     # 1. DATA_TYPE_REGISTRY.file_pattern 精确匹配已处理输出文件（最高优先级）
     for data_type, info in DATA_TYPE_REGISTRY.items():
@@ -1056,7 +1104,7 @@ def discover_files(
         else:
             matches = list(input_dir.glob(pattern))
         if matches:
-            found[data_type] = matches[0]
+            found[data_type] = [matches[0]]
             logger.info("精确匹配: %s → %s", data_type, matches[0].name)
 
     # 2. work_efficiency 专用 glob：按 year/month 构造精确文件名模式（补充）
@@ -1064,16 +1112,16 @@ def discover_files(
         pattern = f"*{year}{month:02d}*工作效率表*.xlsx"
         matches = sorted(input_dir.glob(pattern))
         if matches:
-            found["work_efficiency"] = matches[0]
+            found["work_efficiency"] = [matches[0]]
             logger.info("Glob 匹配: work_efficiency → %s", matches[0].name)
     elif "work_efficiency" not in found:
         pattern = "*工作效率表*.xlsx"
         matches = sorted(input_dir.glob(pattern))
         if matches:
-            found["work_efficiency"] = matches[0]
+            found["work_efficiency"] = [matches[0]]
             logger.info("Glob 匹配: work_efficiency → %s", matches[0].name)
 
-    # 3. 关键字回退：仅对尚未找到的类型使用关键字匹配
+    # 3. 关键字回退：仅对尚未找到的类型使用关键字匹配（收集所有匹配文件）
     kw_type_map = {
         "fuel": "fuel",
         "electrical": "electrical",
@@ -1097,17 +1145,17 @@ def discover_files(
         if not matched_files:
             continue
 
-        target_file = matched_files[0]
         if isinstance(sync_types, list):
             for st in sync_types:
                 if st not in found:
-                    found[st] = target_file
+                    found[st] = list(matched_files)
         else:
-            found[sync_types] = target_file
-        logger.info("关键字回退: %s → %s", module_type, target_file.name)
+            found[sync_types] = list(matched_files)
+        logger.info("关键字回退: %s → %s (%d 个文件)", module_type, [f.name for f in matched_files], len(matched_files))
 
-    for dt, fp in found.items():
-        logger.info("发现文件: %s → %s", dt, fp.name)
+    for dt, fp_list in found.items():
+        for fp in fp_list:
+            logger.info("发现文件: %s → %s", dt, fp.name)
     return found
 
 
@@ -1241,6 +1289,7 @@ def sync(
 
     # 初始化台账（可选）
     ledger = None
+    oil_ledger = None
     if use_ledger:
         from func.equipment_ledger import EquipmentLedger
         from func.config_loader import load_equipment_ledger_cache
@@ -1251,17 +1300,28 @@ def sync(
             ledger._build_search_cache()
             logger.info("已加载设备台账缓存: %d 条", len(cached))
         else:
-            logger.warning("台账匹配已启用但未找到台账缓存，跳过匹配")
+            logger.warning("设备台账缓存未找到，跳过设备名称匹配")
+
+        from func.oil_ledger import OilLedger
+        from func.config_loader import load_oil_ledger_cache
+        oil_cached = load_oil_ledger_cache()
+        if oil_cached:
+            oil_ledger = OilLedger()
+            oil_ledger._df = pd.DataFrame(oil_cached)
+            oil_ledger._build_search_cache()
+            logger.info("已加载油品台账缓存: %d 条", len(oil_cached))
+        else:
+            logger.warning("油品台账缓存未找到，跳过油品名称匹配")
 
     # 生产文件处理缓存（production 和 operation 可能指向同一文件）
     _production_cache: dict[str, dict[str, list[dict[str, Any]]]] | None = None
 
-    # 逐类型同步
+    # 逐类型同步（每个类型可能对应多个文件）
     results = {}
     try:
-        for data_type, file_path in files.items():
+        for data_type, file_list in files.items():
             logger.info("=" * 50)
-            logger.info("同步 %s: %s", data_type, file_path.name)
+            logger.info("同步 %s: %d 个文件", data_type, len(file_list))
 
             table = DATA_TYPE_REGISTRY[data_type]["table"]
             mapping = column_mapping.get(data_type) or column_mapping.get(table, {})
@@ -1270,39 +1330,47 @@ def sync(
                 results[data_type] = {"success": 0, "skipped": 0, "failed": 0}
                 continue
 
-            try:
-                if data_type == "fuel":
-                    rows = _process_fuel_file(file_path, year)
-                elif data_type == "electrical":
-                    rows = _process_electrical_file(file_path, year)
-                elif data_type in ("production", "operation"):
-                    # 缓存生产文件处理结果，避免同一文件处理两次
-                    cache_key = str(file_path)
-                    if _production_cache is None or cache_key not in _production_cache:
-                        result = _process_production_file(file_path)
-                        if _production_cache is None:
-                            _production_cache = {}
-                        _production_cache[cache_key] = result
-                    rows = _production_cache[cache_key].get(data_type, [])
-                elif data_type == "work_efficiency":
-                    rows = _process_work_efficiency_file(
-                        file_path, year, month, apply_header_mapping,
-                    )
-                else:
-                    rows = read_and_map_excel(file_path, DATA_TYPE_REGISTRY[data_type]["sheet"], mapping)
-            except Exception as e:
-                logger.error("[%s] 处理文件失败: %s — %s", data_type, file_path, e)
+            # 聚合所有文件的行数据
+            all_rows: list[dict[str, Any]] = []
+            for file_path in file_list:
+                logger.info("  处理文件: %s", file_path.name)
+                try:
+                    if data_type == "fuel":
+                        rows = _process_fuel_file(file_path, year)
+                    elif data_type == "electrical":
+                        rows = _process_electrical_file(file_path, year)
+                    elif data_type in ("production", "operation"):
+                        # 缓存生产文件处理结果，避免同一文件处理两次
+                        cache_key = str(file_path)
+                        if _production_cache is None or cache_key not in _production_cache:
+                            result = _process_production_file(file_path)
+                            if _production_cache is None:
+                                _production_cache = {}
+                            _production_cache[cache_key] = result
+                        rows = _production_cache[cache_key].get(data_type, [])
+                    elif data_type == "work_efficiency":
+                        rows = _process_work_efficiency_file(
+                            file_path, year, month, apply_header_mapping,
+                        )
+                    else:
+                        rows = read_and_map_excel(file_path, DATA_TYPE_REGISTRY[data_type]["sheet"], mapping)
+                    all_rows.extend(rows)
+                except Exception as e:
+                    logger.error("[%s] 处理文件失败: %s — %s", data_type, file_path, e)
+
+            if not all_rows:
                 results[data_type] = {"success": 0, "skipped": 0, "failed": 0}
                 continue
 
-            rows = _apply_defaults(rows, data_type)
-            rows = _apply_ledger_matching(rows, data_type, ledger)
-            rows = _filter_by_date_range(rows, date_start, date_end)
+            all_rows = _apply_defaults(all_rows, data_type)
+            all_rows = _apply_ledger_matching(all_rows, data_type, ledger)
+            all_rows = _apply_oil_ledger_matching(all_rows, data_type, oil_ledger)
+            all_rows = _filter_by_date_range(all_rows, date_start, date_end)
 
             if sync_mode == "api":
-                results[data_type] = sync_via_api(data_type, rows, mapping, api_client, dry_run)
+                results[data_type] = sync_via_api(data_type, all_rows, mapping, api_client, dry_run)
             else:
-                results[data_type] = sync_via_db(data_type, rows, mapping, db_client, dry_run)
+                results[data_type] = sync_via_db(data_type, all_rows, mapping, db_client, dry_run)
 
     finally:
         if db_client:

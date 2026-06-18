@@ -665,10 +665,12 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log):
     month = int(month_val.value) if month_val and month_val.value else None
 
     # 日期范围
+    date_filter_toggle = sync_refs.get("date_filter_toggle")
+    date_filter_on = date_filter_toggle.value if date_filter_toggle else True
     date_start_val = sync_refs.get("date_start")
     date_end_val = sync_refs.get("date_end")
-    date_start = date_start_val.value.strip() if date_start_val and date_start_val.value else None
-    date_end = date_end_val.value.strip() if date_end_val and date_end_val.value else None
+    date_start = date_start_val.value.strip() if date_filter_on and date_start_val and date_start_val.value else None
+    date_end = date_end_val.value.strip() if date_filter_on and date_end_val and date_end_val.value else None
 
     # 工时表头映射 & 台账匹配
     apply_header_val = sync_refs.get("apply_header")

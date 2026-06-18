@@ -134,6 +134,26 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
+def _get_nested(d: dict[str, Any], path: tuple[str, ...]) -> Any:
+    """按路径取值，缺 key 时返回 None。"""
+    cur: Any = d
+    for k in path:
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(k)
+    return cur
+
+
+def _set_nested(d: dict[str, Any], path: tuple[str, str, str], value: Any) -> None:
+    """按路径设置值，自动创建中间 dict。"""
+    cur = d
+    for k in path[:-1]:
+        if k not in cur or not isinstance(cur[k], dict):
+            cur[k] = {}
+        cur = cur[k]
+    cur[path[-1]] = value
+
+
 def _load_json(path: Path) -> dict[str, Any]:
     """读取 JSON 文件，不存在时返回空 dict。"""
     if not path.exists():
@@ -521,18 +541,40 @@ def get_minebase_mode() -> str:
 
 
 def get_minebase_api_config() -> dict[str, Any]:
-    """获取 MineBase API 模式配置。"""
-    return get_minebase_config().get("api", {})
+    """获取 MineBase API 模式配置（密码从 Keychain 解密）。"""
+    from .secret_store import load_secret
+
+    cfg = get_minebase_config().get("api", {})
+    if "password" in cfg:
+        cfg = {**cfg, "password": load_secret(("minebase", "api", "password"))}
+    return cfg
 
 
 def get_minebase_db_config() -> dict[str, Any]:
-    """获取 MineBase 数据库直连模式配置。"""
-    return get_minebase_config().get("database", {})
+    """获取 MineBase 数据库直连模式配置（密码从 Keychain 解密）。"""
+    from .secret_store import load_secret
+
+    cfg = get_minebase_config().get("database", {})
+    if "password" in cfg:
+        cfg = {**cfg, "password": load_secret(("minebase", "database", "password"))}
+    return cfg
 
 
 def save_minebase_config(minebase_cfg: dict[str, Any]) -> None:
-    """保存 MineBase 配置到 config.user.json。"""
-    update_user_config({"minebase": minebase_cfg})
+    """保存 MineBase 配置到 config.user.json（密码自动存入 Keychain）。"""
+    from .secret_store import store_secret, _SECRET_PATHS, _KEYRING_SENTINEL
+
+    cfg_to_save = copy.deepcopy(minebase_cfg)
+    for path in _SECRET_PATHS:
+        val = _get_nested(cfg_to_save, path[1:])
+        if val:
+            store_secret(path, val)
+            _set_nested(cfg_to_save, path[1:], _KEYRING_SENTINEL)
+    # 写入 config.user.json 顶层 minebase（与 load_config 合并逻辑一致）
+    user_file = _load_json(_USER_CONFIG_FILE)
+    user_file["minebase"] = cfg_to_save
+    _save_json(_USER_CONFIG_FILE, user_file)
+    _invalidate_config_cache()
 
 
 # ---------------------------------------------------------------------------

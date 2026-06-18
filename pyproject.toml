@@ -11,6 +11,7 @@ dependencies = [
     "flet>=0.21.0",
     "xlsxwriter>=3.0.0",
     "rapidfuzz>=3.0.0",
+    "keyring>=25.0.0",
 ]
 
 [project.optional-dependencies]
