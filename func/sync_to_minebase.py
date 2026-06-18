@@ -915,7 +915,7 @@ def sync(
             logger.info("同步 %s: %s", data_type, file_path.name)
 
             table = DATA_TYPE_REGISTRY[data_type]["table"]
-            mapping = column_mapping.get(data_type, {})
+            mapping = column_mapping.get(data_type) or column_mapping.get(table, {})
             if not mapping:
                 logger.warning("[%s] 映射配置中未找到该数据类型，跳过", data_type)
                 results[data_type] = {"success": 0, "skipped": 0, "failed": 0}
