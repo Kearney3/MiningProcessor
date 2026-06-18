@@ -3,6 +3,7 @@ import json
 import pathlib
 import sys
 from datetime import date
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -15,6 +16,7 @@ from func.sync_to_minebase import (
     MineBaseAPIClient,
     _apply_defaults,
     _build_field_mappings,
+    _df_to_mapped_rows,
     _filter_by_date_range,
     _map_row_to_db_columns,
     discover_files,
@@ -534,3 +536,314 @@ class TestMineBaseConfig:
         monkeypatch.setattr(config_loader, "_CONFIG_FILE", pathlib.Path("/nonexistent"))
         monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", pathlib.Path("/nonexistent"))
         assert config_loader.get_minebase_mode() == "api"
+
+
+# ---------------------------------------------------------------------------
+# discover_files glob vs keyword priority
+# ---------------------------------------------------------------------------
+
+
+class TestDiscoverFilesGlobPriority:
+    def test_discover_files_prefers_glob_over_keywords(self, tmp_path):
+        """当 processed output 和 raw input 同时存在时，discover_files 选择 processed output。"""
+        # 创建 processed output
+        (tmp_path / "Fuel.xlsx").write_bytes(b"")
+        # 创建 raw input（关键字匹配能命中）
+        (tmp_path / "Fuel report Normount 6-2026.xlsx").write_bytes(b"")
+
+        found = discover_files(tmp_path, keywords={"fuel": ["Fuel report"]})
+        assert "fuel" in found
+        assert found["fuel"].name == "Fuel.xlsx"
+
+    def test_discover_files_glob_finds_processed_outputs(self, tmp_path):
+        """验证 discover_files 通过 DATA_TYPE_REGISTRY pattern 找到所有 processed output。"""
+        (tmp_path / "Fuel.xlsx").write_bytes(b"")
+        (tmp_path / "电力消耗统计.xlsx").write_bytes(b"")
+        (tmp_path / "合并产量.xlsx").write_bytes(b"")
+        (tmp_path / "202506_工作效率表.xlsx").write_bytes(b"")
+
+        found = discover_files(tmp_path, year=2025, month=6, keywords={})
+        assert found["fuel"].name == "Fuel.xlsx"
+        assert found["electrical"].name == "电力消耗统计.xlsx"
+        assert found["production"].name == "合并产量.xlsx"
+        assert found["operation"].name == "合并产量.xlsx"
+        assert found["work_efficiency"].name == "202506_工作效率表.xlsx"
+
+    def test_discover_files_keyword_fallback_when_no_glob_match(self, tmp_path):
+        """当不存在 processed output 时，关键字匹配作为回退。"""
+        # 只有 raw input，没有 Fuel.xlsx
+        (tmp_path / "Fuel report Normount 6-2026.xlsx").write_bytes(b"")
+
+        found = discover_files(tmp_path, keywords={"fuel": ["Fuel report"]})
+        assert "fuel" in found
+        assert found["fuel"].name == "Fuel report Normount 6-2026.xlsx"
+
+    def test_discover_files_mixed_directory_priority(self, tmp_path):
+        """全类型混合目录：所有 data type 都应优先解析到 processed output。"""
+        # processed outputs
+        (tmp_path / "Fuel.xlsx").write_bytes(b"")
+        (tmp_path / "电力消耗统计.xlsx").write_bytes(b"")
+        (tmp_path / "合并产量.xlsx").write_bytes(b"")
+        (tmp_path / "202506_工作效率表.xlsx").write_bytes(b"")
+
+        # raw inputs (关键字匹配可能命中)
+        (tmp_path / "Fuel report Normount 6-2026.xlsx").write_bytes(b"")
+        (tmp_path / "Цахилгааны зарцуулалт.xlsx").write_bytes(b"")
+        (tmp_path / "夜班日报_2025-06.xlsx").write_bytes(b"")
+
+        keywords = {
+            "fuel": ["Fuel report"],
+            "electrical": ["Цахилгааны"],
+            "production": ["夜班日报"],
+        }
+        found = discover_files(tmp_path, year=2025, month=6, keywords=keywords)
+
+        assert found["fuel"].name == "Fuel.xlsx"
+        assert found["electrical"].name == "电力消耗统计.xlsx"
+        assert found["production"].name == "合并产量.xlsx"
+        assert found["operation"].name == "合并产量.xlsx"
+        assert "202506_工作效率表" in found["work_efficiency"].name
+
+
+# ---------------------------------------------------------------------------
+# work_efficiency mapping: date + shiftType
+# ---------------------------------------------------------------------------
+
+
+class TestWorkEfficiencyMapping:
+    def test_work_efficiency_mapping_includes_date_and_shift(self):
+        """默认列映射中 work_efficiency 应包含 日期->date 和 班次->shiftType。"""
+        mapping = load_column_mapping()
+        we_mapping = mapping.get("work_efficiency") or mapping.get("worktime", {})
+        assert we_mapping, "work_efficiency mapping not found"
+        assert we_mapping["日期"] == "date"
+        assert we_mapping["班次"] == "shiftType"
+
+    def test_read_and_map_work_efficiency_with_date_shift(self, tmp_path):
+        """read_and_map_excel 正确映射 work_efficiency 的 日期、班次、设备名称、应运行分钟。"""
+        mapping = load_column_mapping()
+        we_mapping = mapping.get("work_efficiency") or mapping.get("worktime", {})
+
+        df = pd.DataFrame({
+            "日期": ["2025-06-01", "2025-06-02"],
+            "班次": ["Day", "Night"],
+            "设备名称": ["CAT785D-01", "NTE240-02"],
+            "应运行分钟": [720, 600],
+        })
+        path = tmp_path / "test_work_efficiency.xlsx"
+        df.to_excel(path, index=False)
+
+        rows = read_and_map_excel(path, None, we_mapping)
+        assert len(rows) == 2
+        assert rows[0]["date"] == "2025-06-01"
+        assert rows[0]["shiftType"] == "Day"
+        assert rows[0]["equipmentName"] == "CAT785D-01"
+        assert rows[0]["plannedMinutes"] == 720
+        assert rows[1]["date"] == "2025-06-02"
+        assert rows[1]["shiftType"] == "Night"
+
+
+# ---------------------------------------------------------------------------
+# _df_to_mapped_rows
+# ---------------------------------------------------------------------------
+
+
+class TestDfToMappedRows:
+    def test_basic_mapping(self):
+        """df with 日期/班次/设备名称 -> mapped to date/shiftType/equipmentName."""
+        df = pd.DataFrame({
+            "日期": ["2025-06-01", "2025-06-02"],
+            "班次": ["Day", "Night"],
+            "设备名称": ["CAT785D-01", "NTE240-02"],
+        })
+        mapping = {"日期": "date", "班次": "shiftType", "设备名称": "equipmentName"}
+        rows = _df_to_mapped_rows(df, mapping)
+        assert len(rows) == 2
+        assert rows[0] == {"date": "2025-06-01", "shiftType": "Day", "equipmentName": "CAT785D-01"}
+        assert rows[1] == {"date": "2025-06-02", "shiftType": "Night", "equipmentName": "NTE240-02"}
+
+    def test_nan_handling(self):
+        """NaN values skipped in output."""
+        df = pd.DataFrame({
+            "日期": ["2025-06-01"],
+            "班次": ["Day"],
+            "设备名称": ["CAT785D-01"],
+            "油品消耗": [float("nan")],
+        })
+        mapping = {"日期": "date", "班次": "shiftType", "设备名称": "equipmentName", "油品消耗": "consumption"}
+        rows = _df_to_mapped_rows(df, mapping)
+        assert len(rows) == 1
+        assert "consumption" not in rows[0]
+        assert rows[0]["date"] == "2025-06-01"
+
+    def test_date_conversion(self):
+        """pd.Timestamp -> YYYY-MM-DD string."""
+        df = pd.DataFrame({
+            "日期": [pd.Timestamp("2025-06-15"), pd.Timestamp("2025-07-01")],
+            "班次": ["Day", "Night"],
+        })
+        mapping = {"日期": "date", "班次": "shiftType"}
+        rows = _df_to_mapped_rows(df, mapping)
+        assert rows[0]["date"] == "2025-06-15"
+        assert rows[1]["date"] == "2025-07-01"
+
+    def test_empty_dataframe(self):
+        """Empty df returns empty list."""
+        df = pd.DataFrame(columns=["日期", "班次", "设备名称"])
+        mapping = {"日期": "date", "班次": "shiftType", "设备名称": "equipmentName"}
+        rows = _df_to_mapped_rows(df, mapping)
+        assert rows == []
+
+
+# ---------------------------------------------------------------------------
+# _process_fuel_file
+# ---------------------------------------------------------------------------
+
+
+class TestProcessFuelFile:
+    @patch("func.sync_to_minebase._df_to_mapped_rows")
+    @patch("func.excel_fuel.process_diesel_data")
+    def test_process_fuel_returns_mapped_rows(self, mock_diesel, mock_df_map):
+        """patch process_diesel_data to return {'油耗信息': df}, verify _process_fuel_file returns correctly mapped rows."""
+        from func.sync_to_minebase import _process_fuel_file
+
+        test_df = pd.DataFrame({"col": [1]})
+        mock_diesel.return_value = {"油耗信息": test_df}
+        expected_rows = [
+            {"date": "2025-06-01", "shiftType": "Day", "equipmentName": "CAT785D-01", "fuelName": "0#柴油", "consumption": 150.5},
+        ]
+        mock_df_map.return_value = expected_rows
+
+        result = _process_fuel_file(Path("/fake/Fuel.xlsx"), year=2025)
+        assert result == expected_rows
+        mock_diesel.assert_called_once()
+        mock_df_map.assert_called_once()
+
+    @patch("func.excel_fuel.process_diesel_data", side_effect=RuntimeError("boom"))
+    def test_process_fuel_handles_error(self, mock_diesel):
+        """patch to raise exception, verify returns empty list."""
+        from func.sync_to_minebase import _process_fuel_file
+
+        result = _process_fuel_file(Path("/fake/Fuel.xlsx"), year=2025)
+        assert result == []
+
+
+# ---------------------------------------------------------------------------
+# _process_electrical_file
+# ---------------------------------------------------------------------------
+
+
+class TestProcessElectricalFile:
+    @patch("func.sync_to_minebase._df_to_mapped_rows")
+    @patch("func.excel_electrical.parse_excel_data")
+    def test_process_electrical_returns_mapped_rows(self, mock_parse, mock_df_map):
+        """patch parse_excel_data to return {'电力消耗': df}, verify mapping."""
+        from func.sync_to_minebase import _process_electrical_file
+
+        test_df = pd.DataFrame({"col": [1]})
+        mock_parse.return_value = {"电力消耗": test_df}
+        expected_rows = [
+            {"date": "2025-06-01", "shiftType": "Night", "equipmentName": "EX-001", "consumption": 500.0},
+        ]
+        mock_df_map.return_value = expected_rows
+
+        result = _process_electrical_file(Path("/fake/电力消耗统计.xlsx"), year=2025)
+        assert result == expected_rows
+        mock_parse.assert_called_once()
+        mock_df_map.assert_called_once()
+
+    @patch("func.excel_electrical.parse_excel_data", return_value={})
+    def test_process_electrical_handles_empty(self, mock_parse):
+        """patch to return empty dict, verify returns empty list."""
+        from func.sync_to_minebase import _process_electrical_file
+
+        result = _process_electrical_file(Path("/fake/电力消耗统计.xlsx"), year=2025)
+        assert result == []
+
+
+# ---------------------------------------------------------------------------
+# _process_production_file
+# ---------------------------------------------------------------------------
+
+
+class TestProcessProductionFile:
+    @patch("func.sync_to_minebase._df_to_mapped_rows")
+    @patch("func.excel_production_enhanced.MiningDataProcessor")
+    def test_process_production_returns_both_types(self, mock_processor_cls, mock_df_map):
+        """patch MiningDataProcessor.process_file, verify production and operation rows."""
+        from func.sync_to_minebase import _process_production_file
+
+        running_df = pd.DataFrame({"col": [1]})
+        production_df = pd.DataFrame({"col": [2]})
+        mock_processor_cls.return_value.process_single_file.return_value = (running_df, production_df)
+
+        prod_rows = [{"date": "2025-06-01", "truckName": "CAT785D-01"}]
+        ops_rows = [{"date": "2025-06-01", "equipmentName": "CAT785D-01"}]
+        mock_df_map.side_effect = [prod_rows, ops_rows]
+
+        result = _process_production_file(Path("/fake/合并产量.xlsx"))
+        assert result == {"production": prod_rows, "operation": ops_rows}
+        mock_processor_cls.return_value.process_single_file.assert_called_once()
+
+    @patch("func.sync_to_minebase._df_to_mapped_rows")
+    @patch("func.excel_production_enhanced.MiningDataProcessor")
+    def test_process_production_handles_error(self, mock_processor_cls, mock_df_map):
+        """patch to raise, verify returns empty dicts."""
+        from func.sync_to_minebase import _process_production_file
+
+        mock_processor_cls.return_value.process_single_file.side_effect = RuntimeError("boom")
+
+        result = _process_production_file(Path("/fake/合并产量.xlsx"))
+        assert result == {"production": [], "operation": []}
+
+
+# ---------------------------------------------------------------------------
+# TestSyncWithProcessors
+# ---------------------------------------------------------------------------
+
+
+class TestSyncWithProcessors:
+    @patch("func.sync_to_minebase.sync_via_api")
+    @patch("func.sync_to_minebase._process_fuel_file")
+    @patch("func.sync_to_minebase.discover_files")
+    def test_sync_fuel_via_processor(self, mock_discover, mock_fuel_proc, mock_sync_api, tmp_path):
+        """full integration - patch processor AND api client, verify sync() sends fuel data."""
+        mock_discover.return_value = {"fuel": tmp_path / "Fuel.xlsx"}
+        mock_fuel_proc.return_value = [
+            {"date": "2025-06-01", "shiftType": "Day", "equipmentName": "CAT785D-01", "fuelName": "0#柴油", "consumption": 150.5},
+        ]
+        mock_sync_api.return_value = {"success": 1, "skipped": 0, "failed": 0}
+
+        with patch("func.sync_to_minebase.MineBaseAPIClient") as mock_api_cls, \
+             patch("func.sync_to_minebase.get_minebase_api_config", return_value={"url": "http://test", "username": "u", "password": "p"}):
+            mock_api_cls.return_value = MagicMock()
+            results = sync(tmp_path, mode="api", data_types=["fuel"], dry_run=True)
+
+        assert "fuel" in results
+        assert results["fuel"]["success"] == 1
+        mock_fuel_proc.assert_called_once()
+
+    @patch("func.sync_to_minebase.sync_via_api")
+    @patch("func.sync_to_minebase._process_electrical_file")
+    @patch("func.sync_to_minebase._process_fuel_file")
+    @patch("func.sync_to_minebase.discover_files")
+    def test_sync_processor_failure_continues(self, mock_discover, mock_fuel_proc, mock_elec_proc, mock_sync_api, tmp_path):
+        """one type fails, others still sync."""
+        mock_discover.return_value = {
+            "fuel": tmp_path / "Fuel.xlsx",
+            "electrical": tmp_path / "电力消耗统计.xlsx",
+        }
+        mock_fuel_proc.side_effect = RuntimeError("boom")
+        mock_elec_proc.return_value = [
+            {"date": "2025-06-01", "shiftType": "Night", "equipmentName": "EX-001", "consumption": 500.0},
+        ]
+        mock_sync_api.return_value = {"success": 1, "skipped": 0, "failed": 0}
+
+        with patch("func.sync_to_minebase.MineBaseAPIClient") as mock_api_cls, \
+             patch("func.sync_to_minebase.get_minebase_api_config", return_value={"url": "http://test", "username": "u", "password": "p"}):
+            mock_api_cls.return_value = MagicMock()
+            results = sync(tmp_path, mode="api", data_types=["fuel", "electrical"], dry_run=True)
+
+        # fuel fails and gets empty result, electrical still syncs
+        assert results["fuel"] == {"success": 0, "skipped": 0, "failed": 0}
+        assert results["electrical"]["success"] == 1

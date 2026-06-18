@@ -730,6 +730,229 @@ def _apply_header_mapping(
     return df
 
 
+# ---------------------------------------------------------------------------
+# DataFrame → 行列表转换
+# ---------------------------------------------------------------------------
+
+
+def _df_to_mapped_rows(
+    df: "pd.DataFrame",
+    column_mapping: dict[str, str],
+) -> list[dict[str, Any]]:
+    """将 DataFrame 按映射配置转换为行字典列表。
+
+    跳过 __SKIP__ 映射列和 NaN/NaT 值，Timestamp 转为 YYYY-MM-DD 字符串。
+
+    Args:
+        df: 源 DataFrame。
+        column_mapping: {源列名: 目标字段名} 映射。
+
+    Returns:
+        映射后的行数据列表。
+    """
+    if df is None or df.empty:
+        return []
+
+    _SKIP = "__SKIP__"
+    source_cols = [
+        c for c in df.columns
+        if c in column_mapping and column_mapping[c] != _SKIP
+    ]
+    if not source_cols:
+        return []
+
+    rows = []
+    for _, row in df.iterrows():
+        mapped = {}
+        for src_col in source_cols:
+            target_field = column_mapping[src_col]
+            value = row[src_col]
+            if pd.isna(value):
+                continue
+            if isinstance(value, (pd.Timestamp, datetime)):
+                value = value.strftime("%Y-%m-%d")
+            elif isinstance(value, date):
+                value = value.isoformat()
+            mapped[target_field] = value
+        if mapped:
+            rows.append(mapped)
+    return rows
+
+
+# ---------------------------------------------------------------------------
+# 处理器适配函数
+# ---------------------------------------------------------------------------
+
+
+def _process_fuel_file(
+    file_path: Path,
+    year: int | None = None,
+) -> list[dict[str, Any]]:
+    """通过柴油处理器解析文件，返回同步行列表。"""
+    try:
+        from func.excel_fuel import process_diesel_data
+
+        sheets = process_diesel_data(str(file_path), target_year=year, return_sheets=True)
+        if not sheets:
+            return []
+        df = sheets.get("油耗信息")
+        if df is None:
+            return []
+
+        mapping = {
+            "日期": "date",
+            "班次": "shiftType",
+            "设备名称": "equipmentName",
+            "设备编号": "equipmentCode",
+            "油品种类": "fuelName",
+            "油品消耗": "consumption",
+        }
+        rows = _df_to_mapped_rows(df, mapping)
+        logger.info("fuel 处理器: %s → %d 行", file_path.name, len(rows))
+        return rows
+    except Exception as e:
+        logger.error("fuel 处理器失败: %s — %s", file_path, e)
+        return []
+
+
+def _process_electrical_file(
+    file_path: Path,
+    year: int | None = None,
+) -> list[dict[str, Any]]:
+    """通过电力处理器解析文件，返回同步行列表。"""
+    try:
+        from func.excel_electrical import parse_excel_data
+
+        sheets = parse_excel_data(
+            str(file_path),
+            target_year=year,
+            return_sheets=True,
+            add_shift_column=True,
+            default_shift="Night",
+        )
+        if not sheets:
+            return []
+        df = sheets.get("电力消耗")
+        if df is None:
+            return []
+
+        mapping = {
+            "日期": "date",
+            "班次": "shiftType",
+            "设备名称": "equipmentName",
+            "电力消耗": "consumption",
+        }
+        rows = _df_to_mapped_rows(df, mapping)
+        logger.info("electrical 处理器: %s → %d 行", file_path.name, len(rows))
+        return rows
+    except Exception as e:
+        logger.error("electrical 处理器失败: %s — %s", file_path, e)
+        return []
+
+
+def _process_production_file(
+    file_path: Path,
+) -> dict[str, list[dict[str, Any]]]:
+    """通过产量处理器解析文件，返回 {"production": [...], "operation": [...]}。"""
+    try:
+        from func.excel_production_enhanced import MiningDataProcessor
+
+        processor = MiningDataProcessor()
+        running_df, production_df = processor.process_single_file(str(file_path))
+
+        prod_map = {
+            "日期": "date",
+            "班次": "shiftType",
+            "矿卡名称": "truckName",
+            "挖机名称": "excavatorName",
+            "矿石类型": "materialTypeName",
+            "运次": "tripCount",
+            "产量": "production",
+        }
+        ops_map = {
+            "日期": "date",
+            "班次": "shiftType",
+            "设备名称": "equipmentName",
+            "公司": "company",
+            "小时数仪表开始": "engineHoursStart",
+            "小时数仪表结束": "engineHoursEnd",
+            "运行小时数": "runningHours",
+            "公里数仪表开始": "milemeterStart",
+            "公里数仪表结束": "milemeterEnd",
+            "运行里程": "mileage",
+            "趟数": "tripCount",
+            "备注": "remark",
+        }
+        prod_rows = _df_to_mapped_rows(production_df, prod_map)
+        ops_rows = _df_to_mapped_rows(running_df, ops_map)
+        logger.info(
+            "production 处理器: %s → production=%d, operation=%d",
+            file_path.name, len(prod_rows), len(ops_rows),
+        )
+        return {"production": prod_rows, "operation": ops_rows}
+    except Exception as e:
+        logger.error("production 处理器失败: %s — %s", file_path, e)
+        return {"production": [], "operation": []}
+
+
+def _process_work_efficiency_file(
+    file_path: Path,
+    year: int | None = None,
+    month: int | None = None,
+    apply_header_mapping: bool = True,
+) -> list[dict[str, Any]]:
+    """通过工时处理器解析文件，返回同步行列表。
+
+    已处理的输出文件（含标准化 sheet 结构）直接读取并映射列；
+    如需从原始文件重新处理，可扩展为调用 process_excel_data。
+    """
+    try:
+        mapping = get_minebase_column_mapping().get("work_efficiency", {})
+        if not mapping:
+            logger.warning("work_efficiency 映射配置为空")
+            return []
+
+        # 尝试用工时处理器（需要 year/month）
+        if year and month:
+            from func.excel_worktime import process_excel_data
+
+            hdr_map = None
+            if apply_header_mapping:
+                from func.config_loader import get_worktime_header_mapping
+                hdr_map = get_worktime_header_mapping()
+                if hdr_map and not hdr_map.get("entries"):
+                    hdr_map = None
+
+            sheets = process_excel_data(
+                str(file_path), year, month,
+                return_sheets=True,
+                header_mapping=hdr_map,
+            )
+            if sheets:
+                df = sheets.get("工时数据")
+                if df is not None and not df.empty:
+                    # 如果处理器未应用表头映射，此处补充
+                    if apply_header_mapping and hdr_map and hdr_map.get("entries"):
+                        df = _apply_header_mapping(df, hdr_map)
+                    rows = _df_to_mapped_rows(df, mapping)
+                    logger.info("work_efficiency 处理器: %s → %d 行", file_path.name, len(rows))
+                    return rows
+
+        # 回退：直接读取输出文件（已是标准格式）
+        df = pd.read_excel(file_path, sheet_name=0)
+        if apply_header_mapping:
+            from func.config_loader import get_worktime_header_mapping
+            hdr_map = get_worktime_header_mapping()
+            if hdr_map and hdr_map.get("entries"):
+                df = _apply_header_mapping(df, hdr_map)
+        rows = _df_to_mapped_rows(df, mapping)
+        logger.info("work_efficiency 直接读取: %s → %d 行", file_path.name, len(rows))
+        return rows
+    except Exception as e:
+        logger.error("work_efficiency 处理器失败: %s — %s", file_path, e)
+        return []
+
+
 # 各数据类型的设备名称字段（用于台账匹配）
 _LEDGER_NAME_FIELDS: dict[str, list[str]] = {
     "fuel": ["equipmentName"],
@@ -796,8 +1019,8 @@ def discover_files(
 ) -> dict[str, Path]:
     """在输入目录中查找各数据类型对应的 Excel 文件。
 
-    优先使用关键字匹配（与 excel_batch.scan_files 一致），
-    回退到 DATA_TYPE_REGISTRY 中的 file_pattern glob 匹配。
+    优先使用 DATA_TYPE_REGISTRY 中的 file_pattern 精确匹配已处理的输出文件，
+    回退到关键字匹配（与 excel_batch.scan_files 一致）。
     work_efficiency 类型支持 year/month 构造精确文件名模式。
 
     Args:
@@ -818,18 +1041,52 @@ def discover_files(
         if f.suffix.lower() in (".xlsx", ".xls") and not f.name.startswith("~$")
     )
 
-    # 关键字 → 数据类型映射（batch 模块类型 → sync 数据类型）
+    found: dict[str, Path] = {}
+
+    # 1. DATA_TYPE_REGISTRY.file_pattern 精确匹配已处理输出文件（最高优先级）
+    for data_type, info in DATA_TYPE_REGISTRY.items():
+        if data_type in found:
+            continue
+        # work_efficiency: 有 year/month 时延迟到 step 2 用更精确的模式匹配
+        if data_type == "work_efficiency" and year and month:
+            continue
+        pattern = info["file_pattern"]
+        if "*" in pattern:
+            matches = sorted(input_dir.glob(pattern))
+        else:
+            matches = list(input_dir.glob(pattern))
+        if matches:
+            found[data_type] = matches[0]
+            logger.info("精确匹配: %s → %s", data_type, matches[0].name)
+
+    # 2. work_efficiency 专用 glob：按 year/month 构造精确文件名模式（补充）
+    if "work_efficiency" not in found and year and month:
+        pattern = f"*{year}{month:02d}*工作效率表*.xlsx"
+        matches = sorted(input_dir.glob(pattern))
+        if matches:
+            found["work_efficiency"] = matches[0]
+            logger.info("Glob 匹配: work_efficiency → %s", matches[0].name)
+    elif "work_efficiency" not in found:
+        pattern = "*工作效率表*.xlsx"
+        matches = sorted(input_dir.glob(pattern))
+        if matches:
+            found["work_efficiency"] = matches[0]
+            logger.info("Glob 匹配: work_efficiency → %s", matches[0].name)
+
+    # 3. 关键字回退：仅对尚未找到的类型使用关键字匹配
     kw_type_map = {
         "fuel": "fuel",
         "electrical": "electrical",
-        "production": ["production", "operation"],  # 同一文件，不同 sheet
+        "production": ["production", "operation"],
         "worktime": "work_efficiency",
     }
 
-    found: dict[str, Path] = {}
-
-    # 1. 关键字匹配
     for module_type, sync_types in kw_type_map.items():
+        # 检查该模块对应的所有数据类型是否已找到
+        types_to_check = sync_types if isinstance(sync_types, list) else [sync_types]
+        if all(t in found for t in types_to_check):
+            continue
+
         kw_list = keywords.get(module_type, [])
         if not kw_list:
             continue
@@ -843,34 +1100,11 @@ def discover_files(
         target_file = matched_files[0]
         if isinstance(sync_types, list):
             for st in sync_types:
-                found[st] = target_file
+                if st not in found:
+                    found[st] = target_file
         else:
             found[sync_types] = target_file
-        logger.info("关键字匹配: %s → %s", module_type, target_file.name)
-
-    # 2. work_efficiency 回退：按 year/month 构造 glob 模式
-    if "work_efficiency" not in found:
-        if year and month:
-            pattern = f"*{year}{month:02d}*工作效率表*.xlsx"
-        else:
-            pattern = "*工作效率表*.xlsx"
-        matches = sorted(input_dir.glob(pattern))
-        if matches:
-            found["work_efficiency"] = matches[0]
-            logger.info("Glob 匹配: work_efficiency → %s", matches[0].name)
-
-    # 3. 其他类型回退到 DATA_TYPE_REGISTRY 的 file_pattern
-    for data_type, info in DATA_TYPE_REGISTRY.items():
-        if data_type in found:
-            continue
-        pattern = info["file_pattern"]
-        if "*" in pattern:
-            matches = sorted(input_dir.glob(pattern))
-        else:
-            matches = list(input_dir.glob(pattern))
-        if matches:
-            found[data_type] = matches[0]
-            logger.info("Glob 回退: %s → %s", data_type, matches[0].name)
+        logger.info("关键字回退: %s → %s", module_type, target_file.name)
 
     for dt, fp in found.items():
         logger.info("发现文件: %s → %s", dt, fp.name)
@@ -1019,6 +1253,9 @@ def sync(
         else:
             logger.warning("台账匹配已启用但未找到台账缓存，跳过匹配")
 
+    # 生产文件处理缓存（production 和 operation 可能指向同一文件）
+    _production_cache: dict[str, dict[str, list[dict[str, Any]]]] | None = None
+
     # 逐类型同步
     results = {}
     try:
@@ -1033,44 +1270,30 @@ def sync(
                 results[data_type] = {"success": 0, "skipped": 0, "failed": 0}
                 continue
 
-            sheet = DATA_TYPE_REGISTRY[data_type]["sheet"]
-
-            # work_efficiency: 可选应用工时表头映射
-            if data_type == "work_efficiency" and apply_header_mapping:
-                from func.config_loader import get_worktime_header_mapping
-                hdr_map = get_worktime_header_mapping()
-                if hdr_map and hdr_map.get("entries"):
-                    try:
-                        df = pd.read_excel(file_path, sheet_name=sheet)
-                        if isinstance(df, dict):
-                            df = list(df.values())[0]
-                        df = _apply_header_mapping(df, hdr_map)
-                        # 用映射后的 df 替代 read_and_map_excel 的读取步骤
-                        _SKIP = "__SKIP__"
-                        source_cols = [c for c in df.columns if c in mapping and mapping[c] != _SKIP]
-                        rows = []
-                        for _, row in df.iterrows():
-                            mapped = {}
-                            for src_col in source_cols:
-                                target_field = mapping[src_col]
-                                value = row[src_col]
-                                if pd.isna(value):
-                                    continue
-                                if isinstance(value, (pd.Timestamp, datetime)):
-                                    value = value.strftime("%Y-%m-%d")
-                                elif isinstance(value, date):
-                                    value = value.isoformat()
-                                mapped[target_field] = value
-                            if mapped:
-                                rows.append(mapped)
-                        logger.info("读取 %s (含表头映射): %d 行", file_path.name, len(rows))
-                    except Exception as e:
-                        logger.error("读取 work_efficiency 失败: %s — %s", file_path, e)
-                        rows = []
+            try:
+                if data_type == "fuel":
+                    rows = _process_fuel_file(file_path, year)
+                elif data_type == "electrical":
+                    rows = _process_electrical_file(file_path, year)
+                elif data_type in ("production", "operation"):
+                    # 缓存生产文件处理结果，避免同一文件处理两次
+                    cache_key = str(file_path)
+                    if _production_cache is None or cache_key not in _production_cache:
+                        result = _process_production_file(file_path)
+                        if _production_cache is None:
+                            _production_cache = {}
+                        _production_cache[cache_key] = result
+                    rows = _production_cache[cache_key].get(data_type, [])
+                elif data_type == "work_efficiency":
+                    rows = _process_work_efficiency_file(
+                        file_path, year, month, apply_header_mapping,
+                    )
                 else:
-                    rows = read_and_map_excel(file_path, sheet, mapping)
-            else:
-                rows = read_and_map_excel(file_path, sheet, mapping)
+                    rows = read_and_map_excel(file_path, DATA_TYPE_REGISTRY[data_type]["sheet"], mapping)
+            except Exception as e:
+                logger.error("[%s] 处理文件失败: %s — %s", data_type, file_path, e)
+                results[data_type] = {"success": 0, "skipped": 0, "failed": 0}
+                continue
 
             rows = _apply_defaults(rows, data_type)
             rows = _apply_ledger_matching(rows, data_type, ledger)
