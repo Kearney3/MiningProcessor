@@ -145,7 +145,7 @@ function DataTypeCheckbox({
 export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const [inputDir, setInputDir] = useState("");
   const [mode, setMode] = useState<"api" | "database">("api");
-  const [dataTypes, setDataTypes] = useState<string[]>(["fuel", "production", "electrical", "work_efficiency"]);
+  const [dataTypes, setDataTypes] = useState<string[]>(ALL_TYPES.map((t) => t.id));
   const [dryRun, setDryRun] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SyncResult | null>(null);
@@ -259,7 +259,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-xs font-medium text-slate-500">数据类型</label>
-            <label className="flex items-center gap-2 text-sm text-slate-500 cursor-pointer select-none">
+            <span className="flex items-center gap-2 text-sm text-slate-500 select-none">
               <button
                 type="button"
                 role="checkbox"
@@ -277,7 +277,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
                 {someSelected && <MinusIcon />}
               </button>
               全选
-            </label>
+            </span>
           </div>
           <div className="space-y-0.5">
             {ALL_TYPES.map((t) => (
