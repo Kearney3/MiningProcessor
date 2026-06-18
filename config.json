@@ -86,6 +86,7 @@
     },
     "minebase_column_mapping": {
         "work_efficiency": {
+            "日期": "date", "班次": "shiftType",
             "设备名称": "equipmentName", "设备编号": "equipmentCode", "公司": "company",
             "应运行分钟": "plannedMinutes", "应运行小时数": "plannedHours",
             "停车/换班": "parkShift", "转移": "transfer", "挖机场地推土/清理墙壁": "auxiliaryWork",
