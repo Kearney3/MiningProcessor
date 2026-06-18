@@ -106,6 +106,8 @@ class SyncRefs(TypedDict):
     header_row: ft.TextField
     date_start: ft.TextField
     date_end: ft.TextField
+    apply_header: ft.Checkbox
+    use_ledger: ft.Checkbox
 
 
 class UserConfigRefs(TypedDict):

@@ -105,6 +105,21 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         active_color=theme.PRIMARY,
     )
 
+    # --- 工时表头映射 & 台账匹配 ---
+    header_mapping_check = ft.Checkbox(
+        label="应用工时表头映射",
+        value=True,
+        active_color=theme.PRIMARY,
+        tooltip="对工作效率表应用列名映射配置",
+    )
+
+    ledger_match_check = ft.Checkbox(
+        label="应用台账匹配",
+        value=False,
+        active_color=theme.PRIMARY,
+        tooltip="使用设备台账标准化设备名称",
+    )
+
     # --- 年份/月份 ---
     year_dropdown = ft.Dropdown(
         label="年份",
@@ -241,6 +256,8 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
                             type_row,
                             ft.Divider(height=1, color=theme.BORDER),
                             dry_run_check,
+                            header_mapping_check,
+                            ledger_match_check,
                             ft.Row(
                                 [sync_btn, result_text],
                                 alignment=ft.MainAxisAlignment.START,
@@ -273,6 +290,8 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "header_row": header_row_field,
         "date_start": date_start_field,
         "date_end": date_end_field,
+        "apply_header": header_mapping_check,
+        "use_ledger": ledger_match_check,
     }
 
     return container, refs
