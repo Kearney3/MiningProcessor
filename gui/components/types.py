@@ -101,6 +101,11 @@ class SyncRefs(TypedDict):
     dry_run: ft.Checkbox
     btn: ft.Button
     result_text: ft.Text
+    year: ft.Dropdown
+    month: ft.Dropdown
+    header_row: ft.TextField
+    date_start: ft.TextField
+    date_end: ft.TextField
 
 
 class UserConfigRefs(TypedDict):

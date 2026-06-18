@@ -24,6 +24,7 @@ from typing import Any
 import pandas as pd
 
 from func.config_loader import (
+    get_file_keywords,
     get_minebase_api_config,
     get_minebase_column_mapping,
     get_minebase_config,
@@ -693,31 +694,134 @@ def _map_row_to_db_columns(row: dict) -> tuple[list[str], list[Any]]:
 # ---------------------------------------------------------------------------
 
 
-def discover_files(input_dir: Path) -> dict[str, Path]:
+def discover_files(
+    input_dir: Path,
+    year: int | None = None,
+    month: int | None = None,
+    keywords: dict[str, list[str]] | None = None,
+) -> dict[str, Path]:
     """在输入目录中查找各数据类型对应的 Excel 文件。
+
+    优先使用关键字匹配（与 excel_batch.scan_files 一致），
+    回退到 DATA_TYPE_REGISTRY 中的 file_pattern glob 匹配。
+    work_efficiency 类型支持 year/month 构造精确文件名模式。
+
+    Args:
+        input_dir: 输入目录。
+        year: 年份（用于 work_efficiency 文件名匹配）。
+        month: 月份（用于 work_efficiency 文件名匹配）。
+        keywords: {模块类型: [关键字]}，默认从配置读取。
 
     Returns:
         {data_type: file_path} 字典。
     """
-    found = {}
+    if keywords is None:
+        keywords = get_file_keywords()
+
+    # 列出目录中所有 Excel 文件（排除临时文件）
+    excel_files = sorted(
+        f for f in input_dir.iterdir()
+        if f.suffix.lower() in (".xlsx", ".xls") and not f.name.startswith("~$")
+    )
+
+    # 关键字 → 数据类型映射（batch 模块类型 → sync 数据类型）
+    kw_type_map = {
+        "fuel": "fuel",
+        "electrical": "electrical",
+        "production": ["production", "operation"],  # 同一文件，不同 sheet
+        "worktime": "work_efficiency",
+    }
+
+    found: dict[str, Path] = {}
+
+    # 1. 关键字匹配
+    for module_type, sync_types in kw_type_map.items():
+        kw_list = keywords.get(module_type, [])
+        if not kw_list:
+            continue
+        matched_files = [
+            f for f in excel_files
+            if any(k in f.name for k in kw_list)
+        ]
+        if not matched_files:
+            continue
+
+        target_file = matched_files[0]
+        if isinstance(sync_types, list):
+            for st in sync_types:
+                found[st] = target_file
+        else:
+            found[sync_types] = target_file
+        logger.info("关键字匹配: %s → %s", module_type, target_file.name)
+
+    # 2. work_efficiency 回退：按 year/month 构造 glob 模式
+    if "work_efficiency" not in found:
+        if year and month:
+            pattern = f"*{year}{month:02d}*工作效率表*.xlsx"
+        else:
+            pattern = "*工作效率表*.xlsx"
+        matches = sorted(input_dir.glob(pattern))
+        if matches:
+            found["work_efficiency"] = matches[0]
+            logger.info("Glob 匹配: work_efficiency → %s", matches[0].name)
+
+    # 3. 其他类型回退到 DATA_TYPE_REGISTRY 的 file_pattern
     for data_type, info in DATA_TYPE_REGISTRY.items():
+        if data_type in found:
+            continue
         pattern = info["file_pattern"]
         if "*" in pattern:
             matches = sorted(input_dir.glob(pattern))
         else:
             matches = list(input_dir.glob(pattern))
-
         if matches:
             found[data_type] = matches[0]
-            logger.info("发现文件: %s → %s", data_type, matches[0].name)
-        else:
-            logger.debug("未找到文件: %s (模式: %s)", data_type, pattern)
+            logger.info("Glob 回退: %s → %s", data_type, matches[0].name)
+
+    for dt, fp in found.items():
+        logger.info("发现文件: %s → %s", dt, fp.name)
     return found
 
 
 # ---------------------------------------------------------------------------
 # 主流程
 # ---------------------------------------------------------------------------
+
+
+def _filter_by_date_range(
+    rows: list[dict[str, Any]],
+    date_start: str | None,
+    date_end: str | None,
+) -> list[dict[str, Any]]:
+    """按日期范围过滤行数据。
+
+    Args:
+        rows: 已映射的行数据列表。
+        date_start: 起始日期（含），格式 YYYY-MM-DD，None 不限。
+        date_end: 结束日期（含），格式 YYYY-MM-DD，None 不限。
+
+    Returns:
+        过滤后的行数据列表（新列表，不修改原数据）。
+    """
+    if not date_start and not date_end:
+        return rows
+
+    result = []
+    for row in rows:
+        row_date = row.get("date")
+        if not row_date:
+            result.append(row)
+            continue
+        if date_start and str(row_date) < date_start:
+            continue
+        if date_end and str(row_date) > date_end:
+            continue
+        result.append(row)
+
+    skipped = len(rows) - len(result)
+    if skipped:
+        logger.info("日期过滤: 保留 %d/%d 行 (范围: %s ~ %s)", len(result), len(rows), date_start, date_end)
+    return result
 
 
 def sync(
@@ -728,6 +832,10 @@ def sync(
     mapping_file: str | Path | None = None,
     api_url: str | None = None,
     db_host: str | None = None,
+    year: int | None = None,
+    month: int | None = None,
+    date_start: str | None = None,
+    date_end: str | None = None,
 ) -> dict[str, dict[str, int]]:
     """执行同步的主入口。
 
@@ -739,6 +847,10 @@ def sync(
         mapping_file: 映射配置文件路径。
         api_url: 覆盖 API URL。
         db_host: 覆盖数据库主机。
+        year: 年份（用于文件发现和 work_efficiency 文件名匹配）。
+        month: 月份（用于文件发现和 work_efficiency 文件名匹配）。
+        date_start: 起始日期过滤（含），格式 YYYY-MM-DD。
+        date_end: 结束日期过滤（含），格式 YYYY-MM-DD。
 
     Returns:
         {data_type: {"success": N, "skipped": N, "failed": N}}
@@ -755,7 +867,7 @@ def sync(
         return {}
 
     # 发现文件
-    files = discover_files(input_path)
+    files = discover_files(input_path, year=year, month=month)
     if not files:
         logger.warning("在 %s 中未发现可同步的 Excel 文件", input_path)
         return {}
@@ -812,6 +924,7 @@ def sync(
             sheet = DATA_TYPE_REGISTRY[data_type]["sheet"]
             rows = read_and_map_excel(file_path, sheet, mapping)
             rows = _apply_defaults(rows, data_type)
+            rows = _filter_by_date_range(rows, date_start, date_end)
 
             if sync_mode == "api":
                 results[data_type] = sync_via_api(data_type, rows, mapping, api_client, dry_run)
@@ -844,6 +957,13 @@ def main():
     from func.logger import setup_logging
     setup_logging()
 
+    # 一次性迁移：将 config.user.json 中明文密码转入系统 Keychain
+    try:
+        from func.secret_store import migrate_passwords_to_keyring
+        migrate_passwords_to_keyring()
+    except Exception:
+        pass
+
     parser = argparse.ArgumentParser(description="将 MiningProcessor 数据同步到 MineBase")
     parser.add_argument("input_dir", help="MiningProcessor 输出目录路径")
     parser.add_argument("--mode", choices=["api", "database"], help="同步模式: api 或 database")
@@ -854,6 +974,10 @@ def main():
     parser.add_argument("--mapping", help="列映射配置文件路径")
     parser.add_argument("--url", help="MineBase API 地址（覆盖配置）")
     parser.add_argument("--db-host", help="MineBase 数据库主机（覆盖配置）")
+    parser.add_argument("--year", type=int, help="年份（用于文件发现）")
+    parser.add_argument("--month", type=int, help="月份（用于文件发现）")
+    parser.add_argument("--date-start", dest="date_start", help="起始日期过滤（含），格式 YYYY-MM-DD")
+    parser.add_argument("--date-end", dest="date_end", help="结束日期过滤（含），格式 YYYY-MM-DD")
     args = parser.parse_args()
 
     sync(
@@ -864,6 +988,10 @@ def main():
         mapping_file=args.mapping,
         api_url=args.url,
         db_host=args.db_host,
+        year=args.year,
+        month=args.month,
+        date_start=args.date_start,
+        date_end=args.date_end,
     )
 
 
