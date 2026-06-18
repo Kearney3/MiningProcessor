@@ -670,6 +670,12 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log):
     date_start = date_start_val.value.strip() if date_start_val and date_start_val.value else None
     date_end = date_end_val.value.strip() if date_end_val and date_end_val.value else None
 
+    # 工时表头映射 & 台账匹配
+    apply_header_val = sync_refs.get("apply_header")
+    use_ledger_val = sync_refs.get("use_ledger")
+    apply_header = apply_header_val.value if apply_header_val else True
+    use_ledger = use_ledger_val.value if use_ledger_val else False
+
     set_btn_state(btn, False, "同步中...")
     result_text.visible = False
     result_text.update()
@@ -687,6 +693,8 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log):
                 month=month,
                 date_start=date_start,
                 date_end=date_end,
+                apply_header_mapping=apply_header,
+                use_ledger=use_ledger,
             )
 
         results = await asyncio.to_thread(_do_sync)

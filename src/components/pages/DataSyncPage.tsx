@@ -164,6 +164,8 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   // 日期范围
   const [dateStart, setDateStart] = useState(yesterdayISO());
   const [dateEnd, setDateEnd] = useState(todayISO());
+  const [applyHeaderMapping, setApplyHeaderMapping] = useState(true);
+  const [useLedger, setUseLedger] = useState(false);
 
   const allSelected = ALL_TYPES.length === dataTypes.length;
   const someSelected = dataTypes.length > 0 && !allSelected;
@@ -190,6 +192,8 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
         month: month ? Number(month) : undefined,
         date_start: dateStart || undefined,
         date_end: dateEnd || undefined,
+        apply_header_mapping: applyHeaderMapping,
+        use_ledger: useLedger,
       });
       setResult(res);
     } catch (e) {
@@ -397,6 +401,46 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
             >
               清除
             </button>
+          </div>
+        </div>
+
+        {/* Sync options — header mapping & ledger */}
+        <div className="border-t border-slate-100 pt-4 space-y-3">
+          <div className="flex items-start gap-3">
+            <button
+              role="switch"
+              aria-checked={applyHeaderMapping}
+              onClick={() => setApplyHeaderMapping(!applyHeaderMapping)}
+              className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors shrink-0 mt-0.5 ${
+                applyHeaderMapping ? "bg-blue-600" : "bg-slate-200"
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                applyHeaderMapping ? "translate-x-4" : "translate-x-0.5"
+              }`} />
+            </button>
+            <div>
+              <div className="text-sm text-slate-700">应用工时表头映射</div>
+              <div className="text-xs text-slate-400 mt-0.5">对工作效率表应用列名映射配置</div>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <button
+              role="switch"
+              aria-checked={useLedger}
+              onClick={() => setUseLedger(!useLedger)}
+              className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors shrink-0 mt-0.5 ${
+                useLedger ? "bg-blue-600" : "bg-slate-200"
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                useLedger ? "translate-x-4" : "translate-x-0.5"
+              }`} />
+            </button>
+            <div>
+              <div className="text-sm text-slate-700">应用台账匹配</div>
+              <div className="text-xs text-slate-400 mt-0.5">使用设备台账标准化设备名称</div>
+            </div>
           </div>
         </div>
       </div>

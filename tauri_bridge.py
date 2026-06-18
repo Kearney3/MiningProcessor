@@ -416,6 +416,8 @@ def _sync_minebase(params: dict) -> dict:
         month=params.get("month"),
         date_start=params.get("date_start"),
         date_end=params.get("date_end"),
+        apply_header_mapping=params.get("apply_header_mapping", True),
+        use_ledger=params.get("use_ledger", False),
     )
     return {"results": results}
 

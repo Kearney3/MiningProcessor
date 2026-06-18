@@ -689,6 +689,100 @@ def _map_row_to_db_columns(row: dict) -> tuple[list[str], list[Any]]:
     return columns, values
 
 
+def _apply_header_mapping(
+    df: "pd.DataFrame",
+    header_mapping: dict[str, Any],
+) -> "pd.DataFrame":
+    """按工时表头映射配置重命名 DataFrame 列。
+
+    Args:
+        df: 原始 DataFrame。
+        header_mapping: worktime_header_mapping 配置（含 mode/fuzzy/entries）。
+
+    Returns:
+        列重命名后的新 DataFrame。
+    """
+    if not header_mapping or not header_mapping.get("entries"):
+        return df
+
+    mode = header_mapping.get("mode", "position")
+    entries = header_mapping.get("entries", [])
+
+    rename_map = {}
+    for entry in entries:
+        idx = entry.get("index")
+        new_name = entry.get("new", "")
+        if not new_name:
+            continue
+
+        if mode == "position" and idx is not None:
+            col_idx = int(idx) - 1  # 配置中 index 从 1 开始
+            if 0 <= col_idx < len(df.columns):
+                rename_map[df.columns[col_idx]] = new_name
+        elif mode == "name":
+            original = entry.get("original", "")
+            if original and original in df.columns:
+                rename_map[original] = new_name
+
+    if rename_map:
+        df = df.rename(columns=rename_map)
+        logger.info("工时表头映射: 重命名 %d 列", len(rename_map))
+    return df
+
+
+# 各数据类型的设备名称字段（用于台账匹配）
+_LEDGER_NAME_FIELDS: dict[str, list[str]] = {
+    "fuel": ["equipmentName"],
+    "electrical": ["equipmentName"],
+    "operation": ["equipmentName"],
+    "work_efficiency": ["equipmentName"],
+    "production": ["truckName", "excavatorName"],
+}
+
+
+def _apply_ledger_matching(
+    rows: list[dict[str, Any]],
+    data_type: str,
+    ledger: Any,
+) -> list[dict[str, Any]]:
+    """使用设备台账标准化行数据中的设备名称。
+
+    Args:
+        rows: 已映射的行数据列表。
+        data_type: 数据类型键。
+        ledger: EquipmentLedger 实例。
+
+    Returns:
+        设备名称标准化后的新列表。
+    """
+    from func.equipment_ledger import EquipmentLedger
+
+    if not ledger or not isinstance(ledger, EquipmentLedger):
+        return rows
+
+    name_fields = _LEDGER_NAME_FIELDS.get(data_type, [])
+    if not name_fields:
+        return rows
+
+    matched_count = 0
+    result = []
+    for row in rows:
+        new_row = dict(row)
+        for field in name_fields:
+            raw_name = row.get(field)
+            if not raw_name:
+                continue
+            match = ledger.match(str(raw_name))
+            if match and match["标准名称"] != raw_name:
+                new_row[field] = match["标准名称"]
+                matched_count += 1
+        result.append(new_row)
+
+    if matched_count:
+        logger.info("[%s] 台账匹配: 标准化 %d 个设备名称", data_type, matched_count)
+    return result
+
+
 # ---------------------------------------------------------------------------
 # 文件发现
 # ---------------------------------------------------------------------------
@@ -836,6 +930,8 @@ def sync(
     month: int | None = None,
     date_start: str | None = None,
     date_end: str | None = None,
+    apply_header_mapping: bool = True,
+    use_ledger: bool = False,
 ) -> dict[str, dict[str, int]]:
     """执行同步的主入口。
 
@@ -851,6 +947,8 @@ def sync(
         month: 月份（用于文件发现和 work_efficiency 文件名匹配）。
         date_start: 起始日期过滤（含），格式 YYYY-MM-DD。
         date_end: 结束日期过滤（含），格式 YYYY-MM-DD。
+        apply_header_mapping: 是否对 work_efficiency 应用工时表头映射。
+        use_ledger: 是否使用设备台账标准化设备名称。
 
     Returns:
         {data_type: {"success": N, "skipped": N, "failed": N}}
@@ -907,6 +1005,20 @@ def sync(
         logger.error("未知同步模式: %s (支持 'api' 或 'database')", sync_mode)
         return {}
 
+    # 初始化台账（可选）
+    ledger = None
+    if use_ledger:
+        from func.equipment_ledger import EquipmentLedger
+        from func.config_loader import load_equipment_ledger_cache
+        cached = load_equipment_ledger_cache()
+        if cached:
+            ledger = EquipmentLedger()
+            ledger._df = pd.DataFrame(cached)
+            ledger._build_search_cache()
+            logger.info("已加载设备台账缓存: %d 条", len(cached))
+        else:
+            logger.warning("台账匹配已启用但未找到台账缓存，跳过匹配")
+
     # 逐类型同步
     results = {}
     try:
@@ -922,8 +1034,46 @@ def sync(
                 continue
 
             sheet = DATA_TYPE_REGISTRY[data_type]["sheet"]
-            rows = read_and_map_excel(file_path, sheet, mapping)
+
+            # work_efficiency: 可选应用工时表头映射
+            if data_type == "work_efficiency" and apply_header_mapping:
+                from func.config_loader import get_worktime_header_mapping
+                hdr_map = get_worktime_header_mapping()
+                if hdr_map and hdr_map.get("entries"):
+                    try:
+                        df = pd.read_excel(file_path, sheet_name=sheet)
+                        if isinstance(df, dict):
+                            df = list(df.values())[0]
+                        df = _apply_header_mapping(df, hdr_map)
+                        # 用映射后的 df 替代 read_and_map_excel 的读取步骤
+                        _SKIP = "__SKIP__"
+                        source_cols = [c for c in df.columns if c in mapping and mapping[c] != _SKIP]
+                        rows = []
+                        for _, row in df.iterrows():
+                            mapped = {}
+                            for src_col in source_cols:
+                                target_field = mapping[src_col]
+                                value = row[src_col]
+                                if pd.isna(value):
+                                    continue
+                                if isinstance(value, (pd.Timestamp, datetime)):
+                                    value = value.strftime("%Y-%m-%d")
+                                elif isinstance(value, date):
+                                    value = value.isoformat()
+                                mapped[target_field] = value
+                            if mapped:
+                                rows.append(mapped)
+                        logger.info("读取 %s (含表头映射): %d 行", file_path.name, len(rows))
+                    except Exception as e:
+                        logger.error("读取 work_efficiency 失败: %s — %s", file_path, e)
+                        rows = []
+                else:
+                    rows = read_and_map_excel(file_path, sheet, mapping)
+            else:
+                rows = read_and_map_excel(file_path, sheet, mapping)
+
             rows = _apply_defaults(rows, data_type)
+            rows = _apply_ledger_matching(rows, data_type, ledger)
             rows = _filter_by_date_range(rows, date_start, date_end)
 
             if sync_mode == "api":
@@ -978,6 +1128,8 @@ def main():
     parser.add_argument("--month", type=int, help="月份（用于文件发现）")
     parser.add_argument("--date-start", dest="date_start", help="起始日期过滤（含），格式 YYYY-MM-DD")
     parser.add_argument("--date-end", dest="date_end", help="结束日期过滤（含），格式 YYYY-MM-DD")
+    parser.add_argument("--no-header-mapping", action="store_true", help="不对工时表应用表头映射")
+    parser.add_argument("--ledger", action="store_true", help="使用设备台账标准化设备名称")
     args = parser.parse_args()
 
     sync(
@@ -992,6 +1144,8 @@ def main():
         month=args.month,
         date_start=args.date_start,
         date_end=args.date_end,
+        apply_header_mapping=not args.no_header_mapping,
+        use_ledger=args.ledger,
     )
 
 
