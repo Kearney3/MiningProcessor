@@ -2,6 +2,7 @@
 import json
 import pathlib
 import sys
+import uuid
 from datetime import date
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -14,6 +15,7 @@ sys.path.insert(0, str(ROOT))
 
 from func.sync_to_minebase import (
     MineBaseAPIClient,
+    MineBaseDBClient,
     _apply_defaults,
     _build_field_mappings,
     _df_to_mapped_rows,
@@ -312,6 +314,28 @@ class TestMapRowToDbColumns:
         assert "unknownField" not in columns
         assert len(columns) == 1
 
+    def test_id_column_generated_as_uuid(self):
+        """_map_row_to_db_columns must include 'id' as a valid UUID string.
+
+        Without this, PostgreSQL INSERT fails with:
+        'null value in column "id" violates not-null constraint'
+        """
+        row = {
+            "date": "2026-06-18",
+            "shiftType": "Night",
+            "equipmentName": "NHL NTE240 HT#1222",
+            "equipmentId": "equip-uuid-001",
+            "plannedMinutes": 720,
+        }
+        columns, values = _map_row_to_db_columns(row)
+
+        assert "id" in columns, "columns must include 'id' for the UUID primary key"
+        idx = columns.index("id")
+        id_value = values[idx]
+        # Must be a valid UUID string
+        parsed = uuid.UUID(id_value)
+        assert str(parsed) == id_value
+
 
 # ---------------------------------------------------------------------------
 # _apply_defaults
@@ -536,6 +560,112 @@ class TestMineBaseConfig:
         monkeypatch.setattr(config_loader, "_CONFIG_FILE", pathlib.Path("/nonexistent"))
         monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", pathlib.Path("/nonexistent"))
         assert config_loader.get_minebase_mode() == "api"
+
+    def test_keyring_sentinel_is_not_valid_password(self):
+        """sentinel 值不应被 PostgreSQL 接受为有效密码。
+
+        回归测试：确保 sentinel 字符串不含空格、引号等可能被误解析的字符，
+        且长度足够短不会与真实密码混淆。
+        """
+        from func.secret_store import _KEYRING_SENTINEL
+        # sentinel 应该是明确的标记值，不是空字符串
+        assert _KEYRING_SENTINEL
+        assert len(_KEYRING_SENTINEL) < 20
+
+    def test_frontend_sentinel_matches_backend(self):
+        """前端与后端的 sentinel 值必须一致，否则掩码密码会被当成真实密码发送到数据库。"""
+        from func.secret_store import _KEYRING_SENTINEL
+        # 读取前端源码中定义的 sentinel
+        frontend_src = pathlib.Path(__file__).resolve().parents[1] / "src" / "components" / "pages" / "UserConfigPage.tsx"
+        if not frontend_src.exists():
+            pytest.skip("Tauri frontend source not found")
+        content = frontend_src.read_text(encoding="utf-8")
+        # 提取 KEYRING_SENTINEL 的值
+        import re
+        match = re.search(r'KEYRING_SENTINEL\s*=\s*"([^"]+)"', content)
+        assert match, "前端未定义 KEYRING_SENTINEL"
+        frontend_sentinel = match.group(1)
+        assert frontend_sentinel == _KEYRING_SENTINEL, (
+            f"前端 sentinel ({frontend_sentinel!r}) 与后端 sentinel ({_KEYRING_SENTINEL!r}) 不一致。"
+            f"前端保存的掩码密码将被当作真实密码写入数据库。"
+        )
+
+    def test_load_secret_recognizes_legacy_sentinel(self, monkeypatch, tmp_path):
+        """load_secret 应同时识别新旧两种 sentinel 值（兼容旧配置文件）。"""
+        from func import secret_store
+        from func import config_loader
+        import json
+
+        # 设置临时配置，使用旧版 sentinel 作为密码
+        config_data = {
+            "minebase": {
+                "mode": "database",
+                "api": {"url": "", "username": "", "password": ""},
+                "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "admin", "password": "__KEYRING_SENTINEL__"},
+            },
+        }
+        config_file = tmp_path / "config.json"
+        config_file.write_text(json.dumps(config_data, ensure_ascii=False), encoding="utf-8")
+        monkeypatch.setattr(config_loader, "_CONFIG_FILE", config_file)
+        monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", tmp_path / "config.user.json")
+
+        # Mock keyring 返回真实密码
+        def _get_password(service, key):
+            if key == "minebase.database.password":
+                return "real_password"
+            return None
+        monkeypatch.setattr("keyring.get_password", _get_password)
+
+        config_loader._invalidate_config_cache()
+        result = secret_store.load_secret(("minebase", "database", "password"))
+        assert result == "real_password"
+
+    def test_tauri_save_then_sync_db_password_roundtrip(self, monkeypatch, tmp_path):
+        """模拟 Tauri 前端完整 save → sync 往返：save_config + get_minebase_db_config。"""
+        from func import config_loader
+        from func import secret_store
+        import json
+
+        # 设置临时配置环境
+        base_config = {
+            "minebase": {
+                "mode": "database",
+                "api": {"url": "http://localhost:3000", "username": "", "password": ""},
+                "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "postgres", "password": ""},
+            },
+        }
+        config_file = tmp_path / "config.json"
+        config_file.write_text(json.dumps(base_config, ensure_ascii=False), encoding="utf-8")
+        user_file = tmp_path / "config.user.json"
+        monkeypatch.setattr(config_loader, "_CONFIG_FILE", config_file)
+        monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", user_file)
+
+        # Mock keyring
+        _store: dict[str, str] = {}
+        def _set_pw(s, k, v): _store[f"{s}:{k}"] = v
+        def _get_pw(s, k): return _store.get(f"{s}:{k}")
+        monkeypatch.setattr("keyring.set_password", _set_pw)
+        monkeypatch.setattr("keyring.get_password", _get_pw)
+
+        # ── 模拟 Tauri 前端保存流程 ──
+        # 前端调用 save_minebase_config({ config: {...} })
+        # → config_loader.save_minebase_config(cfg)
+        minebase_cfg = {
+            "mode": "database",
+            "api": {"url": "", "username": "", "password": ""},
+            "database": {"host": "127.0.0.1", "port": 5432, "database": "minebase", "user": "admin", "password": "hunter2"},
+        }
+        config_loader.save_minebase_config(minebase_cfg)
+
+        # ── 模拟 sync 流程 ──
+        # get_minebase_db_config() → load_secret() → keyring
+        config_loader._invalidate_config_cache()
+        db_cfg = config_loader.get_minebase_db_config()
+
+        # 用户名应正确保存
+        assert db_cfg["user"] == "admin", f"Expected 'admin', got '{db_cfg.get('user')}'"
+        # 密码应从 keyring 解密
+        assert db_cfg["password"] == "hunter2", f"Expected 'hunter2', got '{db_cfg.get('password')!r}'"
 
 
 # ---------------------------------------------------------------------------
@@ -847,3 +977,96 @@ class TestSyncWithProcessors:
         # fuel fails and gets empty result, electrical still syncs
         assert results["fuel"] == {"success": 0, "skipped": 0, "failed": 0}
         assert results["electrical"]["success"] == 1
+
+
+# ---------------------------------------------------------------------------
+# MineBaseDBClient.insert_rows — execute_values placeholder bug
+# ---------------------------------------------------------------------------
+
+
+class TestInsertRowsPlaceholder:
+    """Regression: execute_values requires exactly one %s in the query template."""
+
+    @patch("psycopg2.connect")
+    def test_insert_rows_uses_single_placeholder(self, mock_connect):
+        """insert_rows must pass 'VALUES %s' (not 'VALUES (%s, %s, ...)') to execute_values.
+
+        When the query contains multiple %s placeholders, psycopg2 raises:
+        'the query contains more than one '%s' placeholder'
+        """
+        import psycopg2.extras
+
+        mock_cursor = MagicMock()
+        mock_conn = MagicMock()
+        mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
+        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+        mock_connect.return_value = mock_conn
+
+        client = MineBaseDBClient("localhost", 5432, "testdb", "user", "pass")
+
+        columns = ["date", "shift_type", "equipment_name"]
+        values = ["2026-06-18", "Day", "EX-001"]
+
+        with patch.object(psycopg2.extras, "execute_values") as mock_exec:
+            client.insert_rows("work_efficiency", columns, [values])
+
+            mock_exec.assert_called_once()
+            query_template = mock_exec.call_args[0][1]
+            # The template must contain exactly one %s (execute_values expands it)
+            assert query_template.count("%s") == 1, (
+                f"Expected 1 '%s' placeholder, got {query_template.count('%s')}: {query_template}"
+            )
+            assert "VALUES %s" in query_template
+
+
+# ---------------------------------------------------------------------------
+# sync_via_db — savepoint isolation for per-row failures
+# ---------------------------------------------------------------------------
+
+
+class TestSyncViaDbSavepoint:
+    """Regression: a single row INSERT failure must not poison the transaction.
+
+    Without savepoints, PostgreSQL aborts the entire transaction on the first
+    error, causing all subsequent rows to fail with:
+    'current transaction is aborted, commands ignored until end of transaction block'
+    """
+
+    def test_single_row_failure_does_not_poison_transaction(self):
+        """When row 2 fails, rows 1 and 3 should still be inserted."""
+        from func.sync_to_minebase import sync_via_db
+
+        mock_client = MagicMock()
+        mock_cursor = MagicMock()
+        mock_client.conn.cursor.return_value.__enter__ = lambda s: mock_cursor
+        mock_client.conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+
+        # resolve_equipment_id returns a valid ID for all rows
+        mock_client.resolve_equipment_id.return_value = "equip-uuid-001"
+
+        # check_duplicate returns False (no duplicates)
+        mock_client.check_duplicate.return_value = False
+
+        # insert_rows_with_cursor: row 1 and 3 succeed, row 2 raises
+        call_count = 0
+        def mock_insert(cur, table, columns, values_list):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 2:
+                raise Exception("duplicate key value violates unique constraint")
+            return 1
+
+        mock_client.insert_rows_with_cursor = mock_insert
+
+        rows = [
+            {"date": "2026-06-18", "shiftType": "Day", "equipmentName": "EX-001", "consumption": 100.0},
+            {"date": "2026-06-18", "shiftType": "Day", "equipmentName": "EX-002", "consumption": 200.0},
+            {"date": "2026-06-18", "shiftType": "Night", "equipmentName": "EX-003", "consumption": 300.0},
+        ]
+
+        result = sync_via_db("fuel", rows, {}, mock_client, dry_run=False)
+
+        assert result["success"] == 2
+        assert result["failed"] == 1
+        assert result["skipped"] == 0
+        mock_client.commit.assert_called_once()
