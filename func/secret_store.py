@@ -5,7 +5,10 @@
 
 from __future__ import annotations
 
+import copy
 import logging
+from typing import Any
+
 import keyring
 
 from . import config_loader
@@ -33,12 +36,25 @@ def _keyring_key(path: tuple[str, ...]) -> str:
     return ".".join(path)
 
 
+def _is_secret_value(val: Any) -> bool:
+    """判断一个值是否为真实的密码（非空、非 sentinel）。"""
+    return bool(val) and val not in (_KEYRING_SENTINEL, _LEGACY_KEYRING_SENTINEL)
+
+
+# ---------------------------------------------------------------------------
+# 单路径读写（保持向后兼容）
+# ---------------------------------------------------------------------------
+
 def store_secret(path: tuple[str, ...], value: str) -> bool:
-    """将敏感值存入 Keychain，并在 config.user.json 中标记为 sentinel。
+    """将单个敏感值存入 Keychain。
+
+    注意：本函数**不**更新 config.user.json 中的 sentinel 标记，
+    调用方（如 save_minebase_secrets）应自行处理配置文件更新，
+    以避免多次重复读写磁盘。
 
     Returns:
-        True  — Keychain 写入成功，配置已更新为 sentinel。
-        False — Keychain 写入失败，配置保持原值不变（明文回退）。
+        True  — Keychain 写入成功。
+        False — Keychain 写入失败。
     """
     key = _keyring_key(path)
     try:
@@ -46,12 +62,6 @@ def store_secret(path: tuple[str, ...], value: str) -> bool:
     except Exception:
         logger.exception("Keychain 写入失败: %s，密码将以明文保留在配置文件中", key)
         return False
-    # path 形如 ("minebase", "api", "password")，相对于 minebase 节点的子路径为 path[1:]
-    user_file = config_loader._load_json(config_loader._USER_CONFIG_FILE)
-    minebase_cfg = user_file.get("minebase", {})
-    _set_nested(minebase_cfg, path[1:], _KEYRING_SENTINEL)
-    config_loader._save_json(config_loader._USER_CONFIG_FILE, {**user_file, "minebase": minebase_cfg})
-    config_loader._invalidate_config_cache()
     logger.info("密钥已存入系统 Keychain: %s", key)
     return True
 
@@ -87,11 +97,47 @@ def _read_legacy_plaintext(path: tuple[str, ...]) -> str:
     return val if val and val not in (_KEYRING_SENTINEL, _LEGACY_KEYRING_SENTINEL) else ""
 
 
-def has_keyring_secret(path: tuple[str, ...]) -> bool:
-    """判断该路径的密码是否已存入 Keychain。"""
-    config = config_loader.load_config()
-    return _get_nested(config, path) == _KEYRING_SENTINEL
+# ---------------------------------------------------------------------------
+# 批量读写（供 config_loader 委托使用，避免 N+1 文件 I/O）
+# ---------------------------------------------------------------------------
 
+def save_minebase_secrets(
+    cfg: dict[str, Any],
+    secret_paths: list[tuple[str, ...]] | None = None,
+) -> dict[str, Any]:
+    """将配置中的密码存入 Keychain，返回清理后的配置副本。
+
+    遍历所有 secret_paths，对每个真实密码：
+    - 写入 Keychain → 替换为 sentinel
+    - 写入失败 → 保留明文
+
+    调用方负责将返回的配置写入 config.user.json。
+    """
+    paths = secret_paths if secret_paths is not None else _SECRET_PATHS
+    cfg_clean = copy.deepcopy(cfg)
+
+    for path in paths:
+        val = _get_nested(cfg_clean, path[1:])
+        if not _is_secret_value(val):
+            continue
+        if store_secret(path, val):
+            _set_nested(cfg_clean, path[1:], _KEYRING_SENTINEL)
+        # else: Keychain 写入失败，保留明文密码
+
+    return cfg_clean
+
+
+def load_minebase_secret(section: str) -> str:
+    """读取指定 minebase 子模块的密码（api 或 database）。
+
+    用于 config_loader 的 get_minebase_*_config 函数。
+    """
+    return load_secret(("minebase", section, "password"))
+
+
+# ---------------------------------------------------------------------------
+# 迁移
+# ---------------------------------------------------------------------------
 
 def migrate_passwords_to_keyring() -> None:
     """一次性迁移：将 config.user.json 中的明文密码转入 Keychain。
@@ -99,28 +145,61 @@ def migrate_passwords_to_keyring() -> None:
     同时扫描顶层 minebase 和旧格式 user_config.minebase 两个位置。
     幂等 — 已标记为 sentinel 的字段不会重复迁移。
     Keychain 写入失败时保留明文，不中断启动。
+
+    迁移成功后，自动清理 user_config.minebase 旧格式中的密码字段，
+    避免明文残留在配置文件中。
     """
     user_file = config_loader._load_json(config_loader._USER_CONFIG_FILE)
     minebase_cfg = user_file.get("minebase", {})
     legacy_cfg = user_file.get("user_config", {}).get("minebase", {})
     changed = False
+    legacy_changed = False
 
     for path in _SECRET_PATHS:
-        val = _get_nested(minebase_cfg, path[1:])
+        sub_path = path[1:]  # ("api", "password") 或 ("database", "password")
+        val = _get_nested(minebase_cfg, sub_path)
         # 顶层无明文时，从 user_config.minebase 旧格式取
         if not val or val == _KEYRING_SENTINEL:
-            val = _get_nested(legacy_cfg, path[1:])
-        if val and val != _KEYRING_SENTINEL:
-            key = _keyring_key(path)
-            try:
-                keyring.set_password(_KEYRING_SERVICE, key, val)
-            except Exception:
-                logger.exception("Keychain 迁移失败: %s，保留明文密码", key)
-                continue
-            _set_nested(minebase_cfg, path[1:], _KEYRING_SENTINEL)
-            logger.info("已迁移密码到 Keychain: %s", key)
-            changed = True
+            val = _get_nested(legacy_cfg, sub_path)
+        if not _is_secret_value(val):
+            continue
+        key = _keyring_key(path)
+        try:
+            keyring.set_password(_KEYRING_SERVICE, key, val)
+        except Exception:
+            logger.exception("Keychain 迁移失败: %s，保留明文密码", key)
+            continue
+        # 顶层标记为 sentinel
+        _set_nested(minebase_cfg, sub_path, _KEYRING_SENTINEL)
+        # 清理旧格式中的明文密码
+        if _get_nested(legacy_cfg, sub_path):
+            _set_nested(legacy_cfg, sub_path, _KEYRING_SENTINEL)
+            legacy_changed = True
+        logger.info("已迁移密码到 Keychain: %s", key)
+        changed = True
 
     if changed:
-        config_loader._save_json(config_loader._USER_CONFIG_FILE, {**user_file, "minebase": minebase_cfg})
+        # 更新顶层 minebase
+        user_file["minebase"] = minebase_cfg
+        # 更新旧格式（标记为 sentinel 或删除整个空段落）
+        if legacy_changed:
+            user_cfg = user_file.get("user_config", {})
+            if isinstance(user_cfg, dict):
+                has_remaining = any(
+                    _is_secret_value(_get_nested(legacy_cfg, p[1:]))
+                    for p in _SECRET_PATHS
+                )
+                if not has_remaining:
+                    # 所有密码已迁移，移除整个 minebase 段落
+                    user_cfg.pop("minebase", None)
+                else:
+                    user_cfg["minebase"] = legacy_cfg
+                user_file["user_config"] = user_cfg
+        config_loader._save_json(config_loader._USER_CONFIG_FILE, user_file)
         config_loader._invalidate_config_cache()
+
+
+def has_keyring_secret(path: tuple[str, ...]) -> bool:
+    """判断该路径的密码是否已存入 Keychain。"""
+    config = config_loader.load_config()
+    return _get_nested(config, path) == _KEYRING_SENTINEL

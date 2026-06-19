@@ -90,3 +90,17 @@ exe = EXE(
     upx=True,               # 压缩（需安装 upx）
     console=True,           # 需要 stdin/stdout/stderr 通信
 )
+
+# macOS .app bundle 图标（sidecar 是 console 应用，图标由 Tauri 管理）
+_spec_dir = os.path.dirname(os.path.abspath(SPEC))
+app_icon = os.path.join(_spec_dir, 'assets', 'app_icon.icns')
+if not os.path.isfile(app_icon):
+    app_icon = os.path.join(_spec_dir, 'src-tauri', 'icons', 'icon.icns')
+
+if os.name == 'posix':  # macOS / Linux
+    app = BUNDLE(
+        exe,
+        name='MiningProcessor.app',
+        icon=app_icon if os.path.isfile(app_icon) else None,
+        bundle_identifier='com.kearney.mining-processor',
+    )

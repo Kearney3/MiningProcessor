@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#0C1223"/>
+      <stop offset="100%" stop-color="#162040"/>
+    </linearGradient>
+    <linearGradient id="v1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#F5AA28"/>
+      <stop offset="100%" stop-color="#DC941C"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.33" r="0.12">
+      <stop offset="0%" stop-color="#B4E6F0" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#B4E6F0" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+
+  <!-- 背景山 -->
+  <polygon points="10,440 100,268 190,440" fill="#105866"/>
+  <polygon points="100,268 190,440 100,440" fill="#146976"/>
+  <polygon points="310,440 410,252 502,440" fill="#105866"/>
+  <polygon points="410,252 502,440 410,440" fill="#146976"/>
+
+  <!-- 中景山 -->
+  <polygon points="22,440 128,228 234,440" fill="#0E6E80"/>
+  <polygon points="128,228 234,440 128,440" fill="#1694A8"/>
+  <polygon points="278,440 384,218 490,440" fill="#0E6E80"/>
+  <polygon points="384,218 490,440 384,440" fill="#1AA0B4"/>
+
+  <!-- 主峰 -->
+  <polygon points="138,440 256,168 374,440" fill="#1694A8"/>
+  <polygon points="256,168 374,440 256,440" fill="#24BCD2"/>
+
+  <!-- 前景小丘 -->
+  <polygon points="-8,440 72,358 152,440" fill="#0C6272"/>
+  <polygon points="72,358 152,440 72,440" fill="#12788A"/>
+  <polygon points="360,440 440,348 520,440" fill="#0C6272"/>
+  <polygon points="440,348 520,440 440,440" fill="#12788A"/>
+
+  <!-- 矿脉 -->
+  <path d="M100,290 L88,340 115,312Z" fill="url(#v1)" opacity="0.85"/>
+  <path d="M82,355 L75,395 100,372Z" fill="url(#v1)" opacity="0.65"/>
+  <path d="M232,200 L218,260 250,232Z" fill="url(#v1)" opacity="0.9"/>
+  <path d="M210,280 L200,330 228,305Z" fill="url(#v1)" opacity="0.75"/>
+  <path d="M265,240 L255,290 278,265Z" fill="url(#v1)" opacity="0.6"/>
+  <path d="M365,250 L350,305 380,278Z" fill="url(#v1)" opacity="0.85"/>
+  <path d="M342,320 L332,368 358,342Z" fill="url(#v1)" opacity="0.65"/>
+  <path d="M48,380 L42,410 60,395Z" fill="url(#v1)" opacity="0.5"/>
+  <path d="M430,365 L422,400 445,382Z" fill="url(#v1)" opacity="0.5"/>
+
+  <!-- 主峰高光边缘 -->
+  <line x1="138" y1="440" x2="256" y2="168" stroke="#37D2E6" stroke-opacity="0.45" stroke-width="3"/>
+  <line x1="374" y1="440" x2="256" y2="168" stroke="#37D2E6" stroke-opacity="0.28" stroke-width="2"/>
+
+  <!-- 峰顶微光 -->
+  <circle cx="256" cy="172" r="32" fill="url(#glow)"/>
+
+  <!-- 底部渐变 -->
+  <defs>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0C1223" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#0C1223" stop-opacity="0.7"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="380" width="512" height="132" fill="url(#fade)"/>
+</svg>

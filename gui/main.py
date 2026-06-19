@@ -48,6 +48,9 @@ def main(page: ft.Page):
     page.window.height = INITIAL_WINDOW_HEIGHT
     page.window.min_width = MIN_WINDOW_WIDTH
     page.window.min_height = MIN_WINDOW_HEIGHT
+    _icon_path = Path(__file__).resolve().parent.parent / "assets" / "app_icon.png"
+    if _icon_path.exists():
+        page.window.icon = str(_icon_path)
 
     # ---- 日志视图 ----
     log_view, log_refs = cmp.create_log_view()
