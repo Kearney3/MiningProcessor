@@ -454,6 +454,14 @@ def _save_config(params: dict) -> dict:
     return {"ok": True}
 
 
+@_register("save_minebase_config")
+def _save_minebase_config(params: dict) -> dict:
+    from func.config_loader import save_minebase_config
+
+    save_minebase_config(params["config"])
+    return {"ok": True}
+
+
 @_register("get_device_load_map")
 def _get_device_load_map(params: dict) -> dict:
     from func.config_loader import get_device_load_map
@@ -828,6 +836,13 @@ def main() -> None:
     """入口：从 stdin 逐行读取 JSON 请求，处理后写回 stdout。"""
     _setup_logging()
     _emit("log", {"level": "INFO", "message": "Python bridge started"})
+
+    # 启动时将 config.user.json 中残留的明文密码迁移到系统 Keychain
+    try:
+        from func.secret_store import migrate_passwords_to_keyring
+        migrate_passwords_to_keyring()
+    except Exception:
+        logger.debug("密码迁移跳过（Keychain 不可用）", exc_info=True)
 
     for line in sys.stdin:
         line = line.strip()

@@ -617,7 +617,7 @@ function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
   const [passSaved, setPassSaved] = useState<{ api: boolean; db: boolean }>({ api: false, db: false });
 
   const MASKED = "********";
-  const KEYRING_SENTINEL = "__KEYRING_SENTINEL__";
+  const KEYRING_SENTINEL = "__keyring__";
 
   const reload = useCallback(async () => {
     try {
@@ -685,7 +685,7 @@ function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
         api: { ...config.api, password: resolvePass(config.api.password, passSaved.api) },
         database: { ...config.database, password: resolvePass(config.database.password, passSaved.db) },
       };
-      await bridge.call("save_config", { data: { minebase: toSave }, target: "user" });
+      await bridge.call("save_minebase_config", { config: toSave });
       setStatus({ msg: "MineBase 连接配置已保存", kind: "success" });
       notify("MineBase 配置已保存", "success");
       setTimeout(() => setStatus({ msg: "", kind: "info" }), 2500);

@@ -16,6 +16,9 @@ logger = logging.getLogger(__name__)
 # sentinel: 配置文件中出现此值表示实际密码已存入 Keychain
 _KEYRING_SENTINEL = "__keyring__"
 
+# 前端曾使用不同的 sentinel 值，兼容旧配置文件
+_LEGACY_KEYRING_SENTINEL = "__KEYRING_SENTINEL__"
+
 # minebase 配置中需要加密存储的完整路径（相对于配置根节点）
 _SECRET_PATHS: list[tuple[str, ...]] = [
     ("minebase", "api", "password"),
@@ -30,10 +33,19 @@ def _keyring_key(path: tuple[str, ...]) -> str:
     return ".".join(path)
 
 
-def store_secret(path: tuple[str, ...], value: str) -> None:
-    """将敏感值存入 Keychain，并在 config.user.json 中标记为 sentinel。"""
+def store_secret(path: tuple[str, ...], value: str) -> bool:
+    """将敏感值存入 Keychain，并在 config.user.json 中标记为 sentinel。
+
+    Returns:
+        True  — Keychain 写入成功，配置已更新为 sentinel。
+        False — Keychain 写入失败，配置保持原值不变（明文回退）。
+    """
     key = _keyring_key(path)
-    keyring.set_password(_KEYRING_SERVICE, key, value)
+    try:
+        keyring.set_password(_KEYRING_SERVICE, key, value)
+    except Exception:
+        logger.exception("Keychain 写入失败: %s，密码将以明文保留在配置文件中", key)
+        return False
     # path 形如 ("minebase", "api", "password")，相对于 minebase 节点的子路径为 path[1:]
     user_file = config_loader._load_json(config_loader._USER_CONFIG_FILE)
     minebase_cfg = user_file.get("minebase", {})
@@ -41,13 +53,14 @@ def store_secret(path: tuple[str, ...], value: str) -> None:
     config_loader._save_json(config_loader._USER_CONFIG_FILE, {**user_file, "minebase": minebase_cfg})
     config_loader._invalidate_config_cache()
     logger.info("密钥已存入系统 Keychain: %s", key)
+    return True
 
 
 def load_secret(path: tuple[str, ...]) -> str:
     """读取密钥：若配置中为 sentinel 则从 Keychain 取，否则直接返回原值。"""
     config = config_loader.load_config()
     val = _get_nested(config, path)
-    if val == _KEYRING_SENTINEL:
+    if val in (_KEYRING_SENTINEL, _LEGACY_KEYRING_SENTINEL):
         key = _keyring_key(path)
         secret = keyring.get_password(_KEYRING_SERVICE, key)
         if secret is None:
@@ -67,6 +80,7 @@ def migrate_passwords_to_keyring() -> None:
     """一次性迁移：将 config.user.json 中的明文密码转入 Keychain。
 
     幂等 — 已标记为 sentinel 的字段不会重复迁移。
+    Keychain 写入失败时保留明文，不中断启动。
     """
     user_file = config_loader._load_json(config_loader._USER_CONFIG_FILE)
     minebase_cfg = user_file.get("minebase", {})
@@ -76,7 +90,11 @@ def migrate_passwords_to_keyring() -> None:
         val = _get_nested(minebase_cfg, path[1:])
         if val and val != _KEYRING_SENTINEL:
             key = _keyring_key(path)
-            keyring.set_password(_KEYRING_SERVICE, key, val)
+            try:
+                keyring.set_password(_KEYRING_SERVICE, key, val)
+            except Exception:
+                logger.exception("Keychain 迁移失败: %s，保留明文密码", key)
+                continue
             _set_nested(minebase_cfg, path[1:], _KEYRING_SENTINEL)
             logger.info("已迁移密码到 Keychain: %s", key)
             changed = True
