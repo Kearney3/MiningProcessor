@@ -166,7 +166,8 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const [dateStart, setDateStart] = useState(yesterdayISO());
   const [dateEnd, setDateEnd] = useState(yesterdayISO());
   const [applyHeaderMapping, setApplyHeaderMapping] = useState(true);
-  const [useLedger, setUseLedger] = useState(true);
+  const [useEquipmentLedger, setUseEquipmentLedger] = useState(false);
+  const [useOilLedger, setUseOilLedger] = useState(true);
 
   // 启动时验证上次目录是否存在，不存在则清空
   useEffect(() => {
@@ -211,7 +212,8 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
         date_start: dateStart || undefined,
         date_end: dateEnd || undefined,
         apply_header_mapping: applyHeaderMapping,
-        use_ledger: useLedger,
+        use_equipment_ledger: useEquipmentLedger,
+        use_oil_ledger: useOilLedger,
       });
       setResult(res);
       const total = Object.values(res.results).reduce(
@@ -453,19 +455,37 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
           <div className="flex items-start gap-3">
             <button
               role="switch"
-              aria-checked={useLedger}
-              onClick={() => setUseLedger(!useLedger)}
+              aria-checked={useEquipmentLedger}
+              onClick={() => setUseEquipmentLedger(!useEquipmentLedger)}
               className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors shrink-0 mt-0.5 ${
-                useLedger ? "bg-blue-600" : "bg-slate-200"
+                useEquipmentLedger ? "bg-blue-600" : "bg-slate-200"
               }`}
             >
               <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                useLedger ? "translate-x-4" : "translate-x-0.5"
+                useEquipmentLedger ? "translate-x-4" : "translate-x-0.5"
               }`} />
             </button>
             <div>
-              <div className="text-sm text-slate-700">应用台账匹配</div>
+              <div className="text-sm text-slate-700">设备台账匹配</div>
               <div className="text-xs text-slate-400 mt-0.5">使用设备台账标准化设备名称</div>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <button
+              role="switch"
+              aria-checked={useOilLedger}
+              onClick={() => setUseOilLedger(!useOilLedger)}
+              className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors shrink-0 mt-0.5 ${
+                useOilLedger ? "bg-blue-600" : "bg-slate-200"
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                useOilLedger ? "translate-x-4" : "translate-x-0.5"
+              }`} />
+            </button>
+            <div>
+              <div className="text-sm text-slate-700">油品台账匹配</div>
+              <div className="text-xs text-slate-400 mt-0.5">使用油品台账标准化油品名称</div>
             </div>
           </div>
         </div>
