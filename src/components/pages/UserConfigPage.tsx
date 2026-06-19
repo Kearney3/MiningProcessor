@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import type { BridgeProp } from "../../lib/types";
+import { useToast } from "../Toast";
 
 interface FileKeywords {
   fuel: string[];
@@ -305,6 +306,7 @@ function StatusMessage({ message, kind }: { message: string; kind: "success" | "
 // ---------------------------------------------------------------------------
 
 function FileKeywordsSection({ bridge }: { bridge: BridgeProp }) {
+  const { notify } = useToast();
   const [expanded, setExpanded] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ msg: string; kind: "success" | "error" | "info" }>({ msg: "", kind: "info" });
@@ -344,9 +346,11 @@ function FileKeywordsSection({ bridge }: { bridge: BridgeProp }) {
     try {
       await bridge.call("save_config", { data: { file_keywords: keywords }, target: "user" });
       setStatus({ msg: "文件关键字配置已保存", kind: "success" });
+      notify("文件关键字已保存", "success");
       setTimeout(() => setStatus({ msg: "", kind: "info" }), 2500);
     } catch (e) {
       setStatus({ msg: `保存失败: ${String(e)}`, kind: "error" });
+      notify(`保存失败: ${e}`, "error");
     } finally {
       setSaving(false);
     }
@@ -402,6 +406,7 @@ function FileKeywordsSection({ bridge }: { bridge: BridgeProp }) {
 // ---------------------------------------------------------------------------
 
 function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
+  const { notify } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ msg: string; kind: "success" | "error" | "info" }>({ msg: "", kind: "info" });
@@ -462,9 +467,11 @@ function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
         target: "user",
       });
       setStatus({ msg: `已保存 ${cleanEntries.length} 条表头映射`, kind: "success" });
+      notify(`已保存 ${cleanEntries.length} 条表头映射`, "success");
       setTimeout(() => setStatus({ msg: "", kind: "info" }), 2500);
     } catch (e) {
       setStatus({ msg: `保存失败: ${String(e)}`, kind: "error" });
+      notify(`保存失败: ${e}`, "error");
     } finally {
       setSaving(false);
     }
@@ -599,6 +606,7 @@ function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
 // ---------------------------------------------------------------------------
 
 function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
+  const { notify } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -679,9 +687,11 @@ function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
       };
       await bridge.call("save_config", { data: { minebase: toSave }, target: "user" });
       setStatus({ msg: "MineBase 连接配置已保存", kind: "success" });
+      notify("MineBase 配置已保存", "success");
       setTimeout(() => setStatus({ msg: "", kind: "info" }), 2500);
     } catch (e) {
       setStatus({ msg: `保存失败: ${String(e)}`, kind: "error" });
+      notify(`保存失败: ${e}`, "error");
     } finally {
       setSaving(false);
     }
@@ -931,6 +941,7 @@ const TARGET_FIELDS: Record<string, string[]> = {
 };
 
 function ColumnMappingSection({ bridge }: { bridge: BridgeProp }) {
+  const { notify } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [mapping, setMapping] = useState<Record<string, Record<string, string>>>({});
   const [activeType, setActiveType] = useState("fuel_consumption");
@@ -960,9 +971,11 @@ function ColumnMappingSection({ bridge }: { bridge: BridgeProp }) {
     try {
       await bridge.call("save_minebase_column_mapping", { mapping });
       setSuccess("列映射已保存");
+      notify("列映射已保存", "success");
       setTimeout(() => setSuccess(null), 2000);
     } catch (e) {
       setError(String(e));
+      notify(`保存失败: ${e}`, "error");
     } finally {
       setSaving(false);
     }
@@ -974,9 +987,11 @@ function ColumnMappingSection({ bridge }: { bridge: BridgeProp }) {
       await bridge.call("reset_minebase_column_mapping");
       await loadMapping();
       setSuccess("已重置为默认配置");
+      notify("已重置为默认配置", "success");
       setTimeout(() => setSuccess(null), 2000);
     } catch (e) {
       setError(String(e));
+      notify(`重置失败: ${e}`, "error");
     }
   };
 

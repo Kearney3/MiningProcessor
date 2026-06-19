@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type { BridgeProp } from "../../lib/types";
+import { useToast } from "../Toast";
 
 type LoadMap = Record<string, number>;
 
@@ -87,48 +88,6 @@ const IconSettings = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
   </svg>
 );
-
-/* ------------------------------------------------------------------ */
-/*  Toast                                                              */
-/* ------------------------------------------------------------------ */
-
-function Toast({
-  message,
-  kind,
-  onClose,
-}: {
-  message: string;
-  kind: "success" | "error" | "info";
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    const t = setTimeout(onClose, 2500);
-    return () => clearTimeout(t);
-  }, [onClose]);
-
-  const bg =
-    kind === "success"
-      ? "bg-emerald-600"
-      : kind === "error"
-        ? "bg-red-600"
-        : "bg-slate-700";
-
-  const icon =
-    kind === "success" ? (
-      <IconCheck />
-    ) : kind === "error" ? (
-      <IconWarning />
-    ) : null;
-
-  return (
-    <div
-      className={`fixed bottom-6 right-6 z-50 ${bg} text-white text-sm px-5 py-2.5 rounded-lg flex items-center gap-2`}
-    >
-      {icon}
-      {message}
-    </div>
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /*  Confirm dialog                                                     */
@@ -223,13 +182,13 @@ function RestoreDefaultsDialog({
 /* ------------------------------------------------------------------ */
 
 export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
+  const { notify } = useToast();
   const [loadMap, setLoadMap] = useState<LoadMap>({});
   const [persistedMap, setPersistedMap] = useState<LoadMap>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ msg: string; kind: "success" | "error" | "info" } | null>(null);
   const [newName, setNewName] = useState("");
   const [newValue, setSetValue] = useState("");
   const [newNameError, setNewNameError] = useState<string | null>(null);
@@ -246,17 +205,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
   const [restoreDialog, setRestoreDialog] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const toastRef = useRef(toast);
-  toastRef.current = toast;
-
   /* ---- helpers --------------------------------------------------- */
-
-  const showToast = useCallback(
-    (msg: string, kind: "success" | "error" | "info" = "info") => {
-      setToast({ msg, kind });
-    },
-    [],
-  );
 
   // M14: 使用 stable stringify 避免 key 顺序变化导致误判
   const stableStringify = useCallback(
@@ -333,7 +282,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
       next.delete(name);
       return next;
     });
-    showToast("已删除", "info");
+    notify("已删除", "info");
   };
 
   const handleAdd = () => {
@@ -356,7 +305,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
     setLoadMap((prev) => ({ ...prev, [newName.trim()]: num }));
     setNewName("");
     setSetValue("");
-    showToast("已添加", "success");
+    notify("已添加", "success");
   };
 
   /* ---- selection ------------------------------------------------- */
@@ -392,7 +341,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
       selected.forEach((k) => delete next[k]);
       return next;
     });
-    showToast(`已删除 ${selected.size} 条记录`, "success");
+    notify(`已删除 ${selected.size} 条记录`, "success");
     setSelected(new Set());
     setConfirmDeleteDialog(false);
   };
@@ -404,10 +353,10 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
     setError(null);
     try {
       await bridge.call("apply_device_load_map", { map_data: loadMap });
-      showToast("已应用（未保存）", "info");
+      notify("已应用（未保存）", "info");
     } catch (e) {
       setError(String(e));
-      showToast("应用失败", "error");
+      notify("应用失败", "error");
     } finally {
       setApplying(false);
     }
@@ -419,10 +368,10 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
     try {
       await bridge.call("update_device_load_map", { map_data: loadMap });
       setPersistedMap({ ...loadMap });
-      showToast("已保存", "success");
+      notify("已保存", "success");
     } catch (e) {
       setError(String(e));
-      showToast("保存失败", "error");
+      notify("保存失败", "error");
     } finally {
       setSaving(false);
     }
@@ -451,9 +400,9 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
       const count = Object.keys(imported).length;
       if (count === 0) throw new Error("未找到有效记录");
       setLoadMap((prev) => ({ ...prev, ...imported }));
-      showToast(`已导入 ${count} 条记录`, "success");
+      notify(`已导入 ${count} 条记录`, "success");
     } catch (err) {
-      showToast(`导入失败: ${err instanceof Error ? err.message : String(err)}`, "error");
+      notify(`导入失败: ${err instanceof Error ? err.message : String(err)}`, "error");
     } finally {
       // reset so same file can be re-selected
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -472,7 +421,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
     a.download = "device_load_map.json";
     a.click();
     URL.revokeObjectURL(url);
-    showToast("已导出配置文件", "success");
+    notify("已导出配置文件", "success");
   };
 
   /* ---- restore defaults ------------------------------------------ */
@@ -483,10 +432,10 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
       const defaults = await bridge.call<LoadMap>("get_default_load_map", { version });
       if (defaults && typeof defaults === "object") {
         setLoadMap(defaults);
-        showToast(`已恢复${version === "new" ? "新版" : "旧版"}默认配置（未保存）`, "info");
+        notify(`已恢复${version === "new" ? "新版" : "旧版"}默认配置（未保存）`, "info");
       }
     } catch {
-      showToast("获取默认配置失败", "error");
+      notify("获取默认配置失败", "error");
     }
   };
 
@@ -779,15 +728,6 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
         <RestoreDefaultsDialog
           onPick={handleRestore}
           onCancel={() => setRestoreDialog(false)}
-        />
-      )}
-
-      {/* ---- toast ------------------------------------------------ */}
-      {toast && (
-        <Toast
-          message={toast.msg}
-          kind={toast.kind}
-          onClose={() => setToast(null)}
         />
       )}
     </div>
