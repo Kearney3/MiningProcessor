@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import type { BridgeProp } from "../../lib/types";
+import { useToast } from "../Toast";
 import { inputClass, btnPrimaryClass, btnSecondaryClass } from "../../lib/ui-classes";
 
 // ---------------------------------------------------------------------------
@@ -198,6 +199,7 @@ function ToggleSwitch({
 // ---------------------------------------------------------------------------
 
 export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
+  const { notify } = useToast();
   const [filePath, setFilePath] = useState("");
   const [sheetName, setSheetName] = useState("");
   const [availableSheets, setAvailableSheets] = useState<string[]>([]);
@@ -399,8 +401,10 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
           setColumns(Object.keys(res.rows[0]));
         }
       }
+      notify(`匹配完成: ${matchedCount} 匹配, ${unmatchedCount} 未匹配`, "success");
     } catch (e) {
       setError(String(e));
+      notify(`匹配失败: ${e}`, "error");
     } finally {
       setMatching(false);
     }
@@ -429,8 +433,10 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
         columns,
         output_path: outputPath,
       });
+      notify("导出成功", "success");
     } catch (e) {
       setError(String(e));
+      notify(`导出失败: ${e}`, "error");
     }
   };
 

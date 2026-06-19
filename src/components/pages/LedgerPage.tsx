@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import type { BridgeProp } from "../../lib/types";
+import { useToast } from "../Toast";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -283,6 +284,7 @@ function ConfirmDialog({
 // ---------------------------------------------------------------------------
 
 export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: LedgerPageConfig }) {
+  const { notify } = useToast();
   const [rows, setRows] = useState<LedgerRow[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -410,8 +412,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
         column_mapping: mapping,
       });
       await loadData();
+      notify("导入成功", "success");
     } catch (e) {
       setError(String(e));
+      notify(`导入失败: ${e}`, "error");
     } finally {
       setImporting(false);
       setPendingFilePath("");
@@ -427,8 +431,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
       });
       if (!filePath) return;
       await bridge.call(config.exportTemplateMethod, { output_path: filePath });
+      notify("模板导出成功", "success");
     } catch (e) {
       setError(String(e));
+      notify(`模板导出失败: ${e}`, "error");
     }
   };
 
@@ -437,8 +443,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
     try {
       await bridge.call(config.setDefaultMethod);
       setIsDefault(true);
+      notify("已设为默认", "success");
     } catch (e) {
       setError(String(e));
+      notify(`设为默认失败: ${e}`, "error");
     }
   };
 
@@ -447,8 +455,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
     try {
       await bridge.call(config.cancelDefaultMethod);
       setIsDefault(false);
+      notify("已取消默认", "success");
     } catch (e) {
       setError(String(e));
+      notify(`取消默认失败: ${e}`, "error");
     }
   };
 
@@ -458,8 +468,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
       await bridge.call(config.clearMethod);
       setRows([]);
       setColumns([]);
+      notify("已清空台账", "success");
     } catch (e) {
       setError(String(e));
+      notify(`清空失败: ${e}`, "error");
     }
   };
 
