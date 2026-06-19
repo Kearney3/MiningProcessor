@@ -766,6 +766,14 @@ def _export_matched_data(params: dict) -> dict:
     return {"output_file": output_path}
 
 
+@_register("check_directory_exists")
+def _check_directory_exists(params: dict) -> dict:
+    """检查目录是否存在。"""
+    import os
+    path = params.get("path", "")
+    return {"exists": os.path.isdir(path)}
+
+
 @_register("ping")
 def _ping(params: dict) -> dict:
     return {"pong": True, "pid": __import__("os").getpid()}
