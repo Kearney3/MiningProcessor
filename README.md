@@ -104,6 +104,7 @@ MiningProcessor/
 ├── func/                       # 核心处理引擎（Python）
 │   ├── bridge.py               # JSON-RPC over stdio 服务端（GUI 入口）
 │   ├── config_loader.py        # 配置读写与运行时管理
+│   ├── secret_store.py         # Keychain 凭证存储（密码加密）
 │   ├── equipment_ledger.py     # 设备台账与模糊匹配
 │   ├── oil_ledger.py           # 油品台账管理
 │   ├── logger.py               # 统一日志（CLI/GUI 共享）
@@ -151,6 +152,11 @@ MiningProcessor/
 | `user_config.database` | 数据库连接参数（`db_type/host/port/name/user/password`） |
 | `user_config.worktime_header_mapping` | 工作效率表自定义表头映射（支持位置模式和模糊匹配） |
 | `user_config.file_keywords` | 各报表文件识别关键字 |
+| `minebase.mode` | MineBase 同步模式：`api` 或 `database` |
+| `minebase.api` | API 模式连接参数（`url/username/password`） |
+| `minebase.database` | 数据库直连参数（`host/port/database/user/password`） |
+
+> **注意**：`minebase` 下的 `password` 字段通过系统 Keychain 加密存储（macOS Keychain / Windows Credential Manager），配置文件中仅保存哨兵值 `__keyring__`。首次启动 Tauri GUI 时自动将残留明文密码迁移到 Keychain；若 Keychain 不可用，密码以明文保留在 `config.user.json` 中作为回退。
 
 > **注意**：GUI 中"应用当前配置"仅更新运行时内存（`apply_device_load_map()`），"保存配置"才会写回文件（`update_device_load_map()`）。
 
@@ -197,7 +203,7 @@ MiningProcessor/
 ## 测试
 
 ```bash
-# 运行全部测试（277 个用例）
+# 运行全部测试（436 个用例）
 uv run pytest
 
 # 运行指定测试文件
@@ -231,6 +237,8 @@ uv run pytest -v
 | `test_production_config_flow.py` | 生产配置流程 |
 | `test_tab_switching.py` | Tab 切换行为 |
 | `test_drag_resize.py` | 拖拽调整 |
+| `test_secret_store.py` | Keychain 凭证存储、密码迁移、故障回退 |
+| `test_tauri_bridge.py` | Tauri RPC 方法、连接测试、启动迁移 |
 
 ---
 
