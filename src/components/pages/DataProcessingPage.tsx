@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { BridgeProp } from "../../lib/types";
+import { useToast } from "../Toast";
 import { ChevronDownIcon, PlayIcon, FolderIcon, FileIcon, PlusIcon, TrashIcon, CheckCircleIcon, XCircleIcon, AlertTriangleIcon, FuelIcon, ProductionIcon, ElectricalIcon, WorktimeIcon, MergeIcon } from "../../lib/icons";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 
@@ -291,6 +292,7 @@ function FuelCard({
   bridge: BridgeProp;
   useLedger: boolean;
 }) {
+  const { notify } = useToast();
   const [path, setPath] = useState("");
   const [year, setYear] = useState("");
   const [loading, setLoading] = useState(false);
@@ -308,9 +310,12 @@ function FuelCard({
         "process_fuel",
         params,
       );
-      setResult(res.output_file ? `输出: ${res.output_file}` : "处理完成");
+      const msg = res.output_file ? `输出: ${res.output_file}` : "处理完成";
+      setResult(msg);
+      notify(`油耗处理完成`, "success");
     } catch (e) {
       setError(String(e));
+      notify(`油耗处理失败: ${e}`, "error");
     } finally {
       setLoading(false);
     }
@@ -345,6 +350,7 @@ function ProductionCard({
   bridge: BridgeProp;
   useLedger: boolean;
 }) {
+  const { notify } = useToast();
   const [path, setPath] = useState("");
   const [rawStart, setRawStart] = useState("-1");
   const [loading, setLoading] = useState(false);
@@ -362,8 +368,10 @@ function ProductionCard({
         use_ledger: useLedger,
       });
       setResult("处理完成");
+      notify("生产数据处理完成", "success");
     } catch (e) {
       setError(String(e));
+      notify(`生产数据处理失败: ${e}`, "error");
     } finally {
       setLoading(false);
     }
@@ -407,6 +415,7 @@ function ElectricalCard({
   bridge: BridgeProp;
   useLedger: boolean;
 }) {
+  const { notify } = useToast();
   const [path, setPath] = useState("");
   const [year, setYear] = useState("");
   const [addShift, setAddShift] = useState(false);
@@ -429,8 +438,10 @@ function ElectricalCard({
       if (year) params.year = parseInt(year);
       await bridge.call("process_electrical", params);
       setResult("处理完成");
+      notify("电力消耗处理完成", "success");
     } catch (e) {
       setError(String(e));
+      notify(`电力消耗处理失败: ${e}`, "error");
     } finally {
       setLoading(false);
     }
@@ -493,6 +504,7 @@ function WorktimeCard({
   bridge: BridgeProp;
   useLedger: boolean;
 }) {
+  const { notify } = useToast();
   const [path, setPath] = useState("");
   const [year, setYear] = useState(String(currentYear));
   const [month, setMonth] = useState(String(new Date().getMonth() + 1));
@@ -521,8 +533,10 @@ function WorktimeCard({
       }
       await bridge.call("process_worktime", params);
       setResult("处理完成");
+      notify("工时处理完成", "success");
     } catch (e) {
       setError(String(e));
+      notify(`工时处理失败: ${e}`, "error");
     } finally {
       setLoading(false);
     }
@@ -603,6 +617,7 @@ function MergeCard({
   bridge: BridgeProp;
   useLedger: boolean;
 }) {
+  const { notify } = useToast();
   const [folderPath, setFolderPath] = useState("");
   const [keyword, setKeyword] = useState("");
   const [stripTime, setStripTime] = useState(false);
@@ -641,9 +656,12 @@ function MergeCard({
           .map((s) => ({ column: s.column.trim(), ascending: s.ascending })),
         use_ledger: useLedger,
       });
-      setResult(res.output_file ? `输出: ${res.output_file}` : "合并完成");
+      const msg = res.output_file ? `输出: ${res.output_file}` : "合并完成";
+      setResult(msg);
+      notify("文件合并完成", "success");
     } catch (e) {
       setError(String(e));
+      notify(`文件合并失败: ${e}`, "error");
     } finally {
       setLoading(false);
     }

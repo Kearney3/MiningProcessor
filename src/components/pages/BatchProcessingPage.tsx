@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { BridgeProp, BatchProgress, ScanResult } from "../../lib/types";
+import { useToast } from "../Toast";
 import { FolderIcon } from "../../lib/icons";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 
@@ -392,6 +393,7 @@ function ProgressBar({ percent, stage, detail }: { percent: number; stage: strin
 
 export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
   // -- Path & scan --
+  const { notify } = useToast();
   const [folderPath, setFolderPath] = useState("");
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -492,12 +494,15 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
 
       await bridge.call("batch_process", params);
       setResult("批量处理完成");
+      notify("批量处理完成", "success");
     } catch (e) {
       const msg = String(e);
       if (msg.includes("cancel")) {
         setResult("已取消");
+        notify("批量处理已取消", "info");
       } else {
         setError(msg);
+        notify(`批量处理失败: ${msg}`, "error");
       }
     } finally {
       setProcessing(false);

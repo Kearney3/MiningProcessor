@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { BridgeProp, SyncResult } from "../../lib/types";
+import { useToast } from "../Toast";
 import { FolderIcon } from "../../lib/icons";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { DatePicker } from "../DatePicker";
@@ -143,6 +144,7 @@ function DataTypeCheckbox({
 // ═══════════════════════════════════════
 
 export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
+  const { notify } = useToast();
   const [inputDir, setInputDir] = useState("");
   const [mode, setMode] = useState<"api" | "database">("api");
   const [dataTypes, setDataTypes] = useState<string[]>(ALL_TYPES.map((t) => t.id));
@@ -193,8 +195,18 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
         use_ledger: useLedger,
       });
       setResult(res);
+      const total = Object.values(res.results).reduce(
+        (acc, r) => ({ success: acc.success + r.success, skipped: acc.skipped + r.skipped, failed: acc.failed + r.failed }),
+        { success: 0, skipped: 0, failed: 0 },
+      );
+      if (total.failed > 0) {
+        notify(`同步完成: 成功=${total.success}, 跳过=${total.skipped}, 失败=${total.failed}`, "error");
+      } else {
+        notify(`同步完成: 成功=${total.success}, 跳过=${total.skipped}`, "success");
+      }
     } catch (e) {
       setError(String(e));
+      notify(`同步失败: ${e}`, "error");
     } finally {
       setLoading(false);
     }
