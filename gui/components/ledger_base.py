@@ -11,7 +11,6 @@ from pathlib import Path
 import pandas as pd
 import flet as ft
 
-from func import config_loader
 from .common import (
     _log_message, _last_directory, _update_last_directory,
     SortState, create_sortable_columns, _cell_text,

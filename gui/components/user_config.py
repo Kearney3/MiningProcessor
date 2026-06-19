@@ -416,6 +416,8 @@ def _create_minebase_section(page: ft.Page, log):
     _MASKED = "********"
     _api_pass_saved = False  # 是否已有保存的 API 密码
     _db_pass_saved = False   # 是否已有保存的 DB 密码
+    _api_pass_raw = ""       # 原始加密密码值
+    _db_pass_raw = ""        # 原始加密密码值
     mb_status_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
     mb_api_test_btn = theme.secondary_btn("测试连接", icon=ft.Icons.LAN)
     mb_api_test_result = ft.Text("", size=13, visible=False)
@@ -451,21 +453,23 @@ def _create_minebase_section(page: ft.Page, log):
     mb_mode.on_select = lambda _: _toggle_mb_fields()
 
     def _apply_mb_config(cfg: dict):
-        from func.secret_store import load_secret, _KEYRING_SENTINEL
+        from func.secret_store import _ENCRYPTED_PREFIX
 
-        nonlocal _api_pass_saved, _db_pass_saved
+        nonlocal _api_pass_saved, _db_pass_saved, _api_pass_raw, _db_pass_raw
 
         mb_mode.value = cfg.get("mode", "api")
         api = cfg.get("api", {})
         mb_api_url.value = api.get("url", "")
         mb_api_user.value = api.get("username", "")
         api_pass = api.get("password", "")
-        if api_pass == _KEYRING_SENTINEL or api_pass:
+        if api_pass.startswith(_ENCRYPTED_PREFIX) or api_pass:
             mb_api_pass.value = _MASKED
             _api_pass_saved = True
+            _api_pass_raw = api_pass
         else:
             mb_api_pass.value = ""
             _api_pass_saved = False
+            _api_pass_raw = ""
 
         db = cfg.get("database", {})
         mb_db_host.value = db.get("host", "")
@@ -473,21 +477,21 @@ def _create_minebase_section(page: ft.Page, log):
         mb_db_name.value = db.get("database", "")
         mb_db_user.value = db.get("user", "")
         db_pass = db.get("password", "")
-        if db_pass == _KEYRING_SENTINEL or db_pass:
+        if db_pass.startswith(_ENCRYPTED_PREFIX) or db_pass:
             mb_db_pass.value = _MASKED
             _db_pass_saved = True
+            _db_pass_raw = db_pass
         else:
             mb_db_pass.value = ""
             _db_pass_saved = False
+            _db_pass_raw = ""
         _toggle_mb_fields()
 
     def _collect_mb_config() -> dict:
-        from func.secret_store import _KEYRING_SENTINEL
-
-        def _resolve_pass(field_value: str, is_saved: bool) -> str:
-            """如果字段值是掩码且已有保存密码，返回哨兵值保留原密码。"""
+        def _resolve_pass(field_value: str, is_saved: bool, raw_value: str) -> str:
+            """如果字段值是掩码且已有保存密码，返回原始加密值保留原密码。"""
             if is_saved and field_value == _MASKED:
-                return _KEYRING_SENTINEL
+                return raw_value
             return field_value or ""
 
         return {
@@ -495,14 +499,14 @@ def _create_minebase_section(page: ft.Page, log):
             "api": {
                 "url": (mb_api_url.value or "").strip(),
                 "username": (mb_api_user.value or "").strip(),
-                "password": _resolve_pass(mb_api_pass.value, _api_pass_saved),
+                "password": _resolve_pass(mb_api_pass.value, _api_pass_saved, _api_pass_raw),
             },
             "database": {
                 "host": (mb_db_host.value or "").strip() or "localhost",
                 "port": int(_normalize_port_text(mb_db_port.value) or "5432"),
                 "database": (mb_db_name.value or "").strip() or "minebase",
                 "user": (mb_db_user.value or "").strip() or "postgres",
-                "password": _resolve_pass(mb_db_pass.value, _db_pass_saved),
+                "password": _resolve_pass(mb_db_pass.value, _db_pass_saved, _db_pass_raw),
             },
         }
 

@@ -837,13 +837,6 @@ def main() -> None:
     _setup_logging()
     _emit("log", {"level": "INFO", "message": "Python bridge started"})
 
-    # 启动时将 config.user.json 中残留的明文密码迁移到系统 Keychain
-    try:
-        from func.secret_store import migrate_passwords_to_keyring
-        migrate_passwords_to_keyring()
-    except Exception:
-        logger.debug("密码迁移跳过（Keychain 不可用）", exc_info=True)
-
     for line in sys.stdin:
         line = line.strip()
         if not line:

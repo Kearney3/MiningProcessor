@@ -9,11 +9,14 @@ load_config() 合并两者返回（user 覆盖 default），save 时按目标分
 """
 import copy
 import json
+import logging
 import threading
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 
 class _LedgerEncoder(json.JSONEncoder):
@@ -44,7 +47,6 @@ _CONFIG_FILE = Path(__file__).parent.parent / "config.json"
 _USER_CONFIG_FILE = Path(__file__).parent.parent / "config.user.json"
 
 _USER_CONFIG_SECTION = "user_config"
-_USER_CONFIG_DEFAULT_SECTION = "user_config_default"
 
 
 # ---------------------------------------------------------------------------
@@ -154,17 +156,23 @@ def _set_nested(d: dict[str, Any], path: tuple[str, str, str], value: Any) -> No
 
 
 def _load_json(path: Path) -> dict[str, Any]:
-    """读取 JSON 文件，不存在时返回空 dict。"""
+    """读取 JSON 文件，不存在或损坏时返回空 dict。"""
     if not path.exists():
         return {}
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning("读取配置文件失败 (%s): %s", path.name, e)
+        return {}
 
 
 def _save_json(path: Path, data: dict[str, Any]) -> None:
-    """写入 JSON 文件。"""
-    with open(path, "w", encoding="utf-8") as f:
+    """原子写入 JSON 文件（先写临时文件再 rename，防止崩溃导致文件损坏）。"""
+    tmp = path.with_suffix(".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+    tmp.replace(path)
 
 
 # ---------------------------------------------------------------------------
@@ -432,7 +440,8 @@ def load_equipment_ledger_cache() -> list[dict] | None:
     try:
         with open(_EQUIPMENT_LEDGER_CACHE, "r", encoding="utf-8") as f:
             return json.load(f).get("data")
-    except Exception:
+    except Exception as e:
+        logger.warning("加载设备台账缓存失败: %s", e)
         return None
 
 
@@ -460,7 +469,8 @@ def load_oil_ledger_cache() -> list[dict] | None:
     try:
         with open(_OIL_LEDGER_CACHE, "r", encoding="utf-8") as f:
             return json.load(f).get("data")
-    except Exception:
+    except Exception as e:
+        logger.warning("加载油品台账缓存失败: %s", e)
         return None
 
 
@@ -552,8 +562,8 @@ def get_minebase_column_mapping() -> dict[str, dict[str, str]]:
         try:
             with open(_MINEBASE_MAPPING_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("读取 MineBase 列映射文件失败，回退到默认值: %s", e)
     # 回退到 config.json 中的默认值
     config = _load_json(_CONFIG_FILE)
     return dict(config.get("minebase_column_mapping", {}))

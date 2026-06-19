@@ -302,7 +302,7 @@ class TestSaveMinebaseConfig:
 
     @pytest.fixture
     def minebase_env(self, tmp_path, monkeypatch):
-        """创建带 minebase 配置的临时环境并 mock keyring。"""
+        """创建带 minebase 配置的临时环境。"""
         config_data = {
             "minebase": {
                 "mode": "database",
@@ -317,23 +317,11 @@ class TestSaveMinebaseConfig:
         user_file = tmp_path / "config.user.json"
         monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", user_file)
 
-        # Mock keyring with in-memory store
-        _store: dict[str, str] = {}
+        return user_file
 
-        def _set_password(service: str, key: str, value: str):
-            _store[f"{service}:{key}"] = value
-
-        def _get_password(service: str, key: str) -> str | None:
-            return _store.get(f"{service}:{key}")
-
-        monkeypatch.setattr("keyring.set_password", _set_password)
-        monkeypatch.setattr("keyring.get_password", _get_password)
-
-        return _store, user_file
-
-    def test_save_real_password_stores_in_keyring(self, minebase_env):
-        """首次保存真实密码应写入 Keychain 并在配置中标记 sentinel。"""
-        _store, user_file = minebase_env
+    def test_save_real_password_encrypts(self, minebase_env):
+        """首次保存真实密码应加密存储。"""
+        user_file = minebase_env
 
         cfg = {
             "mode": "database",
@@ -342,52 +330,41 @@ class TestSaveMinebaseConfig:
         }
         config_loader.save_minebase_config(cfg)
 
-        # 密码应存入 keyring
-        keyring_key = "MiningProcessor:minebase.database.password"
-        assert _store.get(keyring_key) == "hunter2"
-
-        # 配置文件中密码应为 sentinel
         saved = json.loads(user_file.read_text(encoding="utf-8"))
-        assert saved["minebase"]["database"]["password"] == "__keyring__"
-        # 用户名应正常保存
+        assert saved["minebase"]["database"]["password"].startswith("__enc__")
         assert saved["minebase"]["database"]["user"] == "admin"
 
-    def test_save_sentinel_does_not_overwrite_real_password(self, minebase_env):
-        """第二次保存（密码字段为 sentinel 掩码）不应覆盖 Keychain 中的真实密码。
+    def test_save_encrypted_does_not_re_encrypt(self, minebase_env):
+        """第二次保存（密码已是加密格式）不应重复加密。"""
+        from func.secret_store import _decrypt
 
-        这是关键回归测试：模拟用户首次输入密码 → 保存 → 重新加载（字段显示掩码）
-        → 修改用户名 → 再次保存。第二次保存不应把 sentinel 写入 Keychain。
-        """
-        _store, user_file = minebase_env
-        keyring_key = "MiningProcessor:minebase.database.password"
+        user_file = minebase_env
 
-        # 第一次保存：真实密码
         cfg1 = {
             "mode": "database",
             "api": {"url": "", "username": "", "password": ""},
             "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "admin", "password": "hunter2"},
         }
         config_loader.save_minebase_config(cfg1)
-        assert _store[keyring_key] == "hunter2"
 
-        # 第二次保存：密码为 sentinel（模拟 UI 掩码），只改了用户名
+        saved1 = json.loads(user_file.read_text(encoding="utf-8"))
+        encrypted_pw = saved1["minebase"]["database"]["password"]
+
         cfg2 = {
             "mode": "database",
             "api": {"url": "", "username": "", "password": ""},
-            "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "new_admin", "password": "__keyring__"},
+            "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "new_admin", "password": encrypted_pw},
         }
         config_loader.save_minebase_config(cfg2)
 
-        # 关键断言：keyring 中仍为真实密码，不应被 sentinel 覆盖
-        assert _store[keyring_key] == "hunter2"
+        saved2 = json.loads(user_file.read_text(encoding="utf-8"))
+        assert saved2["minebase"]["database"]["password"] == encrypted_pw
+        assert _decrypt(saved2["minebase"]["database"]["password"]) == "hunter2"
+        assert saved2["minebase"]["database"]["user"] == "new_admin"
 
-        # 用户名应更新为新值
-        saved = json.loads(user_file.read_text(encoding="utf-8"))
-        assert saved["minebase"]["database"]["user"] == "new_admin"
-
-    def test_save_empty_password_does_not_store(self, minebase_env):
-        """空密码不应写入 Keychain。"""
-        _store, user_file = minebase_env
+    def test_save_empty_password_does_not_encrypt(self, minebase_env):
+        """空密码不应加密。"""
+        user_file = minebase_env
 
         cfg = {
             "mode": "api",
@@ -396,16 +373,16 @@ class TestSaveMinebaseConfig:
         }
         config_loader.save_minebase_config(cfg)
 
-        # 空密码不应写入 keyring
-        assert len(_store) == 0
+        saved = json.loads(user_file.read_text(encoding="utf-8"))
+        assert saved["minebase"]["database"]["password"] == ""
+        assert saved["minebase"]["api"]["password"] == ""
 
-    def test_load_secret_returns_real_password_after_sentinel_save(self, minebase_env):
-        """完整 save → load 往返：sentinel 保存后 load_secret 应返回真实密码。"""
+    def test_load_secret_returns_real_password_after_encrypted_save(self, minebase_env):
+        """完整 save → load 往返：加密保存后 load_secret 应返回真实密码。"""
         from func import secret_store
 
-        _store, user_file = minebase_env
+        user_file = minebase_env
 
-        # 第一次保存真实密码
         cfg1 = {
             "mode": "database",
             "api": {"url": "", "username": "", "password": ""},
@@ -413,37 +390,6 @@ class TestSaveMinebaseConfig:
         }
         config_loader.save_minebase_config(cfg1)
 
-        # 第二次保存 sentinel（掩码）
-        cfg2 = {
-            "mode": "database",
-            "api": {"url": "", "username": "", "password": ""},
-            "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "admin", "password": "__keyring__"},
-        }
-        config_loader.save_minebase_config(cfg2)
-
-        # load_secret 应返回真实密码
         config_loader._invalidate_config_cache()
         result = secret_store.load_secret(("minebase", "database", "password"))
         assert result == "s3cret"
-
-    def test_save_keeps_plaintext_when_keyring_fails(self, minebase_env):
-        """Keychain 写入失败时密码应以明文保留在配置中，不丢失。"""
-        _store, user_file = minebase_env
-
-        # 让 keyring 写入抛异常
-        def _fail_set(service: str, key: str, value: str):
-            raise OSError("keychain unavailable")
-        import keyring as _kr
-        _kr.set_password = _fail_set  # type: ignore[assignment]
-
-        cfg = {
-            "mode": "database",
-            "api": {"url": "", "username": "", "password": ""},
-            "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "admin", "password": "hunter2"},
-        }
-        config_loader.save_minebase_config(cfg)
-
-        saved = json.loads(user_file.read_text(encoding="utf-8"))
-        # 密码应保留明文，不被替换为 sentinel
-        assert saved["minebase"]["database"]["password"] == "hunter2"
-        assert saved["minebase"]["database"]["user"] == "admin"

@@ -82,11 +82,14 @@ def _show_snackbar(page: ft.Page, message: str, is_error: bool = False):
         # 降级：run_task 不可用时用 Timer
         import threading
         def _fallback_cleanup():
+            global _active_snackbar
             try:
                 page.overlay.remove(snackbar)
                 page.update()
             except (ValueError, RuntimeError):
                 pass
+            if _active_snackbar is snackbar:
+                _active_snackbar = None
         threading.Timer(3.5, _fallback_cleanup).start()
 
 
@@ -236,7 +239,11 @@ async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=
     if not path:
         _log_message(log, "请先选择文件", level=logging.WARNING)
         return
-    year = int(fuel_refs["year"].value)
+    try:
+        year = int(fuel_refs["year"].value)
+    except (TypeError, ValueError):
+        _log_message(log, "请先选择有效的年份", level=logging.WARNING)
+        return
     await _safe_run_task(page, btn, "处理", path, log, "fuel",
                          year=year, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
 
@@ -293,8 +300,12 @@ async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=
     if not path:
         _log_message(log, "请先选择文件", level=logging.WARNING)
         return
-    year = int(work_refs["year"].value)
-    month = int(work_refs["month"].value)
+    try:
+        year = int(work_refs["year"].value)
+        month = int(work_refs["month"].value)
+    except (TypeError, ValueError):
+        _log_message(log, "请先选择有效的年份和月份", level=logging.WARNING)
+        return
     # 表头映射：根据开关状态决定是否传入
     header_mapping = None
     header_toggle = work_refs.get("header_toggle")
@@ -372,12 +383,7 @@ async def _consume_batch_progress_queue(progress_queue, progress_bar, progress_t
         except Exception:
             break
         last_percent = payload.get("percent", last_percent)
-        if progress_bar is not None and last_percent is not None:
-            progress_bar.value = float(last_percent)
-            progress_bar.update()
-        if progress_text is not None and last_percent is not None:
-            progress_text.value = f"{int(last_percent * 100)}%"
-            progress_text.update()
+    # 只在队列有数据时做一次最终更新（避免逐条更新导致 UI 闪烁）
     if last_percent is not None:
         if progress_bar is not None:
             progress_bar.value = float(last_percent)
@@ -400,8 +406,13 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
     btn = batch_refs["btn"]
     set_btn_state(btn, False, "扫描中...")
 
-    year = int(batch_refs["year"].value)
-    month = int(batch_refs["month"].value)
+    try:
+        year = int(batch_refs["year"].value)
+        month = int(batch_refs["month"].value)
+    except (TypeError, ValueError):
+        _log_message(log, "请先选择有效的年份和月份", level=logging.WARNING)
+        set_btn_state(btn, True, "批量处理")
+        return
     if batch_refs["auto_detect"].value:
         raw_start = -1
     else:
@@ -767,7 +778,7 @@ async def on_test_db_connection(page: ft.Page, config_refs: dict, log):
         _log_message(log, f"数据库连接测试: {msg}", level=logging.INFO if success else logging.WARNING)
         _show_snackbar(page, "连接成功" if success else "连接失败", is_error=not success)
     except Exception as exc:
-        result.value = str(exc)
+        result.value = str(exc)[:200]
         result.color = "#EF4444"
         result.visible = True
         result.update()
@@ -812,7 +823,7 @@ async def on_test_api_connection(page: ft.Page, config_refs: dict, log):
         _log_message(log, f"API 连接测试: {msg}", level=logging.INFO if success else logging.WARNING)
         _show_snackbar(page, "连接成功" if success else "连接失败", is_error=not success)
     except Exception as exc:
-        result.value = str(exc)
+        result.value = str(exc)[:200]
         result.color = "#EF4444"
         result.visible = True
         result.update()

@@ -10,7 +10,6 @@ SURFACE = "#FFFFFF"         # 卡片/容器背景
 SURFACE_HIGH = "#F1F5F9"    # 悬停/选中态
 PRIMARY = "#0891B2"         # 青色主色调(深一号，浅底可读)
 PRIMARY_CONTAINER = "#CFFAFE"
-ACCENT = "#059669"          # 翠绿(成功)
 ERROR = "#DC2626"           # 错误/危险
 WARNING = "#D97706"         # 警告
 TEXT_PRIMARY = "#0F172A"    # 主文字
@@ -25,7 +24,6 @@ SPACING_XS = 4
 SPACING_SM = 8
 SPACING_MD = 12
 SPACING_LG = 16
-SPACING_XL = 24
 
 # ── 圆角 ─────────────────────────────────────────────
 RADIUS_SM = 6
@@ -34,7 +32,6 @@ RADIUS_LG = 10
 
 # ── 尺寸 ─────────────────────────────────────────────
 SIDEBAR_WIDTH = 180
-HEADER_HEIGHT = 48
 
 
 # ── 按钮样式 ─────────────────────────────────────────

@@ -86,7 +86,10 @@ jobs:
       - name: Build app
         shell: bash
         run: |
-          uv run ${{ matrix.build_cmd }} --icon assets/app_icon.png --yes --verbose
+          uv run ${{ matrix.build_cmd }} --yes --verbose \
+            --compile-packages \
+            --cleanup-packages \
+            --cleanup-package-files "*.pyi" "tests/*" "__pycache__"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v7
