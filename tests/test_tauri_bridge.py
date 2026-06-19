@@ -1,4 +1,5 @@
 """tauri_bridge RPC 方法测试"""
+import importlib.util
 import json
 import pathlib
 import sys
@@ -12,6 +13,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import tauri_bridge
+
+_has_psycopg2 = importlib.util.find_spec("psycopg2") is not None
 
 
 # ---------------------------------------------------------------------------
@@ -209,6 +212,7 @@ class TestConnectionFunctions:
         assert ok is False
         assert "401" in msg
 
+    @pytest.mark.skipif(not _has_psycopg2, reason="psycopg2 not installed (optional 'db' extra)")
     def test_db_connection_success(self):
         mock_conn = MagicMock()
         mock_cursor = MagicMock()
@@ -220,6 +224,7 @@ class TestConnectionFunctions:
         assert ok is True
         mock_cursor.execute.assert_called_once_with("SELECT 1")
 
+    @pytest.mark.skipif(not _has_psycopg2, reason="psycopg2 not installed (optional 'db' extra)")
     def test_db_connection_failure(self):
         import psycopg2
         with patch("psycopg2.connect", side_effect=psycopg2.OperationalError("refused")):

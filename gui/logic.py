@@ -6,8 +6,8 @@ import asyncio
 import logging
 import flet as ft
 import os
-import pandas as pd
 from func import config_loader
+from func.excel_utils import get_output_filename
 from func.excel_fuel import process_diesel_data
 from func.excel_production_enhanced import MiningDataProcessor as ProdProcessor
 from func.excel_electrical import parse_excel_data
@@ -17,7 +17,7 @@ from func.excel_batch import scan_files, process_files, MODULE_LABELS
 from func.sync_to_minebase import sync as sync_to_minebase
 from func.sync_to_minebase import test_db_connection
 from func.sync_to_minebase import test_api_connection
-from func.ledger_postprocess import apply_ledger_matching, _find_col
+from func.ledger_postprocess import apply_ledger_matching
 
 
 from gui.components.common import _log_message
@@ -31,12 +31,9 @@ _btn_original_styles: dict[int, ft.ButtonStyle] = {}
 
 _LOADING_STYLE = ft.ButtonStyle(bgcolor="#CBD5E1", color="#64748B")
 
-# 模块类型中文标签
+# 模块类型中文标签（扩展自 func.excel_batch 的公共标签）
 _MODULE_LABELS = {
-    "fuel": "燃油数据",
-    "electrical": "电力数据",
-    "production": "生产数据",
-    "worktime": "工时数据",
+    **MODULE_LABELS,
     "merge": "文件合并",
     "batch": "批量处理",
 }
@@ -122,23 +119,20 @@ def _apply_ledger_matching(output_file: str, equipment_ledger=None, oil_ledger=N
 
 def _get_output_file(module_type: str, path: str, **kwargs) -> str | None:
     """根据模块类型和输入路径，推断输出文件路径"""
-    if module_type == "fuel":
-        return os.path.join(os.path.dirname(path), "Fuel.xlsx")
-    elif module_type == "production":
-        base = path if os.path.isdir(path) else os.path.dirname(path)
-        return os.path.join(base, "合并产量.xlsx")
-    elif module_type == "electrical":
-        return os.path.join(os.path.dirname(path), "电力消耗统计.xlsx")
-    elif module_type == "worktime":
-        year = kwargs.get("year", 2025)
-        month = kwargs.get("month", 1)
-        return os.path.join(os.path.dirname(path), f"{year}{month:02d}_工作效率表.xlsx")
-    elif module_type == "merge":
+    if module_type == "batch":
+        return None  # 台账匹配已在 batch_process 内部处理
+    if module_type == "merge":
         keyword = kwargs.get("keyword", "")
         return os.path.join(path, f"{keyword}_合并.xlsx")
-    elif module_type == "batch":
-        return None  # 台账匹配已在 batch_process 内部处理
-    return None
+
+    year = kwargs.get("year", 2025)
+    month = kwargs.get("month", 1)
+    filename = get_output_filename(module_type, year=year, month=month)
+    if not filename:
+        return None
+
+    base = path if os.path.isdir(path) else os.path.dirname(path)
+    return os.path.join(base, filename)
 
 
 # ---------------------------------------------------------------------------
@@ -340,37 +334,26 @@ async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledge
                          equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
 
 
+def _set_controls_visible(controls: list, visible: bool):
+    """安全地设置一组控件的可见性并更新。"""
+    for ctrl in controls:
+        if ctrl is not None:
+            ctrl.visible = visible
+            ctrl.update()
+
+
 def _show_batch_progress(progress_row, progress_bar, progress_text, cancel_btn):
     if progress_bar is not None:
         progress_bar.value = 0.0
-        progress_bar.visible = True
-        progress_bar.update()
     if progress_text is not None:
         progress_text.value = "0%"
-        progress_text.visible = True
-        progress_text.update()
     if cancel_btn is not None:
         cancel_btn.disabled = False
-        cancel_btn.visible = True
-        cancel_btn.update()
-    if progress_row is not None:
-        progress_row.visible = True
-        progress_row.update()
+    _set_controls_visible([progress_bar, progress_text, cancel_btn, progress_row], True)
 
 
 def _hide_batch_progress(progress_row, progress_bar, progress_text, cancel_btn):
-    if progress_bar is not None:
-        progress_bar.visible = False
-        progress_bar.update()
-    if progress_text is not None:
-        progress_text.visible = False
-        progress_text.update()
-    if cancel_btn is not None:
-        cancel_btn.visible = False
-        cancel_btn.update()
-    if progress_row is not None:
-        progress_row.visible = False
-        progress_row.update()
+    _set_controls_visible([progress_bar, progress_text, cancel_btn, progress_row], False)
 
 
 def _handle_batch_cancel(cancel_event, cancel_btn):

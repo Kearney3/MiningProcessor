@@ -116,8 +116,8 @@ def process_directory(base_dir, year, month, output_file):
     final_df = pd.concat(all_data, axis=0, ignore_index=True)
 
     # 排序与列格式化
-    strip_date_column(final_df, date_format="%Y-%m-%d")
-    sort_by_date_shift(final_df)
+    final_df = strip_date_column(final_df, date_format="%Y-%m-%d")
+    final_df = sort_by_date_shift(final_df)
 
     # 将日期和班次强制排在最前面
     other_cols = [col for col in final_df.columns if col not in ['日期', '班次']]

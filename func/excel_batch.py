@@ -16,8 +16,8 @@ from func.equipment_ledger import EquipmentLedger
 from func.oil_ledger import OilLedger
 from func import config_loader
 from func.logger import get_logger
-from func.excel_utils import dedup_dataframe
-from func.string_utils import clean_string
+from func.excel_utils import dedup_dataframe, get_output_filename
+from func.ledger_postprocess import match_sheets
 
 
 logger = get_logger(__name__)
@@ -266,131 +266,16 @@ def _filter_by_date(
 
 
 # ---------------------------------------------------------------------------
-# 台账匹配
+# 台账匹配（委托给 ledger_postprocess.match_sheets）
 # ---------------------------------------------------------------------------
-
-def _find_col(columns, candidates):
-    """在列名列表中查找第一个匹配的候选列名（支持 strip 匹配）"""
-    # 先尝试精确匹配
-    for c in candidates:
-        if c in columns:
-            return c
-    # 再尝试 strip 后匹配
-    stripped_map = {col.strip(): col for col in columns}
-    for c in candidates:
-        if c in stripped_map:
-            return stripped_map[c]
-    return None
-
 
 def _apply_ledger_to_sheets(
     sheets: dict[str, pd.DataFrame],
     equipment_ledger: EquipmentLedger = None,
     oil_ledger: OilLedger = None,
 ) -> dict[str, pd.DataFrame]:
-    """
-    对 sheets 字典进行台账匹配后处理，返回更新后的 sheets。
-    对于生产数据（同时包含矿卡名称和挖机名称），匹配列名会添加（矿卡）或（挖机）后缀。
-    """
-    if not equipment_ledger and not oil_ledger:
-        return sheets
-
-    matched_any = False
-    for sheet_name, df in sheets.items():
-        cols = set(df.columns)
-
-        if equipment_ledger:
-            # 检测是否同时存在矿卡名称和挖机名称（生产数据场景）
-            has_truck_col = "矿卡名称" in cols
-            has_excavator_col = "挖机名称" in cols
-            
-            if has_truck_col and has_excavator_col:
-                # 生产数据场景：分别匹配矿卡和挖机，添加后缀
-                # 匹配矿卡名称
-                name_col = "矿卡名称"
-                id_col = "设备编号" if "设备编号" in cols else None
-                std_names, std_ids, std_companies = [], [], []
-                for _, row in df.iterrows():
-                    name_val = row.get(name_col)
-                    id_val = row.get(id_col) if id_col else None
-                    name_str = clean_string(name_val) or None
-                    id_str = clean_string(id_val) or None
-                    result = equipment_ledger.match_device(name=name_str, device_id=id_str)
-                    if result:
-                        std_names.append(result.get("标准设备名称", ""))
-                        std_ids.append(result.get("标准设备编号", ""))
-                        std_companies.append(result.get("标准公司名称", ""))
-                    else:
-                        std_names.append("")
-                        std_ids.append("")
-                        std_companies.append("")
-                df["标准设备名称（矿卡）"] = std_names
-                df["标准设备编号（矿卡）"] = std_ids
-                df["标准公司名称（矿卡）"] = std_companies
-                
-                # 匹配挖机名称
-                excavator_col = "挖机名称"
-                std_names_ex, std_ids_ex, std_companies_ex = [], [], []
-                for _, row in df.iterrows():
-                    name_val = row.get(excavator_col)
-                    name_str = clean_string(name_val) or None
-                    result = equipment_ledger.match_device(name=name_str, device_id=None)
-                    if result:
-                        std_names_ex.append(result.get("标准设备名称", ""))
-                        std_ids_ex.append(result.get("标准设备编号", ""))
-                        std_companies_ex.append(result.get("标准公司名称", ""))
-                    else:
-                        std_names_ex.append("")
-                        std_ids_ex.append("")
-                        std_companies_ex.append("")
-                df["标准设备名称（挖机）"] = std_names_ex
-                df["标准设备编号（挖机）"] = std_ids_ex
-                df["标准公司名称（挖机）"] = std_companies_ex
-                matched_any = True
-            else:
-                # 原有逻辑：单列匹配（非生产数据场景）
-                name_col = _find_col(cols, ["设备名称", "矿卡名称"])
-                id_col = "设备编号" if "设备编号" in cols else None
-                if name_col:
-                    std_names, std_ids, std_companies = [], [], []
-                    for _, row in df.iterrows():
-                        name_val = row.get(name_col)
-                        id_val = row.get(id_col) if id_col else None
-                        name_str = clean_string(name_val) or None
-                        id_str = clean_string(id_val) or None
-                        result = equipment_ledger.match_device(name=name_str, device_id=id_str)
-                        if result:
-                            std_names.append(result.get("标准设备名称", ""))
-                            std_ids.append(result.get("标准设备编号", ""))
-                            std_companies.append(result.get("标准公司名称", ""))
-                        else:
-                            std_names.append("")
-                            std_ids.append("")
-                            std_companies.append("")
-                    df["标准设备名称"] = std_names
-                    df["标准设备编号"] = std_ids
-                    df["标准公司名称"] = std_companies
-                    matched_any = True
-
-        if oil_ledger:
-            oil_col = _find_col(cols, ["油品种类", "油品名称"])
-            if oil_col:
-                std_oils = []
-                for _, row in df.iterrows():
-                    oil_val = row.get(oil_col)
-                    if pd.isna(oil_val):
-                        std_oils.append("")
-                    else:
-                        result = oil_ledger.match(clean_string(oil_val))
-                        std_oils.append(result["标准名称"] if result else "")
-                df["标准油品名称"] = std_oils
-                matched_any = True
-
-        sheets[sheet_name] = df
-
-    if matched_any:
-        logger.info("台账匹配完成")
-    return sheets
+    """对 sheets 字典进行台账匹配后处理，返回更新后的 sheets。"""
+    return match_sheets(sheets, equipment_ledger, oil_ledger)
 
 
 
@@ -785,13 +670,6 @@ def _write_separate(
     cancel_event=None,
 ):
     """将各模块结果分别输出为独立 Excel 文件"""
-    output_files = {
-        "fuel": "Fuel.xlsx",
-        "electrical": "电力消耗统计.xlsx",
-        "production": "合并产量.xlsx",
-        "worktime": f"{year}{month:02d}_工作效率表.xlsx",
-    }
-
     total = sum(1 for sheets in all_results.values() if sheets)
     current = 0
     _emit_progress(progress_cb, {"stage": "writing", "percent": 0.0, "current": 0, "total": total, "detail": "开始分开输出"})
@@ -801,7 +679,7 @@ def _write_separate(
         if _check_cancel(cancel_event):
             _emit_progress(progress_cb, {"stage": "cancelled", "percent": max(current / total if total else 0.0, 0.0), "current": current, "total": total, "detail": "用户取消，已完成部分输出"})
             return
-        output_file = os.path.join(folder_path, output_files.get(module_type, f"{module_type}.xlsx"))
+        output_file = os.path.join(folder_path, get_output_filename(module_type, year, month) or f"{module_type}.xlsx")
         with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
             for sheet_name, df in sheets.items():
                 df = dedup_dataframe(df, sheet_name)
