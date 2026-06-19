@@ -1,5 +1,5 @@
 """批量处理模块区域组件"""
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import flet as ft
 
@@ -17,6 +17,16 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
     current_date = datetime.now()
     current_year = str(current_date.year)
     current_month = str(current_date.month)
+
+    def _to_local_dt(d):
+        """将 date 转为带本地时区的 datetime，修复 Flet DatePicker 时区偏移问题。
+
+        Flet 序列化协议会将 naive datetime 转为 UTC 再传给 Flutter，
+        导致 UTC+时区的用户选中的日期往前偏移一天。
+        传入带本地时区的 datetime 可避免二次转换。
+        """
+        naive = datetime.combine(d, datetime.min.time())
+        return naive.replace(tzinfo=datetime.now().astimezone().tzinfo)
 
     # --- 文件夹选择 ---
     batch_path = ft.TextField(
@@ -198,12 +208,13 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         dp = ft.DatePicker(
             first_date=datetime(2015, 1, 1),
             last_date=datetime(2040, 12, 31),
-            current_date=datetime.combine(_selected_date[0], datetime.min.time()),
+            current_date=_to_local_dt(_selected_date[0]),
         )
 
         def _on_date_picked(ev):
             if dp.value:
-                _selected_date[0] = dp.value.date()
+                # dp.value 是 UTC datetime，需先转为本地时间再取日期
+                _selected_date[0] = dp.value.astimezone().date()
                 _update_date_display()
             page.pop_dialog()
 
