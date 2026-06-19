@@ -344,13 +344,19 @@ def sync_via_api(
         # 确认导入
         confirm_resp = api_client.confirm_import(table, session_id)
         confirm_data = confirm_resp.get("data", {})
+        inserted = confirm_data.get("inserted", 0)
+        updated = confirm_data.get("updated", 0)
+        confirmed_skipped = confirm_data.get("skipped", 0)
         logger.info(
             "[%s] API 同步完成: 插入=%d, 更新=%d, 跳过=%d",
             data_type,
-            confirm_data.get("inserted", total_success),
-            confirm_data.get("updated", 0),
-            confirm_data.get("skipped", total_skipped),
+            inserted,
+            updated,
+            confirmed_skipped,
         )
+        # 以 confirm 返回值为最终统计（批处理阶段的计数可能包含被去重的记录）
+        total_success = inserted + updated
+        total_skipped = confirmed_skipped
 
     except Exception as e:
         logger.error("[%s] API 同步失败: %s", data_type, e)
