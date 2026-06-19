@@ -2,7 +2,8 @@
 import json
 import pathlib
 import sys
-from datetime import date
+import uuid
+from datetime import date, datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -300,17 +301,38 @@ class TestMapRowToDbColumns:
             "consumption": 150.5,
         }
         columns, values = _map_row_to_db_columns(row)
+        assert "id" in columns
+        assert "updated_at" in columns
         assert "date" in columns
         assert "shift_type" in columns
         assert "equipment_name" in columns
         assert "equipment_id" in columns
         assert "consumption" in columns
 
+    def test_id_is_valid_uuid(self):
+        """id 列必须是合法 UUID 字符串（Prisma @default(uuid()) 仅在应用层生效）。"""
+        row = {"date": "2026-06-18", "shiftType": "Night", "equipmentName": "EX-001", "equipmentId": "eq-001"}
+        columns, values = _map_row_to_db_columns(row)
+        idx = columns.index("id")
+        parsed = uuid.UUID(values[idx])
+        assert str(parsed) == values[idx]
+
+    def test_updated_at_is_recent(self):
+        """updated_at 列必须是接近当前时间的 datetime（Prisma @updatedAt 仅在应用层生效）。"""
+        row = {"date": "2026-06-18", "shiftType": "Night", "equipmentName": "EX-001", "equipmentId": "eq-001"}
+        before = datetime.now()
+        columns, values = _map_row_to_db_columns(row)
+        after = datetime.now()
+        idx = columns.index("updated_at")
+        ts = values[idx]
+        assert before <= ts <= after
+
     def test_unknown_fields_ignored(self):
         row = {"date": "2025-06-01", "unknownField": "value"}
         columns, values = _map_row_to_db_columns(row)
         assert "unknownField" not in columns
-        assert len(columns) == 1
+        # id + updated_at + date = 3 columns
+        assert len(columns) == 3
 
 
 # ---------------------------------------------------------------------------
