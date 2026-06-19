@@ -483,24 +483,11 @@ class MineBaseDBClient:
         import psycopg2.extras
 
         cols_str = ", ".join(columns)
-        query = f"INSERT INTO {table} ({cols_str}) VALUES %s"
+        placeholders = ", ".join(["%s"] * len(columns))
+        query = f"INSERT INTO {table} ({cols_str}) VALUES ({placeholders})"
 
         with self.conn.cursor() as cur:
             psycopg2.extras.execute_values(cur, query, values_list, page_size=200)
-        return len(values_list)
-
-    def insert_rows_with_cursor(
-        self, cur: Any, table: str, columns: list[str], values_list: list[list[Any]],
-    ) -> int:
-        """使用已有游标插入数据（用于 savepoint 场景）。返回插入行数。"""
-        if not values_list:
-            return 0
-
-        import psycopg2.extras
-
-        cols_str = ", ".join(columns)
-        query = f"INSERT INTO {table} ({cols_str}) VALUES %s"
-        psycopg2.extras.execute_values(cur, query, values_list, page_size=200)
         return len(values_list)
 
     def commit(self) -> None:
@@ -623,16 +610,9 @@ def sync_via_db(
                     total_skipped += 1
                     continue
 
-                # 使用 savepoint 隔离每行插入，避免单行失败毒化整个事务
-                sp_name = f"sp_{total_success}_{total_failed}"
-                with db_client.conn.cursor() as cur:
-                    cur.execute(f"SAVEPOINT {sp_name}")
-                    try:
-                        db_client.insert_rows_with_cursor(cur, table, columns, [values])
-                        total_success += 1
-                    except Exception:
-                        cur.execute(f"ROLLBACK TO SAVEPOINT {sp_name}")
-                        raise
+                # 插入
+                db_client.insert_rows(table, columns, [values])
+                total_success += 1
 
             except Exception as e:
                 logger.error("[%s] 行处理失败: %s — %s", data_type, row, e)
@@ -703,12 +683,9 @@ def _resolve_fks_for_db(data_type: str, row: dict, db_client: MineBaseDBClient) 
 
 
 def _map_row_to_db_columns(row: dict) -> tuple[list[str], list[Any]]:
-    """将 API 字段名的行数据转换为 PostgreSQL 列名和值列表。
-
-    自动在首位插入 UUID 主键 'id'。
-    """
-    columns = ["id"]
-    values = [str(uuid.uuid4())]
+    """将 API 字段名的行数据转换为 PostgreSQL 列名和值列表。"""
+    columns = []
+    values = []
     for field_name, value in row.items():
         col_name = FIELD_TO_COLUMN_MAP.get(field_name)
         if col_name is None:

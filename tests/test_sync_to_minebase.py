@@ -312,8 +312,7 @@ class TestMapRowToDbColumns:
         row = {"date": "2025-06-01", "unknownField": "value"}
         columns, values = _map_row_to_db_columns(row)
         assert "unknownField" not in columns
-        # id (auto-generated) + date = 2 columns
-        assert len(columns) == 2
+        assert len(columns) == 1
 
     def test_id_column_generated_as_uuid(self):
         """_map_row_to_db_columns must include 'id' as a valid UUID string.
