@@ -1,4 +1,4 @@
-# MiningProcessor
+# MiningProcessor v1.0.0
 
 矿山运营 Excel 报表批量处理工具。支持 CLI 命令行和桌面 GUI 两种使用方式，自动解析矿山各类生产、油耗、电耗、工时报表，提取结构化数据并输出标准化 Excel。
 
