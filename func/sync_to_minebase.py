@@ -683,9 +683,14 @@ def _resolve_fks_for_db(data_type: str, row: dict, db_client: MineBaseDBClient) 
 
 
 def _map_row_to_db_columns(row: dict) -> tuple[list[str], list[Any]]:
-    """将 API 字段名的行数据转换为 PostgreSQL 列名和值列表。"""
-    columns = []
-    values = []
+    """将 API 字段名的行数据转换为 PostgreSQL 列名和值列表。
+
+    自动补充数据库必需但代码未提供的字段：
+    - id: UUID 主键（Prisma @default(uuid()) 仅在应用层生效，数据库无 DEFAULT）
+    - updated_at: Prisma @updatedAt 仅在应用层生效，数据库无 DEFAULT
+    """
+    columns = ["id", "updated_at"]
+    values = [str(uuid.uuid4()), datetime.now()]
     for field_name, value in row.items():
         col_name = FIELD_TO_COLUMN_MAP.get(field_name)
         if col_name is None:
