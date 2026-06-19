@@ -1,5 +1,5 @@
 """MineBase 数据同步区域组件"""
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 import flet as ft
 
@@ -181,19 +181,23 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         except (RuntimeError, AttributeError):
             pass
 
+    def _to_local_dt(d):
+        """将 date 转为带本地时区的 datetime，修复 Flet DatePicker 时区偏移问题。"""
+        naive = datetime.combine(d, datetime.min.time())
+        return naive.replace(tzinfo=datetime.now().astimezone().tzinfo)
+
     def _make_on_pick(target_val: _DateValue):
         async def _on_pick(e):
+            ref_date = date.fromisoformat(target_val.value) if target_val.value else yesterday
             dp = ft.DatePicker(
                 first_date=datetime(2015, 1, 1),
                 last_date=datetime(2040, 12, 31),
-                current_date=datetime.combine(
-                    date.fromisoformat(target_val.value) if target_val.value else yesterday,
-                    datetime.min.time(),
-                ),
+                current_date=_to_local_dt(ref_date),
             )
             def _on_picked(ev):
                 if dp.value:
-                    target_val.value = dp.value.date().isoformat()
+                    # dp.value 是 UTC datetime，需先转为本地时间再取日期
+                    target_val.value = dp.value.astimezone().date().isoformat()
                     _update_displays()
                 page.pop_dialog()
             dp.on_change = _on_picked
