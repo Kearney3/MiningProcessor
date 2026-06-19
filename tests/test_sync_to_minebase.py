@@ -938,3 +938,85 @@ class TestResolveFksForDb:
 
         result = _resolve_fks_for_db("production", row, mock_db)
         assert result is None
+
+
+class TestLedgerToggleSplit:
+    """sync() 应支持 use_equipment_ledger 和 use_oil_ledger 独立控制。"""
+
+    @patch("func.sync_to_minebase.sync_via_api")
+    @patch("func.sync_to_minebase._process_fuel_file")
+    @patch("func.sync_to_minebase.discover_files")
+    @patch("func.config_loader.load_oil_ledger_cache")
+    @patch("func.config_loader.load_equipment_ledger_cache")
+    def test_use_equipment_ledger_true_loads_only_equipment(
+        self, mock_eq_cache, mock_oil_cache, mock_discover, mock_fuel, mock_api, tmp_path,
+    ):
+        """use_equipment_ledger=True 应只加载设备台账，油品台账为 None。"""
+        mock_discover.return_value = {"fuel": [tmp_path / "Fuel.xlsx"]}
+        mock_fuel.return_value = [{"date": "2025-06-01", "equipmentName": "CAT785D-01"}]
+        mock_api.return_value = {"success": 1, "skipped": 0, "failed": 0}
+        mock_eq_cache.return_value = [{"标准名称": "CAT785D", "别名": ["卡特785"]}]
+        mock_oil_cache.return_value = None
+
+        with patch("func.sync_to_minebase.MineBaseAPIClient") as mock_api_cls, \
+             patch("func.sync_to_minebase.get_minebase_api_config", return_value={"url": "http://test", "username": "u", "password": "p"}):
+            mock_api_cls.return_value = MagicMock()
+            sync(tmp_path, mode="api", data_types=["fuel"], dry_run=True,
+                 use_equipment_ledger=True, use_oil_ledger=False)
+
+        mock_eq_cache.assert_called_once()
+        mock_oil_cache.assert_not_called()
+
+    @patch("func.sync_to_minebase.sync_via_api")
+    @patch("func.sync_to_minebase._process_fuel_file")
+    @patch("func.sync_to_minebase.discover_files")
+    @patch("func.config_loader.load_oil_ledger_cache")
+    @patch("func.config_loader.load_equipment_ledger_cache")
+    def test_use_oil_ledger_true_loads_only_oil(
+        self, mock_eq_cache, mock_oil_cache, mock_discover, mock_fuel, mock_api, tmp_path,
+    ):
+        """use_oil_ledger=True 应只加载油品台账，设备台账为 None。"""
+        mock_discover.return_value = {"fuel": [tmp_path / "Fuel.xlsx"]}
+        mock_fuel.return_value = [{"date": "2025-06-01", "fuelName": "0#柴油"}]
+        mock_api.return_value = {"success": 1, "skipped": 0, "failed": 0}
+        mock_eq_cache.return_value = None
+        mock_oil_cache.return_value = [{"标准名称": "0号柴油", "编码": "OIL-001"}]
+
+        with patch("func.sync_to_minebase.MineBaseAPIClient") as mock_api_cls, \
+             patch("func.sync_to_minebase.get_minebase_api_config", return_value={"url": "http://test", "username": "u", "password": "p"}):
+            mock_api_cls.return_value = MagicMock()
+            sync(tmp_path, mode="api", data_types=["fuel"], dry_run=True,
+                 use_equipment_ledger=False, use_oil_ledger=True)
+
+        mock_eq_cache.assert_not_called()
+        mock_oil_cache.assert_called_once()
+
+    @patch("func.sync_to_minebase.sync_via_api")
+    @patch("func.sync_to_minebase._process_fuel_file")
+    @patch("func.sync_to_minebase.discover_files")
+    @patch("func.config_loader.load_oil_ledger_cache")
+    @patch("func.config_loader.load_equipment_ledger_cache")
+    def test_use_ledger_true_backward_compat(
+        self, mock_eq_cache, mock_oil_cache, mock_discover, mock_fuel, mock_api, tmp_path,
+    ):
+        """use_ledger=True 应同时启用设备和油品台账（向后兼容）。"""
+        mock_discover.return_value = {"fuel": [tmp_path / "Fuel.xlsx"]}
+        mock_fuel.return_value = [{"date": "2025-06-01"}]
+        mock_api.return_value = {"success": 1, "skipped": 0, "failed": 0}
+        mock_eq_cache.return_value = [{"标准名称": "CAT785D"}]
+        mock_oil_cache.return_value = [{"标准名称": "0号柴油"}]
+
+        with patch("func.sync_to_minebase.MineBaseAPIClient") as mock_api_cls, \
+             patch("func.sync_to_minebase.get_minebase_api_config", return_value={"url": "http://test", "username": "u", "password": "p"}):
+            mock_api_cls.return_value = MagicMock()
+            sync(tmp_path, mode="api", data_types=["fuel"], dry_run=True, use_ledger=True)
+
+        mock_eq_cache.assert_called_once()
+        mock_oil_cache.assert_called_once()
+
+    def test_default_oil_ledger_on_equipment_ledger_off(self):
+        """默认值: use_equipment_ledger=False, use_oil_ledger=True。"""
+        import inspect
+        sig = inspect.signature(sync)
+        assert sig.parameters["use_equipment_ledger"].default is False
+        assert sig.parameters["use_oil_ledger"].default is True
