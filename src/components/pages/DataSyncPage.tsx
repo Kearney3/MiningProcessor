@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { BridgeProp, SyncResult } from "../../lib/types";
 import { useToast } from "../Toast";
@@ -143,9 +143,11 @@ function DataTypeCheckbox({
 // Main page component
 // ═══════════════════════════════════════
 
+const STORAGE_KEY = "sync_last_input_dir";
+
 export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const { notify } = useToast();
-  const [inputDir, setInputDir] = useState("");
+  const [inputDir, setInputDir] = useState(() => localStorage.getItem(STORAGE_KEY) || "");
   const [mode, setMode] = useState<"api" | "database">("api");
   const [dataTypes, setDataTypes] = useState<string[]>(ALL_TYPES.map((t) => t.id));
   const [dryRun, setDryRun] = useState(false);
@@ -165,6 +167,23 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const [dateEnd, setDateEnd] = useState(yesterdayISO());
   const [applyHeaderMapping, setApplyHeaderMapping] = useState(true);
   const [useLedger, setUseLedger] = useState(true);
+
+  // 启动时验证上次目录是否存在，不存在则清空
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return;
+    bridge.call<{ exists: boolean }>("check_directory_exists", { path: saved })
+      .then((res) => {
+        if (!res.exists) {
+          setInputDir("");
+          localStorage.removeItem(STORAGE_KEY);
+        }
+      })
+      .catch(() => {
+        setInputDir("");
+        localStorage.removeItem(STORAGE_KEY);
+      });
+  }, [bridge]);
 
   const allSelected = ALL_TYPES.length === dataTypes.length;
   const someSelected = dataTypes.length > 0 && !allSelected;
@@ -214,7 +233,11 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
 
   const browse = async () => {
     const selected = await open({ directory: true, multiple: false });
-    if (selected) setInputDir(selected as string);
+    if (selected) {
+      const dir = selected as string;
+      setInputDir(dir);
+      localStorage.setItem(STORAGE_KEY, dir);
+    }
   };
 
   return (
