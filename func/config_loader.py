@@ -481,7 +481,7 @@ def has_oil_ledger_cache() -> bool:
 _MINEBASE_CONFIG_FALLBACK: dict[str, Any] = {
     "mode": "api",
     "api": {"url": "http://localhost:3000", "username": "", "password": ""},
-    "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "postgres", "password": ""},
+    "database": {"host": "127.0.0.1", "port": 5432, "database": "minebase", "user": "postgres", "password": ""},
 }
 
 
@@ -529,9 +529,10 @@ def save_minebase_config(minebase_cfg: dict[str, Any]) -> None:
     cfg_to_save = copy.deepcopy(minebase_cfg)
     for path in _SECRET_PATHS:
         val = _get_nested(cfg_to_save, path[1:])
-        if val:
-            store_secret(path, val)
-            _set_nested(cfg_to_save, path[1:], _KEYRING_SENTINEL)
+        if val and val != _KEYRING_SENTINEL:
+            if store_secret(path, val):
+                _set_nested(cfg_to_save, path[1:], _KEYRING_SENTINEL)
+            # else: Keychain 写入失败，保留明文密码在配置中
     # 写入 config.user.json 顶层 minebase（与 load_config 合并逻辑一致）
     user_file = _load_json(_USER_CONFIG_FILE)
     user_file["minebase"] = cfg_to_save

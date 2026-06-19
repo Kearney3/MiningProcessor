@@ -51,12 +51,32 @@ class TestStoreSecret:
             patch.object(config_loader, "_USER_CONFIG_FILE", config_file),
             patch("func.secret_store.keyring") as mock_keyring,
         ):
-            store_secret(("minebase", "api", "password"), "secret123")
+            result = store_secret(("minebase", "api", "password"), "secret123")
             mock_keyring.set_password.assert_called_once_with(
-                _KEYRING_SERVICE, "minebase.api.password", "secret123"
+                _KEYRING_SERVICE, "minebase.api.password", "secret123",
             )
             saved = json.loads(config_file.read_text(encoding="utf-8"))
             assert saved["minebase"]["api"]["password"] == _KEYRING_SENTINEL
+        assert result is True
+
+    def test_returns_false_on_keyring_failure_and_keeps_plaintext(self, tmp_path):
+        """Keychain 写入失败时应返回 False，配置文件保留明文密码。"""
+        config_file = tmp_path / "config.user.json"
+        config_file.write_text(
+            json.dumps({"minebase": {"database": {"password": "old_pass"}}}),
+            encoding="utf-8",
+        )
+        with (
+            patch.object(config_loader, "_USER_CONFIG_FILE", config_file),
+            patch("func.secret_store.keyring") as mock_keyring,
+        ):
+            mock_keyring.set_password.side_effect = OSError("keychain unavailable")
+            result = store_secret(("minebase", "database", "password"), "new_pass")
+
+        assert result is False
+        saved = json.loads(config_file.read_text(encoding="utf-8"))
+        # 密码应保留原值，不被替换为 sentinel
+        assert saved["minebase"]["database"]["password"] == "old_pass"
 
 
 # ---------------------------------------------------------------------------
@@ -225,3 +245,33 @@ class TestMigratePasswords:
         ):
             migrate_passwords_to_keyring()
             mock_keyring.set_password.assert_not_called()
+
+    def test_handles_keyring_failure_and_continues(self, tmp_path):
+        """Keychain 写入失败时应跳过该路径继续处理其余路径。"""
+        config_file = tmp_path / "config.user.json"
+        config_file.write_text(
+            json.dumps({
+                "minebase": {
+                    "api": {"password": "api_pass"},
+                    "database": {"password": "db_pass"},
+                }
+            }),
+            encoding="utf-8",
+        )
+        with (
+            patch.object(config_loader, "_USER_CONFIG_FILE", config_file),
+            patch("func.secret_store.keyring") as mock_keyring,
+        ):
+            # api 写入失败，database 写入成功
+            def _fail_then_succeed(service: str, key: str, value: str):
+                if "api" in key:
+                    raise OSError("keychain locked")
+            mock_keyring.set_password.side_effect = _fail_then_succeed
+
+            migrate_passwords_to_keyring()
+
+        saved = json.loads(config_file.read_text(encoding="utf-8"))
+        # api 密码保留明文（迁移失败）
+        assert saved["minebase"]["api"]["password"] == "api_pass"
+        # database 密码迁移成功，标记为 sentinel
+        assert saved["minebase"]["database"]["password"] == _KEYRING_SENTINEL
