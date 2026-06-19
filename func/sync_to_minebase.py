@@ -632,7 +632,7 @@ def _resolve_fks_for_db(data_type: str, row: dict, db_client: MineBaseDBClient) 
     """为直连模式解析 FK 字段。返回解析后的行，FK 未找到时返回 None。"""
     resolved = dict(row)
 
-    if data_type == "production_record":
+    if data_type in ("production", "production_record"):
         # 矿卡
         truck_name = row.get("truckName")
         if truck_name:

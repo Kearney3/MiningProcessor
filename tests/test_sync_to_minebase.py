@@ -20,6 +20,7 @@ from func.sync_to_minebase import (
     _df_to_mapped_rows,
     _filter_by_date_range,
     _map_row_to_db_columns,
+    _resolve_fks_for_db,
     discover_files,
     load_column_mapping,
     read_and_map_excel,
@@ -869,3 +870,71 @@ class TestSyncWithProcessors:
         # fuel fails and gets empty result, electrical still syncs
         assert results["fuel"] == {"success": 0, "skipped": 0, "failed": 0}
         assert results["electrical"]["success"] == 1
+
+
+# ---------------------------------------------------------------------------
+# TestResolveFksForDb — data_type routing
+# ---------------------------------------------------------------------------
+
+
+class TestResolveFksForDb:
+    """_resolve_fks_for_db must route production rows through the
+    truck/excavator/material branch, not the generic equipment branch."""
+
+    def test_production_row_uses_truck_fk_branch(self):
+        """production rows with truckName/excavatorName should resolve via
+        the production_record branch (truckId, excavatorId), NOT be rejected
+        with '缺少设备名称'."""
+        mock_db = MagicMock()
+        mock_db.resolve_equipment_id.return_value = "equip-uuid-1"
+        mock_db.resolve_material_type_id.return_value = "mat-uuid-1"
+
+        row = {
+            "date": "2025-06-15",
+            "shiftType": "夜班",
+            "truckName": "CAT785D-01",
+            "excavatorName": "EX-001",
+            "materialTypeName": "铜矿",
+            "tripCount": 10,
+            "production": 350.0,
+        }
+
+        # sync() passes "production" (the registry key), not "production_record" (the table name)
+        result = _resolve_fks_for_db("production", row, mock_db)
+
+        # Should NOT be None — production rows must be accepted
+        assert result is not None
+        assert result["truckId"] == "equip-uuid-1"
+        assert result["excavatorId"] == "equip-uuid-1"
+        assert result["materialTypeId"] == "mat-uuid-1"
+        assert result["truckName"] == "CAT785D-01"
+
+    def test_operation_row_uses_equipment_fk_branch(self):
+        """operation rows with equipmentName should resolve via the generic
+        equipment branch (equipmentId)."""
+        mock_db = MagicMock()
+        mock_db.resolve_equipment_id.return_value = "equip-uuid-2"
+
+        row = {
+            "date": "2025-06-15",
+            "shiftType": "夜班",
+            "equipmentName": "CAT785D-01",
+            "tripCount": 10,
+        }
+
+        result = _resolve_fks_for_db("operation", row, mock_db)
+
+        assert result is not None
+        assert result["equipmentId"] == "equip-uuid-2"
+
+    def test_production_row_missing_truck_returns_none(self):
+        """production row without truckName should be rejected."""
+        mock_db = MagicMock()
+        row = {
+            "date": "2025-06-15",
+            "shiftType": "夜班",
+            "excavatorName": "EX-001",
+        }
+
+        result = _resolve_fks_for_db("production", row, mock_db)
+        assert result is None
