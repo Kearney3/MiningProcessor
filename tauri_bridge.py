@@ -418,6 +418,8 @@ def _sync_minebase(params: dict) -> dict:
         date_end=params.get("date_end"),
         apply_header_mapping=params.get("apply_header_mapping", True),
         use_ledger=params.get("use_ledger", False),
+        use_equipment_ledger=params.get("use_equipment_ledger", False),
+        use_oil_ledger=params.get("use_oil_ledger", True),
     )
     return {"results": results}
 
