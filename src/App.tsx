@@ -17,33 +17,6 @@ function App() {
   const [currentPage, setCurrentPage] = useState<PageId>("data-processing");
   const bridge = usePythonBridge();
 
-  const renderPage = () => {
-    switch (currentPage) {
-      case "data-processing":
-        return <DataProcessingPage bridge={bridge} />;
-      case "batch-processing":
-        return <BatchProcessingPage bridge={bridge} />;
-      case "data-sync":
-        return <DataSyncPage bridge={bridge} />;
-      case "ledger-match":
-        return <LedgerMatchPage bridge={bridge} />;
-      case "equipment-ledger":
-        return <EquipmentLedgerPage bridge={bridge} />;
-      case "oil-ledger":
-        return <OilLedgerPage bridge={bridge} />;
-      case "load-config":
-        return <LoadConfigPage bridge={bridge} />;
-      case "user-config":
-        return <UserConfigPage bridge={bridge} />;
-      default:
-        return (
-          <div className="flex items-center justify-center h-full text-slate-400">
-            页面开发中...
-          </div>
-        );
-    }
-  };
-
   return (
     <ToastProvider>
     <div className="flex flex-col h-screen bg-[var(--color-bg)]">
@@ -93,7 +66,30 @@ function App() {
       <div className="flex flex-1 overflow-hidden">
         <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
         <main className="flex-1 overflow-auto p-5">
-          {renderPage()}
+          <div style={{ display: currentPage === "data-processing" ? "block" : "none" }}>
+            <DataProcessingPage bridge={bridge} />
+          </div>
+          <div style={{ display: currentPage === "batch-processing" ? "block" : "none" }}>
+            <BatchProcessingPage bridge={bridge} />
+          </div>
+          <div style={{ display: currentPage === "data-sync" ? "block" : "none" }}>
+            <DataSyncPage bridge={bridge} />
+          </div>
+          <div style={{ display: currentPage === "ledger-match" ? "block" : "none" }}>
+            <LedgerMatchPage bridge={bridge} />
+          </div>
+          <div style={{ display: currentPage === "equipment-ledger" ? "block" : "none" }}>
+            <EquipmentLedgerPage bridge={bridge} />
+          </div>
+          <div style={{ display: currentPage === "oil-ledger" ? "block" : "none" }}>
+            <OilLedgerPage bridge={bridge} />
+          </div>
+          <div style={{ display: currentPage === "load-config" ? "block" : "none" }}>
+            <LoadConfigPage bridge={bridge} />
+          </div>
+          <div style={{ display: currentPage === "user-config" ? "block" : "none" }}>
+            <UserConfigPage bridge={bridge} />
+          </div>
         </main>
       </div>
 
