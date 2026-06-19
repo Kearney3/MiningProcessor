@@ -114,11 +114,17 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         tooltip="对工作效率表应用列名映射配置",
     )
 
-    ledger_match_check = ft.Checkbox(
-        label="应用台账匹配",
-        value=True,
+    equipment_ledger_check = ft.Checkbox(
+        label="设备台账匹配",
+        value=False,
         active_color=theme.PRIMARY,
         tooltip="使用设备台账标准化设备名称",
+    )
+    oil_ledger_check = ft.Checkbox(
+        label="油品台账匹配",
+        value=True,
+        active_color=theme.PRIMARY,
+        tooltip="使用油品台账标准化油品名称",
     )
 
     # --- 年份/月份 ---
@@ -318,7 +324,8 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
                             ft.Divider(height=1, color=theme.BORDER),
                             dry_run_check,
                             header_mapping_check,
-                            ledger_match_check,
+                            equipment_ledger_check,
+                            oil_ledger_check,
                             ft.Row(
                                 [sync_btn, result_text],
                                 alignment=ft.MainAxisAlignment.START,
@@ -353,7 +360,8 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "date_end": _date_end_val,
         "date_filter_toggle": date_filter_check,
         "apply_header": header_mapping_check,
-        "use_ledger": ledger_match_check,
+        "use_equipment_ledger": equipment_ledger_check,
+        "use_oil_ledger": oil_ledger_check,
     }
 
     return container, refs

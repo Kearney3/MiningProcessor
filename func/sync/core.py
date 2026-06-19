@@ -63,6 +63,8 @@ def sync(
     date_end: str | None = None,
     apply_header_mapping: bool = True,
     use_ledger: bool = False,
+    use_equipment_ledger: bool = False,
+    use_oil_ledger: bool = True,
 ) -> dict[str, dict[str, int]]:
     """执行同步的主入口。
 
@@ -79,7 +81,9 @@ def sync(
         date_start: 起始日期过滤（含），格式 YYYY-MM-DD。
         date_end: 结束日期过滤（含），格式 YYYY-MM-DD。
         apply_header_mapping: 是否对 work_efficiency 应用工时表头映射。
-        use_ledger: 是否使用设备台账标准化设备名称。
+        use_ledger: 向后兼容参数，True 时同时启用设备和油品台账。
+        use_equipment_ledger: 是否使用设备台账标准化设备名称。
+        use_oil_ledger: 是否使用油品台账标准化油品名称（默认开启）。
 
     Returns:
         {data_type: {"success": N, "skipped": N, "failed": N}}
@@ -162,10 +166,15 @@ def sync(
         logger.error("未知同步模式: %s (支持 'api' 或 'database')", sync_mode)
         return {}
 
+    # 向后兼容: use_ledger=True 同时启用设备和油品台账
+    if use_ledger:
+        use_equipment_ledger = True
+        use_oil_ledger = True
+
     # 初始化台账（可选）
     ledger = None
     oil_ledger = None
-    if use_ledger:
+    if use_equipment_ledger:
         from func.equipment_ledger import EquipmentLedger
         from func.config_loader import load_equipment_ledger_cache
         cached = load_equipment_ledger_cache()
@@ -177,6 +186,7 @@ def sync(
         else:
             logger.warning("设备台账缓存未找到，跳过设备名称匹配")
 
+    if use_oil_ledger:
         from func.oil_ledger import OilLedger
         from func.config_loader import load_oil_ledger_cache
         oil_cached = load_oil_ledger_cache()

@@ -668,9 +668,11 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log):
 
     # 工时表头映射 & 台账匹配
     apply_header_val = sync_refs.get("apply_header")
-    use_ledger_val = sync_refs.get("use_ledger")
     apply_header = apply_header_val.value if apply_header_val else True
-    use_ledger = use_ledger_val.value if use_ledger_val else False
+    eq_ledger_val = sync_refs.get("use_equipment_ledger")
+    oil_ledger_val = sync_refs.get("use_oil_ledger")
+    use_equipment_ledger = eq_ledger_val.value if eq_ledger_val else False
+    use_oil_ledger = oil_ledger_val.value if oil_ledger_val else True
 
     set_btn_state(btn, False, "同步中...")
     result_text.visible = False
@@ -690,7 +692,8 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log):
                 date_start=date_start,
                 date_end=date_end,
                 apply_header_mapping=apply_header,
-                use_ledger=use_ledger,
+                use_equipment_ledger=use_equipment_ledger,
+                use_oil_ledger=use_oil_ledger,
             )
 
         results = await asyncio.to_thread(_do_sync)
