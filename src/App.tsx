@@ -3,6 +3,7 @@ import { usePythonBridge } from "./hooks/usePythonBridge";
 import type { PageId } from "./lib/types";
 import { Sidebar } from "./components/Sidebar";
 import { LogPanel } from "./components/LogPanel";
+import { ToastProvider } from "./components/Toast";
 import { DataProcessingPage } from "./components/pages/DataProcessingPage";
 import { BatchProcessingPage } from "./components/pages/BatchProcessingPage";
 import { DataSyncPage } from "./components/pages/DataSyncPage";
@@ -44,6 +45,7 @@ function App() {
   };
 
   return (
+    <ToastProvider>
     <div className="flex flex-col h-screen bg-[var(--color-bg)]">
       {/* Header */}
       <header
@@ -98,6 +100,7 @@ function App() {
       {/* Log panel */}
       <LogPanel logs={bridge.logs} onClear={bridge.clearLogs} />
     </div>
+    </ToastProvider>
   );
 }
 
