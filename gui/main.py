@@ -159,6 +159,7 @@ def main(page: ft.Page):
             [
                 ft.Icon(ft.Icons.DATASET, size=24, color=theme.PRIMARY),
                 ft.Text("矿山数据处理工具", size=18, weight=ft.FontWeight.BOLD, color=theme.TEXT_PRIMARY),
+                ft.Text("v1.0.0", size=12, color=theme.TEXT_SECONDARY),
             ],
             spacing=theme.SPACING_SM,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,

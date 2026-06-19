@@ -59,7 +59,7 @@ function App() {
         </div>
 
         {/* Version */}
-        <span className="text-xs text-slate-400 ml-auto">v0.2.0</span>
+        <span className="text-xs text-slate-400 ml-auto">v1.0.0</span>
       </header>
 
       {/* Main content area */}
