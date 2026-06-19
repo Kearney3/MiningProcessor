@@ -78,9 +78,11 @@ def merge_excel_files(
     all_sheet_names: set[str] = set()
     header_dict: dict = {}
     file_sheet_names: dict[str, list[str]] = {}  # file -> [sheet_names]
+    xl_cache: dict[str, pd.ExcelFile] = {}  # 缓存 ExcelFile 避免重复打开
 
     for fpath in matched_files:
         xl = pd.ExcelFile(fpath)
+        xl_cache[fpath] = xl
         header_dict[os.path.basename(fpath)] = {}
         file_sheet_names[fpath] = []
         for sname in xl.sheet_names:
@@ -104,9 +106,10 @@ def merge_excel_files(
                 logger.warning(f"  警告: {os.path.basename(fpath)} 缺少 Sheet '{sname}'，已跳过")
                 continue
 
-            # 逐文件读取，用完即弃，不缓存
+            # 使用缓存的 ExcelFile 对象，避免重复打开文件
             try:
-                df = pd.read_excel(fpath, sheet_name=sname)
+                xl = xl_cache[fpath]
+                df = xl.parse(sheet_name=sname)
             except (ValueError, KeyError, FileNotFoundError) as e:
                 logger.error(f"读取文件 '{fpath}' 的 Sheet '{sname}' 失败: {e}")
                 continue

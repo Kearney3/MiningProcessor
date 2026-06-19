@@ -1,14 +1,31 @@
-"""台账匹配工具区域组件"""
-import datetime
+"""台账匹配工具区域组件 — 纯 GUI 编排层"""
 import asyncio
 import logging
-import threading
 from pathlib import Path
 
 import pandas as pd
 import flet as ft
 
-from .common import _log_message, _last_directory as _import_dir, _update_last_directory, _cell_text, PAGE_SIZE, strip_date_only_times, create_confirm_dialog
+from func.ledger_match import (
+    MatchState,
+    import_excel,
+    match_sheet,
+    export_to_excel,
+    get_current_df,
+    get_view_df,
+    apply_sort,
+    build_match_count_text,
+    DEVICE_RESULT_KEYS,
+    OIL_RESULT_KEY,
+)
+from .common import (
+    _log_message,
+    _last_directory as _import_dir,
+    _update_last_directory,
+    _cell_text,
+    PAGE_SIZE,
+    create_confirm_dialog,
+)
 
 try:
     from . import theme
@@ -17,26 +34,8 @@ except ImportError:
 
 
 # ========================================================================
-# 辅助类：共享状态与控件引用
+# 辅助类：控件引用（仅 UI 控件，不包含数据状态）
 # ========================================================================
-
-class _MatchState:
-    """Holds all mutable state shared between the UI closures."""
-
-    def __init__(self):
-        self.all_sheets: dict[str, pd.DataFrame] = {}
-        self.matched_all_sheets: dict[str, pd.DataFrame] = {}
-        self.matched_sheets: dict[str, pd.DataFrame] = {}
-        self.unmatched_sheets: dict[str, pd.DataFrame] = {}
-        self.filtered_df: pd.DataFrame | None = None
-        self.current_sheet: str = ""
-        self.page: int = 0
-        self.columns: list[str] = []
-        self.sort_column: str | None = None
-        self.sort_ascending: bool = True
-        self.view_mode: str = "all"
-        self.import_cancelled = threading.Event()
-
 
 class _MatchControls:
     """Holds UI control references needed by the extracted action functions."""
@@ -83,11 +82,31 @@ class _MatchControls:
 
 
 # ========================================================================
-# 提取的大函数
+# 模块级辅助函数（仅操作 UI 控件）
 # ========================================================================
 
-async def _do_import(page, log, state: _MatchState, controls: _MatchControls, on_sheet_change_fn):
-    """File import action -- extracted from the former on_import closure."""
+def _hide_import_progress(controls: _MatchControls):
+    """隐藏导入进度 UI"""
+    controls.import_progress_bar.visible = False
+    controls.import_progress_text.visible = False
+    controls.cancel_btn.visible = False
+    controls.import_progress_bar.value = 0
+
+
+def _update_match_status(state: MatchState, controls: _MatchControls, sheet_name: str = None):
+    """更新匹配计数显示"""
+    sheet = sheet_name or state.current_sheet
+    controls.match_count_label.value = build_match_count_text(
+        state.matched_sheets, state.unmatched_sheets, sheet,
+    )
+
+
+# ========================================================================
+# 提取的大函数（UI 包装）
+# ========================================================================
+
+async def _do_import(page, log, state: MatchState, controls: _MatchControls, on_sheet_change_fn):
+    """File import action — thin UI wrapper around func/ledger_match.import_excel."""
     picker = ft.FilePicker()
     files = await picker.pick_files(
         dialog_title="导入 Excel 文件",
@@ -106,97 +125,27 @@ async def _do_import(page, log, state: _MatchState, controls: _MatchControls, on
     controls.match_btn.disabled = True
     page.update()
 
-    parsed_sheets: dict[str, pd.DataFrame] = {}
+    def _on_progress(progress: float, message: str):
+        controls.import_progress_bar.value = progress
+        controls.import_progress_text.value = message
+        page.update()
 
     try:
-        from openpyxl import load_workbook
-
-        # 使用 read_only 模式打开，可以获取行数
-        wb = load_workbook(path, read_only=True, data_only=True)
-        sheet_names = wb.sheetnames
-        total_sheets = len(sheet_names)
-
-        if total_sheets == 0:
-            _log_message(log, "文件中没有 sheet", level=logging.WARNING)
-            _hide_import_progress(state, controls)
-            page.update()
-            return
-
-        for sheet_idx, sname in enumerate(sheet_names):
-            if state.import_cancelled.is_set():
-                break
-
-            ws = wb[sname]
-            # 获取行数（read_only 模式下 max_row 可用）
-            total_rows = ws.max_row or 0
-            total_cols = ws.max_column or 0
-
-            if total_rows == 0 or total_cols == 0:
-                parsed_sheets[sname] = pd.DataFrame()
-                continue
-
-            # 读取表头（第一行）
-            headers = []
-            for cell in next(ws.iter_rows(min_row=1, max_row=1)):
-                val = cell.value
-                if val is not None:
-                    # strip 空白字符，避免列名匹配失败
-                    headers.append(str(val).strip())
-                else:
-                    headers.append(f"Col{cell.column - 1}")
-
-            # 分批读取数据行
-            rows_data = []
-            batch_size = 500
-            rows_read = 0
-
-            for row in ws.iter_rows(min_row=2, values_only=True):
-                if state.import_cancelled.is_set():
-                    break
-
-                rows_data.append(list(row))
-                rows_read += 1
-
-                # 每 batch_size 行更新一次进度
-                if rows_read % batch_size == 0:
-                    progress = rows_read / total_rows if total_rows > 0 else 0
-                    controls.import_progress_bar.value = progress
-                    controls.import_progress_text.value = f"正在导入 {sname}: {rows_read}/{total_rows} 行"
-                    page.update()
-                    await asyncio.sleep(0)
-
-            # 构建 DataFrame
-            if rows_data:
-                # 检查数据行长度与表头是否一致
-                header_len = len(headers)
-                row_lens = set(len(r) for r in rows_data)
-                if len(row_lens) > 1 or (row_lens and header_len not in row_lens):
-                    logging.getLogger(__name__).debug(
-                        "Sheet %r: header_len=%d, row_lengths=%s",
-                        sname, header_len, row_lens,
-                    )
-                df = pd.DataFrame(rows_data, columns=headers)
-                df = strip_date_only_times(df)
-            else:
-                df = pd.DataFrame(columns=headers)
-
-            parsed_sheets[sname] = df
-            _log_message(log, f"已导入 {sname}: {len(df)} 行, {len(df.columns)} 列")
-
-        wb.close()
-
+        parsed_sheets, sheet_names = await asyncio.to_thread(
+            import_excel, path, _on_progress, state.import_cancelled,
+        )
     except Exception as ex:
         controls.file_label.value = f"读取失败: {ex}"
         controls.file_label.color = theme.ERROR
         _log_message(log, f"读取文件失败: {ex}", level=logging.ERROR)
-        _hide_import_progress(state, controls)
+        _hide_import_progress(controls)
         page.update()
         return
 
-    _hide_import_progress(state, controls)
+    _hide_import_progress(controls)
 
     if state.import_cancelled.is_set():
-        _log_message(log, f"导入已取消（已解析 {len(parsed_sheets)}/{total_sheets} 个 sheet）")
+        _log_message(log, f"导入已取消（已解析 {len(parsed_sheets)}/{len(sheet_names)} 个 sheet）")
         if not parsed_sheets:
             page.update()
             return
@@ -216,81 +165,23 @@ async def _do_import(page, log, state: _MatchState, controls: _MatchControls, on
     if sheet_names:
         first = sheet_names[0]
         controls.sheet_dropdown.value = first
-        # 直接调用 _on_sheet_change 确保初始化完整
         on_sheet_change_fn(first)
     else:
         state.current_sheet = ""
 
     controls.match_btn.disabled = False
     controls.view_segment.disabled = False
-    # build_table will be called via on_sheet_change_fn or here
     loaded = len(parsed_sheets)
-    _log_message(log, f"已导入: {path} ({loaded}/{total_sheets} 个 sheet)")
+    _log_message(log, f"已导入: {path} ({loaded}/{len(sheet_names)} 个 sheet)")
     page.update()
 
 
-async def _do_batch_match(
-    page, log, state: _MatchState,
-    df: pd.DataFrame,
-    source_col: str,
-    match_fn,
-    result_keys: list[str],
-    batch_size: int,
-    total_work: int,
-    progress_label: str,
-    controls: _MatchControls,
-    id_col: str | None = None,
-) -> dict[str, list]:
-    """通用批量匹配循环，返回 {result_key: [values...]}。"""
-    results = {k: [] for k in result_keys}
-    total_rows = len(df)
-    for start in range(0, total_rows, batch_size):
-        if state.import_cancelled.is_set():
-            _log_message(log, "匹配已取消")
-            break
-
-        batch = df.iloc[start:start + batch_size]
-        for _, row in batch.iterrows():
-            n = str(row[source_col]) if source_col and source_col in df.columns and not pd.isna(row.get(source_col)) else None
-            i_val = str(row[id_col]) if id_col and id_col in df.columns and not pd.isna(row.get(id_col)) else None
-            if id_col:
-                r = match_fn(name=n, device_id=i_val)
-            else:
-                r = match_fn(n) if n else None
-            if r:
-                for k in result_keys:
-                    results[k].append(r.get(k, ""))
-            else:
-                for k in result_keys:
-                    results[k].append("")
-
-        # 更新进度
-        processed = min(start + batch_size, total_rows)
-        progress = processed / total_work
-        controls.import_progress_bar.value = progress
-        controls.import_progress_text.value = f"{progress_label}: {processed}/{total_work}"
-        page.update()
-        await asyncio.sleep(0)
-
-    return results
-
-
 async def _do_match(
-    page, log, state: _MatchState, controls: _MatchControls,
+    page, log, state: MatchState, controls: _MatchControls,
     eq_ledger, oil_ledger, name_col, id_col, oil_col, build_table_fn,
 ):
-    """Match action -- extracted from the former on_match closure."""
-    def _get_current_df_for_match() -> pd.DataFrame | None:
-        name = state.current_sheet
-        if not name:
-            return None
-        if name in state.matched_all_sheets:
-            return state.matched_all_sheets[name]
-        if name in state.all_sheets:
-            return state.all_sheets[name]
-        return None
-
-    df = _get_current_df_for_match()
+    """Match action — thin UI wrapper around func/ledger_match.match_sheet."""
+    df = get_current_df(state)
     if df is None or df.empty:
         _log_message(log, "没有数据可匹配", level=logging.WARNING)
         return
@@ -316,104 +207,44 @@ async def _do_match(
     controls.export_btn.disabled = True
     page.update()
 
-    batch_size = 100
-    total_rows = len(df)
-    processed = 0
+    def _on_progress(progress: float, message: str):
+        controls.import_progress_bar.value = progress
+        controls.import_progress_text.value = message
+        page.update()
 
     try:
-        result_df = df.copy()
-        matched_count = 0
+        result_df, matched_df, unmatched_df, matched_count = await asyncio.to_thread(
+            match_sheet, df, eq_ledger, oil_ledger,
+            name_col, id_col, oil_col,
+            state.import_cancelled, _on_progress,
+        )
 
-        # 设备匹配
-        DEVICE_KEYS = ["标准设备名称", "标准设备编号", "标准公司名称"]
-        has_truck_col = False
-        has_excavator_col = False
-
-        if eq_ledger and (name_col or id_col):
-            # 检测是否同时存在矿卡名称和挖机名称（生产数据场景）
-            has_truck_col = "矿卡名称" in result_df.columns
-            has_excavator_col = "挖机名称" in result_df.columns
-
-            if has_truck_col and has_excavator_col:
-                # 生产数据场景：分别匹配矿卡和挖机，添加后缀
-                total_work = total_rows * 2
-
-                truck_r = await _do_batch_match(
-                    page, log, state, df, "矿卡名称", eq_ledger.match_device, DEVICE_KEYS,
-                    batch_size, total_work, "正在匹配矿卡", controls, id_col=id_col,
-                )
-                for k, suffix in zip(DEVICE_KEYS, ["（矿卡）", "（矿卡）", "（矿卡）"]):
-                    result_df[k + suffix] = truck_r[k]
-                matched_count += sum(1 for v in truck_r[DEVICE_KEYS[0]] if v)
-
-                excav_r = await _do_batch_match(
-                    page, log, state, df, "挖机名称",
-                    lambda name, device_id=None: eq_ledger.match_device(name=name, device_id=device_id),
-                    DEVICE_KEYS, batch_size, total_work, "正在匹配挖机", controls,
-                )
-                for k, suffix in zip(DEVICE_KEYS, ["（挖机）", "（挖机）", "（挖机）"]):
-                    result_df[k + suffix] = excav_r[k]
-            else:
-                # 原有逻辑：单列匹配（非生产数据场景）
-                equip_r = await _do_batch_match(
-                    page, log, state, df, name_col, eq_ledger.match_device, DEVICE_KEYS,
-                    batch_size, total_rows, "正在匹配设备", controls, id_col=id_col,
-                )
-                for k in DEVICE_KEYS:
-                    result_df[k] = equip_r[k]
-                matched_count += sum(1 for v in equip_r[DEVICE_KEYS[0]] if v)
-
-        # 油品匹配
-        OIL_KEY = "标准名称"
-        oil_matched = 0
-        if oil_ledger and oil_col and oil_col in result_df.columns:
-            oil_r = await _do_batch_match(
-                page, log, state, df, oil_col, lambda v: oil_ledger.match(v), [OIL_KEY],
-                batch_size, total_rows, "正在匹配油品", controls,
-            )
-            result_df["标准油品名称"] = oil_r[OIL_KEY]
-        # 保存匹配结果到单独的字典，不覆盖原始数据
         state.matched_all_sheets[state.current_sheet] = result_df
+        state.matched_sheets[state.current_sheet] = matched_df
+        state.unmatched_sheets[state.current_sheet] = unmatched_df
         state.page = 0
         build_table_fn()
 
-        # 记录日志
         logging.getLogger(__name__).debug(
             "on_match: updated _matched_all_sheets[%r], columns=%s",
             state.current_sheet, list(result_df.columns),
         )
 
-        # 拆分匹配成功/失败的行
-        sheet = state.current_sheet
-        if eq_ledger and (name_col or id_col):
-            if has_truck_col and has_excavator_col:
-                # 生产数据：合并两个匹配列的匹配状态
-                mask_truck = result_df["标准设备名称（矿卡）"].astype(str).str.len() > 0
-                mask_ex = result_df["标准设备名称（挖机）"].astype(str).str.len() > 0
-                mask = mask_truck | mask_ex
-            else:
-                mask = result_df["标准设备名称"].astype(str).str.len() > 0
-            state.matched_sheets[sheet] = result_df[mask].copy()
-            state.unmatched_sheets[sheet] = result_df[~mask].copy()
-        elif oil_ledger and oil_col:
-            mask = result_df["标准油品名称"].astype(str).str.len() > 0
-            state.matched_sheets[sheet] = result_df[mask].copy()
-            state.unmatched_sheets[sheet] = result_df[~mask].copy()
-
+        # Build status text
+        total = len(result_df)
+        oil_matched = sum(1 for v in result_df.get(OIL_RESULT_KEY, pd.Series(dtype=str)) if v)
         parts = []
         if eq_ledger and (name_col or id_col):
-            total = len(result_df)
             parts.append(f"设备匹配: {matched_count}/{total}")
         if oil_ledger and oil_col:
-            total = len(result_df)
             parts.append(f"油品匹配: {oil_matched}/{total}")
-        controls.status_label.value = "  |  ".join(parts)
+        status_text = "  |  ".join(parts)
+        controls.status_label.value = status_text
         _update_match_status(state, controls)
-        _log_message(log, f"匹配完成: {controls.status_label.value}")
+        _log_message(log, f"匹配完成: {status_text}")
     except Exception as ex:
         _log_message(log, f"匹配失败: {ex}", level=logging.ERROR)
     finally:
-        # 恢复 UI
         controls.import_progress_bar.visible = False
         controls.import_progress_text.visible = False
         controls.cancel_btn.visible = False
@@ -424,21 +255,20 @@ async def _do_match(
         page.update()
 
 
-async def _do_export(page, log, state: _MatchState, controls: _MatchControls):
-    """Export action -- extracted from the former on_export closure."""
+async def _do_export(page, log, state: MatchState, controls: _MatchControls):
+    """Export action — thin UI wrapper around func/ledger_match.export_to_excel."""
     if not state.all_sheets and not state.matched_sheets and not state.unmatched_sheets:
         _log_message(log, "没有数据可导出", level=logging.WARNING)
         return
 
-    # 选择保存路径
     picker = ft.FilePicker()
-    path = await picker.save_file(
+    save_path = await picker.save_file(
         dialog_title="导出结果",
         file_name="匹配结果.xlsx",
         allowed_extensions=["xlsx"],
         initial_directory=_import_dir[0] or None,
     )
-    if not path:
+    if not save_path:
         return
 
     # 初始化进度条
@@ -449,138 +279,41 @@ async def _do_export(page, log, state: _MatchState, controls: _MatchControls):
     controls.export_btn.disabled = True
     page.update()
 
+    def _on_progress(progress: float, message: str):
+        controls.import_progress_bar.value = progress
+        controls.import_progress_text.value = message
+        page.update()
+
+    # 选择导出数据
+    mode = state.view_mode
+    if mode == "matched" and state.matched_sheets:
+        export_sheets = state.matched_sheets
+        sheet_name = "已匹配"
+    elif mode == "unmatched" and state.unmatched_sheets:
+        export_sheets = state.unmatched_sheets
+        sheet_name = "未匹配"
+    else:
+        export_sheets = state.matched_all_sheets if state.matched_all_sheets else state.all_sheets
+        sheet_name = "全部"
+
     try:
-        import xlsxwriter
-
-        # 根据视图模式选择数据
-        mode = state.view_mode
-        if mode == "matched" and state.matched_sheets:
-            df_to_export = pd.concat(state.matched_sheets.values(), ignore_index=True)
-            sheet_name = "已匹配"
-        elif mode == "unmatched" and state.unmatched_sheets:
-            df_to_export = pd.concat(state.unmatched_sheets.values(), ignore_index=True)
-            sheet_name = "未匹配"
+        success = await asyncio.to_thread(
+            export_to_excel, export_sheets, save_path, sheet_name,
+            state.import_cancelled, _on_progress,
+        )
+        if success:
+            _log_message(log, f"已导出: {save_path}")
+            _update_last_directory(save_path)
         else:
-            # 优先使用匹配后的完整数据，如果没有则使用原始数据
-            export_data = state.matched_all_sheets if state.matched_all_sheets else state.all_sheets
-            df_to_export = pd.concat(export_data.values(), ignore_index=True)
-            sheet_name = "全部"
-
-        # 创建 xlsxwriter 对象
-        workbook = xlsxwriter.Workbook(path)
-        try:
-            worksheet = workbook.add_worksheet(sheet_name)
-
-            # 定义日期格式
-            date_fmt = workbook.add_format({'num_format': 'yyyy-mm-dd'})
-
-            # 写入表头
-            headers = list(df_to_export.columns)
-            for col, header in enumerate(headers):
-                worksheet.write(0, col, header)
-
-            # 识别日期列（包括 datetime64 和 date/datetime 对象）
-            date_columns = set()
-            for col in headers:
-                if pd.api.types.is_datetime64_any_dtype(df_to_export[col]):
-                    date_columns.add(col)
-                else:
-                    # 检查是否有 date/datetime 对象
-                    sample = df_to_export[col].dropna().head(10)
-                    if not sample.empty and sample.apply(
-                        lambda v: isinstance(v, (datetime.date, datetime.datetime))
-                    ).any():
-                        date_columns.add(col)
-
-            # 分批写入数据
-            batch_size = 1000
-            total_rows = len(df_to_export)
-
-            for i in range(0, total_rows, batch_size):
-                if state.import_cancelled.is_set():
-                    _log_message(log, "导出已取消")
-                    break
-
-                batch = df_to_export.iloc[i:i+batch_size]
-                for row_idx, (_, row) in enumerate(batch.iterrows(), start=i+1):
-                    for col_idx, col_name in enumerate(headers):
-                        value = row[col_name]
-                        # 处理 NaN 值
-                        if pd.isna(value):
-                            worksheet.write(row_idx, col_idx, "")
-                        elif col_name in date_columns:
-                            # 日期列使用日期格式
-                            try:
-                                if isinstance(value, pd.Timestamp):
-                                    worksheet.write_datetime(row_idx, col_idx, value.to_pydatetime(), date_fmt)
-                                elif isinstance(value, (datetime.date, datetime.datetime)):
-                                    worksheet.write_datetime(row_idx, col_idx, value, date_fmt)
-                                else:
-                                    worksheet.write(row_idx, col_idx, value)
-                            except Exception:
-                                worksheet.write(row_idx, col_idx, str(value))
-                        else:
-                            worksheet.write(row_idx, col_idx, value)
-
-                # 更新进度
-                processed = min(i + batch_size, total_rows)
-                progress = processed / total_rows
-                controls.import_progress_bar.value = progress
-                controls.import_progress_text.value = f"正在导出第 {processed}/{total_rows} 行..."
-                page.update()
-
-                await asyncio.sleep(0)
-
-        finally:
-            # 确保 workbook 始终关闭，避免文件损坏和句柄泄漏
-            workbook.close()
-
-        if not state.import_cancelled.is_set():
-            _log_message(log, f"已导出: {path}")
-            _update_last_directory(path)
-        else:
-            # 取消时删除不完整的文件
-            try:
-                import os
-                os.remove(path)
-                _log_message(log, "已删除不完整的导出文件")
-            except OSError:
-                pass
-
+            _log_message(log, "导出已取消")
     except Exception as ex:
         _log_message(log, f"导出失败: {ex}", level=logging.ERROR)
     finally:
-        # 恢复 UI
         controls.import_progress_bar.visible = False
         controls.import_progress_text.visible = False
         controls.cancel_btn.visible = False
         controls.export_btn.disabled = False
         page.update()
-
-
-# ========================================================================
-# 模块级辅助函数（操作共享状态/控件，由闭包调用）
-# ========================================================================
-
-def _hide_import_progress(state: _MatchState, controls: _MatchControls):
-    """隐藏导入进度 UI"""
-    controls.import_progress_bar.visible = False
-    controls.import_progress_text.visible = False
-    controls.cancel_btn.visible = False
-    controls.import_progress_bar.value = 0
-
-
-def _update_match_status(state: _MatchState, controls: _MatchControls, sheet_name: str = None):
-    """更新匹配计数显示"""
-    sheet = sheet_name or state.current_sheet
-    matched = state.matched_sheets.get(sheet)
-    unmatched = state.unmatched_sheets.get(sheet)
-    if matched is not None and unmatched is not None:
-        m = len(matched)
-        u = len(unmatched)
-        controls.match_count_label.value = f"已匹配: {m}  |  未匹配: {u}"
-    else:
-        controls.match_count_label.value = ""
 
 
 # ========================================================================
@@ -592,7 +325,7 @@ def create_ledger_match_section(
 ) -> tuple[ft.Container, dict]:
     """创建台账匹配工具区域，返回 (container, refs)"""
 
-    state = _MatchState()
+    state = MatchState()
 
     # --- 控件 ---
     file_label = ft.Text("未导入文件", size=12, color=ft.Colors.GREY)
@@ -664,7 +397,7 @@ def create_ledger_match_section(
             Segment(label=ft.Text("未匹配"), value="unmatched"),
         ],
         on_change=_on_view_segment_change,
-        disabled=True,  # 初始禁用，导入后启用
+        disabled=True,
     )
 
     status_label = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
@@ -730,39 +463,9 @@ def create_ledger_match_section(
     # ========================================================================
     # 内部工具函数（短闭包保留在主函数内）
     # ========================================================================
-    def _get_current_df() -> pd.DataFrame | None:
-        name = state.current_sheet
-        if not name:
-            return None
-        # 优先返回匹配后的数据，如果没有则返回原始数据
-        if name in state.matched_all_sheets:
-            return state.matched_all_sheets[name]
-        if name in state.all_sheets:
-            return state.all_sheets[name]
-        return None
-
-    def _apply_filter_and_sort():
-        """对当前 sheet 的 DataFrame 应用排序，更新 filtered_df"""
-        df = _get_current_df()
-        if df is None:
-            state.filtered_df = None
-            return
-
-        result = df.copy()
-
-        # 排序
-        col = state.sort_column
-        if col and col in result.columns:
-            ascending = state.sort_ascending
-            try:
-                result = result.sort_values(by=col, ascending=ascending, kind="stable")
-            except Exception:
-                logging.getLogger(__name__).debug("排序失败: col=%s", col)
-
-        state.filtered_df = result
 
     def _total_pages():
-        df = _get_view_df()
+        df = get_view_df(state)
         if df is None or df.empty:
             return 1
         return max(1, (len(df) + PAGE_SIZE - 1) // PAGE_SIZE)
@@ -773,21 +476,6 @@ def create_ledger_match_section(
         page_label.value = f"{cur + 1} / {total}"
         prev_btn.disabled = cur <= 0
         next_btn.disabled = cur >= total - 1
-
-    def _show_import_progress(total: int):
-        """显示导入进度 UI"""
-        state.import_cancelled.clear()
-        import_progress_bar.value = 0
-        import_progress_bar.visible = True
-        import_progress_text.value = f"正在解析 0/{total} 个 sheet..."
-        import_progress_text.visible = True
-        cancel_btn.visible = True
-        match_btn.disabled = True
-
-    def _update_import_progress(current: int, total: int, sheet_name: str):
-        """更新导入进度"""
-        import_progress_bar.value = current / total if total > 0 else 0
-        import_progress_text.value = f"正在解析 {current}/{total}: {sheet_name}"
 
     def _on_cancel_import(e):
         state.import_cancelled.set()
@@ -804,13 +492,11 @@ def create_ledger_match_section(
         id_dropdown.update()
 
     def _on_oil_toggle(e):
-        enabled = oil_match_switch.value
-        oil_dropdown.disabled = not enabled
+        oil_dropdown.disabled = not oil_match_switch.value
         oil_dropdown.update()
 
     def _on_view_change(tab_index: int):
-        modes = ["all", "matched", "unmatched"]
-        state.view_mode = modes[tab_index]
+        state.view_mode = _VIEW_MODES[tab_index]
         state.page = 0
         build_table()
 
@@ -825,7 +511,7 @@ def create_ledger_match_section(
             def handler(e):
                 state.sort_column = cols[e.column_index]
                 state.sort_ascending = e.ascending
-                _apply_filter_and_sort()
+                apply_sort(state)
                 state.page = 0
                 build_table()
             return handler
@@ -846,19 +532,9 @@ def create_ledger_match_section(
         else:
             data_table.columns = [ft.DataColumn(ft.Text("等待导入数据..."))]
 
-    def _get_view_df() -> pd.DataFrame | None:
-        """根据当前视图模式返回对应的 DataFrame"""
-        mode = state.view_mode
-        sheet = state.current_sheet
-        if mode == "matched":
-            return state.matched_sheets.get(sheet)
-        elif mode == "unmatched":
-            return state.unmatched_sheets.get(sheet)
-        return state.filtered_df
-
     def build_table():
-        _apply_filter_and_sort()
-        df = _get_view_df()
+        apply_sort(state)
+        df = get_view_df(state)
         if df is None or df.empty:
             data_table.rows = []
             data_table.columns = [ft.DataColumn(ft.Text("等待导入数据..."))]
@@ -940,7 +616,6 @@ def create_ledger_match_section(
         state.sort_column = None
         state.columns.clear()
         state.sort_ascending = True
-        # 重置视图模式为"全部"，避免切换 sheet 后显示不一致
         state.view_mode = "all"
         view_segment.selected = ["all"]
         df = state.all_sheets[sheet_name]
@@ -957,7 +632,7 @@ def create_ledger_match_section(
     sheet_dropdown.on_select = _on_sheet_dropdown_change
 
     # ========================================================================
-    # Wire action callbacks to extracted module-level functions
+    # Wire action callbacks
     # ========================================================================
     async def on_import(e):
         await _do_import(page, log, state, controls, _on_sheet_change)
@@ -965,20 +640,11 @@ def create_ledger_match_section(
 
     def _do_clear_impl():
         """清空的实际逻辑"""
-        _hide_import_progress(state, controls)
-        state.matched_sheets.clear()
-        state.unmatched_sheets.clear()
-        state.matched_all_sheets.clear()
-        state.view_mode = "all"
+        _hide_import_progress(controls)
+        state.clear()
+        state.import_cancelled.clear()  # clear() already calls this but be explicit
         view_segment.selected = ["all"]
         view_segment.disabled = True
-        state.all_sheets.clear()
-        state.filtered_df = None
-        state.current_sheet = ""
-        state.page = 0
-        state.sort_column = None
-        state.columns.clear()
-        state.sort_ascending = True
         file_label.value = "未导入文件"
         file_label.color = ft.Colors.GREY
         sheet_dropdown.options = []
@@ -1046,7 +712,6 @@ def create_ledger_match_section(
         alignment=ft.MainAxisAlignment.CENTER,
     )
 
-    # ── 文件操作栏 ──
     file_row = ft.Row(
         [
             ft.Row(
@@ -1064,14 +729,12 @@ def create_ledger_match_section(
         vertical_alignment=ft.CrossAxisAlignment.CENTER,
     )
 
-    # ── 进度条 ──
     progress_row = ft.Row(
         [import_progress_bar, import_progress_text, cancel_btn],
         spacing=8,
         vertical_alignment=ft.CrossAxisAlignment.CENTER,
     )
 
-    # ── 匹配配置（可折叠，2 列网格） ──
     match_config_grid = ft.ResponsiveRow(
         [
             ft.Container(
@@ -1100,7 +763,6 @@ def create_ledger_match_section(
         content_controls=[match_config_grid],
     )
 
-    # ── 操作栏（2 行） ──
     action_rows = ft.Column(
         [
             ft.Row([match_btn, export_btn], spacing=8),
@@ -1118,20 +780,10 @@ def create_ledger_match_section(
                     size=13,
                     color=theme.TEXT_SECONDARY,
                 ),
-
-                # ── 文件操作 ──
                 theme.module_card([file_row, progress_row], spacing=6),
-
-                # ── 匹配配置（折叠） ──
                 match_config_collapsible,
-
-                # ── 操作栏 ──
                 action_rows,
-
-                # ── 视图切换 ──
                 view_segment,
-
-                # ── 数据表格 ──
                 ft.Container(
                     content=table_wrapper,
                     border=ft.Border.all(1, theme.BORDER),
@@ -1140,8 +792,6 @@ def create_ledger_match_section(
                     bgcolor=theme.SURFACE_HIGH,
                     expand=True,
                 ),
-
-                # ── 分页 ──
                 ft.Row(
                     [prev_btn, page_label, next_btn],
                     spacing=4,

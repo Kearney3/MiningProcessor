@@ -33,13 +33,13 @@ if [ ! -f "$SIDECAR_BIN" ]; then
 fi
 echo "  → $SIDECAR_BIN ($(du -h "$SIDECAR_BIN" | cut -f1))"
 
-# ─── 2. Tauri build ───
-echo "[2/3] Building Tauri application..."
+# ─── 2. Tauri build（仅 .app）───
+echo "[2/4] Building Tauri application (.app)..."
 source "$HOME/.cargo/env"
-pnpm tauri build
+pnpm tauri build --bundles app
 
 # ─── 3. 嵌入 sidecar 到 .app bundle ───
-echo "[3/3] Embedding sidecar into app bundle..."
+echo "[3/4] Embedding sidecar into app bundle..."
 
 BUNDLE_DIR="src-tauri/target/release/bundle/macos"
 
@@ -62,6 +62,32 @@ codesign --force --sign - "$APP_DIR" 2>/dev/null || true
 echo "  → Embedded: $MACOS_DIR/tauri-bridge"
 echo "  → App bundle: $APP_DIR"
 
+# ─── 4. 打包 DMG（使用已嵌入 sidecar 的 .app）───
+echo "[4/4] Packaging DMG with hdiutil..."
+DMG_DIR="src-tauri/target/release/bundle/dmg"
+mkdir -p "$DMG_DIR"
+
+# 从配置读取版本号和产品名
+VERSION=$(grep -o '"version": *"[^"]*"' src-tauri/tauri.conf.json | head -1 | cut -d'"' -f4)
+APP_NAME=$(basename "$APP_DIR")
+DMG_NAME="${APP_NAME%.app}_${VERSION}_aarch64.dmg"
+DMG_PATH="$DMG_DIR/$DMG_NAME"
+
+# 创建临时挂载目录
+STAGING_DIR=$(mktemp -d)
+cp -R "$APP_DIR" "$STAGING_DIR/"
+ln -s /Applications "$STAGING_DIR/Applications"
+
+hdiutil create \
+    -volname "$APP_NAME" \
+    -srcfolder "$STAGING_DIR" \
+    -ov \
+    -format UDZO \
+    -imagekey zlib-level=9 \
+    "$DMG_PATH"
+
+rm -rf "$STAGING_DIR"
+
 # 验证
 echo ""
 echo "═══ Bundle Contents ═══"
@@ -70,4 +96,4 @@ ls -lh "$MACOS_DIR/"
 echo ""
 echo "═══ Build Complete ═══"
 echo "App: $APP_DIR"
-echo "DMG: $BUNDLE_DIR/*.dmg"
+echo "DMG: $DMG_PATH"

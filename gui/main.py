@@ -10,7 +10,7 @@ from pathlib import Path
 from . import components as cmp
 from . import logic as logic
 from .log_system import LogSystem
-from .log_system import MIN_LOG_HEIGHT  # 重新导出供测试使用
+from .log_system import MIN_LOG_HEIGHT  # re-exported for test access
 
 try:
     from . import theme
@@ -27,12 +27,6 @@ INITIAL_WINDOW_HEIGHT = 900
 
 def main(page: ft.Page):
     setup_logging()
-    # 一次性迁移：将 config.user.json 中明文密码转入系统 Keychain
-    try:
-        from func.secret_store import migrate_passwords_to_keyring
-        migrate_passwords_to_keyring()
-    except Exception:
-        logging.getLogger(__name__).debug("密钥迁移跳过（keyring 不可用或已完成）")
     page.title = "矿山数据处理工具"
     assets_dir = Path(__file__).resolve().parent.parent / "assets"
     page.assets_dir = str(assets_dir)
@@ -109,13 +103,16 @@ def main(page: ft.Page):
     }
 
     current_nav = {"key": "modules"}
+    _prev_nav_key = ["modules"]  # mutable container for closure
 
     def _select_page(key: str):
         def handler(e):
+            old_key = _prev_nav_key[0]
+            _prev_nav_key[0] = key
             current_nav["key"] = key
             content_col.controls = [pages[key]]
             content_col.update()
-            _update_sidebar()
+            _update_sidebar(old_key, key)
         return handler
 
     # Build sidebar nav items with group labels
@@ -129,9 +126,12 @@ def main(page: ft.Page):
             sidebar_nav_items.append(item)
             _nav_item_map[key] = item
 
-    def _update_sidebar():
-        for key, item in _nav_item_map.items():
-            is_selected = (key == current_nav["key"])
+    def _update_sidebar(old_key: str, new_key: str):
+        for key in (old_key, new_key):
+            item = _nav_item_map.get(key)
+            if item is None:
+                continue
+            is_selected = (key == new_key)
             row = item.content
             icon_ctrl = row.controls[0]
             text_ctrl = row.controls[1]

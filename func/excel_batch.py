@@ -285,11 +285,14 @@ def _apply_ledger_to_sheets(
 
 def _add_default_shift(sheets: dict[str, pd.DataFrame], default_shift: str = "Night") -> dict[str, pd.DataFrame]:
     """对没有「班次」列的 sheet 新增一列，默认值为 default_shift。"""
+    result = {}
     for sheet_name, df in sheets.items():
         if "班次" not in df.columns:
-            df["班次"] = default_shift
+            result[sheet_name] = df.assign(班次=default_shift)
             logger.info(f"Sheet '{sheet_name}' 缺少班次列，已新增默认值: {default_shift}")
-    return sheets
+        else:
+            result[sheet_name] = df
+    return result
 
 
 def _aggregate_production_data(

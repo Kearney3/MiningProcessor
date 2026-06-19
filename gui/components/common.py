@@ -46,6 +46,17 @@ def safe_update(*controls):
             pass
 
 
+def to_local_dt(d):
+    """将 date 转为带本地时区的 datetime，修复 Flet DatePicker 时区偏移问题。
+
+    Flet 序列化协议会将 naive datetime 转为 UTC 再传给 Flutter，
+    导致 UTC+时区的用户选中的日期往前偏移一天。
+    传入带本地时区的 datetime 可避免二次转换。
+    """
+    naive = datetime.combine(d, datetime.min.time())
+    return naive.replace(tzinfo=datetime.now().astimezone().tzinfo)
+
+
 PAGE_SIZE = 20
 
 
