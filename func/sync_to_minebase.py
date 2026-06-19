@@ -483,8 +483,7 @@ class MineBaseDBClient:
         import psycopg2.extras
 
         cols_str = ", ".join(columns)
-        placeholders = ", ".join(["%s"] * len(columns))
-        query = f"INSERT INTO {table} ({cols_str}) VALUES ({placeholders})"
+        query = f"INSERT INTO {table} ({cols_str}) VALUES %s"
 
         with self.conn.cursor() as cur:
             psycopg2.extras.execute_values(cur, query, values_list, page_size=200)
