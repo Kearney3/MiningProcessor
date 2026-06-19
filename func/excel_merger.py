@@ -58,8 +58,6 @@ def merge_excel_files(
     """
     # 1. 收集匹配的 Excel 文件
     matched_files: List[str] = []
-    # 预设的输出文件名（用于自我排除）
-    expected_output_name = f"{keyword}_合并.xlsx"
     for fname in sorted(os.listdir(folder_path)):
         lower = fname.lower()
         if lower.endswith("_合并.xlsx"):

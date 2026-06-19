@@ -6,7 +6,7 @@ import numpy as np
 
 from func.logger import get_logger
 from func.string_utils import clean_string
-from func.excel_utils import dedup_dataframe
+from func.excel_utils import dedup_dataframe, resolve_shift
 
 logger = get_logger(__name__)
 
@@ -81,25 +81,9 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False):
                 continue
 
             # --- 核心改进：班次识别逻辑 ---
-            current_shift = None
-
-            # 如果当前列标题直接写了班次（通常是燃油列）
-            if idx in col_to_shift:
-                current_shift = col_to_shift[idx]
-            else:
-                # 如果当前是小时数列，班次在右边，我们需要向右寻找最近的班次标识
-                # 寻找范围设为往后看 3 列
-                for search_idx in range(idx, min(idx + 3, header_rows.shape[1])):
-                    if search_idx in col_to_shift:
-                        current_shift = col_to_shift[search_idx]
-                        break
-
-            # 如果实在没找到，尝试向前看（ffill效果）
-            if not current_shift:
-                for search_idx in range(idx, 2, -1):
-                    if search_idx in col_to_shift:
-                        current_shift = col_to_shift[search_idx]
-                        break
+            current_shift = resolve_shift(
+                col_to_shift, idx, max_lookahead=3, num_cols=header_rows.shape[1]
+            )
 
             data_type = None
             if "已使用小时数" in h4 or "АМЦ" in h4:

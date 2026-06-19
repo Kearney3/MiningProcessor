@@ -6,11 +6,10 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
-
 import keyring
 
 from . import config_loader
+from .config_loader import _get_nested, _set_nested
 
 logger = logging.getLogger(__name__)
 
@@ -24,26 +23,6 @@ _SECRET_PATHS: list[tuple[str, ...]] = [
 ]
 
 _KEYRING_SERVICE = "MiningProcessor"
-
-
-def _get_nested(d: dict[str, Any], path: tuple[str, ...]) -> Any:
-    """按路径取值，缺 key 时返回 None。"""
-    cur: Any = d
-    for k in path:
-        if not isinstance(cur, dict):
-            return None
-        cur = cur.get(k)
-    return cur
-
-
-def _set_nested(d: dict[str, Any], path: tuple[str, ...], value: Any) -> None:
-    """按路径设置值，自动创建中间 dict。"""
-    cur = d
-    for k in path[:-1]:
-        if k not in cur or not isinstance(cur[k], dict):
-            cur[k] = {}
-        cur = cur[k]
-    cur[path[-1]] = value
 
 
 def _keyring_key(path: tuple[str, ...]) -> str:

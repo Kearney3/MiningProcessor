@@ -185,20 +185,6 @@ class TestUpdateDeviceLoadMap:
         assert file_config["device_load_map"]["NEW"] == 50   # 新增
 
 
-class TestGetShiftMapping:
-    def test_returns_shift_mapping(self, temp_config):
-        result = config_loader.get_shift_mapping()
-        assert result["白班"] == "Day"
-        assert result["夜班"] == "Night"
-
-    def test_returns_empty_when_missing(self, tmp_path, monkeypatch):
-        config_file = tmp_path / "config.json"
-        config_file.write_text(json.dumps({}), encoding="utf-8")
-        monkeypatch.setattr(config_loader, "_CONFIG_FILE", config_file)
-        monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", tmp_path / "nope.json")
-        assert config_loader.get_shift_mapping() == {}
-
-
 class TestGetDefaultYearMonth:
     def test_get_default_year(self, temp_config):
         assert config_loader.get_default_year() == 2025

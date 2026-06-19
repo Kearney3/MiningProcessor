@@ -153,8 +153,8 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
     final_df = pd.concat(all_data, axis=0, ignore_index=True)
 
     # 5. 排序：按日期排序, 并将日期列转换为日期类型, 去除时间部分
-    strip_date_column(final_df, date_format="%Y-%m-%d")
-    sort_by_date_shift(final_df)
+    final_df = strip_date_column(final_df, date_format="%Y-%m-%d")
+    final_df = sort_by_date_shift(final_df)
 
     # 把日期和班次的位置放在第一列和第二列
     other_cols = [col for col in final_df.columns if col not in ['日期', '班次']]

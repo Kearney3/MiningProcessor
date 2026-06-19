@@ -10,7 +10,8 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from gui.logic import _find_col, _get_output_file, _log_message, _apply_ledger_matching
+from func.ledger_postprocess import _find_col, match_sheets
+from gui.logic import _get_output_file, _log_message, _apply_ledger_matching
 
 
 # ---------------------------------------------------------------------------
@@ -435,3 +436,82 @@ class TestWorktimeLedgerMatching:
         result = pd.read_excel(out)
         assert "标准设备名称" in result.columns
         assert result["标准设备名称"].iloc[0] == "STD_TR100"
+
+
+# ---------------------------------------------------------------------------
+# match_sheets (ledger_postprocess)
+# ---------------------------------------------------------------------------
+class TestMatchSheets:
+    """Tests for the in-memory match_sheets function."""
+
+    class _StubEquipmentLedger:
+        def match_device(self, name=None, device_id=None):
+            return {
+                "标准设备名称": f"STD_{name}",
+                "标准设备编号": f"ID_{device_id or 'N/A'}",
+                "标准公司名称": "测试公司",
+            }
+
+    class _StubOilLedger:
+        def match(self, name):
+            return {"标准名称": f"STD_{name}", "原始名称": name, "匹配方式": "精确", "相似度": 100}
+
+    def test_returns_sheets_unchanged_when_no_ledgers(self):
+        sheets = {"Sheet1": pd.DataFrame({"A": [1]})}
+        result = match_sheets(sheets)
+        assert result is sheets
+        assert "标准设备名称" not in result["Sheet1"].columns
+
+    def test_single_equipment_column(self):
+        df = pd.DataFrame({"设备名称": ["TR100"], "值": [100]})
+        sheets = {"数据": df}
+        result = match_sheets(sheets, equipment_ledger=self._StubEquipmentLedger())
+        assert "标准设备名称" in result["数据"].columns
+        assert result["数据"]["标准设备名称"].iloc[0] == "STD_TR100"
+
+    def test_production_dual_column(self):
+        df = pd.DataFrame({"矿卡名称": ["TR100"], "挖机名称": ["EX200"], "产量": [50]})
+        sheets = {"生产": df}
+        result = match_sheets(sheets, equipment_ledger=self._StubEquipmentLedger())
+        assert "标准设备名称（矿卡）" in result["生产"].columns
+        assert "标准设备名称（挖机）" in result["生产"].columns
+        assert result["生产"]["标准设备名称（矿卡）"].iloc[0] == "STD_TR100"
+        assert result["生产"]["标准设备名称（挖机）"].iloc[0] == "STD_EX200"
+
+    def test_oil_matching(self):
+        df = pd.DataFrame({"油品种类": ["0# 柴油"], "值": [50]})
+        sheets = {"油耗": df}
+        result = match_sheets(sheets, oil_ledger=self._StubOilLedger())
+        assert "标准油品名称" in result["油耗"].columns
+        assert result["油耗"]["标准油品名称"].iloc[0] == "STD_0# 柴油"
+
+    def test_equipment_and_oil_combined(self):
+        df = pd.DataFrame({"设备名称": ["TR100"], "油品种类": ["0# 柴油"], "值": [50]})
+        sheets = {"数据": df}
+        result = match_sheets(
+            sheets,
+            equipment_ledger=self._StubEquipmentLedger(),
+            oil_ledger=self._StubOilLedger(),
+        )
+        assert "标准设备名称" in result["数据"].columns
+        assert "标准油品名称" in result["数据"].columns
+
+    def test_multiple_sheets(self):
+        df1 = pd.DataFrame({"设备名称": ["TR100"], "值": [1]})
+        df2 = pd.DataFrame({"设备名称": ["EX200"], "值": [2]})
+        sheets = {"S1": df1, "S2": df2}
+        result = match_sheets(sheets, equipment_ledger=self._StubEquipmentLedger())
+        assert "标准设备名称" in result["S1"].columns
+        assert "标准设备名称" in result["S2"].columns
+
+    def test_no_matching_columns_skips_sheet(self):
+        df = pd.DataFrame({"无关列": [1, 2], "值": [3, 4]})
+        sheets = {"数据": df}
+        result = match_sheets(sheets, equipment_ledger=self._StubEquipmentLedger())
+        assert "标准设备名称" not in result["数据"].columns
+
+    def test_with_id_column(self):
+        df = pd.DataFrame({"设备名称": ["TR100"], "设备编号": ["HT#1"], "值": [1]})
+        sheets = {"数据": df}
+        result = match_sheets(sheets, equipment_ledger=self._StubEquipmentLedger())
+        assert result["数据"]["标准设备编号"].iloc[0] == "ID_HT#1"

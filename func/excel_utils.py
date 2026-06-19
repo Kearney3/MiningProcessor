@@ -16,6 +16,71 @@ from func.string_utils import clean_string
 
 logger = logging.getLogger(__name__)
 
+# 模块类型到默认输出文件名的映射（不含 worktime，因其含动态年月）
+MODULE_OUTPUT_FILES: dict[str, str] = {
+    "fuel": "Fuel.xlsx",
+    "electrical": "电力消耗统计.xlsx",
+    "production": "合并产量.xlsx",
+}
+
+
+def get_output_filename(module_type: str, year: int = 2025, month: int = 1) -> str | None:
+    """根据模块类型返回默认输出文件名。
+
+    Args:
+        module_type: 模块类型（fuel/electrical/production/worktime）。
+        year: 工时模块的年份。
+        month: 工时模块的月份。
+
+    Returns:
+        输出文件名，未知类型返回 None。
+    """
+    if module_type == "worktime":
+        return f"{year}{month:02d}_工作效率表.xlsx"
+    return MODULE_OUTPUT_FILES.get(module_type)
+
+
+def resolve_shift(
+    col_to_shift: dict[int, str],
+    target_idx: int,
+    max_lookahead: int = 3,
+    num_cols: int | None = None,
+) -> str | None:
+    """在 col_to_shift 映射中查找 target_idx 对应的班次。
+
+    查找策略：
+    1. 精确匹配 target_idx
+    2. 向后搜索 (target_idx+1 .. target_idx+max_lookahead)
+    3. 向前搜索 (target_idx-1 .. 3)
+
+    Args:
+        col_to_shift: {列索引: "Day"/"Night"} 映射。
+        target_idx: 要查找班次的列索引。
+        max_lookahead: 向后搜索的最大列数，默认 3。
+        num_cols: 总列数，用于限制向后搜索范围。None 时不限制。
+
+    Returns:
+        "Day"、"Night" 或 None（未找到）。
+    """
+    # 精确匹配
+    if target_idx in col_to_shift:
+        return col_to_shift[target_idx]
+
+    # 向后搜索
+    end = target_idx + max_lookahead + 1
+    if num_cols is not None:
+        end = min(end, num_cols)
+    for search_idx in range(target_idx + 1, end):
+        if search_idx in col_to_shift:
+            return col_to_shift[search_idx]
+
+    # 向前搜索
+    for search_idx in range(target_idx - 1, 2, -1):
+        if search_idx in col_to_shift:
+            return col_to_shift[search_idx]
+
+    return None
+
 
 def strip_date_column(
     df: pd.DataFrame,
@@ -26,24 +91,25 @@ def strip_date_column(
     """将 DataFrame 的日期列标准化为 date 对象（去除时间部分）。
 
     Args:
-        df: 待处理的 DataFrame（原地修改）。
+        df: 待处理的 DataFrame（返回新对象，不修改原 df）。
         date_column: 日期列名。
         target_year: 若指定，覆盖所有日期的年份。
         date_format: pd.to_datetime 的 format 参数，None 时自动推断。
 
     Returns:
-        处理后的 DataFrame（同引用）。
+        处理后的新 DataFrame。
     """
     if date_column not in df.columns or df.empty:
         return df
 
-    df[date_column] = pd.to_datetime(df[date_column], format=date_format, errors="coerce")
+    result = df.copy()
+    result[date_column] = pd.to_datetime(result[date_column], format=date_format, errors="coerce")
     if target_year is not None:
-        df[date_column] = df[date_column].apply(
+        result[date_column] = result[date_column].apply(
             lambda d: d.replace(year=target_year) if pd.notna(d) else d
         )
-    df[date_column] = df[date_column].dt.date
-    return df
+    result[date_column] = result[date_column].dt.date
+    return result
 
 
 def sort_by_date_shift(
@@ -54,19 +120,19 @@ def sort_by_date_shift(
     """按日期和班次排序。
 
     Args:
-        df: 待排序的 DataFrame（原地排序）。
+        df: 待排序的 DataFrame（返回新对象，不修改原 df）。
         sort_columns: 排序列，默认 ["日期", "班次"]。
         kind: 排序算法，默认 "stable"。
 
     Returns:
-        排序后的 DataFrame（同引用）。
+        排序后的新 DataFrame。
     """
     if sort_columns is None:
         sort_columns = ["日期", "班次"]
 
     existing = [c for c in sort_columns if c in df.columns]
     if existing:
-        df.sort_values(by=existing, kind=kind, inplace=True)
+        return df.sort_values(by=existing, kind=kind)
     return df
 
 
@@ -133,39 +199,41 @@ def clean_split_dataframe(
     - 按非元数据列全空去行
 
     Args:
-        df: 分割后的 DataFrame（原地修改）。
+        df: 分割后的 DataFrame（返回新对象，不修改原 df）。
         skip_columns: 不参与全空检查的列，默认 ["日期", "班次"]。
         check_keyword: 用于定位检查列的关键字。
 
     Returns:
-        清洗后的 DataFrame（同引用）。
+        清洗后的新 DataFrame。
     """
     if skip_columns is None:
         skip_columns = ["日期", "班次"]
 
+    result = df.copy()
+
     # 移除 NaN 列
-    df = df.loc[:, df.columns.notna()]
+    result = result.loc[:, result.columns.notna()]
 
     # 移除空列名列
-    if "" in df.columns:
-        df = df.drop(columns=[""])
+    if "" in result.columns:
+        result = result.drop(columns=[""])
 
     # 按关键字列去空行
-    if len(df.columns) > 1:
+    if len(result.columns) > 1:
         check_idx = -1
-        for idx, col in enumerate(df.columns):
+        for idx, col in enumerate(result.columns):
             if check_keyword in col:
                 check_idx = idx
                 break
         if check_idx != -1:
-            check_col = df.columns[check_idx]
-            df.dropna(subset=[check_col], inplace=True)
+            check_col = result.columns[check_idx]
+            result = result.dropna(subset=[check_col])
 
     # 按非元数据列全空去行
-    subset_cols = [c for c in df.columns if c not in skip_columns]
-    df.dropna(how="all", subset=subset_cols, inplace=True)
+    subset_cols = [c for c in result.columns if c not in skip_columns]
+    result = result.dropna(how="all", subset=subset_cols)
 
-    return df
+    return result
 
 
 def dedup_dataframe(

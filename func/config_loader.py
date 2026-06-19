@@ -9,7 +9,6 @@ load_config() 合并两者返回（user 覆盖 default），save 时按目标分
 """
 import copy
 import json
-import os
 import threading
 from pathlib import Path
 from typing import Any
@@ -223,17 +222,6 @@ def save_config(config: dict[str, Any]) -> None:
     _invalidate_config_cache()
 
 
-def save_user_config_file(data: dict[str, Any]) -> None:
-    """保存用户配置到 config.user.json。"""
-    _save_json(_USER_CONFIG_FILE, data)
-    _invalidate_config_cache()
-
-
-def load_user_config_file() -> dict[str, Any]:
-    """仅加载 config.user.json（不合并默认值）。"""
-    return _load_json(_USER_CONFIG_FILE)
-
-
 # ---------------------------------------------------------------------------
 # 设备装载量
 # ---------------------------------------------------------------------------
@@ -281,11 +269,6 @@ def update_device_load_map(updates: dict[str, int]) -> dict[str, int]:
 # ---------------------------------------------------------------------------
 # 班次 / 年月
 # ---------------------------------------------------------------------------
-
-def get_shift_mapping() -> dict[str, str]:
-    """获取班次名称映射"""
-    config = load_config()
-    return config.get("shift_mapping", {})
 
 
 def get_default_shift() -> str:
@@ -371,14 +354,6 @@ def reset_user_config(section: str | None = None) -> None:
     _invalidate_config_cache()
 
 
-def get_user_config_default(section: str | None = None, default: Any = None) -> Any:
-    """读取 user_config_default 中的默认配置骨架（来自 config.json）。"""
-    config = _load_json(_CONFIG_FILE)
-    defaults = config.get(_USER_CONFIG_DEFAULT_SECTION, {})
-    if section is None:
-        return defaults if defaults else default
-    return defaults.get(section, default) if isinstance(defaults, dict) else default
-
 
 # ---------------------------------------------------------------------------
 # 文件关键字
@@ -428,19 +403,6 @@ def save_worktime_header_mapping(mapping: dict) -> None:
     """持久化工作效率表头映射配置。"""
     update_user_config({"worktime_header_mapping": mapping})
 
-
-def is_worktime_header_apply() -> bool:
-    """获取工作效率表头修改开关状态（默认 True）。"""
-    config = load_config()
-    return config.get("worktime_header_apply", True)
-
-
-def set_worktime_header_apply(enabled: bool) -> None:
-    """设置工作效率表头修改开关状态并持久化。"""
-    config = _load_json(_CONFIG_FILE)
-    config["worktime_header_apply"] = bool(enabled)
-    _save_json(_CONFIG_FILE, config)
-    _invalidate_config_cache()
 
 
 # ---------------------------------------------------------------------------
