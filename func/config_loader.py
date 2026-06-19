@@ -504,35 +504,29 @@ def get_minebase_mode() -> str:
 
 def get_minebase_api_config() -> dict[str, Any]:
     """获取 MineBase API 模式配置（密码从 Keychain 解密）。"""
-    from .secret_store import load_secret
+    from .secret_store import load_minebase_secret
 
     cfg = get_minebase_config().get("api", {})
     if "password" in cfg:
-        cfg = {**cfg, "password": load_secret(("minebase", "api", "password"))}
+        cfg = {**cfg, "password": load_minebase_secret("api")}
     return cfg
 
 
 def get_minebase_db_config() -> dict[str, Any]:
     """获取 MineBase 数据库直连模式配置（密码从 Keychain 解密）。"""
-    from .secret_store import load_secret
+    from .secret_store import load_minebase_secret
 
     cfg = get_minebase_config().get("database", {})
     if "password" in cfg:
-        cfg = {**cfg, "password": load_secret(("minebase", "database", "password"))}
+        cfg = {**cfg, "password": load_minebase_secret("database")}
     return cfg
 
 
 def save_minebase_config(minebase_cfg: dict[str, Any]) -> None:
     """保存 MineBase 配置到 config.user.json（密码自动存入 Keychain）。"""
-    from .secret_store import store_secret, _SECRET_PATHS, _KEYRING_SENTINEL
+    from .secret_store import save_minebase_secrets
 
-    cfg_to_save = copy.deepcopy(minebase_cfg)
-    for path in _SECRET_PATHS:
-        val = _get_nested(cfg_to_save, path[1:])
-        if val and val != _KEYRING_SENTINEL:
-            if store_secret(path, val):
-                _set_nested(cfg_to_save, path[1:], _KEYRING_SENTINEL)
-            # else: Keychain 写入失败，保留明文密码在配置中
+    cfg_to_save = save_minebase_secrets(minebase_cfg)
     # 写入 config.user.json 顶层 minebase（与 load_config 合并逻辑一致）
     user_file = _load_json(_USER_CONFIG_FILE)
     user_file["minebase"] = cfg_to_save
