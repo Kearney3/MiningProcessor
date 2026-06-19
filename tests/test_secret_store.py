@@ -133,6 +133,36 @@ class TestLoadSecret:
             result = load_secret(("minebase", "api", "password"))
         assert result == ""
 
+    def test_falls_back_to_legacy_user_config_when_keychain_missing(self, tmp_path):
+        """Keychain 无条目时应从 user_config.minebase 旧格式回退读取明文密码。"""
+        config_file = tmp_path / "config.json"
+        config_file.write_text(
+            json.dumps({"minebase": {"database": {"password": _KEYRING_SENTINEL}}}),
+            encoding="utf-8",
+        )
+        user_file = tmp_path / "config.user.json"
+        user_file.write_text(
+            json.dumps({
+                "user_config": {
+                    "minebase": {
+                        "database": {"password": "legacy_db_pass"},
+                    }
+                },
+                "minebase": {
+                    "database": {"password": _KEYRING_SENTINEL},
+                },
+            }),
+            encoding="utf-8",
+        )
+        with (
+            patch.object(config_loader, "_CONFIG_FILE", config_file),
+            patch.object(config_loader, "_USER_CONFIG_FILE", user_file),
+            patch("func.secret_store.keyring") as mock_keyring,
+        ):
+            mock_keyring.get_password.return_value = None
+            result = load_secret(("minebase", "database", "password"))
+        assert result == "legacy_db_pass"
+
     def test_returns_empty_when_path_missing(self, tmp_path):
         config_file = tmp_path / "config.json"
         config_file.write_text(json.dumps({}), encoding="utf-8")
@@ -275,3 +305,30 @@ class TestMigratePasswords:
         assert saved["minebase"]["api"]["password"] == "api_pass"
         # database 密码迁移成功，标记为 sentinel
         assert saved["minebase"]["database"]["password"] == _KEYRING_SENTINEL
+
+    def test_migrates_from_legacy_user_config_minebase(self, tmp_path):
+        """应从 user_config.minebase 旧格式迁移明文密码到 Keychain。"""
+        config_file = tmp_path / "config.user.json"
+        config_file.write_text(
+            json.dumps({
+                "user_config": {
+                    "minebase": {
+                        "database": {"password": "legacy_db_pass"},
+                    }
+                },
+                "minebase": {
+                    "database": {"password": _KEYRING_SENTINEL},
+                },
+            }),
+            encoding="utf-8",
+        )
+        with (
+            patch.object(config_loader, "_USER_CONFIG_FILE", config_file),
+            patch("func.secret_store.keyring") as mock_keyring,
+        ):
+            migrate_passwords_to_keyring()
+
+        # 应从旧格式读取密码并写入 keychain
+        mock_keyring.set_password.assert_called_once_with(
+            _KEYRING_SERVICE, "minebase.database.password", "legacy_db_pass",
+        )
