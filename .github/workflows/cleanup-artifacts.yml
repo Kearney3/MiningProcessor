@@ -1,0 +1,55 @@
+# 自动清理旧的 GitHub Actions artifacts，节省存储空间
+
+name: Cleanup Old Artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      min_age_days:
+        description: "删除多少天前的 artifacts"
+        required: false
+        default: "30"
+
+permissions:
+  actions: write
+
+jobs:
+  cleanup:
+    name: Delete old artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete artifacts older than ${{ inputs.min_age_days || '30' }} days
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const minAgeDays = parseInt('${{ inputs.min_age_days || '30' }}');
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - minAgeDays);
+
+            console.log(`Deleting artifacts created before ${cutoffDate.toISOString()}`);
+
+            let deletedCount = 0;
+            let skippedCount = 0;
+
+            for await (const response of github.paginate.iterator(
+              github.rest.actions.listArtifactsForRepo,
+              { owner: context.repo.owner, repo: context.repo.repo, per_page: 100 }
+            )) {
+              for (const artifact of response.data) {
+                const createdAt = new Date(artifact.created_at);
+
+                if (createdAt < cutoffDate) {
+                  console.log(`Deleting: ${artifact.name} (created ${artifact.created_at}, size ${Math.round(artifact.size_in_bytes / 1024)}KB)`);
+                  await github.rest.actions.deleteArtifact({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    artifact_id: artifact.id
+                  });
+                  deletedCount++;
+                } else {
+                  skippedCount++;
+                }
+              }
+            }
+
+            console.log(`\nDone: ${deletedCount} deleted, ${skippedCount} kept`);
