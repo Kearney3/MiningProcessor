@@ -203,10 +203,13 @@ def merge_excel_files(
     if output_file is None:
         output_file = os.path.join(folder_path, f"{keyword}_合并.xlsx")
 
-    with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
-        for sname, df in merged_sheets.items():
-            df = dedup_dataframe(df, f"合并-{sname}")
-            df.to_excel(writer, sheet_name=sname, index=False)
+    from func.excel_formatter import write_formatted_excel
+
+    formatted_sheets = {}
+    for sname, df in merged_sheets.items():
+        formatted_sheets[sname] = dedup_dataframe(df, f"合并-{sname}")
+
+    write_formatted_excel(output_file, formatted_sheets)
 
     logger.info(f"\n合并完成！输出文件: {output_file}")
     return output_file

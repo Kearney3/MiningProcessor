@@ -135,9 +135,11 @@ def parse_excel_data(file_path, target_year=None, return_sheets=False, add_shift
     if return_sheets:
         return {"电力消耗": result_df}
 
+    from func.excel_formatter import write_formatted_excel
+
     # 导出
     output_file = os.path.join(os.path.dirname(file_path), "电力消耗统计.xlsx")
-    result_df.to_excel(output_file, index=False, sheet_name="电力消耗")
+    write_formatted_excel(output_file, {"电力消耗": result_df})
     logger.info(f"处理完成！结果已保存至: {output_file}")
 
 

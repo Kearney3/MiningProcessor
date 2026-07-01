@@ -259,30 +259,50 @@ def export_to_excel(
     delete_on_cancel: bool = True,
 ) -> bool:
     """Write concatenated *sheets* to *output_path*.  Returns True on success."""
-    import xlsxwriter
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    from func.excel_formatter import (
+        DATE_NUM_FORMAT,
+        HEADER_FILL,
+        HEADER_FONT_COLOR,
+        _auto_column_widths,
+        _is_date_column,
+    )
+
     cancelled = cancel_event or threading.Event()
     if not sheets:
         return False
 
     df_to_export = pd.concat(sheets.values(), ignore_index=True)
-    workbook = xlsxwriter.Workbook(output_path)
-    try:
-        ws = workbook.add_worksheet(sheet_name)
-        date_fmt = workbook.add_format({"num_format": "yyyy-mm-dd"})
-        headers = list(df_to_export.columns)
-        for col, header in enumerate(headers):
-            ws.write(0, col, header)
 
+    wb = Workbook()
+    try:
+        ws = wb.active
+        ws.title = sheet_name
+
+        header_font = Font(bold=True, color=HEADER_FONT_COLOR)
+        header_fill = PatternFill(start_color=HEADER_FILL, end_color=HEADER_FILL, fill_type="solid")
+        center_align = Alignment(horizontal="center", vertical="center")
+
+        headers = list(df_to_export.columns)
+        for col, header in enumerate(headers, start=1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = center_align
+
+        # 列宽自适应
+        col_widths = _auto_column_widths(df_to_export)
+        for idx, width in enumerate(col_widths, start=1):
+            ws.column_dimensions[get_column_letter(idx)].width = width
+
+        # 检测日期列
         date_cols: set[str] = set()
         for col in headers:
-            if pd.api.types.is_datetime64_any_dtype(df_to_export[col]):
+            if _is_date_column(df_to_export[col]):
                 date_cols.add(col)
-            else:
-                sample = df_to_export[col].dropna().head(10)
-                if not sample.empty and sample.apply(
-                    lambda v: isinstance(v, (datetime.date, datetime.datetime))
-                ).any():
-                    date_cols.add(col)
 
         total_rows = len(df_to_export)
         for i in range(0, total_rows, EXPORT_BATCH):
@@ -290,28 +310,28 @@ def export_to_excel(
                 logger.info("导出已取消")
                 break
             batch = df_to_export.iloc[i:i + EXPORT_BATCH]
-            for row_idx, (_, row) in enumerate(batch.iterrows(), start=i + 1):
-                for col_idx, col_name in enumerate(headers):
+            for row_idx, (_, row) in enumerate(batch.iterrows(), start=i + 2):
+                for col_idx, col_name in enumerate(headers, start=1):
                     value = row[col_name]
                     if pd.isna(value):
-                        ws.write(row_idx, col_idx, "")
-                    elif col_name in date_cols:
-                        try:
-                            if isinstance(value, pd.Timestamp):
-                                ws.write_datetime(row_idx, col_idx, value.to_pydatetime(), date_fmt)
-                            elif isinstance(value, (datetime.date, datetime.datetime)):
-                                ws.write_datetime(row_idx, col_idx, value, date_fmt)
-                            else:
-                                ws.write(row_idx, col_idx, value)
-                        except Exception:
-                            ws.write(row_idx, col_idx, str(value))
+                        ws.cell(row=row_idx, column=col_idx, value=None)
                     else:
-                        ws.write(row_idx, col_idx, value)
+                        cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                        if col_name in date_cols:
+                            cell.number_format = DATE_NUM_FORMAT
             if progress_cb and total_rows > 0:
                 processed = min(i + EXPORT_BATCH, total_rows)
                 progress_cb(processed / total_rows, f"正在导出第 {processed}/{total_rows} 行...")
+
+        # 冻结首行 + 自动筛选
+        ws.freeze_panes = "A2"
+        if ws.max_column:
+            last_col = get_column_letter(ws.max_column)
+            ws.auto_filter.ref = f"A1:{last_col}{ws.max_row}"
+
+        wb.save(output_path)
     finally:
-        workbook.close()
+        wb.close()
 
     if cancelled.is_set() and delete_on_cancel:
         try:

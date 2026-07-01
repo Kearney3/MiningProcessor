@@ -650,11 +650,13 @@ def _table_merge_and_write(
     if _check_cancel(cancel_event):
         _emit_progress(progress_cb, {"stage": "cancelled", "percent": 2/_MERGE_STAGE_COUNT, "current": 2, "total": _MERGE_STAGE_COUNT, "detail": "用户取消，已完成部分输出"})
         return
+    from func.excel_formatter import write_formatted_excel
+
     merged = _reorder_columns(merged)
     merged = dedup_dataframe(merged, "表内合并")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_file = os.path.join(folder_path, f"表内合并结果_{year}{month:02d}_{timestamp}.xlsx")
-    merged.to_excel(output_file, index=False, sheet_name="合并数据")
+    write_formatted_excel(output_file, {"合并数据": merged})
     logger.info(f"表内合并完成: {output_file} ({len(merged)} 行)")
     _emit_progress(progress_cb, {"stage": "finished", "percent": 1.0, "current": _MERGE_STAGE_COUNT, "total": _MERGE_STAGE_COUNT, "detail": "表内合并：写入完成"})
 
@@ -671,27 +673,34 @@ def _write_merged(
     cancel_event=None,
 ):
     """将所有模块的结果合并到单个 Excel 文件"""
+    from func.excel_formatter import write_formatted_excel
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_file = os.path.join(folder_path, f"批量处理结果_{year}{month:02d}_{timestamp}.xlsx")
 
     total = sum(len(sheets) for sheets in all_results.values())
     current = 0
     _emit_progress(progress_cb, {"stage": "writing", "percent": 0.0, "current": 0, "total": total, "detail": "开始合并输出"})
-    with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
-        for module_type, sheets in all_results.items():
-            prefix = MODULE_PREFIXES.get(module_type, f"{module_type}_")
-            for sheet_name, df in sheets.items():
-                if _check_cancel(cancel_event):
-                    _emit_progress(progress_cb, {"stage": "cancelled", "percent": max(current / total if total else 0.0, 0.0), "current": current, "total": total, "detail": "用户取消，已完成部分输出"})
-                    return
-                prefixed_name = f"{prefix}{sheet_name}"
-                if len(prefixed_name) > MAX_SHEET_NAME_LENGTH:
-                    prefixed_name = prefixed_name[:MAX_SHEET_NAME_LENGTH]
-                df = dedup_dataframe(df, prefixed_name)
-                df.to_excel(writer, sheet_name=prefixed_name, index=False)
-                current += 1
-                logger.info(f"写入 Sheet: {prefixed_name} ({len(df)} 行)")
-                _emit_progress(progress_cb, {"stage": "writing", "percent": current / total if total else 1.0, "current": current, "total": total, "detail": f"写入 Sheet: {prefixed_name}"})
+
+    # 第一遍：收集并去重（支持取消检查）
+    output_sheets = {}
+    for module_type, sheets in all_results.items():
+        prefix = MODULE_PREFIXES.get(module_type, f"{module_type}_")
+        for sheet_name, df in sheets.items():
+            if _check_cancel(cancel_event):
+                _emit_progress(progress_cb, {"stage": "cancelled", "percent": max(current / total if total else 0.0, 0.0), "current": current, "total": total, "detail": "用户取消，已完成部分输出"})
+                return
+            prefixed_name = f"{prefix}{sheet_name}"
+            if len(prefixed_name) > MAX_SHEET_NAME_LENGTH:
+                prefixed_name = prefixed_name[:MAX_SHEET_NAME_LENGTH]
+            df = dedup_dataframe(df, prefixed_name)
+            output_sheets[prefixed_name] = df
+            current += 1
+            logger.info(f"写入 Sheet: {prefixed_name} ({len(df)} 行)")
+            _emit_progress(progress_cb, {"stage": "writing", "percent": current / total if total else 1.0, "current": current, "total": total, "detail": f"写入 Sheet: {prefixed_name}"})
+
+    # 第二遍：统一格式化输出
+    write_formatted_excel(output_file, output_sheets)
 
     logger.info(f"合并输出完成: {output_file}")
     _emit_progress(progress_cb, {"stage": "finished", "percent": 1.0, "current": total, "total": total, "detail": "合并输出完成"})
@@ -706,6 +715,8 @@ def _write_separate(
     cancel_event=None,
 ):
     """将各模块结果分别输出为独立 Excel 文件"""
+    from func.excel_formatter import write_formatted_excel
+
     total = sum(1 for sheets in all_results.values() if sheets)
     current = 0
     _emit_progress(progress_cb, {"stage": "writing", "percent": 0.0, "current": 0, "total": total, "detail": "开始分开输出"})
@@ -716,11 +727,12 @@ def _write_separate(
             _emit_progress(progress_cb, {"stage": "cancelled", "percent": max(current / total if total else 0.0, 0.0), "current": current, "total": total, "detail": "用户取消，已完成部分输出"})
             return
         output_file = os.path.join(folder_path, get_output_filename(module_type, year, month) or f"{module_type}.xlsx")
-        with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
-            for sheet_name, df in sheets.items():
-                df = dedup_dataframe(df, sheet_name)
-                df.to_excel(writer, sheet_name=sheet_name, index=False)
-                logger.info(f"写入: {output_file} / {sheet_name} ({len(df)} 行)")
+        formatted_sheets = {}
+        for sheet_name, df in sheets.items():
+            df = dedup_dataframe(df, sheet_name)
+            formatted_sheets[sheet_name] = df
+            logger.info(f"写入: {output_file} / {sheet_name} ({len(df)} 行)")
+        write_formatted_excel(output_file, formatted_sheets)
         current += 1
         logger.info(f"单独输出完成: {output_file}")
         _emit_progress(progress_cb, {"stage": "writing", "percent": current / total if total else 1.0, "current": current, "total": total, "detail": f"已输出 {os.path.basename(output_file)}"})

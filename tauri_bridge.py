@@ -832,8 +832,10 @@ def _export_matched_data(params: dict) -> dict:
     for col in export_cols:
         if col not in df.columns:
             df[col] = ""
+    from func.excel_formatter import write_formatted_excel
+
     df = df[export_cols]
-    df.to_excel(safe_output, index=False, engine="openpyxl")
+    write_formatted_excel(safe_output, {"导出数据": df})
     return {"output_file": safe_output}
 
 

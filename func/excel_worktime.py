@@ -171,7 +171,9 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
     if output_file is None:
         file_dir = os.path.dirname(file_path) or "."
         output_file = os.path.join(file_dir, f"{year}{month:02d}_工作效率表.xlsx")
-    final_df.to_excel(output_file, index=False)
+    from func.excel_formatter import write_formatted_excel
+
+    write_formatted_excel(output_file, {"工时数据": final_df})
     logger.info(f"数据处理完成，已保存至: {output_file}")
 
     if return_sheets:

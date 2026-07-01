@@ -377,9 +377,8 @@ class MiningDataProcessor:
 
         # 输出单文件结果
         if output_file:
-            with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
-                running_df.to_excel(writer, sheet_name='运行数据', index=False)
-                production_df.to_excel(writer, sheet_name='生产数据', index=False)
+            from func.excel_formatter import write_formatted_excel
+            write_formatted_excel(output_file, {"运行数据": running_df, "生产数据": production_df})
 
         return running_df, production_df
 
@@ -433,9 +432,8 @@ class MiningDataProcessor:
 
         if total_files == 0:
             logger.warning("未找到符合条件的 Excel 文件。")
-            with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
-                pd.DataFrame().to_excel(writer, sheet_name='运行数据', index=False)
-                pd.DataFrame().to_excel(writer, sheet_name='生产数据', index=False)
+            from func.excel_formatter import write_formatted_excel
+            write_formatted_excel(output_file, {"运行数据": pd.DataFrame(), "生产数据": pd.DataFrame()})
             return
 
         logger.info(f"共发现 {total_files} 个待处理文件，启动 {max_workers} 个线程...")
@@ -485,9 +483,8 @@ class MiningDataProcessor:
                 f"统计信息：共处理 {total_files} 个文件，成功 {success_files} 个，失败 {total_files - success_files} 个")
             return sheets if sheets else None
 
-        with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
-            final_running.to_excel(writer, sheet_name='运行数据', index=False)
-            final_production.to_excel(writer, sheet_name='生产数据', index=False)
+        from func.excel_formatter import write_formatted_excel
+        write_formatted_excel(output_file, {"运行数据": final_running, "生产数据": final_production})
 
         logger.info(f"汇总完成，输出文件：{output_file}")
         logger.info(

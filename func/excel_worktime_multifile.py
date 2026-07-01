@@ -148,8 +148,10 @@ def process_directory(base_dir, year, month, output_file):
     # 去重
     final_df = dedup_dataframe(final_df, "多文件工时合并")
 
+    from func.excel_formatter import write_formatted_excel
+
     # 保存
-    final_df.to_excel(output_file, index=False)
+    write_formatted_excel(output_file, {"工时数据": final_df})
     logger.info(f"数据处理并合并完成，已保存至: {output_file}")
 
 
