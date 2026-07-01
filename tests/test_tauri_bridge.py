@@ -152,6 +152,66 @@ class TestPostProcessLedger:
 
 
 # ---------------------------------------------------------------------------
+# process_fuel RPC — regression: must return output file path
+# ---------------------------------------------------------------------------
+
+
+class TestProcessFuelRPC:
+    """process_fuel handler 测试。"""
+
+    def test_returns_output_file_path(self, tmp_path):
+        """process_fuel 必须返回 output_file 以便应用台账匹配。"""
+        input_file = str(tmp_path / "fuel_input.xlsx")
+        pd.DataFrame({"a": [1]}).to_excel(input_file, index=False)
+
+        expected_output = str(tmp_path / "Fuel.xlsx")
+        with patch("func.excel_fuel.process_diesel_data", return_value=expected_output), \
+             patch.object(tauri_bridge, "_post_process_ledger") as mock_post:
+            result = tauri_bridge._process_fuel({
+                "path": input_file,
+                "use_equipment_ledger": True,
+                "use_oil_ledger": True,
+            })
+        assert result["output_file"] == expected_output
+        mock_post.assert_called_once_with(
+            expected_output,
+            use_equipment_ledger=True,
+            use_oil_ledger=True,
+        )
+
+    def test_no_post_process_when_ledger_disabled(self, tmp_path):
+        """台账匹配禁用时 _post_process_ledger 收到 False 参数（内部早返回）。"""
+        input_file = str(tmp_path / "fuel_input.xlsx")
+        pd.DataFrame({"a": [1]}).to_excel(input_file, index=False)
+
+        expected_output = str(tmp_path / "Fuel.xlsx")
+        with patch("func.excel_fuel.process_diesel_data", return_value=expected_output), \
+             patch.object(tauri_bridge, "_post_process_ledger") as mock_post:
+            result = tauri_bridge._process_fuel({
+                "path": input_file,
+                "use_equipment_ledger": False,
+                "use_oil_ledger": False,
+            })
+        assert result["output_file"] == expected_output
+        mock_post.assert_called_once_with(
+            expected_output,
+            use_equipment_ledger=False,
+            use_oil_ledger=False,
+        )
+
+    def test_returns_none_when_processing_fails(self, tmp_path):
+        """处理失败时 output_file 为 None，不调用台账匹配。"""
+        input_file = str(tmp_path / "bad.xlsx")
+        pd.DataFrame({"a": [1]}).to_excel(input_file, index=False)
+
+        with patch("func.excel_fuel.process_diesel_data", return_value=None), \
+             patch.object(tauri_bridge, "_post_process_ledger") as mock_post:
+            result = tauri_bridge._process_fuel({"path": input_file})
+        assert result["output_file"] is None
+        mock_post.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
 # get_config RPC
 # ---------------------------------------------------------------------------
 

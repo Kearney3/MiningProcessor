@@ -208,6 +208,7 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False):
         df_fuel.to_excel(writer, sheet_name="油耗信息", index=False)
 
     logger.info(f"处理完成！文件已保存: {output_file}")
+    return output_file
 
 
 def main():
