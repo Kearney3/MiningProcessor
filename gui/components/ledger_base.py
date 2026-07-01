@@ -286,8 +286,9 @@ def create_ledger_section_factory(
                 instance.export_template(save_path)
             else:
                 # 回退：创建空模板
+                from func.excel_formatter import write_formatted_excel
                 df = pd.DataFrame(columns=cfg.columns)
-                df.to_excel(save_path, index=False)
+                write_formatted_excel(save_path, {"模板": df})
             _update_last_directory(save_path)
             _log_message(log, f"已导出模板: {save_path}")
         except Exception as ex:

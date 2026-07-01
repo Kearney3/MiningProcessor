@@ -114,10 +114,12 @@ class LedgerBase:
 
     def export_template(self, output_path: str) -> None:
         """导出台账模板 Excel"""
+        from func.excel_formatter import write_formatted_excel
+
         df = pd.DataFrame(columns=self._ledger_columns)
         # 添加示例行
         df.loc[0] = self._template_sample
-        df.to_excel(output_path, index=False)
+        write_formatted_excel(output_path, {"台账模板": df})
         logger.info(f"台账模板已导出: {output_path}")
 
     def match(self, raw_name: str) -> Optional[dict]:

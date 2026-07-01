@@ -210,10 +210,13 @@ def apply_ledger_matching(
     if not any_matched:
         return False
 
-    # 重写 Excel
-    with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
-        for sheet_name, df in matched_sheets.items():
-            df = dedup_dataframe(df, f"台账匹配-{sheet_name}")
-            df.to_excel(writer, sheet_name=sheet_name, index=False)
+    from func.excel_formatter import write_formatted_excel
+
+    # 重写 Excel（先去重再格式化输出）
+    deduped_sheets = {
+        name: dedup_dataframe(df, f"台账匹配-{name}")
+        for name, df in matched_sheets.items()
+    }
+    write_formatted_excel(output_file, deduped_sheets)
     logger.info("台账匹配完成，已更新: %s", output_file)
     return True

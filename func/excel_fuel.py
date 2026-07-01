@@ -214,10 +214,10 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False):
             sheets["油耗信息"] = df_fuel
         return sheets if sheets else None
 
+    from func.excel_formatter import write_formatted_excel
+
     output_file = os.path.join(os.path.dirname(file_path), "Fuel.xlsx")
-    with pd.ExcelWriter(output_file) as writer:
-        df_engine.to_excel(writer, sheet_name="设备信息", index=False)
-        df_fuel.to_excel(writer, sheet_name="油耗信息", index=False)
+    write_formatted_excel(output_file, {"设备信息": df_engine, "油耗信息": df_fuel})
 
     logger.info(f"处理完成！文件已保存: {output_file}")
     return output_file
