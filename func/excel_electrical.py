@@ -156,5 +156,9 @@ def main():
                      add_shift_column=args.add_shift, default_shift=args.default_shift)
 
 
+# 统一命名别名（L-01）
+process_electrical_data = parse_excel_data
+
+
 if __name__ == "__main__":
     main()

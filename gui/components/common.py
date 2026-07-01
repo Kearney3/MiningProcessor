@@ -33,11 +33,12 @@ def year_options(start_offset: int = -5, end_offset: int = 10) -> list[ft.dropdo
 
 
 def _log_message(log, message: str, level: int = logging.INFO):
-    """兼容仅接收 message 的旧回调，也支持显式日志级别。"""
-    try:
-        log(message, level=level)
-    except TypeError:
-        log(message)
+    """兼容仅接收 message 的旧回调，也支持显式日志级别。
+
+    .. deprecated:: 请使用 ``gui.utils._log_message`` 代替。
+    """
+    from gui.utils import _log_message as _impl
+    return _impl(log, message, level=level)
 
 
 def safe_update(*controls):

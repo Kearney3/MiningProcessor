@@ -11,10 +11,10 @@ import os
 import pandas as pd
 from func import config_loader
 from func.excel_utils import get_output_filename
-from func.excel_fuel import process_diesel_data
+from func.excel_fuel import process_fuel_data
 from func.excel_production_enhanced import MiningDataProcessor as ProdProcessor
-from func.excel_electrical import parse_excel_data
-from func.excel_worktime import process_excel_data
+from func.excel_electrical import process_electrical_data
+from func.excel_worktime import process_worktime_data
 from func.excel_merger import merge_excel_files
 from func.excel_batch import scan_files, process_files, MODULE_LABELS
 from func.sync_to_minebase import sync as sync_to_minebase
@@ -23,7 +23,7 @@ from func.sync_to_minebase import test_api_connection
 from func.ledger_postprocess import apply_ledger_matching
 
 
-from gui.components.common import _log_message
+from gui.utils import _log_message
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +163,7 @@ def _get_output_file(module_type: str, path: str, **kwargs) -> str | None:
 def _dispatch_module(module_type: str, path: str, **kwargs) -> object | None:
     """Dispatch to the appropriate processor. Returns worktime_sheets or None."""
     if module_type == "fuel":
-        process_diesel_data(path, kwargs.get("year"))
+        process_fuel_data(path, kwargs.get("year"))
     elif module_type == "production":
         raw_start = kwargs.get("raw_start", -1)
         device_load_map = config_loader.get_device_load_map()
@@ -176,7 +176,7 @@ def _dispatch_module(module_type: str, path: str, **kwargs) -> object | None:
             output_file = os.path.join(os.path.dirname(path) or ".", "合并产量.xlsx")
             processor.process_single_file(path, output_file)
     elif module_type == "electrical":
-        parse_excel_data(path, kwargs.get("year"),
+        process_electrical_data(path, kwargs.get("year"),
                          add_shift_column=kwargs.get("add_shift_column", False),
                          default_shift=kwargs.get("default_shift", "Day"))
     elif module_type == "worktime":
@@ -185,7 +185,7 @@ def _dispatch_module(module_type: str, path: str, **kwargs) -> object | None:
         header_mapping = kwargs.get("header_mapping", None)
         file_dir = os.path.dirname(path) or "."
         output_file = os.path.join(file_dir, f"{year}{month:02d}_工作效率表.xlsx")
-        return process_excel_data(path, year, month, output_file,
+        return process_worktime_data(path, year, month, output_file,
                                   return_sheets=True, header_mapping=header_mapping)
     elif module_type == "merge":
         keyword = kwargs.get("keyword", "")
