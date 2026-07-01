@@ -301,9 +301,13 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     work_path.suffix.on_click = on_work_browse
     merge_path.suffix.on_click = on_merge_browse
 
-    # --- 台账匹配开关 ---
-    match_toggle = ft.Checkbox(
-        label="启用台账匹配（设备+油品）",
+    # --- 台账匹配开关（设备 / 油品 独立控制） ---
+    match_eq_toggle = ft.Checkbox(
+        label="设备台账匹配",
+        value=False,
+    )
+    match_oil_toggle = ft.Checkbox(
+        label="油品台账匹配",
         value=False,
     )
 
@@ -358,7 +362,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                     ft.Row([sort_rules_column, add_sort_btn], spacing=8,
                            alignment=ft.MainAxisAlignment.START),
                 ], spacing=4),
-                ft.Row([match_toggle], spacing=8),
+                ft.Row([match_eq_toggle, match_oil_toggle], spacing=8),
             ],
             spacing=8,
             expand=True,
@@ -371,7 +375,8 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     )
 
     module_refs = {
-        "_match_toggle": match_toggle,
+        "_match_eq_toggle": match_eq_toggle,
+        "_match_oil_toggle": match_oil_toggle,
         "fuel": {"path": fuel_path, "year": fuel_year, "btn": fuel_btn},
         "prod": {"path": prod_path, "raw_start": prod_raw_start, "btn": prod_btn},
         "elec": {"path": elec_path, "year": elec_year, "btn": elec_btn, "add_shift": elec_add_shift, "default_shift": elec_default_shift},

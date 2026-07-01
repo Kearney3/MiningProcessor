@@ -416,7 +416,8 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
   const [baseTableType, setBaseTableType] = useState<BaseTableType>("fuel");
 
   // -- Ledger --
-  const [useLedger, setUseLedger] = useState(false);
+  const [useEquipmentLedger, setUseEquipmentLedger] = useState(false);
+  const [useOilLedger, setUseOilLedger] = useState(false);
 
   // -- Date filter --
   const [dateFilterEnabled, setDateFilterEnabled] = useState(false);
@@ -470,7 +471,8 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
         year: parseInt(year),
         month: parseInt(month),
         raw_start: parseInt(rawStart),
-        use_ledger: useLedger,
+        use_equipment_ledger: useEquipmentLedger,
+        use_oil_ledger: useOilLedger,
       };
 
       if (tableMergeMode === "merge") {
@@ -508,7 +510,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
       setProcessing(false);
       bridge.setProgress(null);
     }
-  }, [scanResult, folderPath, year, month, rawStart, useLedger, tableMergeMode, baseTableType, dateFilterEnabled, filterDate, useHeaderMapping, headerMode, fuzzyMatch, bridge]);
+  }, [scanResult, folderPath, year, month, rawStart, useEquipmentLedger, useOilLedger, tableMergeMode, baseTableType, dateFilterEnabled, filterDate, useHeaderMapping, headerMode, fuzzyMatch, bridge]);
 
   const handleProcess = () => {
     if (hasMissing) {
@@ -646,9 +648,16 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
           </div>
           <div className="flex items-end pb-0.5">
             <Toggle
-              checked={useLedger}
-              onChange={setUseLedger}
-              label="台账匹配"
+              checked={useEquipmentLedger}
+              onChange={setUseEquipmentLedger}
+              label="设备台账匹配"
+            />
+          </div>
+          <div className="flex items-end pb-0.5">
+            <Toggle
+              checked={useOilLedger}
+              onChange={setUseOilLedger}
+              label="油品台账匹配"
             />
           </div>
         </div>

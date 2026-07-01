@@ -74,11 +74,16 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         tooltip="将所有处理结果合并到单个 Excel 文件（Sheet 带前缀）",
     )
 
-    # --- 台账匹配开关 ---
-    batch_ledger_toggle = ft.Checkbox(
-        label="启用台账匹配",
+    # --- 台账匹配开关（设备 / 油品 独立控制） ---
+    batch_match_eq = ft.Checkbox(
+        label="设备台账匹配",
         value=True,
-        tooltip="批量处理时自动匹配设备台账和油品台账",
+        tooltip="批量处理时自动匹配设备台账",
+    )
+    batch_match_oil = ft.Checkbox(
+        label="油品台账匹配",
+        value=True,
+        tooltip="批量处理时自动匹配油品台账",
     )
 
     # --- 表内合并 ---
@@ -86,7 +91,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         label="表内合并",
         value=False,
         tooltip="将所有数据通过左合并聚合到单个 Sheet（需先开启台账匹配）",
-        disabled=not batch_ledger_toggle.value,
+        disabled=not (batch_match_eq.value or batch_match_oil.value),
     )
 
     # ── 基准表芯片切换（表内合并专用） ──
@@ -125,7 +130,8 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
             batch_table_merge.disabled = True
             batch_base_table.row.visible = False
         else:
-            batch_table_merge.disabled = not batch_ledger_toggle.value
+            any_ledger = batch_match_eq.value or batch_match_oil.value
+            batch_table_merge.disabled = not any_ledger
         try:
             batch_table_merge.update()
             batch_base_table.row.update()
@@ -135,7 +141,8 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
     batch_merge.on_change = _on_merge_change
 
     def _on_ledger_toggle_for_merge(e):
-        if not batch_ledger_toggle.value:
+        any_ledger = batch_match_eq.value or batch_match_oil.value
+        if not any_ledger:
             batch_table_merge.value = False
             batch_table_merge.disabled = True
             batch_base_table.row.visible = False
@@ -147,7 +154,8 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         except (RuntimeError, AttributeError):
             pass
 
-    batch_ledger_toggle.on_change = _on_ledger_toggle_for_merge
+    batch_match_eq.on_change = _on_ledger_toggle_for_merge
+    batch_match_oil.on_change = _on_ledger_toggle_for_merge
 
     # --- 日期筛选 ---
     _selected_date = [current_date.date()]  # 用列表包裹以便闭包修改
@@ -259,7 +267,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         [
             ft.Container(ft.Row([batch_auto_detect, batch_raw_start], spacing=4), col={"xs": 12, "md": 6}),
             ft.Container(_batch_hmc.toggle, col={"xs": 12, "md": 6}),
-            ft.Container(batch_ledger_toggle, col={"xs": 12, "md": 6}),
+            ft.Container(ft.Row([batch_match_eq, batch_match_oil], spacing=4), col={"xs": 12, "md": 6}),
             ft.Container(batch_merge, col={"xs": 12, "md": 6}),
             ft.Container(batch_table_merge, col={"xs": 12, "md": 6}),
             ft.Container(
@@ -344,7 +352,8 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "merge": batch_merge,
         "table_merge": batch_table_merge,
         "base_table": batch_base_table,
-        "ledger_toggle": batch_ledger_toggle,
+        "match_eq_toggle": batch_match_eq,
+        "match_oil_toggle": batch_match_oil,
         "header_toggle": _batch_hmc.toggle,
         "header_mode": _batch_hmc.mode,
         "header_fuzzy": _batch_hmc.fuzzy,

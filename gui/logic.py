@@ -576,19 +576,22 @@ def wire_processing_buttons(module_refs: dict, page: ft.Page, log, ledger_refs: 
     oil_ledger_refs = oil_ledger_refs or {}
 
     def _get_ledgers():
-        """根据开关状态获取台账实例"""
-        toggle = module_refs.get("_match_toggle")
-        if not toggle or not toggle.value:
-            return None, None
-        eq = ledger_refs.get("get_ledger", lambda: None)()
-        oil = oil_ledger_refs.get("get_oil", lambda: None)()
-        # 日志：显示台账加载状态
-        if eq is None and oil is None:
-            logging.warning("台账匹配已启用，但设备台账和油品台账均未加载")
-        elif eq is None:
-            logging.warning("设备台账未加载，设备匹配将被跳过")
-        elif oil is None:
-            logging.warning("油品台账未加载，油品匹配将被跳过")
+        """根据独立开关状态获取台账实例"""
+        eq_toggle = module_refs.get("_match_eq_toggle")
+        oil_toggle = module_refs.get("_match_oil_toggle")
+
+        eq = None
+        if eq_toggle and eq_toggle.value:
+            eq = ledger_refs.get("get_ledger", lambda: None)()
+            if eq is None:
+                logging.warning("设备台账匹配已启用，但设备台账未加载")
+
+        oil = None
+        if oil_toggle and oil_toggle.value:
+            oil = oil_ledger_refs.get("get_oil", lambda: None)()
+            if oil is None:
+                logging.warning("油品台账匹配已启用，但油品台账未加载")
+
         return eq, oil
 
     async def handle_fuel_click(e: ft.ControlEvent):
@@ -620,12 +623,10 @@ def wire_processing_buttons(module_refs: dict, page: ft.Page, log, ledger_refs: 
     # Batch
     if "batch" in module_refs:
         async def handle_batch_click(e: ft.ControlEvent):
-            batch_toggle = module_refs["batch"].get("ledger_toggle")
-            if batch_toggle and batch_toggle.value:
-                eq = ledger_refs.get("get_ledger", lambda: None)()
-                oil = oil_ledger_refs.get("get_oil", lambda: None)()
-            else:
-                eq, oil = None, None
+            eq_toggle = module_refs["batch"].get("match_eq_toggle")
+            oil_toggle = module_refs["batch"].get("match_oil_toggle")
+            eq = ledger_refs.get("get_ledger", lambda: None)() if eq_toggle and eq_toggle.value else None
+            oil = oil_ledger_refs.get("get_oil", lambda: None)() if oil_toggle and oil_toggle.value else None
             await on_batch_process(page, module_refs["batch"], log, equipment_ledger=eq, oil_ledger=oil)
         module_refs["batch"]["btn"].on_click = handle_batch_click
 
