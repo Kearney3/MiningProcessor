@@ -792,7 +792,13 @@ def wire_sync_button(sync_refs: dict, page: ft.Page, log):
 
 
 async def on_test_db_connection(page: ft.Page, config_refs: dict, log):
-    """测试数据库连接"""
+    """测试数据库连接
+
+    如果密码字段显示掩码（********），自动从已保存的配置中加载真实密码，
+    方便用户无需重新输入密码即可测试连接。加载的密码不会回填到界面。
+    """
+    from func.config_loader import get_minebase_db_config
+
     btn = config_refs["mb_test_btn"]
     result = config_refs["mb_test_result"]
 
@@ -801,6 +807,15 @@ async def on_test_db_connection(page: ft.Page, config_refs: dict, log):
     database = (config_refs["mb_db_name"].value or "").strip()
     user = (config_refs["mb_db_user"].value or "").strip()
     password = config_refs["mb_db_pass"].value or ""
+
+    # 如果密码字段是掩码且有已保存的密码，从配置中加载真实密码
+    _MASKED = "********"
+    if password == _MASKED:
+        saved_cfg = get_minebase_db_config()
+        password = saved_cfg.get("password", "")
+        if not password:
+            _show_snackbar(page, "未找到已保存的密码，请先输入密码并保存", is_error=True)
+            return
 
     if not port_str.isdigit():
         _show_snackbar(page, "端口必须是数字", is_error=True)
@@ -840,13 +855,28 @@ def wire_test_db_button(config_refs: dict, page: ft.Page, log):
 
 
 async def on_test_api_connection(page: ft.Page, config_refs: dict, log):
-    """测试 API 连接"""
+    """测试 API 连接
+
+    如果密码字段显示掩码（********），自动从已保存的配置中加载真实密码，
+    方便用户无需重新输入密码即可测试连接。加载的密码不会回填到界面。
+    """
+    from func.config_loader import get_minebase_api_config
+
     btn = config_refs["mb_api_test_btn"]
     result = config_refs["mb_api_test_result"]
 
     url = (config_refs["mb_api_url"].value or "").strip()
     username = (config_refs["mb_api_user"].value or "").strip()
     password = config_refs["mb_api_pass"].value or ""
+
+    # 如果密码字段是掩码且有已保存的密码，从配置中加载真实密码
+    _MASKED = "********"
+    if password == _MASKED:
+        saved_cfg = get_minebase_api_config()
+        password = saved_cfg.get("password", "")
+        if not password:
+            _show_snackbar(page, "未找到已保存的密码，请先输入密码并保存", is_error=True)
+            return
 
     if not url:
         _show_snackbar(page, "请填写 API 地址", is_error=True)

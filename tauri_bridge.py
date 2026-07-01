@@ -856,15 +856,29 @@ def _ping(params: dict) -> dict:
 
 @_register("test_minebase_connection")
 def _test_minebase_connection(params: dict) -> dict:
-    """测试 MineBase 连接（API 或数据库模式）。"""
+    """测试 MineBase 连接（API 或数据库模式）。
+
+    如果前端传入 __keyring__ 哨兵值，自动从已保存的配置中加载真实密码，
+    方便用户无需重新输入密码即可测试连接。
+    """
+    from func.config_loader import get_minebase_api_config, get_minebase_db_config
     from func.sync_to_minebase import test_api_connection, test_db_connection
 
+    KEYRING_SENTINEL = "__keyring__"
     mode = params.get("mode", "api")
+    password = params.get("password", "")
+
+    if password == KEYRING_SENTINEL:
+        if mode == "api":
+            password = get_minebase_api_config().get("password", "")
+        else:
+            password = get_minebase_db_config().get("password", "")
+
     if mode == "api":
         ok, msg = test_api_connection(
             url=params.get("url", "http://localhost:3000"),
             username=params.get("username", ""),
-            password=params.get("password", ""),
+            password=password,
         )
     else:
         ok, msg = test_db_connection(
@@ -872,7 +886,7 @@ def _test_minebase_connection(params: dict) -> dict:
             port=int(params.get("port", 5432)),
             database=params.get("database", "minebase"),
             user=params.get("user", "postgres"),
-            password=params.get("password", ""),
+            password=password,
         )
     return {"success": ok, "message": msg}
 
