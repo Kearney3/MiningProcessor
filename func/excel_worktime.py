@@ -195,5 +195,9 @@ def main():
         logger.error(f"错误：找不到输入文件 '{args.input_file}'！")
 
 
+# 统一命名别名（L-01）
+process_worktime_data = process_excel_data
+
+
 if __name__ == "__main__":
     main()

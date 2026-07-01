@@ -233,5 +233,9 @@ def main():
     process_diesel_data(args.input_file, args.year)
 
 
+# 统一命名别名（L-01）
+process_fuel_data = process_diesel_data
+
+
 if __name__ == "__main__":
     main()

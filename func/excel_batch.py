@@ -8,10 +8,10 @@ import os
 import pandas as pd
 from datetime import datetime, date as date_type
 
-from func.excel_fuel import process_diesel_data
-from func.excel_electrical import parse_excel_data
+from func.excel_fuel import process_fuel_data
+from func.excel_electrical import process_electrical_data
 from func.excel_production_enhanced import MiningDataProcessor
-from func.excel_worktime import process_excel_data
+from func.excel_worktime import process_worktime_data
 from func.equipment_ledger import EquipmentLedger
 from func.oil_ledger import OilLedger
 from func import config_loader
@@ -111,7 +111,7 @@ def _process_fuel_module(files: list[str], year: int) -> dict[str, pd.DataFrame]
     for fpath in files:
         try:
             logger.info(f"燃油数据源: {os.path.basename(fpath)}")
-            sheets = process_diesel_data(fpath, target_year=year, return_sheets=True)
+            sheets = process_fuel_data(fpath, target_year=year, return_sheets=True)
             if sheets:
                 return sheets
         except Exception as e:
@@ -124,7 +124,7 @@ def _process_electrical_module(files: list[str], year: int) -> dict[str, pd.Data
     for fpath in files:
         try:
             logger.info(f"电力数据源: {os.path.basename(fpath)}")
-            sheets = parse_excel_data(fpath, target_year=year, return_sheets=True)
+            sheets = process_electrical_data(fpath, target_year=year, return_sheets=True)
             if sheets:
                 return sheets
         except Exception as e:
@@ -152,7 +152,7 @@ def _process_worktime_module(
     for fpath in files:
         try:
             logger.info(f"工时数据源: {os.path.basename(fpath)}")
-            sheets = process_excel_data(fpath, year, month, return_sheets=True,
+            sheets = process_worktime_data(fpath, year, month, return_sheets=True,
                                         header_mapping=header_mapping)
             if sheets:
                 return sheets

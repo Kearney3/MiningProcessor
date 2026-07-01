@@ -26,10 +26,10 @@ def _patch_fuel_processing(monkeypatch):
         }
     )
 
-    def fake_process_diesel_data(file_path, target_year=None, return_sheets=False):
+    def fake_process_fuel_data(file_path, target_year=None, return_sheets=False):
         return {"设备信息": df.copy(), "油耗信息": df.copy()}
 
-    monkeypatch.setattr(batch_mod, "process_diesel_data", fake_process_diesel_data)
+    monkeypatch.setattr(batch_mod, "process_fuel_data", fake_process_fuel_data)
 
 
 def test_separate_output_reports_file_progress(tmp_path):
