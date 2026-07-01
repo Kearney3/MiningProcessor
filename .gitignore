@@ -51,6 +51,10 @@ config.user.json
 # CodeGraph
 .codegraph/
 
+# Graphify
+graphify-out/
+.graphify_*.json
+
 # Node.js
 node_modules/
 

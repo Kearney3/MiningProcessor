@@ -1,12 +1,25 @@
-# MiningProcessor v1.0.0
+# ⛏️ MiningProcessor
 
-矿山运营 Excel 报表批量处理工具。支持 CLI 命令行和桌面 GUI 两种使用方式，自动解析矿山各类生产、油耗、电耗、工时报表，提取结构化数据并输出标准化 Excel。
+> 矿山运营 Excel 报表批量处理工具
 
-> **Python** ≥ 3.12（开发环境 3.14） · **依赖管理** [uv](https://docs.astral.sh/uv/) · **GUI 框架** [Tauri v2](https://v2.tauri.app/) + React + TypeScript（前端） + Python（后端）
+<p>
+  <img src="https://img.shields.io/badge/version-v1.0.0-blue?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/Python-≥3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="python" />
+  <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="license" />
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="platform" />
+  <img src="https://img.shields.io/badge/Tauri-v2-FFC131?style=flat-square&logo=tauri&logoColor=black" alt="tauri" />
+  <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black" alt="react" />
+  <img src="https://img.shields.io/badge/tests-436%20passed-brightgreen?style=flat-square" alt="tests" />
+</p>
+
+<p>
+  <strong>CLI</strong> 命令行 + <strong>Tauri 桌面 GUI</strong> 双入口<br/>
+  自动解析矿山生产、油耗、电耗、工时报表 → 结构化数据 → 标准化 Excel
+</p>
 
 ---
 
-## 功能模块
+## 📦 功能模块
 
 | 入口 | CLI 命令 | 功能 | 输入 | 输出 |
 |------|----------|------|------|------|
@@ -20,7 +33,7 @@
 
 ---
 
-## 快速开始
+## 🚀 快速开始
 
 ### 环境准备
 
@@ -48,7 +61,7 @@ pnpm tauri dev
 pnpm dev:bridge
 ```
 
-GUI 提供完整的处理流程入口：
+**GUI 功能一览：**
 
 - 各类报表一键处理（电力模块可选添加班次列）
 - 配置编辑（设备装载量映射、班次名称等）
@@ -82,7 +95,7 @@ uv run merge <输入文件夹> <关键字> [--strip-time] [--sort '<json>']
 
 ---
 
-## 项目结构
+## 🏗️ 项目结构
 
 ```
 MiningProcessor/
@@ -118,23 +131,24 @@ MiningProcessor/
 ├── vite.config.ts              # Vite 构建配置
 ├── tauri.conf.json             # Tauri 应用配置
 ├── config.json                 # 持久化配置
-├── tests/                      # pytest 测试（277 个用例）
+├── tests/                      # pytest 测试（436 个用例）
 ├── .github/workflows/          # CI 构建（Flet + Tauri）
 │   ├── build-flet-client.yml   # Flet 桌面应用构建
-│   └── build-tauri.yml         # Tauri 桌面应用构建
+│   ├── build-tauri.yml         # Tauri 桌面应用构建
+│   └── cleanup-artifacts.yml   # 自动清理旧 artifacts
 └── DESIGN.md                   # 详细技术架构文档
 ```
 
 ---
 
-## 配置说明
+## ⚙️ 配置说明
 
 项目采用双配置文件机制：
 
 - **`config.json`**：系统默认配置，提交到 Git，包含设备映射、班次名称等公共设置。
 - **`config.user.json`**：用户覆盖配置（已 gitignore），包含数据库凭据、工作效率表头映射等敏感/个性化设置。`load_config()` 运行时自动合并两者（user 覆盖 default）。
 
-`config.json` 主要配置项：
+**`config.json` 主要配置项：**
 
 | 配置项 | 说明 |
 |--------|------|
@@ -145,7 +159,7 @@ MiningProcessor/
 | `worktime_header_apply` | 是否应用自定义表头映射 |
 | `user_config_default` | 用户配置默认值（`file_keywords`） |
 
-`config.user.json` 主要配置项：
+**`config.user.json` 主要配置项：**
 
 | 配置项 | 说明 |
 |--------|------|
@@ -156,13 +170,13 @@ MiningProcessor/
 | `minebase.api` | API 模式连接参数（`url/username/password`） |
 | `minebase.database` | 数据库直连参数（`host/port/database/user/password`） |
 
-> **注意**：`minebase` 下的 `password` 字段通过系统 Keychain 加密存储（macOS Keychain / Windows Credential Manager），配置文件中仅保存哨兵值 `__keyring__`。首次启动 Tauri GUI 时自动将残留明文密码迁移到 Keychain；若 Keychain 不可用，密码以明文保留在 `config.user.json` 中作为回退。
+> **⚠️ 安全说明**：`minebase` 下的 `password` 字段通过系统 Keychain 加密存储（macOS Keychain / Windows Credential Manager），配置文件中仅保存哨兵值 `__keyring__`。首次启动 Tauri GUI 时自动将残留明文密码迁移到 Keychain；若 Keychain 不可用，密码以明文保留在 `config.user.json` 中作为回退。
 
-> **注意**：GUI 中"应用当前配置"仅更新运行时内存（`apply_device_load_map()`），"保存配置"才会写回文件（`update_device_load_map()`）。
+> **⚠️ 行为说明**：GUI 中"应用当前配置"仅更新运行时内存（`apply_device_load_map()`），"保存配置"才会写回文件（`update_device_load_map()`）。
 
 ---
 
-## 架构设计
+## 🧩 架构设计
 
 ### 三层架构
 
@@ -200,7 +214,7 @@ MiningProcessor/
 
 ---
 
-## 测试
+## 🧪 测试
 
 ```bash
 # 运行全部测试（436 个用例）
@@ -218,7 +232,7 @@ uv run pytest tests/test_gui_components.py -k config
 uv run pytest -v
 ```
 
-测试覆盖范围：
+**测试覆盖范围：**
 
 | 测试文件 | 覆盖内容 |
 |----------|----------|
@@ -242,11 +256,11 @@ uv run pytest -v
 
 ---
 
-## 构建桌面应用
+## 📦 构建桌面应用
 
 ### Tauri 构建（推荐）
 
-项目配置了 GitHub Actions 自动构建 Tauri 桌面应用，详见 `.github/workflows/build-tauri.yml`。
+项目配置了 GitHub Actions 手动触发构建 Tauri 桌面应用，详见 `.github/workflows/build-tauri.yml`。
 
 本地构建：
 
@@ -257,7 +271,7 @@ pnpm tauri build
 
 ### Flet 构建（保留）
 
-项目配置了 GitHub Actions 自动构建 Flet 桌面应用（macOS / Windows），详见 `.github/workflows/build-flet-client.yml`。
+项目配置了 GitHub Actions 手动触发构建 Flet 桌面应用（macOS / Windows），详见 `.github/workflows/build-flet-client.yml`。
 
 本地构建：
 
@@ -268,6 +282,21 @@ uv run flet build windows # Windows
 
 ---
 
-## 许可证
+## 📋 更新日志
 
-MIT License。
+### v1.0.0 · 2025-06-19
+
+- 🎉 首个正式版本
+- Tauri v2 桌面应用（macOS arm64 / Windows x64 & arm64）
+- React 前端 + Python sidecar（JSON-RPC over stdio）
+- 7 个 Excel 报表处理模块
+- 设备台账 / 油品台账 / 模糊匹配
+- Keychain 密码加密存储
+- 436 个自动化测试用例
+- GitHub Actions 手动构建 + artifacts 清理
+
+---
+
+## 📄 许可证
+
+[MIT License](LICENSE)
