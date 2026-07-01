@@ -8,14 +8,16 @@ Security model
 Encryption keys are derived via PBKDF2-HMAC-SHA256 (480 000 iterations)
 from a passphrase and a fixed salt.
 
-* **Preferred**: set the environment variable ``MP_MASTER_KEY`` to a
-  strong, unique passphrase.  This keeps the key out of source code so
-  that encrypted values cannot be trivially reversed by anyone with
-  repository access.
-* **Fallback**: when ``MP_MASTER_KEY`` is *not* set, the module falls
-  back to a legacy hardcoded passphrase for backward compatibility and
-  emits a ``WARNING``-level log message reminding the operator to
-  configure the environment variable.
+Key resolution priority (highest to lowest):
+1. ``MP_MASTER_KEY`` environment variable — operator-controlled, portable
+   across machines.  Best for production.
+2. **Machine UUID** — derived from the host's hardware UUID (macOS) or
+   machine-id (Linux) or MAC address hash (fallback).  Config is
+   automatically tied to the local machine: encrypted files from other
+   machines cannot be decrypted here, and vice-versa.
+3. **Legacy hardcoded passphrase** — kept only for backward compatibility
+   with configs encrypted before the machine-ID feature was introduced.
+   Emits a WARNING-level log message.
 
 The salt (``_SALT``) is intentionally kept as a constant.  Salts do not
 need to be secret; they only need to be consistent so that the same
@@ -65,18 +67,88 @@ _SALT = b"mp-config-salt-v1"
 _fernet: Fernet | None = None
 
 
+def _get_machine_id() -> str:
+    """Obtain a stable, machine-unique identifier.
+
+    Resolution order:
+    1. macOS — IOPlatformUUID from IORegistry
+    2. Linux — /etc/machine-id (systemd/dbus)
+    3. Fallback — SHA-256 hash of MAC address (uuid.getnode)
+
+    Returns a hex string; raises RuntimeError only if the fallback also fails.
+    """
+    import hashlib
+    import platform
+    import subprocess
+
+    system = platform.system()
+
+    if system == "Darwin":
+        try:
+            result = subprocess.run(
+                ["ioreg", "-d2", "-c", "IOPlatformExpertDevice"],
+                capture_output=True, text=True, timeout=5,
+            )
+            for line in result.stdout.splitlines():
+                if "IOPlatformUUID" in line:
+                    return line.split('"')[-2]
+        except Exception:
+            pass
+
+    elif system == "Linux":
+        for path in ("/etc/machine-id", "/var/lib/dbus/machine-id"):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    mid = f.read().strip()
+                    if mid:
+                        return mid
+            except Exception:
+                pass
+
+    elif system == "Windows":
+        try:
+            result = subprocess.run(
+                ["wmic", "csproduct", "get", "uuid"],
+                capture_output=True, text=True, timeout=5,
+            )
+            lines = [ln.strip() for ln in result.stdout.splitlines() if ln.strip()]
+            if len(lines) > 1:
+                return lines[1]
+        except Exception:
+            pass
+
+    # Cross-platform fallback: hash the MAC address
+    import uuid
+
+    node = uuid.getnode()
+    if node is not None and node != 0:
+        digest = hashlib.sha256(f"mp-machine-{node:x}".encode()).hexdigest()
+        return digest[:16]
+
+    raise RuntimeError("Cannot determine a unique machine identifier")
+
+
 def _get_passphrase() -> bytes:
     """Return the encryption passphrase.
 
-    Checks the ``MP_MASTER_KEY`` environment variable first.  If unset,
-    falls back to the legacy hardcoded passphrase and logs a warning.
+    Priority:
+    1. ``MP_MASTER_KEY`` environment variable.
+    2. Machine UUID (auto-detected, no configuration needed).
+    3. Legacy hardcoded passphrase (emits a warning).
     """
     env_key = os.environ.get("MP_MASTER_KEY")
     if env_key:
         return env_key.encode("utf-8")
+
+    try:
+        mid = _get_machine_id()
+        return mid.encode("utf-8")
+    except Exception:
+        pass
+
     logger.warning(
-        "MP_MASTER_KEY environment variable is not set; "
-        "using legacy hardcoded passphrase. "
+        "MP_MASTER_KEY environment variable is not set and machine ID "
+        "could not be determined; using legacy hardcoded passphrase. "
         "Set MP_MASTER_KEY to a strong secret for production use."
     )
     return _LEGACY_PASSPHRASE
@@ -107,12 +179,13 @@ def _derive_key() -> Fernet:
 
 
 def _reset_fernet_cache() -> None:
-    """Clear the cached Fernet instance.
+    """Clear the cached Fernet instances.
 
     Useful in tests or after changing ``MP_MASTER_KEY`` at runtime.
     """
-    global _fernet
+    global _fernet, _legacy_fernet
     _fernet = None
+    _legacy_fernet = None
 
 
 def _encrypt(value: str) -> str:
@@ -123,12 +196,39 @@ def _encrypt(value: str) -> str:
     return f"{_ENCRYPTED_PREFIX}{token}"
 
 
+_legacy_fernet: Fernet | None = None
+
+
 def _decrypt(value: str) -> str:
-    """Decrypt a ``__enc__``-prefixed value.  Non-encrypted values pass through."""
+    """Decrypt a ``__enc__``-prefixed value.  Non-encrypted values pass through.
+
+    If decryption with the current key fails (e.g. config was encrypted with
+    the legacy hardcoded key before machine-ID support was added), the legacy
+    key is tried as a fallback.  A ``DEBUG`` log is emitted when fallback
+    succeeds so that operators know a migration is advisable.
+    """
+    global _legacy_fernet
+
     if not value or not value.startswith(_ENCRYPTED_PREFIX):
         return value or ""
     token = value[len(_ENCRYPTED_PREFIX):]
-    return _derive_key().decrypt(token.encode("ascii")).decode("utf-8")
+    try:
+        return _derive_key().decrypt(token.encode("ascii")).decode("utf-8")
+    except InvalidToken:
+        pass
+    # Fallback: try the legacy hardcoded key (pre-machine-ID configs)
+    if _legacy_fernet is None:
+        _legacy_fernet = _build_fernet(_LEGACY_PASSPHRASE)
+    try:
+        plaintext = _legacy_fernet.decrypt(token.encode("ascii")).decode("utf-8")
+        logger.debug(
+            "Password decrypted with legacy key; consider re-saving "
+            "MineBase config to upgrade encryption."
+        )
+        return plaintext
+    except InvalidToken:
+        pass
+    raise InvalidToken("无法解密密码：当前密钥和遗留密钥均失败，请重新保存密码")
 
 
 # ---------------------------------------------------------------------------
