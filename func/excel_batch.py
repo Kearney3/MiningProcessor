@@ -22,6 +22,9 @@ from func.ledger_postprocess import match_sheets
 
 logger = get_logger(__name__)
 
+# Excel sheet 名称最大长度（Excel 限制为 31 字符）
+MAX_SHEET_NAME_LENGTH = 31
+
 
 def _check_cancel(cancel_event) -> bool:
     return cancel_event is not None and cancel_event.is_set()
@@ -99,6 +102,62 @@ def scan_files(folder_path: str, keywords: dict[str, list[str]] | None = None) -
 # 处理
 # ---------------------------------------------------------------------------
 
+
+def _process_fuel_module(files: list[str], year: int) -> dict[str, pd.DataFrame]:
+    """处理燃油数据文件列表，返回第一个成功的 sheets 字典。"""
+    for fpath in files:
+        try:
+            logger.info(f"燃油数据源: {os.path.basename(fpath)}")
+            sheets = process_diesel_data(fpath, target_year=year, return_sheets=True)
+            if sheets:
+                return sheets
+        except Exception as e:
+            logger.error(f"燃油处理失败: {os.path.basename(fpath)} -> {e}", exc_info=True)
+    return {}
+
+
+def _process_electrical_module(files: list[str], year: int) -> dict[str, pd.DataFrame]:
+    """处理电力数据文件列表，返回第一个成功的 sheets 字典。"""
+    for fpath in files:
+        try:
+            logger.info(f"电力数据源: {os.path.basename(fpath)}")
+            sheets = parse_excel_data(fpath, target_year=year, return_sheets=True)
+            if sheets:
+                return sheets
+        except Exception as e:
+            logger.error(f"电力处理失败: {os.path.basename(fpath)} -> {e}", exc_info=True)
+    return {}
+
+
+def _process_production_module(folder_path: str, raw_start: int) -> dict[str, pd.DataFrame]:
+    """处理生产数据，返回 sheets 字典或空字典。"""
+    try:
+        processor = MiningDataProcessor(version="new", raw_start=raw_start)
+        sheets = processor.process_folder(folder_path, return_sheets=True)
+        if sheets:
+            return sheets
+        logger.warning("生产数据处理无结果")
+    except Exception as e:
+        logger.error(f"生产数据处理失败: {e}", exc_info=True)
+    return {}
+
+
+def _process_worktime_module(
+    files: list[str], year: int, month: int, header_mapping: dict | None
+) -> dict[str, pd.DataFrame]:
+    """处理工时数据文件列表，返回第一个成功的 sheets 字典。"""
+    for fpath in files:
+        try:
+            logger.info(f"工时数据源: {os.path.basename(fpath)}")
+            sheets = process_excel_data(fpath, year, month, return_sheets=True,
+                                        header_mapping=header_mapping)
+            if sheets:
+                return sheets
+        except Exception as e:
+            logger.error(f"工时处理失败: {os.path.basename(fpath)} -> {e}", exc_info=True)
+    return {}
+
+
 def process_files(
     folder_path: str,
     matched: dict[str, list[str]],
@@ -145,52 +204,23 @@ def process_files(
 
     # ── 燃油数据 ──
     if "fuel" in matched:
-        for fpath in matched["fuel"]:
-            try:
-                logger.info(f"燃油数据源: {os.path.basename(fpath)}")
-                sheets = process_diesel_data(fpath, target_year=year, return_sheets=True)
-                if sheets:
-                    all_results["fuel"] = sheets
-                    break
-            except Exception as e:
-                logger.error(f"燃油处理失败: {os.path.basename(fpath)} -> {e}")
+        all_results["fuel"] = _process_fuel_module(matched["fuel"], year)
 
     # ── 电力数据 ──
     if "electrical" in matched:
-        for fpath in matched["electrical"]:
-            try:
-                logger.info(f"电力数据源: {os.path.basename(fpath)}")
-                sheets = parse_excel_data(fpath, target_year=year, return_sheets=True)
-                if sheets:
-                    all_results["electrical"] = sheets
-                    break
-            except Exception as e:
-                logger.error(f"电力处理失败: {os.path.basename(fpath)} -> {e}")
+        all_results["electrical"] = _process_electrical_module(matched["electrical"], year)
 
     # ── 生产数据 ──
     if "production" in matched:
-        try:
-            processor = MiningDataProcessor(version="new", raw_start=raw_start)
-            sheets = processor.process_folder(folder_path, return_sheets=True)
-            if sheets:
-                all_results["production"] = sheets
-            else:
-                logger.warning("生产数据处理无结果")
-        except Exception as e:
-            logger.error(f"生产数据处理失败: {e}")
+        result = _process_production_module(folder_path, raw_start)
+        if result:
+            all_results["production"] = result
 
     # ── 工时数据 ──
     if "worktime" in matched:
-        for fpath in matched["worktime"]:
-            try:
-                logger.info(f"工时数据源: {os.path.basename(fpath)}")
-                sheets = process_excel_data(fpath, year, month, return_sheets=True,
-                                                header_mapping=worktime_header_mapping)
-                if sheets:
-                    all_results["worktime"] = sheets
-                    break
-            except Exception as e:
-                logger.error(f"工时处理失败: {os.path.basename(fpath)} -> {e}")
+        all_results["worktime"] = _process_worktime_module(
+            matched["worktime"], year, month, worktime_header_mapping
+        )
 
     # ── 日志摘要 ──
     success_labels = [MODULE_LABELS.get(k, k) for k in all_results]
@@ -252,7 +282,9 @@ def _filter_by_date(
             if "日期" not in df.columns:
                 kept[sheet_name] = df
                 continue
-            col = pd.to_datetime(df["日期"], errors="coerce")
+            col = df["日期"]
+            if not pd.api.types.is_datetime64_any_dtype(col):
+                col = pd.to_datetime(col, errors="coerce")
             mask = col.dt.date == target_date
             sub = df.loc[mask].copy()
             if not sub.empty:
@@ -595,8 +627,6 @@ def _table_merge_and_write(
             logger.warning(f"跳过空表: {label}")
             continue
         # 确保 join_keys 同时存在于 base 和 right
-        base_keys_ok = [k for k in join_keys if k in merged.columns]
-        right_keys_ok = [k for k in join_keys if k in right_df.columns]
         available_keys = [k for k in join_keys if k in merged.columns and k in right_df.columns]
         missing_in_right = [k for k in join_keys if k not in right_df.columns]
         missing_in_base = [k for k in join_keys if k not in merged.columns]
@@ -652,8 +682,8 @@ def _write_merged(
                     _emit_progress(progress_cb, {"stage": "cancelled", "percent": max(current / total if total else 0.0, 0.0), "current": current, "total": total, "detail": "用户取消，已完成部分输出"})
                     return
                 prefixed_name = f"{prefix}{sheet_name}"
-                if len(prefixed_name) > 31:
-                    prefixed_name = prefixed_name[:31]
+                if len(prefixed_name) > MAX_SHEET_NAME_LENGTH:
+                    prefixed_name = prefixed_name[:MAX_SHEET_NAME_LENGTH]
                 df = dedup_dataframe(df, prefixed_name)
                 df.to_excel(writer, sheet_name=prefixed_name, index=False)
                 current += 1

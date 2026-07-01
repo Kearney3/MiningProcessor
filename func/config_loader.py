@@ -116,6 +116,7 @@ _runtime_lock = threading.Lock()
 _runtime_config: dict[str, Any] | None = None
 
 # M1: 基于文件 mtime 的配置缓存，避免 GUI 启动期间重复读盘
+_config_lock = threading.Lock()  # protects _config_cache and _config_cache_mtime
 _config_cache: dict[str, Any] | None = None
 _config_cache_mtime: tuple[float, float] = (0.0, 0.0)
 
@@ -205,23 +206,25 @@ def load_config() -> dict[str, Any]:
     mt1 = _CONFIG_FILE.stat().st_mtime if _CONFIG_FILE.exists() else 0.0
     mt2 = _USER_CONFIG_FILE.stat().st_mtime if _USER_CONFIG_FILE.exists() else 0.0
 
-    if _config_cache is not None and (mt1, mt2) == _config_cache_mtime:
-        return _config_cache
+    with _config_lock:
+        if _config_cache is not None and (mt1, mt2) == _config_cache_mtime:
+            return _config_cache
 
-    base = _load_json(_CONFIG_FILE)
-    user = _load_json(_USER_CONFIG_FILE)
-    result = _deep_merge(base, user) if user else base
+        base = _load_json(_CONFIG_FILE)
+        user = _load_json(_USER_CONFIG_FILE)
+        result = _deep_merge(base, user) if user else base
 
-    _config_cache = result
-    _config_cache_mtime = (mt1, mt2)
-    return result
+        _config_cache = result
+        _config_cache_mtime = (mt1, mt2)
+        return result
 
 
 def _invalidate_config_cache() -> None:
     """清除配置缓存，在写入配置文件后调用 (M1)。"""
     global _config_cache, _config_cache_mtime
-    _config_cache = None
-    _config_cache_mtime = (0.0, 0.0)
+    with _config_lock:
+        _config_cache = None
+        _config_cache_mtime = (0.0, 0.0)
 
 
 def save_config(config: dict[str, Any]) -> None:

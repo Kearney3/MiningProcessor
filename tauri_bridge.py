@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import secrets
 import sys
 import threading
 from datetime import date, datetime
@@ -34,6 +35,25 @@ else:
 
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+
+def _sanitize_path(
+    raw: str,
+    must_exist: bool = False,
+    allow_file: bool = True,
+    allow_dir: bool = True,
+) -> Path:
+    """Validate and normalize a file path to prevent directory traversal."""
+    p = Path(raw).resolve()
+    if ".." in Path(raw).parts:
+        raise ValueError("Path must not contain ..")
+    if must_exist and not p.exists():
+        raise FileNotFoundError(f"Path does not exist: {p.name}")
+    if p.is_file() and not allow_file:
+        raise ValueError("Expected directory, got file")
+    if p.is_dir() and not allow_dir:
+        raise ValueError("Expected file, got directory")
+    return p
 
 
 # ─── JSON 编码器（处理 pandas/numpy/datetime 等类型）───
@@ -240,7 +260,8 @@ def _post_process_ledger(
 def _process_fuel(params: dict) -> dict:
     from func.excel_fuel import process_diesel_data
 
-    result = process_diesel_data(params["path"], target_year=params.get("year"))
+    safe_path = str(_sanitize_path(params["path"], must_exist=True))
+    result = process_diesel_data(safe_path, target_year=params.get("year"))
     output_file = str(result) if result else None
     if output_file:
         _post_process_ledger(
@@ -260,7 +281,7 @@ def _process_production(params: dict) -> dict:
     processor = MiningDataProcessor(
         raw_start=params.get("raw_start", -1), device_load_map=load_map
     )
-    path = params["path"]
+    path = str(_sanitize_path(params["path"], must_exist=True))
     p = Path(path)
     if p.is_dir():
         processor.process_folder(path)
@@ -281,13 +302,14 @@ def _process_production(params: dict) -> dict:
 def _process_electrical(params: dict) -> dict:
     from func.excel_electrical import parse_excel_data
 
+    safe_path = str(_sanitize_path(params["path"], must_exist=True))
     parse_excel_data(
-        params["path"],
+        safe_path,
         target_year=params.get("year"),
         add_shift_column=params.get("add_shift_column", False),
         default_shift=params.get("default_shift", "Day"),
     )
-    output_file = str(Path(params["path"]).parent / "电力消耗统计.xlsx")
+    output_file = str(Path(safe_path).parent / "电力消耗统计.xlsx")
     _post_process_ledger(
         output_file,
         use_equipment_ledger=params.get("use_equipment_ledger", False),
@@ -312,9 +334,10 @@ def _process_worktime(params: dict) -> dict:
             header_mapping["fuzzy"] = params["fuzzy_match"]
 
     year, month = params["year"], params["month"]
-    output_file = str(Path(params["path"]).parent / f"{year}{month:02d}_工作效率表.xlsx")
+    safe_path = str(_sanitize_path(params["path"], must_exist=True))
+    output_file = str(Path(safe_path).parent / f"{year}{month:02d}_工作效率表.xlsx")
     process_excel_data(
-        params["path"],
+        safe_path,
         year=year,
         month=month,
         output_file=output_file,
@@ -333,8 +356,9 @@ def _process_worktime(params: dict) -> dict:
 def _process_merge(params: dict) -> dict:
     from func.excel_merger import merge_excel_files
 
+    safe_folder = str(_sanitize_path(params["folder_path"], must_exist=True, allow_file=False))
     output = merge_excel_files(
-        params["folder_path"],
+        safe_folder,
         params["keyword"],
         strip_time=params.get("strip_time", False),
         sort_configs=params.get("sort_configs"),
@@ -352,7 +376,8 @@ def _process_merge(params: dict) -> dict:
 def _batch_scan(params: dict) -> dict:
     from func.excel_batch import scan_files
 
-    matched, missing = scan_files(params["folder_path"])
+    safe_folder = str(_sanitize_path(params["folder_path"], must_exist=True, allow_file=False))
+    matched, missing = scan_files(safe_folder)
     return {"matched": matched, "missing": missing}
 
 
@@ -390,11 +415,12 @@ def _batch_process(params: dict) -> dict:
     # 重置取消标记
     _cancel_event.clear()
 
+    safe_folder = str(_sanitize_path(params["folder_path"], allow_file=False))
     matched = params.get("matched")
     if not matched:
         from func.excel_batch import scan_files
 
-        matched, _ = scan_files(params["folder_path"])
+        matched, _ = scan_files(safe_folder)
 
     # 表合并基础表校验
     table_merge_config = params.get("table_merge_config")
@@ -405,7 +431,7 @@ def _batch_process(params: dict) -> dict:
             return {"error": f"表内合并需要 {required} 数据，但未在目录中找到"}
 
     result = process_files(
-        folder_path=params["folder_path"],
+        folder_path=safe_folder,
         matched=matched,
         year=params.get("year"),
         month=params.get("month"),
@@ -432,8 +458,9 @@ def _cancel(params: dict) -> dict:
 def _sync_minebase(params: dict) -> dict:
     from func.sync_to_minebase import sync
 
+    safe_input = str(_sanitize_path(params["input_dir"], must_exist=True, allow_file=False))
     results = sync(
-        input_dir=params["input_dir"],
+        input_dir=safe_input,
         mode=params.get("mode"),
         data_types=params.get("data_types"),
         dry_run=params.get("dry_run", False),
@@ -569,7 +596,8 @@ def _get_oil_ledger_data(params: dict) -> dict:
 def _load_ledger_file_columns(params: dict) -> dict:
     """读取 Excel 文件的列名（用于列映射）。"""
     import pandas as pd
-    df = pd.read_excel(params["file_path"], nrows=0)
+    safe_path = str(_sanitize_path(params["file_path"], must_exist=True, allow_dir=False))
+    df = pd.read_excel(safe_path, nrows=0)
     return {"columns": [str(c) for c in df.columns]}
 
 
@@ -577,7 +605,8 @@ def _load_ledger_file_columns(params: dict) -> dict:
 def _load_oil_ledger_file_columns(params: dict) -> dict:
     """读取 Excel 文件的列名（油品台账，用于列映射）。"""
     import pandas as pd
-    df = pd.read_excel(params["file_path"], nrows=0)
+    safe_path = str(_sanitize_path(params["file_path"], must_exist=True, allow_dir=False))
+    df = pd.read_excel(safe_path, nrows=0)
     return {"columns": [str(c) for c in df.columns]}
 
 
@@ -587,8 +616,9 @@ def _import_equipment_ledger(params: dict) -> dict:
     from func.equipment_ledger import EquipmentLedger
     from func.config_loader import save_equipment_ledger_cache
 
+    safe_path = str(_sanitize_path(params["file_path"], must_exist=True, allow_dir=False))
     ledger = EquipmentLedger()
-    ledger.load(params["file_path"], column_mapping=params.get("column_mapping"))
+    ledger.load(safe_path, column_mapping=params.get("column_mapping"))
     records = ledger.to_dict()
     save_equipment_ledger_cache(records)
     return {"ok": True, "count": len(records)}
@@ -600,8 +630,9 @@ def _import_oil_ledger(params: dict) -> dict:
     from func.oil_ledger import OilLedger
     from func.config_loader import save_oil_ledger_cache
 
+    safe_path = str(_sanitize_path(params["file_path"], must_exist=True, allow_dir=False))
     ledger = OilLedger()
-    ledger.load(params["file_path"], column_mapping=params.get("column_mapping"))
+    ledger.load(safe_path, column_mapping=params.get("column_mapping"))
     records = ledger.to_dict()
     save_oil_ledger_cache(records)
     return {"ok": True, "count": len(records)}
@@ -611,18 +642,20 @@ def _import_oil_ledger(params: dict) -> dict:
 def _export_equipment_ledger_template(params: dict) -> dict:
     """导出设备台账模板 Excel。"""
     from func.equipment_ledger import EquipmentLedger
+    safe_path = str(_sanitize_path(params["output_path"], allow_dir=False))
     ledger = EquipmentLedger()
-    ledger.export_template(params["output_path"])
-    return {"ok": True, "output_file": params["output_path"]}
+    ledger.export_template(safe_path)
+    return {"ok": True, "output_file": safe_path}
 
 
 @_register("export_oil_ledger_template")
 def _export_oil_ledger_template(params: dict) -> dict:
     """导出油品台账模板 Excel。"""
     from func.oil_ledger import OilLedger
+    safe_path = str(_sanitize_path(params["output_path"], allow_dir=False))
     ledger = OilLedger()
-    ledger.export_template(params["output_path"])
-    return {"ok": True, "output_file": params["output_path"]}
+    ledger.export_template(safe_path)
+    return {"ok": True, "output_file": safe_path}
 
 
 @_register("set_default_equipment_ledger")
@@ -678,7 +711,7 @@ def _clear_oil_ledger(params: dict) -> dict:
 @_register("list_directory")
 def _list_directory(params: dict) -> dict:
     """列出目录内容，返回文件和子目录。"""
-    p = Path(params["path"])
+    p = _sanitize_path(params["path"], must_exist=True, allow_file=False)
     if not p.is_dir():
         return {"error": "Not a directory", "files": [], "dirs": []}
     files = []
@@ -697,7 +730,8 @@ def _list_directory(params: dict) -> dict:
 def _list_excel_sheets(params: dict) -> dict:
     """列出 Excel 文件中的所有 Sheet 名。"""
     import pandas as pd
-    xl = pd.ExcelFile(params["path"])
+    safe_path = str(_sanitize_path(params["path"], must_exist=True, allow_dir=False))
+    xl = pd.ExcelFile(safe_path)
     return {"sheets": xl.sheet_names}
 
 
@@ -705,8 +739,9 @@ def _list_excel_sheets(params: dict) -> dict:
 def _read_excel_sheet(params: dict) -> dict:
     """读取指定 Sheet 的数据（默认限制 5000 行）。"""
     import pandas as pd
+    safe_path = str(_sanitize_path(params["path"], must_exist=True, allow_dir=False))
     max_rows = params.get("max_rows", 5000)
-    df = pd.read_excel(params["path"], sheet_name=params["sheet"])
+    df = pd.read_excel(safe_path, sheet_name=params["sheet"])
     columns = [str(c) for c in df.columns]
     total = len(df)
     if len(df) > max_rows:
@@ -788,7 +823,7 @@ def _export_matched_data(params: dict) -> dict:
     import pandas as pd
     rows = params["rows"]
     columns = params["columns"]
-    output_path = params["output_path"]
+    safe_output = str(_sanitize_path(params["output_path"], allow_dir=False))
 
     # 移除内部标记列
     export_cols = [c for c in columns if c != "__matched"]
@@ -798,16 +833,18 @@ def _export_matched_data(params: dict) -> dict:
         if col not in df.columns:
             df[col] = ""
     df = df[export_cols]
-    df.to_excel(output_path, index=False, engine="openpyxl")
-    return {"output_file": output_path}
+    df.to_excel(safe_output, index=False, engine="openpyxl")
+    return {"output_file": safe_output}
 
 
 @_register("check_directory_exists")
 def _check_directory_exists(params: dict) -> dict:
     """检查目录是否存在。"""
-    import os
-    path = params.get("path", "")
-    return {"exists": os.path.isdir(path)}
+    try:
+        p = _sanitize_path(params.get("path", ""), allow_file=False)
+        return {"exists": p.is_dir()}
+    except (ValueError, FileNotFoundError):
+        return {"exists": False}
 
 
 @_register("ping")
@@ -856,8 +893,10 @@ def _handle_request(req: dict) -> None:
     try:
         result = _METHODS[method](params)
         _send({"id": req_id, "result": result})
-    except Exception as e:
-        _send({"id": req_id, "error": str(e)})
+    except Exception:
+        ref_id = secrets.token_hex(4)
+        logger.error("RPC error ref=%s method=%s", ref_id, method, exc_info=True)
+        _send({"id": req_id, "error": f"处理失败 (ref: {ref_id})，请查看日志获取详情"})
 
 
 def main() -> None:

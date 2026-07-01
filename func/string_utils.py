@@ -11,6 +11,8 @@
 import re
 import pandas as pd
 
+_MULTI_SPACE = re.compile(r' {2,}')
+
 
 def clean_string(val) -> str:
     """
@@ -30,6 +32,10 @@ def clean_string(val) -> str:
     Returns:
         清理后的字符串（保证无内部换行/Tab，两端无空格）
     """
+    # Fast path for numeric values - skip all string processing
+    if isinstance(val, (int, float)) and not pd.isna(val):
+        return str(val)
+
     # 处理 pd.Series
     if isinstance(val, pd.Series):
         if val.empty:
@@ -48,10 +54,12 @@ def clean_string(val) -> str:
     s = str(val)
     # 去两端空白
     s = s.strip()
+    if not s:
+        return ""
     # 内部换行和制表符替换为空格
     s = s.replace("\n", " ").replace("\r", " ").replace("\t", " ")
     # 合并连续空格
-    s = re.sub(r" {2,}", " ", s)
+    s = _MULTI_SPACE.sub(" ", s)
     # 最终再去两端
     s = s.strip()
     return s

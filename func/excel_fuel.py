@@ -6,18 +6,32 @@ import numpy as np
 
 from func.logger import get_logger
 from func.string_utils import clean_string
-from func.excel_utils import dedup_dataframe, resolve_shift
+from func.excel_utils import dedup_dataframe, resolve_shift, detect_shift
 
 logger = get_logger(__name__)
 
 
 def process_diesel_data(file_path, target_year=None, return_sheets=False):
+    """处理设备柴油消耗报表，提取发动机与油耗数据。
+
+    Args:
+        file_path: Excel 文件路径。
+        target_year: 覆盖日期年份，None 时使用原始年份。
+        return_sheets: 若为 True，返回 {sheet_name: DataFrame} 字典而非写入文件。
+
+    Returns:
+        当 return_sheets=False 时返回输出文件路径 (str)；
+        当 return_sheets=True 且有数据时返回 sheets 字典；
+        当 return_sheets=True 且无数据时返回 None。
+
+    Raises:
+        ValueError: 未找到匹配的柴油消耗 Sheet，或 Sheet 中无有效数据。
+    """
     xl = pd.ExcelFile(file_path)
     sheet_names = [s for s in xl.sheet_names if "设备柴油消耗" in s or "Техник" in s]
 
     if not sheet_names:
-        logger.warning("未找到包含'设备柴油消耗'或'Техник'的Sheet")
-        return
+        raise ValueError("未找到匹配的柴油消耗Sheet（需包含'设备柴油消耗'或'Техник'）")
 
     engine_data_list = []
     fuel_data_list = []
@@ -46,10 +60,9 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False):
         col_to_shift = {}
         for col_idx in range(header_rows.shape[1]):
             h4_val = clean_string(header_rows.iloc[2, col_idx])
-            if "白班" in h4_val or "өдөр" in h4_val.lower():
-                col_to_shift[col_idx] = "Day"
-            elif "夜班" in h4_val or "шөнө" in h4_val.lower():
-                col_to_shift[col_idx] = "Night"
+            shift = detect_shift(h4_val)
+            if shift:
+                col_to_shift[col_idx] = shift
 
         # 4. 识别列属性
         col_mapping = []
@@ -181,8 +194,7 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False):
 
     # 如果数据都为空，那么不导出
     if df_engine.shape[0] == 0 and df_fuel.shape[0] == 0:
-        logger.error("没有找到任何发动机数据和油耗数据，导出失败")
-        return None
+        raise ValueError("柴油消耗表中未找到有效数据（发动机数据和油耗数据均为空）")
 
     # 清理辅助列
     if not df_engine.empty and 'shift_rank' in df_engine.columns:

@@ -158,9 +158,11 @@ class MiningDataProcessor:
         # 使用局部变量避免多线程竞态条件（process_folder 并发调用时共享同一实例）
         raw_start = self.raw_start
         if self.auto_detect == True:
-            mask = df_raw.apply(lambda row: row.astype(str).str.contains(self.target_text).any(), axis=1)
-            # 获取对应的索引
-            row_indices = df_raw[mask].index.tolist()
+            # HIGH-11 fix: limit search to first 20 rows to avoid full DataFrame scan
+            search_area = df_raw.iloc[:20]
+            mask = search_area.apply(
+                lambda row: row.astype(str).str.contains(self.target_text, na=False).any(), axis=1)
+            row_indices = search_area[mask].index.tolist()
             if len(row_indices) > 0:
                 raw_start = row_indices[0] + 1
                 logger.info(f"开启自动检测，找到目标文本{self.target_text}，行号为: {raw_start}")
@@ -216,51 +218,57 @@ class MiningDataProcessor:
         running_rows = []
         production_rows = []
 
-        # 哪些列属于“生产列"
+        # 哪些列属于"生产列"
         exclude_keywords = ["小时数", "公里数", "总趟数", "备注", "开始", "结束", "公司"]
+        excavator_exclude = ["Мото", "Эхэлсэн", "Компани", "км", "Дууссан"]
 
-        for _, row in data.iterrows():
-            truck_name = self.safe_str(row["矿卡名称"])
+        # HIGH-08 fix: Pre-classify production columns outside the row loop
+        production_col_info = []  # list of (col_name, excavator_name, ore_type)
+        for col in data.columns:
+            if col == "矿卡名称":
+                continue
+            col_str = self.safe_str(col)
+            if any(k in col_str for k in exclude_keywords):
+                continue
+            if "｜" not in col_str:
+                continue
+            parts = col_str.split("｜", 1)
+            excavator_name = self.safe_str(parts[0])
+            if any(k in excavator_name for k in excavator_exclude):
+                continue
+            ore_type = self.safe_str(parts[1])
+            if not excavator_name and not ore_type:
+                continue
+            production_col_info.append((col, excavator_name, ore_type))
 
-            # 这里按你的意图应该过滤空值和合计行
+        # HIGH-08 fix: Use .at[] access instead of iterrows unpacking
+        has_hour_start = hour_start_col in data.columns
+        has_hour_end = hour_end_col in data.columns
+        has_km_start = km_start_col in data.columns
+        has_km_end = km_end_col in data.columns
+        has_company = company_col in data.columns
+
+        for row_idx in data.index:
+            truck_name = self.safe_str(data.at[row_idx, "矿卡名称"])
+
+            # 过滤空值和合计行
             if not truck_name or "Нийт" in truck_name:
                 continue
 
-            h_start = self.safe_number(row[hour_start_col]) if hour_start_col in data.columns else 0
-            h_end = self.safe_number(row[hour_end_col]) if hour_end_col in data.columns else 0
-            k_start = self.safe_number(row[km_start_col]) if km_start_col in data.columns else 0
-            k_end = self.safe_number(row[km_end_col]) if km_end_col in data.columns else 0
-            company = self.safe_str(row[company_col]) if company_col in data.columns else ""
+            h_start = self.safe_number(data.at[row_idx, hour_start_col]) if has_hour_start else 0
+            h_end = self.safe_number(data.at[row_idx, hour_end_col]) if has_hour_end else 0
+            k_start = self.safe_number(data.at[row_idx, km_start_col]) if has_km_start else 0
+            k_end = self.safe_number(data.at[row_idx, km_end_col]) if has_km_end else 0
+            company = self.safe_str(data.at[row_idx, company_col]) if has_company else ""
 
-            if company_col is not None and company == "":
+            if has_company and company == "":
                 continue
 
             total_trips = 0
             capacity = self.get_load_capacity(truck_name)
 
-            for col in data.columns:
-                if col == "矿卡名称":
-                    continue
-
-                col_str = self.safe_str(col)
-
-                # 排除运行类列，只保留“挖机｜矿石类型"类列
-                if any(k in col_str for k in exclude_keywords):
-                    continue
-
-                if "｜" not in col_str:
-                    continue
-
-                parts = col_str.split("｜", 1)
-                excavator_name = self.safe_str(parts[0])
-                # 排除运行类列，只保留“挖机｜矿石类型"类列
-                if any(k in excavator_name for k in ["Мото", "Эхэлсэн", "Компани", "км", "Дууссан"]):
-                    continue
-                ore_type = self.safe_str(parts[1])
-                if not excavator_name and not ore_type:
-                    continue
-
-                trips = self.safe_number(row[col], default=0)
+            for col, excavator_name, ore_type in production_col_info:
+                trips = self.safe_number(data.at[row_idx, col], default=0)
 
                 if trips > 0 and ore_type != "" and "共" not in ore_type and trips % 1 == 0:
                     production = trips * capacity
@@ -302,37 +310,39 @@ class MiningDataProcessor:
         B列设备名称, C列公司, F列小时数开始, G列小时数结束
         输出到运行数据表
         """
-        result_rows = []
-
-        # 默认从第4行开始
+        # HIGH-08 fix: Vectorized extraction instead of per-row iloc loop
         start_row = 3
+        if len(df_raw) <= start_row:
+            return pd.DataFrame()
 
-        for i in range(start_row, len(df_raw)):
-            device_name = self.safe_str(df_raw.iloc[i, 1])  # B列
-            company = self.safe_str(df_raw.iloc[i, 2])  # C列
-            h_start = self.safe_number(df_raw.iloc[i, 5])  # F列
-            h_end = self.safe_number(df_raw.iloc[i, 6])  # G列
-            comment = self.safe_str(df_raw.iloc[i, 8])  # I列备注
+        subset = df_raw.iloc[start_row:].copy()
+        device_names = subset.iloc[:, 1].apply(self.safe_str)
 
-            if not device_name:
-                continue
+        # Filter out empty device names
+        valid_mask = device_names.astype(bool)
+        if not valid_mask.any():
+            return pd.DataFrame()
 
-            result_rows.append({
-                "日期": date_val,
-                "班次": shift_val,
-                "设备名称": device_name,
-                "公司": company,
-                "小时数仪表开始": h_start,
-                "小时数仪表结束": h_end,
-                "运行小时数": h_end - h_start,
-                "公里数仪表开始": 0,
-                "公里数仪表结束": 0,
-                "运行里程": 0,
-                "趟数": 0,
-                "备注": comment,
-            })
+        subset = subset[valid_mask]
+        device_names = device_names[valid_mask]
 
-        return pd.DataFrame(result_rows)
+        result_df = pd.DataFrame({
+            "日期": date_val,
+            "班次": shift_val,
+            "设备名称": device_names.values,
+            "公司": subset.iloc[:, 2].apply(self.safe_str).values,
+            "小时数仪表开始": subset.iloc[:, 5].apply(lambda v: self.safe_number(v)).values,
+            "小时数仪表结束": subset.iloc[:, 6].apply(lambda v: self.safe_number(v)).values,
+            "公里数仪表开始": 0,
+            "公里数仪表结束": 0,
+            "运行里程": 0,
+            "趟数": 0,
+            "备注": subset.iloc[:, 8].apply(self.safe_str).values if subset.shape[1] > 8 else "",
+        })
+
+        result_df["运行小时数"] = result_df["小时数仪表结束"] - result_df["小时数仪表开始"]
+
+        return result_df
 
     # ---------------------------
     # 单文件处理

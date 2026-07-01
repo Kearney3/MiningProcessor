@@ -4,8 +4,10 @@ GUI 业务逻辑层
 """
 import asyncio
 import logging
+import traceback
 import flet as ft
 import os
+import pandas as pd
 from func import config_loader
 from func.excel_utils import get_output_filename
 from func.excel_fuel import process_diesel_data
@@ -21,6 +23,8 @@ from func.ledger_postprocess import apply_ledger_matching
 
 
 from gui.components.common import _log_message
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -39,58 +43,72 @@ _MODULE_LABELS = {
 }
 
 
-_active_snackbar: ft.SnackBar | None = None
+class _SnackbarManager:
+    """Encapsulates snackbar state to avoid mutable global."""
 
+    def __init__(self) -> None:
+        self._active: ft.SnackBar | None = None
 
-def _show_snackbar(page: ft.Page, message: str, is_error: bool = False):
-    """显示 snackbar 通知（线程安全，单一活跃实例）"""
-    global _active_snackbar
-    # 移除上一个未消失的 snackbar
-    if _active_snackbar is not None:
+    def show(self, page: ft.Page, message: str, is_error: bool = False) -> None:
+        """Display a snackbar notification (thread-safe, single active instance)."""
+        # Remove previous undismissed snackbar
+        if self._active is not None:
+            try:
+                page.overlay.remove(self._active)
+            except ValueError:
+                pass
+            self._active = None
+
+        snackbar = ft.SnackBar(
+            content=ft.Text(message, color=ft.Colors.WHITE),
+            bgcolor=ft.Colors.RED_700 if is_error else ft.Colors.GREEN_700,
+            duration=3000,
+        )
+        self._active = snackbar
+        page.overlay.append(snackbar)
+        snackbar.open = True
+        page.update()
+
+        async def _cleanup() -> None:
+            await asyncio.sleep(3.5)
+            if self._active is snackbar:
+                try:
+                    page.overlay.remove(snackbar)
+                    page.update()
+                except (ValueError, RuntimeError):
+                    pass
+                self._active = None
+
         try:
-            page.overlay.remove(_active_snackbar)
-        except ValueError:
-            pass
-        _active_snackbar = None
+            page.run_task(_cleanup)
+        except (AttributeError, RuntimeError):
+            import threading
 
-    snackbar = ft.SnackBar(
-        content=ft.Text(message, color=ft.Colors.WHITE),
-        bgcolor=ft.Colors.RED_700 if is_error else ft.Colors.GREEN_700,
-        duration=3000,
-    )
-    _active_snackbar = snackbar
-    page.overlay.append(snackbar)
-    snackbar.open = True
-    page.update()
+            def _fallback_cleanup() -> None:
+                try:
+                    page.overlay.remove(snackbar)
+                    page.update()
+                except (ValueError, RuntimeError):
+                    pass
+                if self._active is snackbar:
+                    self._active = None
 
-    # 使用 asyncio 在 Flet 事件循环中安全清理
-    async def _cleanup():
-        nonlocal snackbar
-        global _active_snackbar
-        await asyncio.sleep(3.5)
-        if _active_snackbar is snackbar:
-            try:
-                page.overlay.remove(snackbar)
-                page.update()
-            except (ValueError, RuntimeError):
-                pass
-            _active_snackbar = None
+            threading.Timer(3.5, _fallback_cleanup).start()
 
-    try:
-        page.run_task(_cleanup)
-    except (AttributeError, RuntimeError):
-        # 降级：run_task 不可用时用 Timer
-        import threading
-        def _fallback_cleanup():
-            global _active_snackbar
-            try:
-                page.overlay.remove(snackbar)
-                page.update()
-            except (ValueError, RuntimeError):
-                pass
-            if _active_snackbar is snackbar:
-                _active_snackbar = None
-        threading.Timer(3.5, _fallback_cleanup).start()
+    def hide(self) -> None:
+        """Dismiss the current snackbar if any."""
+        self._active = None
+
+
+_snackbar_mgr = _SnackbarManager()
+
+
+def _show_snackbar(page: ft.Page, message: str, is_error: bool = False) -> None:
+    _snackbar_mgr.show(page, message, is_error)
+
+
+def _hide_snackbar() -> None:
+    _snackbar_mgr.hide()
 
 
 def set_btn_state(btn: ft.Button, enabled: bool, label: str = "处理"):
@@ -141,60 +159,67 @@ def _get_output_file(module_type: str, path: str, **kwargs) -> str | None:
 # ---------------------------------------------------------------------------
 # 任务执行
 # ---------------------------------------------------------------------------
+def _dispatch_module(module_type: str, path: str, **kwargs) -> object | None:
+    """Dispatch to the appropriate processor. Returns worktime_sheets or None."""
+    if module_type == "fuel":
+        process_diesel_data(path, kwargs.get("year"))
+    elif module_type == "production":
+        raw_start = kwargs.get("raw_start", -1)
+        device_load_map = config_loader.get_device_load_map()
+        processor = ProdProcessor(raw_start=raw_start, device_load_map=device_load_map)
+        logging.info(f"装载量参数：{device_load_map}")
+        if os.path.isdir(path):
+            output_file = os.path.join(path, "合并产量.xlsx")
+            processor.process_folder(path, output_file)
+        else:
+            output_file = os.path.join(os.path.dirname(path) or ".", "合并产量.xlsx")
+            processor.process_single_file(path, output_file)
+    elif module_type == "electrical":
+        parse_excel_data(path, kwargs.get("year"),
+                         add_shift_column=kwargs.get("add_shift_column", False),
+                         default_shift=kwargs.get("default_shift", "Day"))
+    elif module_type == "worktime":
+        year = kwargs.get("year", 2025)
+        month = kwargs.get("month", 1)
+        header_mapping = kwargs.get("header_mapping", None)
+        file_dir = os.path.dirname(path) or "."
+        output_file = os.path.join(file_dir, f"{year}{month:02d}_工作效率表.xlsx")
+        return process_excel_data(path, year, month, output_file,
+                                  return_sheets=True, header_mapping=header_mapping)
+    elif module_type == "merge":
+        keyword = kwargs.get("keyword", "")
+        strip_time = kwargs.get("strip_time", False)
+        sort_configs = kwargs.get("sort_configs", None)
+        merge_excel_files(path, keyword, strip_time=strip_time, sort_configs=sort_configs)
+    # batch 模块由 _execute_batch_task 单独处理
+    return None
+
+
 def _execute_task(module_type: str, path: str, **kwargs) -> str | None:
-    """在后台线程中执行处理任务"""
-    error_message = None
+    """在后台线程中执行处理任务，返回错误信息或 None"""
     equipment_ledger = kwargs.pop("equipment_ledger", None)
     oil_ledger = kwargs.pop("oil_ledger", None)
 
     try:
-        worktime_sheets = None
-        if module_type == "fuel":
-            process_diesel_data(path, kwargs.get("year"))
-        elif module_type == "production":
-            raw_start = kwargs.get("raw_start", -1)
-            device_load_map = config_loader.get_device_load_map()
-            processor = ProdProcessor(raw_start=raw_start, device_load_map=device_load_map)
-            logging.info(f"装载量参数：{device_load_map}")
-            if os.path.isdir(path):
-                output_file = os.path.join(path, "合并产量.xlsx")
-                processor.process_folder(path, output_file)
-            else:
-                output_file = os.path.join(os.path.dirname(path) or ".", "合并产量.xlsx")
-                processor.process_single_file(path, output_file)
-        elif module_type == "electrical":
-            parse_excel_data(path, kwargs.get("year"),
-                             add_shift_column=kwargs.get("add_shift_column", False),
-                             default_shift=kwargs.get("default_shift", "Day"))
-        elif module_type == "worktime":
-            year = kwargs.get("year", 2025)
-            month = kwargs.get("month", 1)
-            header_mapping = kwargs.get("header_mapping", None)
-            file_dir = os.path.dirname(path) or "."
-            output_file = os.path.join(file_dir, f"{year}{month:02d}_工作效率表.xlsx")
-            worktime_sheets = process_excel_data(path, year, month, output_file,
-                                                 return_sheets=True, header_mapping=header_mapping)
-        elif module_type == "merge":
-            keyword = kwargs.get("keyword", "")
-            strip_time = kwargs.get("strip_time", False)
-            sort_configs = kwargs.get("sort_configs", None)
-            merge_excel_files(path, keyword, strip_time=strip_time, sort_configs=sort_configs)
-        # batch 模块由 _execute_batch_task 单独处理
+        worktime_sheets = _dispatch_module(module_type, path, **kwargs)
+    except Exception:
+        logger.exception("Task execution failed: module=%s path=%s", module_type, path)
+        return traceback.format_exc()
 
-        # 台账匹配后处理
-        if equipment_ledger or oil_ledger:
-            output_file = _get_output_file(module_type, path, **kwargs)
-            if output_file and os.path.exists(output_file):
-                sheets_data = worktime_sheets if module_type == "worktime" else None
-                _apply_ledger_matching(output_file, equipment_ledger, oil_ledger,
-                                       preloaded_sheets=sheets_data)
-    except Exception as ex:
-        error_message = str(ex)
+    if not (equipment_ledger or oil_ledger):
+        return None
 
-    return error_message
+    output_file = _get_output_file(module_type, path, **kwargs)
+    if not output_file or not os.path.exists(output_file):
+        return None
+
+    sheets_data = worktime_sheets if module_type == "worktime" else None
+    _apply_ledger_matching(output_file, equipment_ledger, oil_ledger,
+                           preloaded_sheets=sheets_data)
+    return None
 
 
-async def run_task(page: ft.Page, module_type: str, path: str, btn: ft.Button, log, **kwargs):
+async def run_task(page: ft.Page, module_type: str, path: str, btn: ft.Button, log, **kwargs) -> None:
     """异步执行处理任务，按钮状态由调用方自行恢复"""
     del btn  # 保留现有调用签名，避免影响其他调用方
 
@@ -232,7 +257,7 @@ async def _safe_run_task(
 # ---------------------------------------------------------------------------
 # 各模块按钮回调
 # ---------------------------------------------------------------------------
-async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=None, oil_ledger=None):
+async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=None, oil_ledger=None) -> None:
     """燃油处理按钮回调"""
     btn = fuel_refs["btn"]
     path = fuel_refs["path"].value
@@ -248,7 +273,7 @@ async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=
                          year=year, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
 
 
-async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=None, oil_ledger=None):
+async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=None, oil_ledger=None) -> None:
     """生产处理按钮回调"""
     btn = prod_refs["btn"]
     path = prod_refs["path"].value
@@ -269,7 +294,7 @@ async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=
                          raw_start=raw_start, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
 
 
-async def on_elec_process(page: ft.Page, elec_refs: dict, log, equipment_ledger=None, oil_ledger=None):
+async def on_elec_process(page: ft.Page, elec_refs: dict, log, equipment_ledger=None, oil_ledger=None) -> None:
     """电力处理按钮回调"""
     btn = elec_refs["btn"]
     path = elec_refs["path"].value
@@ -293,7 +318,7 @@ async def on_elec_process(page: ft.Page, elec_refs: dict, log, equipment_ledger=
                          equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
 
 
-async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=None, oil_ledger=None):
+async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=None, oil_ledger=None) -> None:
     """工时处理按钮回调"""
     btn = work_refs["btn"]
     path = work_refs["path"].value
@@ -322,7 +347,7 @@ async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=
                          header_mapping=header_mapping)
 
 
-async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledger=None, oil_ledger=None):
+async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledger=None, oil_ledger=None) -> None:
     """Excel 合并按钮回调"""
     btn = merge_refs["btn"]
     path = merge_refs["path"].value
@@ -393,7 +418,7 @@ async def _consume_batch_progress_queue(progress_queue, progress_bar, progress_t
             progress_text.update()
 
 
-async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledger=None, oil_ledger=None):
+async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledger=None, oil_ledger=None) -> None:
     """批量处理按钮回调（带文件扫描 + 缺失确认弹窗）"""
     import queue
     import threading
@@ -567,7 +592,55 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
 # ---------------------------------------------------------------------------
 # 初始化 & 绑定
 # ---------------------------------------------------------------------------
-def wire_processing_buttons(module_refs: dict, page: ft.Page, log, ledger_refs: dict = None, oil_ledger_refs: dict = None):
+def _get_ledgers_from_refs(
+    module_refs: dict,
+    ledger_refs: dict,
+    oil_ledger_refs: dict,
+) -> tuple:
+    """根据独立开关状态获取台账实例"""
+    eq_toggle = module_refs.get("_match_eq_toggle")
+    oil_toggle = module_refs.get("_match_oil_toggle")
+
+    eq = None
+    if eq_toggle and eq_toggle.value:
+        eq = ledger_refs.get("get_ledger", lambda: None)()
+        if eq is None:
+            logging.warning("设备台账匹配已启用，但设备台账未加载")
+
+    oil = None
+    if oil_toggle and oil_toggle.value:
+        oil = oil_ledger_refs.get("get_oil", lambda: None)()
+        if oil is None:
+            logging.warning("油品台账匹配已启用，但油品台账未加载")
+
+    return eq, oil
+
+
+def _make_module_handler(
+    page: ft.Page,
+    module_refs: dict,
+    module_key: str,
+    log,
+    ledger_refs: dict,
+    oil_ledger_refs: dict,
+    callback,
+):
+    """Create a click handler that resolves ledgers and invokes *callback*."""
+
+    async def handler(e: ft.ControlEvent) -> None:
+        eq, oil = _get_ledgers_from_refs(module_refs, ledger_refs, oil_ledger_refs)
+        await callback(page, module_refs[module_key], log, equipment_ledger=eq, oil_ledger=oil)
+
+    return handler
+
+
+def wire_processing_buttons(
+    module_refs: dict,
+    page: ft.Page,
+    log,
+    ledger_refs: dict | None = None,
+    oil_ledger_refs: dict | None = None,
+) -> None:
     """
     将模块 refs 中的按钮绑定到处理回调
     必须在模块区域创建完成后调用
@@ -575,54 +648,22 @@ def wire_processing_buttons(module_refs: dict, page: ft.Page, log, ledger_refs: 
     ledger_refs = ledger_refs or {}
     oil_ledger_refs = oil_ledger_refs or {}
 
-    def _get_ledgers():
-        """根据独立开关状态获取台账实例"""
-        eq_toggle = module_refs.get("_match_eq_toggle")
-        oil_toggle = module_refs.get("_match_oil_toggle")
+    _MODULE_CALLBACKS = [
+        ("fuel", on_fuel_process),
+        ("prod", on_prod_process),
+        ("elec", on_elec_process),
+        ("work", on_work_process),
+        ("merge", on_merge_process),
+    ]
 
-        eq = None
-        if eq_toggle and eq_toggle.value:
-            eq = ledger_refs.get("get_ledger", lambda: None)()
-            if eq is None:
-                logging.warning("设备台账匹配已启用，但设备台账未加载")
-
-        oil = None
-        if oil_toggle and oil_toggle.value:
-            oil = oil_ledger_refs.get("get_oil", lambda: None)()
-            if oil is None:
-                logging.warning("油品台账匹配已启用，但油品台账未加载")
-
-        return eq, oil
-
-    async def handle_fuel_click(e: ft.ControlEvent):
-        eq, oil = _get_ledgers()
-        await on_fuel_process(page, module_refs["fuel"], log, equipment_ledger=eq, oil_ledger=oil)
-
-    async def handle_prod_click(e: ft.ControlEvent):
-        eq, oil = _get_ledgers()
-        await on_prod_process(page, module_refs["prod"], log, equipment_ledger=eq, oil_ledger=oil)
-
-    async def handle_elec_click(e: ft.ControlEvent):
-        eq, oil = _get_ledgers()
-        await on_elec_process(page, module_refs["elec"], log, equipment_ledger=eq, oil_ledger=oil)
-
-    async def handle_work_click(e: ft.ControlEvent):
-        eq, oil = _get_ledgers()
-        await on_work_process(page, module_refs["work"], log, equipment_ledger=eq, oil_ledger=oil)
-
-    async def handle_merge_click(e: ft.ControlEvent):
-        eq, oil = _get_ledgers()
-        await on_merge_process(page, module_refs["merge"], log, equipment_ledger=eq, oil_ledger=oil)
-
-    module_refs["fuel"]["btn"].on_click = handle_fuel_click
-    module_refs["prod"]["btn"].on_click = handle_prod_click
-    module_refs["elec"]["btn"].on_click = handle_elec_click
-    module_refs["work"]["btn"].on_click = handle_work_click
-    module_refs["merge"]["btn"].on_click = handle_merge_click
+    for key, callback in _MODULE_CALLBACKS:
+        module_refs[key]["btn"].on_click = _make_module_handler(
+            page, module_refs, key, log, ledger_refs, oil_ledger_refs, callback,
+        )
 
     # Batch
     if "batch" in module_refs:
-        async def handle_batch_click(e: ft.ControlEvent):
+        async def handle_batch_click(e: ft.ControlEvent) -> None:
             eq_toggle = module_refs["batch"].get("match_eq_toggle")
             oil_toggle = module_refs["batch"].get("match_oil_toggle")
             eq = ledger_refs.get("get_ledger", lambda: None)() if eq_toggle and eq_toggle.value else None
@@ -631,7 +672,7 @@ def wire_processing_buttons(module_refs: dict, page: ft.Page, log, ledger_refs: 
         module_refs["batch"]["btn"].on_click = handle_batch_click
 
 
-async def on_sync_process(page: ft.Page, sync_refs: dict, log):
+async def on_sync_process(page: ft.Page, sync_refs: dict, log) -> None:
     """MineBase 同步按钮回调"""
     path = sync_refs["path"].value
     if not path:

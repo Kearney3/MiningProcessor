@@ -25,6 +25,7 @@ def make_tab_buttons(n):
     return [MockControl() for _ in range(n)]
 
 
+# NOTE: Tests local reimplementation, not production gui/main.py — see M-27
 def select_tab(tab_contents, tab_buttons, idx):
     """Replicate the _select_tab logic from main.py."""
     for i, c in enumerate(tab_contents):
@@ -34,6 +35,7 @@ def select_tab(tab_contents, tab_buttons, idx):
         btn.style = "active" if i == idx else "inactive"
 
 
+# NOTE: Tests local reimplementation, not production gui/main.py — see M-27
 def test_initial_state():
     """First tab visible, others hidden."""
     contents = make_tab_contents(3)
@@ -45,6 +47,7 @@ def test_initial_state():
     assert contents[2].visible is False
 
 
+# NOTE: Tests local reimplementation, not production gui/main.py — see M-27
 def test_switch_to_second_tab():
     """Switching to tab 1 shows content 1, hides others."""
     contents = make_tab_contents(3)
@@ -59,6 +62,7 @@ def test_switch_to_second_tab():
     assert contents[2].visible is False
 
 
+# NOTE: Tests local reimplementation, not production gui/main.py — see M-27
 def test_switch_to_third_tab():
     """Switching to tab 2 shows content 2, hides others."""
     contents = make_tab_contents(3)
@@ -73,6 +77,7 @@ def test_switch_to_third_tab():
     assert contents[2].visible is True
 
 
+# NOTE: Tests local reimplementation, not production gui/main.py — see M-27
 def test_switch_back_to_first():
     """Switching back to tab 0 restores initial state."""
     contents = make_tab_contents(3)
@@ -88,6 +93,7 @@ def test_switch_back_to_first():
     assert contents[2].visible is False
 
 
+# NOTE: Tests local reimplementation, not production gui/main.py — see M-27
 def test_button_style_updates():
     """Only the selected tab button gets 'active' style."""
     contents = make_tab_contents(3)

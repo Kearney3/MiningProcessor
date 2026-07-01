@@ -16,6 +16,24 @@ from func.string_utils import clean_string
 
 logger = logging.getLogger(__name__)
 
+# All known shift patterns for text-based detection
+_SHIFT_PATTERNS: dict[str, list[str]] = {
+    "Day": ["白班", "өдөр", "day", "日班"],
+    "Night": ["夜班", "шөнө", "night", "夜"],
+}
+
+
+def detect_shift(text: str) -> str | None:
+    """Identify shift from text content. Returns 'Day', 'Night', or None."""
+    if not text:
+        return None
+    lower = str(text).lower()
+    for shift, keywords in _SHIFT_PATTERNS.items():
+        if any(kw in lower for kw in keywords):
+            return shift
+    return None
+
+
 # 模块类型到默认输出文件名的映射（不含 worktime，因其含动态年月）
 MODULE_OUTPUT_FILES: dict[str, str] = {
     "fuel": "Fuel.xlsx",
@@ -260,3 +278,30 @@ def dedup_dataframe(
         tag = f"[{label}] " if label else ""
         logger.info("%s去重: %d → %d 行，移除 %d 条重复记录", tag, before, len(df), removed)
     return df
+
+
+def strip_date_only_times(df: pd.DataFrame) -> pd.DataFrame:
+    """对 datetime 列检测：若所有非空值的时间部分均为 00:00:00，
+    则转换为 date 对象，避免 Excel 导出时出现多余的 ' 00:00:00'。
+
+    Args:
+        df: 待处理的 DataFrame（返回新对象，不修改原 df）。
+
+    Returns:
+        处理后的新 DataFrame。
+    """
+    import datetime as _dt
+
+    midnight = _dt.time(0, 0, 0)
+    result = df.copy()
+    for col in result.columns:
+        if not pd.api.types.is_datetime64_any_dtype(result[col]):
+            continue
+        times = result[col].dropna().dt.time
+        if times.empty:
+            continue
+        if (times == midnight).all():
+            result[col] = result[col].apply(
+                lambda v: v.date() if pd.notna(v) else v
+            )
+    return result
