@@ -47,7 +47,8 @@ class MergeRefs(TypedDict):
 
 
 class ModuleRefs(TypedDict):
-    _match_toggle: ft.Checkbox
+    _match_eq_toggle: ft.Checkbox
+    _match_oil_toggle: ft.Checkbox
     fuel: FuelRefs
     prod: ProdRefs
     elec: ElecRefs
@@ -107,7 +108,8 @@ class SyncRefs(TypedDict):
     date_start: ft.TextField
     date_end: ft.TextField
     apply_header: ft.Checkbox
-    use_ledger: ft.Checkbox
+    use_equipment_ledger: ft.Checkbox
+    use_oil_ledger: ft.Checkbox
 
 
 class UserConfigRefs(TypedDict):

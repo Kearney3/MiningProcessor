@@ -32,10 +32,10 @@ class TestPostProcessLedger:
                 df.to_excel(w, sheet_name=name, index=False)
         return path
 
-    def test_skip_when_use_ledger_false(self, tmp_path):
-        """use_ledger=False 时不执行任何操作。"""
+    def test_skip_when_both_false(self, tmp_path):
+        """两个开关都为 False 时不执行任何操作。"""
         path = self._write_excel(tmp_path, {"s": pd.DataFrame({"a": [1]})})
-        tauri_bridge._post_process_ledger(path, use_ledger=False)
+        tauri_bridge._post_process_ledger(path, use_equipment_ledger=False, use_oil_ledger=False)
         df = pd.read_excel(path)
         assert list(df.columns) == ["a"]
 
@@ -46,7 +46,7 @@ class TestPostProcessLedger:
         })
         with patch("func.config_loader.has_equipment_ledger_cache", return_value=False), \
              patch("func.config_loader.has_oil_ledger_cache", return_value=False):
-            tauri_bridge._post_process_ledger(path, use_ledger=True)
+            tauri_bridge._post_process_ledger(path, use_equipment_ledger=True, use_oil_ledger=True)
         df = pd.read_excel(path)
         assert "标准设备名称" not in df.columns
 
@@ -63,7 +63,7 @@ class TestPostProcessLedger:
         with patch("func.config_loader.has_equipment_ledger_cache", return_value=True), \
              patch("func.config_loader.load_equipment_ledger_cache", return_value=mock_ledger_data), \
              patch("func.config_loader.has_oil_ledger_cache", return_value=False):
-            tauri_bridge._post_process_ledger(path, use_ledger=True)
+            tauri_bridge._post_process_ledger(path, use_equipment_ledger=True, use_oil_ledger=False)
         df = pd.read_excel(path)
         assert "标准设备名称" in df.columns
         assert df["标准设备名称"].iloc[0] == "NTE240"
@@ -85,7 +85,7 @@ class TestPostProcessLedger:
              patch("func.config_loader.load_equipment_ledger_cache", return_value=mock_eq_data), \
              patch("func.config_loader.has_oil_ledger_cache", return_value=True), \
              patch("func.config_loader.load_oil_ledger_cache", return_value=mock_oil_data):
-            tauri_bridge._post_process_ledger(path, use_ledger=True)
+            tauri_bridge._post_process_ledger(path, use_equipment_ledger=True, use_oil_ledger=True)
         df = pd.read_excel(path)
         assert "标准油品名称" in df.columns
 
@@ -107,12 +107,48 @@ class TestPostProcessLedger:
         with patch("func.config_loader.has_equipment_ledger_cache", return_value=True), \
              patch("func.config_loader.load_equipment_ledger_cache", return_value=mock_eq_data), \
              patch("func.config_loader.has_oil_ledger_cache", return_value=False):
-            tauri_bridge._post_process_ledger(path, use_ledger=True)
+            tauri_bridge._post_process_ledger(path, use_equipment_ledger=True, use_oil_ledger=False)
         df = pd.read_excel(path)
         assert "标准设备名称（矿卡）" in df.columns
         assert "标准设备名称（挖机）" in df.columns
         assert df["标准设备名称（矿卡）"].iloc[0] == "NTE240"
         assert df["标准设备名称（挖机）"].iloc[0] == "EX2600"
+
+    def test_equipment_only_skip_oil(self, tmp_path):
+        """仅启用设备台账匹配时，油品列不匹配。"""
+        path = self._write_excel(tmp_path, {
+            "数据": pd.DataFrame({
+                "日期": ["2025-01-01"],
+                "设备名称": ["卡车A"],
+                "油品种类": ["0号柴油"],
+            }),
+        })
+        mock_eq_data = [
+            {"设备名称": "卡车A", "标准设备名称": "NTE240", "标准设备编号": "001", "标准公司名称": "A"},
+        ]
+        with patch("func.config_loader.has_equipment_ledger_cache", return_value=True), \
+             patch("func.config_loader.load_equipment_ledger_cache", return_value=mock_eq_data):
+            tauri_bridge._post_process_ledger(path, use_equipment_ledger=True, use_oil_ledger=False)
+        df = pd.read_excel(path)
+        assert "标准设备名称" in df.columns
+        assert "标准油品名称" not in df.columns
+
+    def test_oil_only_skip_equipment(self, tmp_path):
+        """仅启用油品台账匹配时，设备列不匹配。"""
+        path = self._write_excel(tmp_path, {
+            "数据": pd.DataFrame({
+                "日期": ["2025-01-01"],
+                "设备名称": ["卡车A"],
+                "油品种类": ["0号柴油"],
+            }),
+        })
+        mock_oil_data = [{"油品名称": "0号柴油", "标准油品名称": "柴油"}]
+        with patch("func.config_loader.has_oil_ledger_cache", return_value=True), \
+             patch("func.config_loader.load_oil_ledger_cache", return_value=mock_oil_data):
+            tauri_bridge._post_process_ledger(path, use_equipment_ledger=False, use_oil_ledger=True)
+        df = pd.read_excel(path)
+        assert "标准油品名称" in df.columns
+        assert "标准设备名称" not in df.columns
 
 
 # ---------------------------------------------------------------------------

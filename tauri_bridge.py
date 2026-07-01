@@ -215,14 +215,18 @@ def _load_oil_ledger_from_cache():
 # ═══════════════════════════════════════════════════════════
 
 
-def _post_process_ledger(output_file: str, use_ledger: bool) -> None:
+def _post_process_ledger(
+    output_file: str,
+    use_equipment_ledger: bool = False,
+    use_oil_ledger: bool = True,
+) -> None:
     """对输出 Excel 文件进行台账匹配后处理。"""
-    if not use_ledger:
+    if not use_equipment_ledger and not use_oil_ledger:
         return
     from func.ledger_postprocess import apply_ledger_matching
 
-    equipment_ledger = _load_equipment_ledger_from_cache()
-    oil_ledger = _load_oil_ledger_from_cache()
+    equipment_ledger = _load_equipment_ledger_from_cache() if use_equipment_ledger else None
+    oil_ledger = _load_oil_ledger_from_cache() if use_oil_ledger else None
 
     apply_ledger_matching(output_file, equipment_ledger, oil_ledger)
 
@@ -239,7 +243,11 @@ def _process_fuel(params: dict) -> dict:
     result = process_diesel_data(params["path"], target_year=params.get("year"))
     output_file = str(result) if result else None
     if output_file:
-        _post_process_ledger(output_file, params.get("use_ledger", False))
+        _post_process_ledger(
+            output_file,
+            use_equipment_ledger=params.get("use_equipment_ledger", False),
+            use_oil_ledger=params.get("use_oil_ledger", False),
+        )
     return {"output_file": output_file}
 
 
@@ -261,7 +269,11 @@ def _process_production(params: dict) -> dict:
         processor.process_single_file(path)
         output_file = None
     if output_file:
-        _post_process_ledger(output_file, params.get("use_ledger", False))
+        _post_process_ledger(
+            output_file,
+            use_equipment_ledger=params.get("use_equipment_ledger", False),
+            use_oil_ledger=params.get("use_oil_ledger", False),
+        )
     return {"output_file": output_file}
 
 
@@ -276,7 +288,11 @@ def _process_electrical(params: dict) -> dict:
         default_shift=params.get("default_shift", "Day"),
     )
     output_file = str(Path(params["path"]).parent / "电力消耗统计.xlsx")
-    _post_process_ledger(output_file, params.get("use_ledger", False))
+    _post_process_ledger(
+        output_file,
+        use_equipment_ledger=params.get("use_equipment_ledger", False),
+        use_oil_ledger=params.get("use_oil_ledger", False),
+    )
     return {"output_file": output_file}
 
 
@@ -305,7 +321,11 @@ def _process_worktime(params: dict) -> dict:
         return_sheets=False,
         header_mapping=header_mapping,
     )
-    _post_process_ledger(output_file, params.get("use_ledger", False))
+    _post_process_ledger(
+        output_file,
+        use_equipment_ledger=params.get("use_equipment_ledger", False),
+        use_oil_ledger=params.get("use_oil_ledger", False),
+    )
     return {"output_file": output_file}
 
 
@@ -320,7 +340,11 @@ def _process_merge(params: dict) -> dict:
         sort_configs=params.get("sort_configs"),
     )
     if output:
-        _post_process_ledger(output, params.get("use_ledger", False))
+        _post_process_ledger(
+            output,
+            use_equipment_ledger=params.get("use_equipment_ledger", False),
+            use_oil_ledger=params.get("use_oil_ledger", False),
+        )
     return {"output_file": output}
 
 
@@ -338,8 +362,10 @@ def _batch_process(params: dict) -> dict:
     from func.config_loader import get_worktime_header_mapping
 
     # 台账
-    equipment_ledger = _load_equipment_ledger_from_cache() if params.get("use_ledger") else None
-    oil_ledger = _load_oil_ledger_from_cache() if params.get("use_ledger") else None
+    use_eq = params.get("use_equipment_ledger", False)
+    use_oil = params.get("use_oil_ledger", False)
+    equipment_ledger = _load_equipment_ledger_from_cache() if use_eq else None
+    oil_ledger = _load_oil_ledger_from_cache() if use_oil else None
 
     # 进度回调 → 事件推送
     def progress_cb(payload):
