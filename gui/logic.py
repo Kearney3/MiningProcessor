@@ -5,6 +5,7 @@ GUI 业务逻辑层
 import asyncio
 import logging
 import traceback
+from datetime import datetime
 import flet as ft
 import os
 import pandas as pd
@@ -146,7 +147,7 @@ def _get_output_file(module_type: str, path: str, **kwargs) -> str | None:
         keyword = kwargs.get("keyword", "")
         return os.path.join(path, f"{keyword}_合并.xlsx")
 
-    year = kwargs.get("year", 2025)
+    year = kwargs.get("year", datetime.now().year)
     month = kwargs.get("month", 1)
     filename = get_output_filename(module_type, year=year, month=month)
     if not filename:
@@ -179,7 +180,7 @@ def _dispatch_module(module_type: str, path: str, **kwargs) -> object | None:
                          add_shift_column=kwargs.get("add_shift_column", False),
                          default_shift=kwargs.get("default_shift", "Day"))
     elif module_type == "worktime":
-        year = kwargs.get("year", 2025)
+        year = kwargs.get("year", datetime.now().year)
         month = kwargs.get("month", 1)
         header_mapping = kwargs.get("header_mapping", None)
         file_dir = os.path.dirname(path) or "."
@@ -219,9 +220,8 @@ def _execute_task(module_type: str, path: str, **kwargs) -> str | None:
     return None
 
 
-async def run_task(page: ft.Page, module_type: str, path: str, btn: ft.Button, log, **kwargs) -> None:
+async def run_task(page: ft.Page, module_type: str, path: str, log, **kwargs) -> None:
     """异步执行处理任务，按钮状态由调用方自行恢复"""
-    del btn  # 保留现有调用签名，避免影响其他调用方
 
     label = _MODULE_LABELS.get(module_type, module_type)
     _log_message(log, f"[{label}] 开始处理...")
@@ -249,7 +249,7 @@ async def _safe_run_task(
     """通用处理回调模板：禁用按钮 → 执行任务 → 恢复按钮 (M4)"""
     set_btn_state(btn, False, "处理中...")
     try:
-        await run_task(page, module_type, path, btn, log, **kwargs)
+        await run_task(page, module_type, path, log, **kwargs)
     finally:
         set_btn_state(btn, True, label)
 

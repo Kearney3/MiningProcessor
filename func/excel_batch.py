@@ -25,6 +25,9 @@ logger = get_logger(__name__)
 # Excel sheet 名称最大长度（Excel 限制为 31 字符）
 MAX_SHEET_NAME_LENGTH = 31
 
+# 表内合并输出阶段数
+_MERGE_STAGE_COUNT = 3
+
 
 def _check_cancel(cancel_event) -> bool:
     return cancel_event is not None and cancel_event.is_set()
@@ -540,9 +543,9 @@ def _table_merge_and_write(
     """
     执行表内合并流程：聚合生产数据 → 左合并所有模块 → 输出单 sheet Excel。
     """
-    _emit_progress(progress_cb, {"stage": "writing", "percent": 1/3, "current": 1, "total": 3, "detail": "表内合并：开始聚合"})
+    _emit_progress(progress_cb, {"stage": "writing", "percent": 1/_MERGE_STAGE_COUNT, "current": 1, "total": _MERGE_STAGE_COUNT, "detail": "表内合并：开始聚合"})
     if _check_cancel(cancel_event):
-        _emit_progress(progress_cb, {"stage": "cancelled", "percent": 1/3, "current": 1, "total": 3, "detail": "用户取消，已完成部分输出"})
+        _emit_progress(progress_cb, {"stage": "cancelled", "percent": 1/_MERGE_STAGE_COUNT, "current": 1, "total": _MERGE_STAGE_COUNT, "detail": "用户取消，已完成部分输出"})
         return
     base_type = table_merge_config.get("base_type", "fuel")
     join_keys = ["日期", "班次", "标准设备名称"]
@@ -643,9 +646,9 @@ def _table_merge_and_write(
             logger.error(f"合并 '{label}' 失败: {e}")
 
     # 6. 列排序 & 输出
-    _emit_progress(progress_cb, {"stage": "writing", "percent": 2/3, "current": 2, "total": 3, "detail": "表内合并：开始写入"})
+    _emit_progress(progress_cb, {"stage": "writing", "percent": 2/_MERGE_STAGE_COUNT, "current": 2, "total": _MERGE_STAGE_COUNT, "detail": "表内合并：开始写入"})
     if _check_cancel(cancel_event):
-        _emit_progress(progress_cb, {"stage": "cancelled", "percent": 2/3, "current": 2, "total": 3, "detail": "用户取消，已完成部分输出"})
+        _emit_progress(progress_cb, {"stage": "cancelled", "percent": 2/_MERGE_STAGE_COUNT, "current": 2, "total": _MERGE_STAGE_COUNT, "detail": "用户取消，已完成部分输出"})
         return
     merged = _reorder_columns(merged)
     merged = dedup_dataframe(merged, "表内合并")
@@ -653,7 +656,7 @@ def _table_merge_and_write(
     output_file = os.path.join(folder_path, f"表内合并结果_{year}{month:02d}_{timestamp}.xlsx")
     merged.to_excel(output_file, index=False, sheet_name="合并数据")
     logger.info(f"表内合并完成: {output_file} ({len(merged)} 行)")
-    _emit_progress(progress_cb, {"stage": "finished", "percent": 1.0, "current": 3, "total": 3, "detail": "表内合并：写入完成"})
+    _emit_progress(progress_cb, {"stage": "finished", "percent": 1.0, "current": _MERGE_STAGE_COUNT, "total": _MERGE_STAGE_COUNT, "detail": "表内合并：写入完成"})
 
 # ---------------------------------------------------------------------------
 # 输出
