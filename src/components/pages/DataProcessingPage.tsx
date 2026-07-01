@@ -296,7 +296,7 @@ function FuelCard({
 }) {
   const { notify } = useToast();
   const [path, setPath] = useState("");
-  const [year, setYear] = useState("");
+  const [year, setYear] = useState(String(currentYear));
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -428,7 +428,7 @@ function ElectricalCard({
 }) {
   const { notify } = useToast();
   const [path, setPath] = useState("");
-  const [year, setYear] = useState("");
+  const [year, setYear] = useState(String(currentYear));
   const [addShift, setAddShift] = useState(false);
   const [defaultShift, setDefaultShift] = useState("Day");
   const [loading, setLoading] = useState(false);
