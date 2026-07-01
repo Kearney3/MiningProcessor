@@ -8,7 +8,7 @@ import re
 import argparse
 
 from func.logger import get_logger
-from func.excel_utils import dedup_dataframe
+from func.excel_utils import dedup_dataframe, detect_shift
 from func.string_utils import clean_string
 
 logger = get_logger(__name__)
@@ -56,12 +56,9 @@ def parse_excel_data(file_path, target_year=None, return_sheets=False, add_shift
                         cell_val = clean_string(df.iloc[scan_row, col_idx])
                     except Exception:
                         continue
-                    if not cell_val:
-                        continue
-                    if "白班" in cell_val or "өдөр" in cell_val.lower() or cell_val.upper() == "DAY":
-                        col_to_shift[col_idx] = "Day"
-                    elif "夜班" in cell_val or "шөнө" in cell_val.lower() or cell_val.upper() == "NIGHT":
-                        col_to_shift[col_idx] = "Night"
+                    shift = detect_shift(cell_val)
+                    if shift:
+                        col_to_shift[col_idx] = shift
 
         for col_idx in range(4, len(date_row)):
             cell_val = date_row[col_idx]

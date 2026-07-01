@@ -23,6 +23,21 @@ LEDGER_COLUMNS = [
 
 
 class EquipmentLedger(LedgerBase):
+    """设备名称标准化与匹配。
+
+    提供设备台账的导入、缓存构建与匹配能力，用于将报表中的原始设备名
+    称标准化为台账中登记的标准名称。
+
+    匹配策略（优先级由高到低）：
+    1. 设备编号精确匹配（match_by_id）—— O(1) 缓存查找
+    2. 设备名称前缀匹配（继承自 LedgerBase.match）
+    3. rapidfuzz 模糊匹配（继承自 LedgerBase.match）
+
+    典型用法：
+        ledger = EquipmentLedger("设备台账.xlsx")
+        result = ledger.match_device(name="CAT785D-01", device_id="#1101")
+        # -> {"标准设备名称": "NTE240 HT#1101", "标准设备编号": "HT#1101", "标准公司名称": "A公司"}
+    """
     def __init__(self, ledger_path: Optional[str] = None):
         self._id_cache: dict[str, dict] = {}  # 缓存：设备编号 -> 标准信息
         self._name_to_info: dict[str, dict] = {}  # 反向索引：标准设备名称 -> 完整信息 (H7)

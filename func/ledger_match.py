@@ -11,6 +11,7 @@ from typing import Any, Callable, Optional
 import pandas as pd
 
 from func.logger import get_logger
+from func.excel_utils import strip_date_only_times
 
 logger = get_logger(__name__)
 
@@ -63,20 +64,6 @@ ProgressCallback = Callable[[float, str], None]  # (progress 0-1, message)
 # ---------------------------------------------------------------------------
 # Excel 导入
 # ---------------------------------------------------------------------------
-
-def _strip_date_only_times(df: pd.DataFrame) -> pd.DataFrame:
-    """Convert datetime columns with all-midnight times to plain date objects."""
-    import datetime as _dt
-    midnight = _dt.time(0, 0, 0)
-    result = df.copy()
-    for col in result.columns:
-        if not pd.api.types.is_datetime64_any_dtype(result[col]):
-            continue
-        times = result[col].dropna().dt.time
-        if times.empty or not (times == midnight).all():
-            continue
-        result[col] = result[col].apply(lambda v: v.date() if pd.notna(v) else v)
-    return result
 
 
 def import_excel(
@@ -138,7 +125,7 @@ def import_excel(
                 if len(row_lens) > 1 or (row_lens and header_len not in row_lens):
                     logger.debug("Sheet %r: header_len=%d, row_lengths=%s", sname, header_len, row_lens)
                 df = pd.DataFrame(rows_data, columns=headers)
-                df = _strip_date_only_times(df)
+                df = strip_date_only_times(df)
             else:
                 df = pd.DataFrame(columns=headers)
 

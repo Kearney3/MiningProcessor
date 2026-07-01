@@ -15,6 +15,7 @@ def test_drag_update_event_has_no_delta_y():
     assert "delta_y" not in fields, "DragUpdateEvent unexpectedly has delta_y"
 
 
+# NOTE: Uses source inspection — fragile under refactor — see M-28
 def test_resize_handler_uses_primary_delta():
     """The drag handler must read e.primary_delta, not e.delta_y."""
     import inspect
@@ -23,6 +24,7 @@ def test_resize_handler_uses_primary_delta():
     assert "e.delta_y" not in source, "Handler should not use e.delta_y"
 
 
+# NOTE: Uses source inspection — fragile under refactor — see M-28
 def test_log_height_adjusted_on_resize():
     """When log view is resized, the log container height must be updated."""
     import inspect

@@ -21,6 +21,7 @@ __pypackages__/
 .claude/
 .codex/
 .cursor/
+.serena/
 .trellis/
 
 # Test / cache

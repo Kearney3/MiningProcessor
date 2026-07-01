@@ -9,6 +9,9 @@ import pandas as pd
 from pathlib import Path
 
 from func.config_loader import get_user_config, update_user_config
+from func.excel_utils import strip_date_only_times
+
+logger = logging.getLogger(__name__)
 
 # 共享的文件选择器上次目录，所有模块复用同一份
 # 使用列表以便在各模块内原地更新，保证跨模块可见
@@ -58,24 +61,6 @@ def to_local_dt(d):
 
 
 PAGE_SIZE = 20
-
-
-def strip_date_only_times(df: pd.DataFrame) -> pd.DataFrame:
-    """对 datetime 列检测：若所有非空值的时间部分均为 00:00:00，
-    则转换为 date 对象，避免 Excel 导出时出现多余的 ' 00:00:00'。"""
-    import datetime as _dt
-    midnight = _dt.time(0, 0, 0)
-    for col in df.columns:
-        if not pd.api.types.is_datetime64_any_dtype(df[col]):
-            continue
-        times = df[col].dropna().dt.time
-        if times.empty:
-            continue
-        if (times == midnight).all():
-            df[col] = df[col].apply(
-                lambda v: v.date() if pd.notna(v) else v
-            )
-    return df
 
 
 def month_options() -> list[ft.dropdown.Option]:
@@ -253,7 +238,7 @@ class SortState:
             try:
                 return df.sort_values(by=self.column, ascending=self.ascending, kind="stable")
             except Exception:
-                pass
+                logger.debug('Sort failed for column %s', self.column, exc_info=True)
         return df
 
     def get_column_index(self, columns: list[str]) -> int | None:
