@@ -79,9 +79,11 @@ class TestGetOutputFile:
         assert "电力消耗统计.xlsx" in result
 
     def test_worktime_with_defaults(self, tmp_path):
+        from datetime import datetime
         input_file = str(tmp_path / "work.xlsx")
         result = _get_output_file("worktime", input_file)
-        assert "202501_工作效率表.xlsx" in result
+        current_year = datetime.now().year
+        assert f"{current_year}01_工作效率表.xlsx" in result
 
     def test_worktime_with_custom_year_month(self, tmp_path):
         input_file = str(tmp_path / "work.xlsx")
