@@ -74,12 +74,11 @@ jobs:
           releaseBody: "See the assets below for download links."
           releaseDraft: true
           prerelease: false
-          args: "--target aarch64-apple-darwin"
+          args: "--target aarch64-apple-darwin --bundles app"
 
       - name: Embed sidecar into .app bundle
         shell: bash
         run: |
-          # Tauri action 使用 --target 时产物在 target/<triple>/ 下
           BUNDLE_DIR="src-tauri/target/aarch64-apple-darwin/release/bundle"
           APP_DIR=$(find "$BUNDLE_DIR/macos" -name "*.app" -maxdepth 1 | head -1)
           if [ -n "$APP_DIR" ]; then
@@ -94,13 +93,34 @@ jobs:
             ls -R "$BUNDLE_DIR" || true
           fi
 
+      - name: Create DMG
+        shell: bash
+        run: |
+          BUNDLE_DIR="src-tauri/target/aarch64-apple-darwin/release/bundle"
+          APP_DIR=$(find "$BUNDLE_DIR/macos" -name "*.app" -maxdepth 1 | head -1)
+          APP_NAME=$(basename "$APP_DIR")
+          VERSION=$(grep -o '"version": *"[^"]*"' src-tauri/tauri.conf.json | head -1 | cut -d'"' -f4)
+          DMG_DIR="$BUNDLE_DIR/dmg"
+          mkdir -p "$DMG_DIR"
+          DMG_PATH="$DMG_DIR/${APP_NAME%.app}_${VERSION}_aarch64.dmg"
+
+          STAGING=$(mktemp -d)
+          cp -R "$APP_DIR" "$STAGING/"
+          ln -s /Applications "$STAGING/Applications"
+          hdiutil create \
+            -volname "$APP_NAME" \
+            -srcfolder "$STAGING" \
+            -ov -format UDZO \
+            -imagekey zlib-level=9 \
+            "$DMG_PATH"
+          rm -rf "$STAGING"
+          echo "✅ DMG created: $DMG_PATH"
+
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-arm64
-          path: |
-            src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app
-            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+          path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
           if-no-files-found: error
 
   # ══════════════════════════════════════════════════════════
@@ -149,26 +169,26 @@ jobs:
       - name: Build frontend
         run: pnpm build
 
-      - name: Build Tauri app
+      - name: Build Tauri app (MSI only)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: "--target x86_64-pc-windows-msvc"
+          args: "--target x86_64-pc-windows-msvc --bundles msi"
 
-      - name: Embed sidecar into Windows bundle
+      - name: Embed sidecar and build NSIS installer
         shell: bash
         run: |
-          # 查找 NSIS 安装包目录
-          for dir in src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis; do
-            if [ -d "$dir" ]; then
-              cp build-sidecar/tauri-bridge.exe "$dir/" 2>/dev/null || true
-              echo "✅ Sidecar placed in $dir"
-            fi
-          done
-          # 也复制到 release 目录供直接运行
-          cp build-sidecar/tauri-bridge.exe src-tauri/target/x86_64-pc-windows-msvc/release/ 2>/dev/null || true
-          echo "✅ Sidecar embedded for Windows x64"
+          BUNDLE_DIR="src-tauri/target/x86_64-pc-windows-msvc/release/bundle"
+
+          # 嵌入 sidecar 到 bundle 目录，供后续 NSIS 打包
+          cp build-sidecar/tauri-bridge.exe "$BUNDLE_DIR/"
+          chmod +x "$BUNDLE_DIR/tauri-bridge.exe"
+          echo "✅ Sidecar placed in $BUNDLE_DIR"
+
+          # 重新打包 NSIS（Rust 二进制已缓存，不会重新编译）
+          cargo tauri build --target x86_64-pc-windows-msvc --bundles nsis
+          echo "✅ NSIS installer rebuilt with sidecar"
 
       - name: Upload Windows x64 artifact
         uses: actions/upload-artifact@v4
@@ -176,5 +196,5 @@ jobs:
           name: windows-x64
           path: |
             src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
-            src-tauri/target/x86_64-pc-windows-msvc/release/tauri-bridge.exe
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/tauri-bridge.exe
           if-no-files-found: warn
