@@ -59,33 +59,15 @@ fn find_bridge_script() -> Result<std::path::PathBuf, String> {
 
 /// 尝试以 sidecar 模式启动（打包后）
 ///
-/// Tauri externalBin 将 sidecar 命名为 tauri-bridge-<target_triple>[.exe]。
-/// macOS .app 位于 Contents/MacOS/，Windows NSIS 位于安装目录。
+/// 在可执行文件同目录下查找 `tauri-bridge` 二进制。
+/// 对于 macOS .app bundle，位于 Contents/MacOS/tauri-bridge。
 fn try_start_sidecar() -> Option<PythonBridge> {
     let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
 
-    let triple = if cfg!(target_os = "macos") {
-        if cfg!(target_arch = "aarch64") {
-            "aarch64-apple-darwin"
-        } else {
-            "x86_64-apple-darwin"
-        }
-    } else if cfg!(target_os = "windows") {
-        "x86_64-pc-windows-msvc"
-    } else {
-        return None;
-    };
-
-    let bin_name = if cfg!(target_os = "windows") {
-        format!("tauri-bridge-{}.exe", triple)
-    } else {
-        format!("tauri-bridge-{}", triple)
-    };
-
     let candidates = [
-        exe_dir.join(&bin_name),                        // 同目录（Windows NSIS / macOS）
-        exe_dir.join("../MacOS").join(&bin_name),       // 从 Resources 目录
-        exe_dir.join("../../MacOS").join(&bin_name),    // 从嵌套目录
+        exe_dir.join("tauri-bridge"),
+        exe_dir.join("../MacOS/tauri-bridge"),      // 从 Resources 目录
+        exe_dir.join("../../MacOS/tauri-bridge"),    // 从嵌套目录
     ];
 
     for candidate in &candidates {
@@ -162,7 +144,7 @@ fn init_bridge(app: &tauri::App) -> Result<(), String> {
         .and_then(|p| p.parent().map(|d| d.to_string_lossy().to_string()))
         .unwrap_or_else(|| "unknown".into());
     let msg = format!(
-        "Python bridge 未找到。已搜索：{}/tauri-bridge-*（sidecar）和系统 Python（dev 模式）。\
+        "Python bridge 未找到。已搜索：{}/tauri-bridge（sidecar）和系统 Python（dev 模式）。\
          请确保已运行 build.sh 打包 sidecar，或在开发模式下运行 pnpm tauri dev。",
         exe_dir
     );
