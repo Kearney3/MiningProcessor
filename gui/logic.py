@@ -400,7 +400,8 @@ def _handle_batch_cancel(cancel_event, cancel_btn):
         cancel_btn.update()
 
 
-async def _consume_batch_progress_queue(progress_queue, progress_bar, progress_text):
+def _drain_batch_progress_queue_once(progress_queue, progress_bar, progress_text) -> float | None:
+    """Drain all available items from the queue and update UI once. Returns last percent or None."""
     last_percent = None
     while True:
         try:
@@ -408,14 +409,36 @@ async def _consume_batch_progress_queue(progress_queue, progress_bar, progress_t
         except Exception:
             break
         last_percent = payload.get("percent", last_percent)
-    # 只在队列有数据时做一次最终更新（避免逐条更新导致 UI 闪烁）
     if last_percent is not None:
-        if progress_bar is not None:
-            progress_bar.value = float(last_percent)
-            progress_bar.update()
-        if progress_text is not None:
-            progress_text.value = f"{int(last_percent * 100)}%"
-            progress_text.update()
+        _apply_progress_update(last_percent, progress_bar, progress_text)
+    return last_percent
+
+
+def _apply_progress_update(percent: float, progress_bar, progress_text) -> None:
+    """Update progress bar and text controls with the given percent."""
+    if progress_bar is not None:
+        progress_bar.value = float(percent)
+        progress_bar.update()
+    if progress_text is not None:
+        progress_text.value = f"{int(percent * 100)}%"
+        progress_text.update()
+
+
+async def _poll_batch_progress_queue(progress_queue, progress_bar, progress_text, done_flag: asyncio.Event):
+    """Continuously drain the progress queue while the batch is running.
+
+    Polls every 0.3 seconds. Stops when ``done_flag`` is set and the queue
+    has been fully drained (one final sweep after ``done_flag``).
+    """
+    while not done_flag.is_set():
+        try:
+            await asyncio.wait_for(done_flag.wait(), timeout=0.3)
+        except asyncio.TimeoutError:
+            # Timeout expired -> poll the queue
+            _drain_batch_progress_queue_once(progress_queue, progress_bar, progress_text)
+
+    # Final drain after the worker thread has finished
+    _drain_batch_progress_queue_once(progress_queue, progress_bar, progress_text)
 
 
 async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledger=None, oil_ledger=None) -> None:
@@ -554,6 +577,10 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
 
         # ── 第三阶段：执行处理 ──
         set_btn_state(btn, False, "处理中...")
+        done_flag = asyncio.Event()
+        progress_poller = asyncio.create_task(
+            _poll_batch_progress_queue(progress_queue, progress_bar, progress_text, done_flag)
+        )
         try:
             thread_result = {}
             def _batch_target():
@@ -570,7 +597,9 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
                     thread_result["error"] = ex
 
             await asyncio.to_thread(_batch_target)
-            await _consume_batch_progress_queue(progress_queue, progress_bar, progress_text)
+            # Signal the poller to do its final drain and stop
+            done_flag.set()
+            await progress_poller
             if "error" in thread_result:
                 raise thread_result["error"]
             if cancel_event is not None and cancel_event.is_set():
@@ -580,6 +609,14 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
                 _log_message(log, "批量处理完成")
                 _show_snackbar(page, "批量处理完成")
         except Exception as ex:
+            # Ensure poller is cancelled on error to prevent task leak
+            done_flag.set()
+            if not progress_poller.done():
+                progress_poller.cancel()
+                try:
+                    await progress_poller
+                except asyncio.CancelledError:
+                    pass
             _log_message(log, f"批量处理失败: {ex}", level=logging.ERROR)
             _show_snackbar(page, f"批量处理失败: {ex}", is_error=True)
 

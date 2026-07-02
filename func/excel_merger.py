@@ -7,7 +7,7 @@ from typing import List, Tuple
 import pandas as pd
 from func.logger import get_logger
 from func.string_utils import clean_string
-from func.excel_utils import dedup_dataframe
+from func.excel_utils import dedup_dataframe, sanitize_filename
 
 logger = get_logger(__name__)
 
@@ -199,9 +199,14 @@ def merge_excel_files(
 
         merged_sheets[sname] = merged_df
 
+    # Close cached ExcelFile handles
+    for xl in xl_cache.values():
+        xl.close()
+
     # 5. 输出文件
     if output_file is None:
-        output_file = os.path.join(folder_path, f"{keyword}_合并.xlsx")
+        safe_keyword = sanitize_filename(keyword)
+        output_file = os.path.join(folder_path, f"{safe_keyword}_合并.xlsx")
 
     from func.excel_formatter import write_formatted_excel
 

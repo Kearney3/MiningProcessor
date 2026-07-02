@@ -111,44 +111,45 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
     except (FileNotFoundError, PermissionError, ValueError) as e:
         raise RuntimeError(f"读取 Excel 文件失败: {e}") from e
 
-    all_data = []
-    success_count = 0
-    day_list = []
+    with xls:
+        all_data = []
+        success_count = 0
+        day_list = []
 
-    for sheet_name in xls.sheet_names:
-        # 确保sheet名称是数字（代表日期）
-        if not clean_string(sheet_name).isdigit():
-            logger.warning(f"跳过非日期Sheet: {sheet_name}")
-            continue
+        for sheet_name in xls.sheet_names:
+            # 确保sheet名称是数字（代表日期）
+            if not clean_string(sheet_name).isdigit():
+                logger.warning(f"跳过非日期Sheet: {sheet_name}")
+                continue
 
-        # 读取整个sheet，不设表头
-        df_raw = pd.read_excel(xls, sheet_name=sheet_name, header=None)
+            # 读取整个sheet，不设表头
+            df_raw = pd.read_excel(xls, sheet_name=sheet_name, header=None)
 
-        # 1. 确定日期字符串 (YYYY-MM-DD)
-        day = int(clean_string(sheet_name))
-        date_str = f"{year}-{month:02d}-{day:02d}"
-        day_list.append(day)
+            # 1. 确定日期字符串 (YYYY-MM-DD)
+            day = int(clean_string(sheet_name))
+            date_str = f"{year}-{month:02d}-{day:02d}"
+            day_list.append(day)
 
-        # 2. 分割 Day/Night 班次（day_end_offset=-1 对应原 worktime 行为）
-        combined_day_df = split_day_night_shifts(df_raw)
+            # 2. 分割 Day/Night 班次（day_end_offset=-1 对应原 worktime 行为）
+            combined_day_df = split_day_night_shifts(df_raw)
 
-        # 插入日期列到第一列
-        combined_day_df.insert(0, '日期', date_str)
+            # 插入日期列到第一列
+            combined_day_df.insert(0, '日期', date_str)
 
-        # 3. 清洗
-        combined_day_df = clean_split_dataframe(combined_day_df)
+            # 3. 清洗
+            combined_day_df = clean_split_dataframe(combined_day_df)
 
-        all_data.append(combined_day_df)
-        success_count += 1
-        logger.info(f"成功处理日期: {day}, 有效数据行数: {len(combined_day_df)}")
+            all_data.append(combined_day_df)
+            success_count += 1
+            logger.info(f"成功处理日期: {day}, 有效数据行数: {len(combined_day_df)}")
 
-    # 4. 合并所有日期的数据
-    if not all_data:
-        logger.warning("未提取到任何有效数据。")
-        return
+        # 4. 合并所有日期的数据
+        if not all_data:
+            logger.warning("未提取到任何有效数据。")
+            return
 
-    logger.info(f"成功处理 {success_count} 个日期数据")
-    logger.info(f"成功导入的日期为: {sorted(day_list)}")
+        logger.info(f"成功处理 {success_count} 个日期数据")
+        logger.info(f"成功导入的日期为: {sorted(day_list)}")
 
     final_df = pd.concat(all_data, axis=0, ignore_index=True)
 
@@ -167,7 +168,10 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
     # 去重
     final_df = dedup_dataframe(final_df, "工时数据")
 
-    # 7. 输出到Excel
+    # 7. 输出到Excel（跳过写入当 return_sheets=True）
+    if return_sheets:
+        return {"工时数据": final_df}
+
     if output_file is None:
         file_dir = os.path.dirname(file_path) or "."
         output_file = os.path.join(file_dir, f"{year}{month:02d}_工作效率表.xlsx")
@@ -175,9 +179,6 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
 
     write_formatted_excel(output_file, {"工时数据": final_df})
     logger.info(f"数据处理完成，已保存至: {output_file}")
-
-    if return_sheets:
-        return {"工时数据": final_df}
 
 
 # --- 参数配置 ---
