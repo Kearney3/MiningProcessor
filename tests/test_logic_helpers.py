@@ -332,7 +332,7 @@ class TestWorktimeHeaderMapping:
 
     def test_mapping_indices_before_insert(self, tmp_path):
         """表头映射的 position 索引对应原始列位置（insert 之前）"""
-        from func.excel_worktime import _apply_header_mapping
+        from func.excel_utils import apply_header_mapping
 
         # 模拟 insert 之前的 DataFrame（原始 Mongolian 列 + 班次）
         df = pd.DataFrame({
@@ -352,7 +352,7 @@ class TestWorktimeHeaderMapping:
             ],
         }
 
-        result = _apply_header_mapping(df, mapping)
+        result = apply_header_mapping(df, mapping)
         assert list(result.columns) == ["序号", "设备名称", "公司", "班次"]
 
 

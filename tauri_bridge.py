@@ -190,49 +190,20 @@ def _register(name: str):
 
 
 # ═══════════════════════════════════════════════════════════
-# 台账缓存加载（公共工具，消除重复代码 M6）
+# 台账缓存加载 & 匹配后处理（委托 func/orchestration.py 共享模块）
 # ═══════════════════════════════════════════════════════════
 
 
 def _load_equipment_ledger_from_cache():
     """从缓存加载设备台账实例，失败返回 None。"""
-    import pandas as pd
-    from func.equipment_ledger import EquipmentLedger
-    from func.config_loader import has_equipment_ledger_cache, load_equipment_ledger_cache
-    try:
-        if has_equipment_ledger_cache():
-            cached = load_equipment_ledger_cache()
-            if cached:
-                ledger = EquipmentLedger()
-                ledger._df = pd.DataFrame(cached)
-                ledger._build_search_cache()
-                return ledger
-    except Exception:
-        pass
-    return None
+    from func.orchestration import load_equipment_ledger_from_cache
+    return load_equipment_ledger_from_cache()
 
 
 def _load_oil_ledger_from_cache():
     """从缓存加载油品台账实例，失败返回 None。"""
-    import pandas as pd
-    from func.oil_ledger import OilLedger
-    from func.config_loader import has_oil_ledger_cache, load_oil_ledger_cache
-    try:
-        if has_oil_ledger_cache():
-            cached = load_oil_ledger_cache()
-            if cached:
-                ledger = OilLedger()
-                ledger._df = pd.DataFrame(cached)
-                ledger._build_search_cache()
-                return ledger
-    except Exception:
-        pass
-    return None
-
-
-# ═══════════════════════════════════════════════════════════
-# 台账匹配后处理（各模块共用）
-# ═══════════════════════════════════════════════════════════
+    from func.orchestration import load_oil_ledger_from_cache
+    return load_oil_ledger_from_cache()
 
 
 def _post_process_ledger(
@@ -241,14 +212,12 @@ def _post_process_ledger(
     use_oil_ledger: bool = True,
 ) -> None:
     """对输出 Excel 文件进行台账匹配后处理。"""
-    if not use_equipment_ledger and not use_oil_ledger:
-        return
-    from func.ledger_postprocess import apply_ledger_matching
-
-    equipment_ledger = _load_equipment_ledger_from_cache() if use_equipment_ledger else None
-    oil_ledger = _load_oil_ledger_from_cache() if use_oil_ledger else None
-
-    apply_ledger_matching(output_file, equipment_ledger, oil_ledger)
+    from func.orchestration import postprocess_from_cache
+    postprocess_from_cache(
+        output_file,
+        use_equipment_ledger=use_equipment_ledger,
+        use_oil_ledger=use_oil_ledger,
+    )
 
 
 # ═══════════════════════════════════════════════════════════
@@ -321,17 +290,15 @@ def _process_electrical(params: dict) -> dict:
 @_register("process_worktime")
 def _process_worktime(params: dict) -> dict:
     from func.excel_worktime import process_excel_data
-    from func.config_loader import get_worktime_header_mapping
+    from func.orchestration import build_worktime_header_mapping
 
     header_mapping = None
     if params.get("use_header_mapping"):
-        header_mapping = get_worktime_header_mapping()
-        if params.get("header_mode"):
-            header_mapping["mode"] = params["header_mode"]
-        if params.get("header_fuzzy") is not None:
-            header_mapping["fuzzy"] = params["header_fuzzy"]
-        elif params.get("fuzzy_match") is not None:  # H8: 兼容前端 fuzzy_match 参数名
-            header_mapping["fuzzy"] = params["fuzzy_match"]
+        header_mapping = build_worktime_header_mapping(
+            mode=params.get("header_mode"),
+            fuzzy=params.get("header_fuzzy"),
+            fuzzy_match=params.get("fuzzy_match"),
+        )
 
     year, month = params["year"], params["month"]
     safe_path = str(_sanitize_path(params["path"], must_exist=True))
@@ -384,13 +351,12 @@ def _batch_scan(params: dict) -> dict:
 @_register("batch_process")
 def _batch_process(params: dict) -> dict:
     from func.excel_batch import process_files
-    from func.config_loader import get_worktime_header_mapping
+    from func.orchestration import load_ledgers, build_worktime_header_mapping
 
     # 台账
     use_eq = params.get("use_equipment_ledger", False)
     use_oil = params.get("use_oil_ledger", False)
-    equipment_ledger = _load_equipment_ledger_from_cache() if use_eq else None
-    oil_ledger = _load_oil_ledger_from_cache() if use_oil else None
+    equipment_ledger, oil_ledger = load_ledgers(use_equipment=use_eq, use_oil=use_oil)
 
     # 进度回调 → 事件推送
     def progress_cb(payload):
@@ -404,13 +370,11 @@ def _batch_process(params: dict) -> dict:
     # 工时表头映射
     worktime_header_mapping = None
     if params.get("use_worktime_header_mapping"):
-        worktime_header_mapping = get_worktime_header_mapping()
-        if params.get("header_mode"):
-            worktime_header_mapping["mode"] = params["header_mode"]
-        if params.get("header_fuzzy") is not None:
-            worktime_header_mapping["fuzzy"] = params["header_fuzzy"]
-        elif params.get("fuzzy_match") is not None:  # H8: 兼容前端 fuzzy_match 参数名
-            worktime_header_mapping["fuzzy"] = params["fuzzy_match"]
+        worktime_header_mapping = build_worktime_header_mapping(
+            mode=params.get("header_mode"),
+            fuzzy=params.get("header_fuzzy"),
+            fuzzy_match=params.get("fuzzy_match"),
+        )
 
     # 重置取消标记
     _cancel_event.clear()
