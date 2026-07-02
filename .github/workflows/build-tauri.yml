@@ -59,7 +59,9 @@ jobs:
           uv run pyinstaller tauri_bridge.spec \
             --distpath build-sidecar \
             --clean --noconfirm
-          ls -lh build-sidecar/tauri-bridge
+          # Tauri externalBin 要求带目标三元组后缀
+          cp build-sidecar/tauri-bridge build-sidecar/tauri-bridge-aarch64-apple-darwin
+          ls -lh build-sidecar/tauri-bridge-aarch64-apple-darwin
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -71,41 +73,20 @@ jobs:
           releaseBody: "See the assets below for download links."
           releaseDraft: true
           prerelease: false
-          args: "--target aarch64-apple-darwin --bundles app"
-
-      - name: Embed sidecar into .app bundle
-        shell: bash
-        run: |
-          BUNDLE_DIR="src-tauri/target/aarch64-apple-darwin/release/bundle"
-          APP_DIR=$(find "$BUNDLE_DIR/macos" -name "*.app" -maxdepth 1 | head -1)
-          if [ -n "$APP_DIR" ]; then
-            cp build-sidecar/tauri-bridge "$APP_DIR/Contents/MacOS/tauri-bridge"
-            chmod +x "$APP_DIR/Contents/MacOS/tauri-bridge"
-            codesign --force --sign - "$APP_DIR/Contents/MacOS/tauri-bridge" || true
-            codesign --force --sign - "$APP_DIR" || true
-            echo "✅ Sidecar embedded in $APP_DIR"
-            ls -lh "$APP_DIR/Contents/MacOS/"
-          else
-            echo "⚠️ .app bundle not found in $BUNDLE_DIR"
-            ls -R "$BUNDLE_DIR" || true
-          fi
+          args: "--target aarch64-apple-darwin"
 
       - name: Create DMG
         shell: bash
         run: |
           BUNDLE_DIR="src-tauri/target/aarch64-apple-darwin/release/bundle"
-          DMG_DIR="$BUNDLE_DIR/dmg"
 
-          # 检查 tauri-action 是否已经创建了 DMG
-          echo "=== Pre-existing DMG files ==="
-          find "$BUNDLE_DIR" -name "*.dmg" -exec ls -lh {} \; 2>/dev/null || echo "(none)"
-
-          # 删除 tauri-action 可能创建的旧 DMG，避免 -ov 覆盖出问题
-          rm -f "$DMG_DIR"/*.dmg 2>/dev/null || true
+          # 删除 tauri-action 可能创建的 DMG
+          rm -f "$BUNDLE_DIR/dmg"/*.dmg 2>/dev/null || true
 
           APP_DIR=$(find "$BUNDLE_DIR/macos" -name "*.app" -maxdepth 1 | head -1)
           APP_NAME=$(basename "$APP_DIR")
           VERSION=$(grep -o '"version": *"[^"]*"' src-tauri/tauri.conf.json | head -1 | cut -d'"' -f4)
+          DMG_DIR="$BUNDLE_DIR/dmg"
           mkdir -p "$DMG_DIR"
           DMG_PATH="$DMG_DIR/${APP_NAME%.app}_${VERSION}_aarch64.dmg"
 
@@ -172,37 +153,20 @@ jobs:
           uv run pyinstaller tauri_bridge.spec \
             --distpath build-sidecar \
             --clean --noconfirm
-          ls -lh build-sidecar/tauri-bridge.exe
+          # Tauri externalBin 要求带目标三元组后缀
+          cp build-sidecar/tauri-bridge.exe build-sidecar/tauri-bridge-x86_64-pc-windows-msvc.exe
+          ls -lh build-sidecar/tauri-bridge-x86_64-pc-windows-msvc.exe
 
-      - name: Build frontend
-        run: pnpm build
-
-      - name: Build Tauri app (NSIS, without sidecar)
+      - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: "--target x86_64-pc-windows-msvc --bundles nsis"
-
-      - name: Embed sidecar and build NSIS installer
-        shell: bash
-        run: |
-          BUNDLE_DIR="src-tauri/target/x86_64-pc-windows-msvc/release/bundle"
-
-          # 嵌入 sidecar 到 bundle 目录，供后续 NSIS 打包
-          cp build-sidecar/tauri-bridge.exe "$BUNDLE_DIR/"
-          chmod +x "$BUNDLE_DIR/tauri-bridge.exe"
-          echo "✅ Sidecar placed in $BUNDLE_DIR"
-
-          # 重新打包 NSIS（Rust 二进制已缓存，不会重新编译）
-          pnpm tauri build --target x86_64-pc-windows-msvc --bundles nsis
-          echo "✅ NSIS installer rebuilt with sidecar"
+          args: "--target x86_64-pc-windows-msvc"
 
       - name: Upload Windows x64 artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-x64
-          path: |
-            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
-            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/tauri-bridge.exe
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
           if-no-files-found: warn
