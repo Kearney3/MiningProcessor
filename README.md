@@ -152,7 +152,7 @@ MiningProcessor/
 
 | 配置项 | 说明 |
 |--------|------|
-| `device_load_map` | 设备型号 → 装载量（吨）映射，用于生产数据计算 |
+| `device_load_map` | 设备型号 → 装载量（方）映射，用于生产数据计算 |
 | `device_load_map_old` | 旧版装载量映射（历史兼容） |
 | `default_year` / `default_month` | 默认年月参数 |
 | `shift_mapping` | 班次名称映射（中/蒙文 → 英文） |

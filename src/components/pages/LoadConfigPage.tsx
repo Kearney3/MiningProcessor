@@ -569,7 +569,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
                   设备名称
                 </th>
                 <th className="text-left px-3 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  装载量 (吨)
+                  装载量 (方)
                 </th>
                 <th className="text-right px-3 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider w-20">
                   操作
@@ -658,7 +658,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
                         value={newValue}
                         onChange={(e) => { setSetValue(e.target.value); setNewValueError(null); }}
                         onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                        placeholder="吨数"
+                        placeholder="方数"
                         className={`w-full text-sm border rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 bg-white transition-colors ${
                           newValueError ? "border-red-300" : "border-slate-300 focus:border-blue-500"
                         }`}
