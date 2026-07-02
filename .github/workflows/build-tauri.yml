@@ -195,7 +195,7 @@ jobs:
           echo "✅ Sidecar placed in $BUNDLE_DIR"
 
           # 重新打包 NSIS（Rust 二进制已缓存，不会重新编译）
-          cargo tauri build --target x86_64-pc-windows-msvc --bundles nsis
+          pnpm tauri build --target x86_64-pc-windows-msvc --bundles nsis
           echo "✅ NSIS installer rebuilt with sidecar"
 
       - name: Upload Windows x64 artifact
