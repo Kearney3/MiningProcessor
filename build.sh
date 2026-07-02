@@ -83,7 +83,6 @@ hdiutil create \
     -srcfolder "$STAGING_DIR" \
     -ov \
     -format UDZO \
-    -imagekey zlib-level=9 \
     "$DMG_PATH"
 
 rm -rf "$STAGING_DIR"
