@@ -61,9 +61,6 @@ jobs:
             --clean --noconfirm
           ls -lh build-sidecar/tauri-bridge
 
-      - name: Build frontend
-        run: pnpm build
-
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -97,10 +94,18 @@ jobs:
         shell: bash
         run: |
           BUNDLE_DIR="src-tauri/target/aarch64-apple-darwin/release/bundle"
+          DMG_DIR="$BUNDLE_DIR/dmg"
+
+          # 检查 tauri-action 是否已经创建了 DMG
+          echo "=== Pre-existing DMG files ==="
+          find "$BUNDLE_DIR" -name "*.dmg" -exec ls -lh {} \; 2>/dev/null || echo "(none)"
+
+          # 删除 tauri-action 可能创建的旧 DMG，避免 -ov 覆盖出问题
+          rm -f "$DMG_DIR"/*.dmg 2>/dev/null || true
+
           APP_DIR=$(find "$BUNDLE_DIR/macos" -name "*.app" -maxdepth 1 | head -1)
           APP_NAME=$(basename "$APP_DIR")
           VERSION=$(grep -o '"version": *"[^"]*"' src-tauri/tauri.conf.json | head -1 | cut -d'"' -f4)
-          DMG_DIR="$BUNDLE_DIR/dmg"
           mkdir -p "$DMG_DIR"
           DMG_PATH="$DMG_DIR/${APP_NAME%.app}_${VERSION}_aarch64.dmg"
 
@@ -113,7 +118,11 @@ jobs:
             -ov -format UDZO \
             "$DMG_PATH"
           rm -rf "$STAGING"
-          echo "✅ DMG created: $DMG_PATH"
+
+          # 验证 DMG
+          echo "=== DMG verification ==="
+          ls -lh "$DMG_PATH"
+          hdiutil verify "$DMG_PATH" && echo "✅ DMG integrity OK" || echo "❌ DMG corrupted"
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4

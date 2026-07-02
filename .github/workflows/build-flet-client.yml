@@ -21,7 +21,7 @@ jobs:
           # -------- Desktop --------
           - name: macos
             runner: macos-26
-            build_cmd: "flet build macos"
+            build_cmd: "flet build macos --arch arm64"
             artifact_path: build/macos
             needs_linux_deps: false
 
