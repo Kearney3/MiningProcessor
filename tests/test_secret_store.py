@@ -2,7 +2,7 @@
 import json
 import pathlib
 import sys
-from unittest.mock import patch
+from unittest.mock import mock_open, patch
 
 import pytest
 
@@ -14,6 +14,8 @@ from func.secret_store import (
     _ENCRYPTED_PREFIX,
     _decrypt,
     _encrypt,
+    _get_machine_id,
+    _reset_fernet_cache,
     has_encrypted_secret,
     load_minebase_secret,
     load_secret,
@@ -223,3 +225,54 @@ class TestHasEncryptedSecret:
             patch.object(config_loader, "_USER_CONFIG_FILE", empty_user),
         ):
             assert has_encrypted_secret(("minebase", "api", "password")) is False
+
+
+# ---------------------------------------------------------------------------
+# _get_machine_id — exception logging
+# ---------------------------------------------------------------------------
+class TestGetMachineIdExceptionLogging:
+    """_get_machine_id should log (not swallow) exceptions and fall through."""
+
+    def test_darwin_subprocess_failure_logs_and_falls_through(self, caplog):
+        """On macOS, if ioreg raises, logger.debug should be called with exc_info."""
+        with (
+            patch("platform.system", return_value="Darwin"),
+            patch("subprocess.run", side_effect=OSError("ioreg not found")),
+            patch("uuid.getnode", return_value=0xAAAABBCCDDEE),
+            caplog.at_level("DEBUG", logger="func.secret_store"),
+        ):
+            result = _get_machine_id()
+
+        assert any("IOPlatformUUID" in r.message for r in caplog.records)
+        assert any(r.exc_info is not None for r in caplog.records if "IOPlatformUUID" in r.message)
+        # Falls through to MAC-address fallback
+        assert result is not None
+
+    def test_linux_file_read_failure_logs_and_falls_through(self, caplog):
+        """On Linux, if /etc/machine-id is unreadable, logger.debug should be called."""
+        m = mock_open()
+        m.side_effect = PermissionError("denied")
+        with (
+            patch("platform.system", return_value="Linux"),
+            patch("builtins.open", m),
+            patch("uuid.getnode", return_value=0xAAAABBCCDDEE),
+            caplog.at_level("DEBUG", logger="func.secret_store"),
+        ):
+            result = _get_machine_id()
+
+        assert any("machine-id" in r.message for r in caplog.records)
+        assert result is not None
+
+    def test_windows_subprocess_failure_logs_and_falls_through(self, caplog):
+        """On Windows, if wmic raises, logger.debug should be called with exc_info."""
+        with (
+            patch("platform.system", return_value="Windows"),
+            patch("subprocess.run", side_effect=FileNotFoundError("wmic not found")),
+            patch("uuid.getnode", return_value=0xAAAABBCCDDEE),
+            caplog.at_level("DEBUG", logger="func.secret_store"),
+        ):
+            result = _get_machine_id()
+
+        assert any("wmic" in r.message for r in caplog.records)
+        assert any(r.exc_info is not None for r in caplog.records if "wmic" in r.message)
+        assert result is not None

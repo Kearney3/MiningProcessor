@@ -93,7 +93,7 @@ def _get_machine_id() -> str:
                 if "IOPlatformUUID" in line:
                     return line.split('"')[-2]
         except Exception:
-            pass
+            logger.debug("Failed to read machine ID via IOPlatformUUID", exc_info=True)
 
     elif system == "Linux":
         for path in ("/etc/machine-id", "/var/lib/dbus/machine-id"):
@@ -103,7 +103,7 @@ def _get_machine_id() -> str:
                     if mid:
                         return mid
             except Exception:
-                pass
+                logger.debug("Failed to read machine ID via %s", path, exc_info=True)
 
     elif system == "Windows":
         try:
@@ -115,7 +115,7 @@ def _get_machine_id() -> str:
             if len(lines) > 1:
                 return lines[1]
         except Exception:
-            pass
+            logger.debug("Failed to read machine ID via wmic", exc_info=True)
 
     # Cross-platform fallback: hash the MAC address
     import uuid
