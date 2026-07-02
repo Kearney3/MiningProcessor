@@ -169,12 +169,12 @@ jobs:
       - name: Build frontend
         run: pnpm build
 
-      - name: Build Tauri app (MSI only)
+      - name: Build Tauri app (NSIS, without sidecar)
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: "--target x86_64-pc-windows-msvc --bundles msi"
+          args: "--target x86_64-pc-windows-msvc --bundles nsis"
 
       - name: Embed sidecar and build NSIS installer
         shell: bash
