@@ -93,7 +93,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
                 value=str(row_state["capacity"]),
                 text_size=13,
                 width=80,
-                hint_text="吨" if not str(row_state["capacity"]).strip() else None,
+                hint_text="方" if not str(row_state["capacity"]).strip() else None,
                 border_color=ft.Colors.TRANSPARENT,
                 focused_border_color=theme.PRIMARY,
                 color=theme.TEXT_PRIMARY,
