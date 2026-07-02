@@ -3,6 +3,7 @@
 """
 import os
 
+import numpy as np
 import pandas as pd
 import re
 import argparse
@@ -31,6 +32,10 @@ def parse_excel_data(file_path, target_year=None, return_sheets=False, add_shift
         for sheet_name in sheet_names:
             logger.info(f"正在处理 Sheet: {sheet_name}")
             df = xl.parse(sheet_name, header=None)  # 不设表头，手动定位
+
+            if df.empty or df.shape[1] == 0:
+                logger.warning(f"跳过 Sheet {sheet_name}: 空表")
+                continue
 
             # 2. 找到"日期"所在行
             date_row_idx = None
@@ -64,7 +69,11 @@ def parse_excel_data(file_path, target_year=None, return_sheets=False, add_shift
                 cell_val = date_row[col_idx]
                 try:
                     # 尝试解析日期
-                    dt = pd.to_datetime(cell_val)
+                    # 处理 Excel 序列号日期（自 1899-12-30 起的天数）
+                    if isinstance(cell_val, (int, float, np.integer, np.floating)) and not pd.isna(cell_val) and cell_val > 30000:
+                        dt = pd.to_datetime(cell_val, unit='D', origin='1899-12-30')
+                    else:
+                        dt = pd.to_datetime(cell_val)
                     if pd.isna(dt): continue
 
                     # 如果用户指定了年份，进行更正
@@ -92,7 +101,7 @@ def parse_excel_data(file_path, target_year=None, return_sheets=False, add_shift
                             power_val = df.iloc[idx, col_idx]
 
                             # 只记录有数值的数据
-                            if pd.notna(power_val) and isinstance(power_val, (int, float)):
+                            if pd.notna(power_val) and isinstance(power_val, (int, float, np.integer, np.floating)):
                                 record = {
                                     "日期": current_date,
                                     "设备名称": device_name,

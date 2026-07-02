@@ -316,6 +316,109 @@ def dedup_dataframe(
     return df
 
 
+# ---------------------------------------------------------------------------
+# Header mapping
+# ---------------------------------------------------------------------------
+
+
+def apply_header_mapping(
+    df: pd.DataFrame,
+    mapping_config: dict,
+    fuzzy_threshold: int = 70,
+) -> pd.DataFrame:
+    """Rename DataFrame columns according to a mapping configuration.
+
+    Supports two modes:
+
+    - ``"position"``: match columns by 1-based index.
+    - ``"name"``: match columns by original name (exact or fuzzy via rapidfuzz).
+
+    When *fuzzy* is enabled in the config **and** ``rapidfuzz`` is installed,
+    each column is matched against all mapping entries and the best match above
+    *fuzzy_threshold* wins.  When ``rapidfuzz`` is not installed the function
+    silently falls back to exact matching.
+
+    Args:
+        df: The source DataFrame (returned as a new object).
+        mapping_config: A dict with ``mode``, ``fuzzy``, and ``entries`` keys.
+            ``entries`` is a list of dicts with ``index``, ``original``, and
+            ``new`` keys.
+        fuzzy_threshold: Minimum rapidfuzz score (0-100) to accept a fuzzy
+            match.  Defaults to 70.
+
+    Returns:
+        A new DataFrame with matched columns renamed.
+    """
+    if not mapping_config or not mapping_config.get("entries"):
+        return df
+
+    mode = mapping_config.get("mode", "position")
+    fuzzy = mapping_config.get("fuzzy", False)
+    entries = mapping_config["entries"]
+    cols = list(df.columns)
+    rename_map: dict[str, str] = {}
+
+    if mode == "position":
+        for entry in entries:
+            idx = entry.get("index")
+            new_name = clean_string(entry.get("new"))
+            if idx is None or not new_name:
+                continue
+            try:
+                idx = int(idx)
+            except (TypeError, ValueError):
+                continue
+            # Config uses 1-based indices; convert to 0-based.
+            if 1 <= idx <= len(cols):
+                idx = idx - 1
+                old_name = cols[idx]
+                rename_map[old_name] = new_name
+    else:
+        # name mode
+        orig_to_new: dict[str, str] = {}
+        for entry in entries:
+            orig = clean_string(entry.get("original"))
+            new_name = clean_string(entry.get("new"))
+            if orig and new_name:
+                orig_to_new[orig] = new_name
+
+        if fuzzy:
+            try:
+                from rapidfuzz import fuzz
+
+                for col in cols:
+                    col_str = clean_string(col)
+                    best_score = 0
+                    best_target = None
+                    for orig, new_name in orig_to_new.items():
+                        score = fuzz.ratio(col_str, orig)
+                        if score > best_score:
+                            best_score = score
+                            best_target = new_name
+                    if best_score >= fuzzy_threshold and best_target:
+                        rename_map[col] = best_target
+            except ImportError:
+                logger.warning("rapidfuzz 未安装，回退到精确匹配")
+                for col in cols:
+                    col_str = clean_string(col)
+                    if col_str in orig_to_new:
+                        rename_map[col] = orig_to_new[col_str]
+        else:
+            for col in cols:
+                col_str = clean_string(col)
+                if col_str in orig_to_new:
+                    rename_map[col] = orig_to_new[col_str]
+
+    if rename_map:
+        logger.info(
+            "表头映射生效（模式: %s），重命名 %d 列: %s",
+            mode,
+            len(rename_map),
+            rename_map,
+        )
+    return df.rename(columns=rename_map)
+
+
 def strip_date_only_times(df: pd.DataFrame) -> pd.DataFrame:
     """对 datetime 列检测：若所有非空值的时间部分均为 00:00:00，
     则转换为 date 对象，避免 Excel 导出时出现多余的 ' 00:00:00'。

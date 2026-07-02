@@ -23,7 +23,6 @@ from func.sync.core import (
 from func.sync.db_client import MineBaseDBClient
 from func.sync.file_processors import (
     _apply_defaults,
-    _apply_header_mapping,
     _apply_ledger_matching,
     _apply_oil_ledger_matching,
     _build_field_mappings,
@@ -36,6 +35,7 @@ from func.sync.file_processors import (
     _process_work_efficiency_file,
     _resolve_fks_for_db,
     discover_files,
+    process_file_generic,
     read_and_map_excel,
 )
 from func.sync.sync_engines import (
@@ -68,7 +68,6 @@ __all__ = [
     "test_db_connection",
     # 文件处理器
     "_apply_defaults",
-    "_apply_header_mapping",
     "_apply_ledger_matching",
     "_apply_oil_ledger_matching",
     "_build_field_mappings",
@@ -80,4 +79,5 @@ __all__ = [
     "_process_production_file",
     "_process_work_efficiency_file",
     "_resolve_fks_for_db",
+    "process_file_generic",
 ]

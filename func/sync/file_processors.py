@@ -7,7 +7,7 @@ Excel 文件处理器适配函数。
 import sys
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import pandas as pd
 
@@ -83,6 +83,61 @@ def _get_df_to_mapped_rows():
 
 
 # ---------------------------------------------------------------------------
+# 通用处理器包装
+# ---------------------------------------------------------------------------
+
+
+def process_file_generic(
+    file_path: Path,
+    processor_fn: Callable[..., Any],
+    sheet_extractor: Callable[[Any], Any],
+    row_mapper: Callable[[Any], Any],
+    module_type: str,
+    empty_result: Any = None,
+    **processor_kwargs: Any,
+) -> Any:
+    """通用文件处理包装器，消除各处理器适配函数的重复 try/except 样板代码。
+
+    流程: 调用 processor_fn → sheet_extractor 提取结果 → row_mapper 映射行。
+    任何异常都会被捕获、记录日志，并返回 empty_result。
+
+    Args:
+        file_path: 待处理的文件路径。
+        processor_fn: 实际处理函数（如 process_diesel_data）。
+        sheet_extractor: 从处理器返回值中提取目标数据的函数。
+            返回 None 表示无数据。
+        row_mapper: 将提取结果映射为行列表的函数。
+        module_type: 模块类型标识（如 "fuel"），用于日志。
+        empty_result: 异常或无数据时的返回值（默认为 None，调用方可传 [] 等）。
+        **processor_kwargs: 传递给 processor_fn 的额外关键字参数。
+
+    Returns:
+        row_mapper 的返回值；异常或无数据时返回 empty_result。
+    """
+    try:
+        result = processor_fn(str(file_path), **processor_kwargs)
+        extracted = sheet_extractor(result)
+        if extracted is None:
+            return empty_result
+        mapped = row_mapper(extracted)
+        logger.info("%s 处理器: %s → %s", module_type, file_path.name, _summarize(mapped))
+        return mapped
+    except Exception as e:
+        logger.error("%s 处理器失败: %s — %s", module_type, file_path, e)
+        return empty_result
+
+
+def _summarize(result: Any) -> str:
+    """为日志生成结果摘要字符串。"""
+    if isinstance(result, dict):
+        parts = [f"{k}={len(v)}" for k, v in result.items()]
+        return ", ".join(parts)
+    if isinstance(result, list):
+        return f"{len(result)} 行"
+    return str(result)
+
+
+# ---------------------------------------------------------------------------
 # 处理器适配函数
 # ---------------------------------------------------------------------------
 
@@ -92,30 +147,35 @@ def _process_fuel_file(
     year: int | None = None,
 ) -> list[dict[str, Any]]:
     """通过柴油处理器解析文件，返回同步行列表。"""
-    try:
-        from func.excel_fuel import process_diesel_data
+    from func.excel_fuel import process_diesel_data
 
-        sheets = process_diesel_data(str(file_path), target_year=year, return_sheets=True)
+    mapping = {
+        "日期": "date",
+        "班次": "shiftType",
+        "设备名称": "equipmentName",
+        "设备编号": "equipmentCode",
+        "油品种类": "fuelName",
+        "油品消耗": "consumption",
+    }
+
+    def _extract(sheets):
         if not sheets:
-            return []
-        df = sheets.get("油耗信息")
-        if df is None:
-            return []
+            return None
+        return sheets.get("油耗信息")
 
-        mapping = {
-            "日期": "date",
-            "班次": "shiftType",
-            "设备名称": "equipmentName",
-            "设备编号": "equipmentCode",
-            "油品种类": "fuelName",
-            "油品消耗": "consumption",
-        }
-        rows = _get_df_to_mapped_rows()(df, mapping)
-        logger.info("fuel 处理器: %s → %d 行", file_path.name, len(rows))
-        return rows
-    except Exception as e:
-        logger.error("fuel 处理器失败: %s — %s", file_path, e)
-        return []
+    def _map_rows(df):
+        return _get_df_to_mapped_rows()(df, mapping)
+
+    return process_file_generic(
+        file_path,
+        processor_fn=process_diesel_data,
+        sheet_extractor=_extract,
+        row_mapper=_map_rows,
+        module_type="fuel",
+        empty_result=[],
+        target_year=year,
+        return_sheets=True,
+    )
 
 
 def _process_electrical_file(
@@ -123,121 +183,95 @@ def _process_electrical_file(
     year: int | None = None,
 ) -> list[dict[str, Any]]:
     """通过电力处理器解析文件，返回同步行列表。"""
-    try:
-        from func.excel_electrical import parse_excel_data
+    from func.excel_electrical import parse_excel_data
 
-        sheets = parse_excel_data(
-            str(file_path),
-            target_year=year,
-            return_sheets=True,
-            add_shift_column=True,
-            default_shift="Night",
-        )
+    mapping = {
+        "日期": "date",
+        "班次": "shiftType",
+        "设备名称": "equipmentName",
+        "电力消耗": "consumption",
+    }
+
+    def _extract(sheets):
         if not sheets:
-            return []
-        df = sheets.get("电力消耗")
-        if df is None:
-            return []
+            return None
+        return sheets.get("电力消耗")
 
-        mapping = {
-            "日期": "date",
-            "班次": "shiftType",
-            "设备名称": "equipmentName",
-            "电力消耗": "consumption",
-        }
-        rows = _get_df_to_mapped_rows()(df, mapping)
-        logger.info("electrical 处理器: %s → %d 行", file_path.name, len(rows))
-        return rows
-    except Exception as e:
-        logger.error("electrical 处理器失败: %s — %s", file_path, e)
-        return []
+    def _map_rows(df):
+        return _get_df_to_mapped_rows()(df, mapping)
+
+    return process_file_generic(
+        file_path,
+        processor_fn=parse_excel_data,
+        sheet_extractor=_extract,
+        row_mapper=_map_rows,
+        module_type="electrical",
+        empty_result=[],
+        target_year=year,
+        return_sheets=True,
+        add_shift_column=True,
+        default_shift="Night",
+    )
 
 
 def _process_production_file(
     file_path: Path,
 ) -> dict[str, list[dict[str, Any]]]:
     """通过产量处理器解析文件，返回 {"production": [...], "operation": [...]}。"""
-    try:
-        from func.excel_production_enhanced import MiningDataProcessor
+    from func.excel_production_enhanced import MiningDataProcessor
 
+    prod_map = {
+        "日期": "date",
+        "班次": "shiftType",
+        "矿卡名称": "truckName",
+        "挖机名称": "excavatorName",
+        "矿石类型": "materialTypeName",
+        "运次": "tripCount",
+        "产量": "production",
+    }
+    ops_map = {
+        "日期": "date",
+        "班次": "shiftType",
+        "设备名称": "equipmentName",
+        "公司": "company",
+        "小时数仪表开始": "engineHoursStart",
+        "小时数仪表结束": "engineHoursEnd",
+        "运行小时数": "runningHours",
+        "公里数仪表开始": "milemeterStart",
+        "公里数仪表结束": "milemeterEnd",
+        "运行里程": "mileage",
+        "趟数": "tripCount",
+        "备注": "remark",
+    }
+    _map = _get_df_to_mapped_rows()
+
+    def _processor(path: str, **_kw: Any) -> tuple:
         processor = MiningDataProcessor()
-        running_df, production_df = processor.process_single_file(str(file_path))
+        return processor.process_single_file(path)
 
-        prod_map = {
-            "日期": "date",
-            "班次": "shiftType",
-            "矿卡名称": "truckName",
-            "挖机名称": "excavatorName",
-            "矿石类型": "materialTypeName",
-            "运次": "tripCount",
-            "产量": "production",
+    def _extract(pair: tuple | None) -> tuple | None:
+        if pair is None:
+            return None
+        running_df, production_df = pair
+        if production_df is None and running_df is None:
+            return None
+        return running_df, production_df
+
+    def _map_rows(pair: tuple) -> dict[str, list[dict[str, Any]]]:
+        running_df, production_df = pair
+        return {
+            "production": _map(production_df, prod_map),
+            "operation": _map(running_df, ops_map),
         }
-        ops_map = {
-            "日期": "date",
-            "班次": "shiftType",
-            "设备名称": "equipmentName",
-            "公司": "company",
-            "小时数仪表开始": "engineHoursStart",
-            "小时数仪表结束": "engineHoursEnd",
-            "运行小时数": "runningHours",
-            "公里数仪表开始": "milemeterStart",
-            "公里数仪表结束": "milemeterEnd",
-            "运行里程": "mileage",
-            "趟数": "tripCount",
-            "备注": "remark",
-        }
-        _map = _get_df_to_mapped_rows()
-        prod_rows = _map(production_df, prod_map)
-        ops_rows = _map(running_df, ops_map)
-        logger.info(
-            "production 处理器: %s → production=%d, operation=%d",
-            file_path.name, len(prod_rows), len(ops_rows),
-        )
-        return {"production": prod_rows, "operation": ops_rows}
-    except Exception as e:
-        logger.error("production 处理器失败: %s — %s", file_path, e)
-        return {"production": [], "operation": []}
 
-
-def _apply_header_mapping(
-    df: "pd.DataFrame",
-    header_mapping: dict[str, Any],
-) -> "pd.DataFrame":
-    """按工时表头映射配置重命名 DataFrame 列。
-
-    Args:
-        df: 原始 DataFrame。
-        header_mapping: worktime_header_mapping 配置（含 mode/fuzzy/entries）。
-
-    Returns:
-        列重命名后的新 DataFrame。
-    """
-    if not header_mapping or not header_mapping.get("entries"):
-        return df
-
-    mode = header_mapping.get("mode", "position")
-    entries = header_mapping.get("entries", [])
-
-    rename_map = {}
-    for entry in entries:
-        idx = entry.get("index")
-        new_name = entry.get("new", "")
-        if not new_name:
-            continue
-
-        if mode == "position" and idx is not None:
-            col_idx = int(idx) - 1  # 配置中 index 从 1 开始
-            if 0 <= col_idx < len(df.columns):
-                rename_map[df.columns[col_idx]] = new_name
-        elif mode == "name":
-            original = entry.get("original", "")
-            if original and original in df.columns:
-                rename_map[original] = new_name
-
-    if rename_map:
-        df = df.rename(columns=rename_map)
-        logger.info("工时表头映射: 重命名 %d 列", len(rename_map))
-    return df
+    return process_file_generic(
+        file_path,
+        processor_fn=_processor,
+        sheet_extractor=_extract,
+        row_mapper=_map_rows,
+        module_type="production",
+        empty_result={"production": [], "operation": []},
+    )
 
 
 def _process_work_efficiency_file(
@@ -251,47 +285,72 @@ def _process_work_efficiency_file(
     已处理的输出文件（含标准化 sheet 结构）直接读取并映射列；
     如需从原始文件重新处理，可扩展为调用 process_excel_data。
     """
-    try:
-        from func.config_loader import get_minebase_column_mapping
-        mapping = get_minebase_column_mapping().get("work_efficiency", {})
-        if not mapping:
-            logger.warning("work_efficiency 映射配置为空")
-            return []
+    from func.config_loader import get_minebase_column_mapping
 
-        # 尝试用工时处理器（需要 year/month）
-        if year and month:
-            from func.excel_worktime import process_excel_data
+    mapping = get_minebase_column_mapping().get("work_efficiency", {})
+    if not mapping:
+        logger.warning("work_efficiency 映射配置为空")
+        return []
 
-            hdr_map = None
-            if apply_header_mapping:
-                from func.config_loader import get_worktime_header_mapping
-                hdr_map = get_worktime_header_mapping()
-                if hdr_map and not hdr_map.get("entries"):
-                    hdr_map = None
+    map_rows = _get_df_to_mapped_rows()
 
-            sheets = process_excel_data(
-                str(file_path), year, month,
-                return_sheets=True,
-                header_mapping=hdr_map,
-            )
-            if sheets:
-                df = sheets.get("工时数据")
-                if df is not None and not df.empty:
-                    # 如果处理器未应用表头映射，此处补充
-                    if apply_header_mapping and hdr_map and hdr_map.get("entries"):
-                        df = _apply_header_mapping(df, hdr_map)
-                    rows = _get_df_to_mapped_rows()(df, mapping)
-                    logger.info("work_efficiency 处理器: %s → %d 行", file_path.name, len(rows))
-                    return rows
+    def _map_and_log(df: pd.DataFrame) -> list[dict[str, Any]]:
+        rows = map_rows(df, mapping)
+        logger.info("work_efficiency 处理器: %s → %d 行", file_path.name, len(rows))
+        return rows
 
-        # 回退：直接读取输出文件（已是标准格式）
-        df = pd.read_excel(file_path, sheet_name=0)
+    def _apply_hdr(df: pd.DataFrame) -> pd.DataFrame:
+        if not apply_header_mapping:
+            return df
+        from func.config_loader import get_worktime_header_mapping
+        hdr = get_worktime_header_mapping()
+        if hdr and hdr.get("entries"):
+            from func.excel_utils import apply_header_mapping as _apply_hdr_map
+            return _apply_hdr_map(df, hdr)
+        return df
+
+    # 优先用工时处理器（需要 year/month）
+    if year and month:
+        from func.excel_worktime import process_excel_data
+
+        hdr_map = None
         if apply_header_mapping:
             from func.config_loader import get_worktime_header_mapping
             hdr_map = get_worktime_header_mapping()
-            if hdr_map and hdr_map.get("entries"):
-                df = _apply_header_mapping(df, hdr_map)
-        rows = _get_df_to_mapped_rows()(df, mapping)
+            if hdr_map and not hdr_map.get("entries"):
+                hdr_map = None
+
+        def _extractor(sheets):
+            if not sheets:
+                return None
+            df = sheets.get("工时数据")
+            if df is None or df.empty:
+                return None
+            if apply_header_mapping and hdr_map and hdr_map.get("entries"):
+                from func.excel_utils import apply_header_mapping as _apply_hdr_map
+                df = _apply_hdr_map(df, hdr_map)
+            return df
+
+        result = process_file_generic(
+            file_path,
+            processor_fn=process_excel_data,
+            sheet_extractor=_extractor,
+            row_mapper=_map_and_log,
+            module_type="work_efficiency",
+            empty_result=[],
+            year=year,
+            month=month,
+            return_sheets=True,
+            header_mapping=hdr_map,
+        )
+        if result:
+            return result
+
+    # 回退：直接读取输出文件（已是标准格式）
+    try:
+        df = pd.read_excel(file_path, sheet_name=0)
+        df = _apply_hdr(df)
+        rows = _map_and_log(df)
         logger.info("work_efficiency 直接读取: %s → %d 行", file_path.name, len(rows))
         return rows
     except Exception as e:

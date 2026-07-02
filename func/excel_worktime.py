@@ -5,87 +5,9 @@ import argparse
 # 假设 func.logger 已经正确配置
 from func.logger import get_logger
 from func.string_utils import clean_string
-from func.excel_utils import split_day_night_shifts, clean_split_dataframe, strip_date_column, sort_by_date_shift, dedup_dataframe
+from func.excel_utils import apply_header_mapping, split_day_night_shifts, clean_split_dataframe, strip_date_column, sort_by_date_shift, dedup_dataframe
 
 logger = get_logger(__name__)
-
-
-def _apply_header_mapping(df: pd.DataFrame, mapping_config: dict) -> pd.DataFrame:
-    """根据映射配置重命名 DataFrame 列。
-
-    mapping_config 格式::
-
-        {
-            "mode": "position" | "name",
-            "fuzzy": False,
-            "entries": [{"index": int|None, "original": str, "new": str}, ...]
-        }
-
-    - position 模式: 按列索引（行号）匹配并重命名
-    - name 模式:   按原始列名匹配，可选模糊匹配（rapidfuzz）
-    """
-    if not mapping_config or not mapping_config.get("entries"):
-        return df
-
-    mode = mapping_config.get("mode", "position")
-    fuzzy = mapping_config.get("fuzzy", False)
-    entries = mapping_config["entries"]
-    cols = list(df.columns)
-    rename_map: dict[str, str] = {}
-
-    if mode == "position":
-        for entry in entries:
-            idx = entry.get("index")
-            new_name = clean_string(entry.get("new"))
-            if idx is None or not new_name:
-                continue
-            try:
-                idx = int(idx)
-            except (TypeError, ValueError):
-                continue
-            # 用户界面使用 1-based 索引，内部转换为 0-based
-            if 1 <= idx <= len(cols):
-                idx = idx - 1
-                old_name = cols[idx]
-                rename_map[old_name] = new_name
-    else:
-        # name 模式
-        orig_to_new: dict[str, str] = {}
-        for entry in entries:
-            orig = clean_string(entry.get("original"))
-            new_name = clean_string(entry.get("new"))
-            if orig and new_name:
-                orig_to_new[orig] = new_name
-
-        if fuzzy:
-            try:
-                from rapidfuzz import fuzz
-                for col in cols:
-                    col_str = clean_string(col)
-                    best_score = 0
-                    best_target = None
-                    for orig, new_name in orig_to_new.items():
-                        score = fuzz.ratio(col_str, orig)
-                        if score > best_score:
-                            best_score = score
-                            best_target = new_name
-                    if best_score >= 70 and best_target:
-                        rename_map[col] = best_target
-            except ImportError:
-                logger.warning("rapidfuzz 未安装，回退到精确匹配")
-                for col in cols:
-                    col_str = clean_string(col)
-                    if col_str in orig_to_new:
-                        rename_map[col] = orig_to_new[col_str]
-        else:
-            for col in cols:
-                col_str = clean_string(col)
-                if col_str in orig_to_new:
-                    rename_map[col] = orig_to_new[col_str]
-
-    if rename_map:
-        logger.info(f"表头映射生效（模式: {mode}），重命名 {len(rename_map)} 列: {rename_map}")
-    return df.rename(columns=rename_map)
 
 
 def process_excel_data(file_path, year, month, output_file=None, return_sheets=False,
@@ -163,7 +85,7 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
 
     # 6. 应用表头映射（数据处理完成后，对最终列结构进行重命名）
     if header_mapping and header_mapping.get('entries'):
-        final_df = _apply_header_mapping(final_df, header_mapping)
+        final_df = apply_header_mapping(final_df, header_mapping)
 
     # 去重
     final_df = dedup_dataframe(final_df, "工时数据")
