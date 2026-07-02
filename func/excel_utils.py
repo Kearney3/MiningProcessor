@@ -9,12 +9,42 @@ Excel 处理共享工具函数
 """
 
 import logging
+import re
 
 import pandas as pd
 
 from func.string_utils import clean_string
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Filename sanitization (path-traversal prevention)
+# ---------------------------------------------------------------------------
+
+
+def sanitize_filename(name: str) -> str:
+    """Remove path separators and ``..`` sequences from *name*.
+
+    This prevents path-traversal attacks when user-supplied strings are
+    embedded in file paths (e.g. the ``keyword`` argument of
+    :func:`~func.excel_merger.merge_excel_files`).
+
+    Specifically:
+    - Strips ``/`` and ``\\`` (path separators on Unix and Windows).
+    - Removes ``..`` sequences to prevent directory escalation.
+
+    Args:
+        name: The raw user-supplied string to sanitize.
+
+    Returns:
+        A sanitised string safe for use as part of a filename.
+    """
+    # Use a regex to replace sequences containing / or \ with nothing.
+    # We do NOT want to remove dots used in legitimate names, only ".."
+    sanitized = re.sub(r'[/\\]', '', name)
+    # Remove ".." sequences (they may appear after separator removal too)
+    sanitized = re.sub(r'\.{2,}', '', sanitized)
+    return sanitized
 
 # All known shift patterns for text-based detection
 _SHIFT_PATTERNS: dict[str, list[str]] = {
@@ -180,6 +210,12 @@ def split_day_night_shifts(
     valid_mask = header_row.notna() & (header_row.apply(lambda x: clean_string(x)) != "")
     valid_cols = valid_mask[valid_mask].index.tolist()
     valid_headers = header_row[valid_cols].apply(clean_string).tolist()
+
+    if not valid_cols:
+        day_data = df_raw.iloc[data_start_index:].copy()
+        day_data.columns = header_row
+        day_data["班次"] = "Day"
+        return day_data
 
     split_idx = -1
     for idx in range(data_start_index, len(df_raw)):

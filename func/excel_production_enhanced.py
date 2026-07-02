@@ -71,12 +71,12 @@ class MiningDataProcessor:
         return date_val, shift
 
     def get_load_capacity(self, truck_name):
-        """根据矿卡名称模糊匹配装载量"""
+        """根据矿卡名称模糊匹配装载量，优先匹配更长（更具体）的型号"""
         if pd.isna(truck_name):
             return 0
 
         truck_name_upper = clean_string(truck_name).upper()
-        for model, capacity in self.load_map.items():
+        for model, capacity in sorted(self.load_map.items(), key=lambda x: len(x[0]), reverse=True):
             if model.upper() in truck_name_upper:
                 return capacity
         return 0
@@ -352,21 +352,20 @@ class MiningDataProcessor:
         date_val, shift_val = self.parse_filename(filename)
 
         # 只打开一次 Excel 文件
-        xls = pd.ExcelFile(file_path)
+        with pd.ExcelFile(file_path) as xls:
+            if len(xls.sheet_names) < 2:
+                logger.warning(f"文件 {file_path} 中少于2个sheet，尝试将第一个sheet作为生产数据处理。")
+                # raise ValueError("文件中少于2个sheet，请检查Excel结构。")
 
-        if len(xls.sheet_names) < 2:
-            logger.warning(f"文件 {file_path} 中少于2个sheet，尝试将第一个sheet作为生产数据处理。")
-            # raise ValueError("文件中少于2个sheet，请检查Excel结构。")
+            # 用同一个 xls 解析，避免重复打开文件
+            df_sheet1 = pd.read_excel(xls, sheet_name=0, header=None)
+            running_df_1, production_df = self.process_sheet1(df_sheet1, date_val, shift_val)
 
-        # 用同一个 xls 解析，避免重复打开文件
-        df_sheet1 = pd.read_excel(xls, sheet_name=0, header=None)
-        running_df_1, production_df = self.process_sheet1(df_sheet1, date_val, shift_val)
-
-        if len(xls.sheet_names) > 1:
-            df_sheet2 = pd.read_excel(xls, sheet_name=1, header=None)
-            running_df_2 = self.process_sheet2(df_sheet2, date_val, shift_val)
-        else:
-            running_df_2 = pd.DataFrame()
+            if len(xls.sheet_names) > 1:
+                df_sheet2 = pd.read_excel(xls, sheet_name=1, header=None)
+                running_df_2 = self.process_sheet2(df_sheet2, date_val, shift_val)
+            else:
+                running_df_2 = pd.DataFrame()
 
         # 合并运行数据
         running_df = pd.concat([running_df_1, running_df_2], ignore_index=True)

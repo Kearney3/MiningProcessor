@@ -11,10 +11,10 @@ logger = get_logger(__name__)
 
 
 def extract_data_from_sheet(df_raw, year, month, day):
-    “””
+    """
     核心业务逻辑：从单个 DataFrame 中提取白班和夜班数据
-    “””
-    date_str = f”{year}-{month:02d}-{day:02d}”
+    """
+    date_str = f"{year}-{month:02d}-{day:02d}"
 
     if len(df_raw) < 2:
         return None
@@ -25,7 +25,7 @@ def extract_data_from_sheet(df_raw, year, month, day):
         return None
 
     # 插入日期列到第一列
-    combined_day_df.insert(0, “日期”, date_str)
+    combined_day_df.insert(0, "日期", date_str)
 
     # 清洗
     combined_day_df = clean_split_dataframe(combined_day_df)
@@ -78,33 +78,34 @@ def process_directory(base_dir, year, month, output_file):
                 logger.error(f"读取文件失败 '{excel_path}': {e}")
                 continue
 
-            # 寻找与目标日期对应的 Sheet
-            target_sheet_name = None
-            for sheet in xls.sheet_names:
-                if clean_string(sheet).isdigit() and int(clean_string(sheet)) == target_day:
-                    target_sheet_name = sheet
-                    break
-            if not target_sheet_name and len(xls.sheet_names) == 1:
-                target_sheet_name = xls.sheet_names[0]
-                logger.warning(f"文件 '{file}' 中只有一个 Sheet，已自动选择「{target_sheet_name}」")
+            with xls:
+                # 寻找与目标日期对应的 Sheet
+                target_sheet_name = None
+                for sheet in xls.sheet_names:
+                    if clean_string(sheet).isdigit() and int(clean_string(sheet)) == target_day:
+                        target_sheet_name = sheet
+                        break
+                if not target_sheet_name and len(xls.sheet_names) == 1:
+                    target_sheet_name = xls.sheet_names[0]
+                    logger.warning(f"文件 '{file}' 中只有一个 Sheet，已自动选择「{target_sheet_name}」")
 
-            if not target_sheet_name:
-                logger.warning(f"未找到与日期 {target_day} 匹配的 Sheet，已跳过")
-                continue
+                if not target_sheet_name:
+                    logger.warning(f"未找到与日期 {target_day} 匹配的 Sheet，已跳过")
+                    continue
 
-            # 读取目标 Sheet
-            df_raw = pd.read_excel(xls, sheet_name=target_sheet_name, header=None)
+                # 读取目标 Sheet
+                df_raw = pd.read_excel(xls, sheet_name=target_sheet_name, header=None)
 
-            # 使用提取逻辑
-            df_processed = extract_data_from_sheet(df_raw, year, month, target_day)
+                # 使用提取逻辑
+                df_processed = extract_data_from_sheet(df_raw, year, month, target_day)
 
-            if df_processed is not None and not df_processed.empty:
-                all_data.append(df_processed)
-                success_count += 1
-                processed_days.append(target_day)
-                logger.info(f"成功提取日期 {target_day} 的数据，共 {len(df_processed)} 行")
-            else:
-                logger.warning(f"日期 {target_day} 的 Sheet 「{target_sheet_name}」数据提取为空")
+                if df_processed is not None and not df_processed.empty:
+                    all_data.append(df_processed)
+                    success_count += 1
+                    processed_days.append(target_day)
+                    logger.info(f"成功提取日期 {target_day} 的数据，共 {len(df_processed)} 行")
+                else:
+                    logger.warning(f"日期 {target_day} 的 Sheet 「{target_sheet_name}」数据提取为空")
 
     if not all_data:
         logger.warning("未提取到任何有效数据。请检查文件夹结构或 Excel 内容。")

@@ -221,9 +221,9 @@ def _decrypt(value: str) -> str:
         _legacy_fernet = _build_fernet(_LEGACY_PASSPHRASE)
     try:
         plaintext = _legacy_fernet.decrypt(token.encode("ascii")).decode("utf-8")
-        logger.debug(
-            "Password decrypted with legacy key; consider re-saving "
-            "MineBase config to upgrade encryption."
+        logger.warning(
+            "Password decrypted with legacy hardcoded key; consider setting "
+            "MP_MASTER_KEY and re-saving MineBase config to upgrade encryption."
         )
         return plaintext
     except InvalidToken:
