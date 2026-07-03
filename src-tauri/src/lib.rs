@@ -7,6 +7,8 @@ use tauri::{Emitter, Manager, State};
 /// 不再需要外层 Mutex<Option<PythonBridge>>，避免 cancel_task 与 invoke_python 的死锁 (H1)。
 struct AppState {
     bridge: PythonBridge,
+    mode: String,
+    command: String,
 }
 
 #[tauri::command]
@@ -22,6 +24,16 @@ async fn invoke_python(
 async fn cancel_task(state: State<'_, AppState>) -> Result<(), String> {
     state.bridge.cancel();
     Ok(())
+}
+
+#[tauri::command]
+async fn get_bridge_info(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
+    Ok(serde_json::json!({
+        "mode": state.mode,
+        "pid": state.bridge.pid(),
+        "alive": state.bridge.is_alive(),
+        "command": state.command,
+    }))
 }
 
 /// 查找 Python 解释器（dev 模式）
@@ -124,17 +136,35 @@ fn spawn_stderr_logger(bridge: &PythonBridge, handle: &tauri::AppHandle) {
 fn init_bridge(app: &tauri::App) -> Result<(), String> {
     // 优先尝试 sidecar 模式（打包后）
     if let Some(bridge) = try_start_sidecar() {
+        let pid = bridge.pid();
         spawn_stderr_logger(&bridge, app.handle());
-        app.manage(AppState { bridge });
+        let _ = app.handle().emit("python-log", &serde_json::json!({
+            "event": "connection",
+            "data": { "status": "connected", "mode": "sidecar", "pid": pid }
+        }));
+        app.manage(AppState {
+            bridge,
+            mode: "sidecar".into(),
+            command: "tauri-bridge (sidecar)".into(),
+        });
         println!("Python bridge started (sidecar mode)");
         return Ok(());
     }
 
     // 回退到 dev 模式（直接调 Python）
     if let Some((bridge, info)) = try_start_dev() {
+        let pid = bridge.pid();
         spawn_stderr_logger(&bridge, app.handle());
-        app.manage(AppState { bridge });
-        println!("Python bridge started (dev mode): {}", info);
+        let _ = app.handle().emit("python-log", &serde_json::json!({
+            "event": "connection",
+            "data": { "status": "connected", "mode": "dev", "pid": pid, "command": info }
+        }));
+        app.manage(AppState {
+            bridge,
+            mode: "dev".into(),
+            command: info,
+        });
+        println!("Python bridge started (dev mode)");
         return Ok(());
     }
 
@@ -149,6 +179,10 @@ fn init_bridge(app: &tauri::App) -> Result<(), String> {
         exe_dir
     );
     eprintln!("Warning: {}", msg);
+    let _ = app.handle().emit("python-log", &serde_json::json!({
+        "event": "connection",
+        "data": { "status": "error", "error": msg }
+    }));
     let _ = app.handle().emit("python-log", &serde_json::json!({
         "event": "log",
         "data": { "level": "ERROR", "message": msg }
@@ -165,7 +199,7 @@ pub fn run() {
             init_bridge(app).unwrap_or_else(|e| eprintln!("Bridge init warning: {}", e));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![invoke_python, cancel_task])
+        .invoke_handler(tauri::generate_handler![invoke_python, cancel_task, get_bridge_info])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

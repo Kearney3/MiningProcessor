@@ -815,7 +815,7 @@ def _check_directory_exists(params: dict) -> dict:
 
 @_register("ping")
 def _ping(params: dict) -> dict:
-    return {"pong": True, "pid": __import__("os").getpid()}
+    return {"pong": True, "pid": __import__("os").getpid(), "version": "1.0.0"}
 
 
 @_register("test_minebase_connection")
