@@ -64,6 +64,24 @@ export interface LedgerData {
   columns: string[];
 }
 
+/** 连接状态 */
+export type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
+
+/** 连接日志条目 */
+export interface ConnectionLog {
+  level: string;
+  message: string;
+  timestamp: string;
+}
+
+/** 桥接进程信息 (从 Rust 侧获取) */
+export interface BridgeInfo {
+  mode: "sidecar" | "dev" | null;
+  pid: number | null;
+  alive: boolean;
+  command: string | null;
+}
+
 /** 页面 ID */
 export type PageId =
   | "data-processing"

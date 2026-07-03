@@ -4,6 +4,7 @@ import type { PageId } from "./lib/types";
 import { Sidebar } from "./components/Sidebar";
 import { LogPanel } from "./components/LogPanel";
 import { ToastProvider } from "./components/Toast";
+import { ConnectionStatusBadge } from "./components/ConnectionStatusBadge";
 import { DataProcessingPage } from "./components/pages/DataProcessingPage";
 import { BatchProcessingPage } from "./components/pages/BatchProcessingPage";
 import { DataSyncPage } from "./components/pages/DataSyncPage";
@@ -47,16 +48,13 @@ function App() {
         </div>
 
         {/* Connection badge */}
-        <div className="flex items-center gap-1.5 ml-4">
-          <span
-            className={`w-1.5 h-1.5 rounded-full ${
-              bridge.isConnected ? "bg-green-500" : "bg-red-500"
-            }`}
-          />
-          <span className="text-xs text-slate-400">
-            {bridge.isConnected ? "已连接" : "未连接"}
-          </span>
-        </div>
+        <ConnectionStatusBadge
+          status={bridge.connectionStatus}
+          error={bridge.connectionError}
+          logs={bridge.connectionLogs}
+          bridgeInfo={bridge.bridgeInfo}
+          onReconnect={bridge.reconnect}
+        />
 
         {/* Version */}
         <span className="text-xs text-slate-400 ml-auto">v1.0.0</span>

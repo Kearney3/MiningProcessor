@@ -188,6 +188,21 @@ impl PythonBridge {
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::SeqCst);
     }
+
+    /// 获取子进程 PID（用于前端展示）
+    pub fn pid(&self) -> Option<u32> {
+        self.child.lock().ok()?.as_ref().map(|c| c.id())
+    }
+
+    /// 检查子进程是否仍在运行
+    pub fn is_alive(&self) -> bool {
+        if let Ok(mut guard) = self.child.lock() {
+            if let Some(ref mut c) = *guard {
+                return c.try_wait().ok().flatten().is_none();
+            }
+        }
+        false
+    }
 }
 
 impl Drop for PythonBridge {
