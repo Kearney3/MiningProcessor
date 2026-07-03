@@ -289,10 +289,12 @@ function FuelCard({
   bridge,
   useEquipmentLedger,
   useOilLedger,
+  skipHidden,
 }: {
   bridge: BridgeProp;
   useEquipmentLedger: boolean;
   useOilLedger: boolean;
+  skipHidden: boolean;
 }) {
   const { notify } = useToast();
   const [path, setPath] = useState("");
@@ -310,6 +312,7 @@ function FuelCard({
         path,
         use_equipment_ledger: useEquipmentLedger,
         use_oil_ledger: useOilLedger,
+        skip_hidden: skipHidden,
       };
       if (year) params.year = parseInt(year);
       const res = await bridge.call<{ output_file?: string }>(
@@ -353,10 +356,12 @@ function ProductionCard({
   bridge,
   useEquipmentLedger,
   useOilLedger,
+  skipHidden,
 }: {
   bridge: BridgeProp;
   useEquipmentLedger: boolean;
   useOilLedger: boolean;
+  skipHidden: boolean;
 }) {
   const { notify } = useToast();
   const [path, setPath] = useState("");
@@ -375,6 +380,7 @@ function ProductionCard({
         raw_start: parseInt(rawStart),
         use_equipment_ledger: useEquipmentLedger,
         use_oil_ledger: useOilLedger,
+        skip_hidden: skipHidden,
       });
       setResult("处理完成");
       notify("生产数据处理完成", "success");
@@ -421,10 +427,12 @@ function ElectricalCard({
   bridge,
   useEquipmentLedger,
   useOilLedger,
+  skipHidden,
 }: {
   bridge: BridgeProp;
   useEquipmentLedger: boolean;
   useOilLedger: boolean;
+  skipHidden: boolean;
 }) {
   const { notify } = useToast();
   const [path, setPath] = useState("");
@@ -446,6 +454,7 @@ function ElectricalCard({
         default_shift: defaultShift,
         use_equipment_ledger: useEquipmentLedger,
         use_oil_ledger: useOilLedger,
+        skip_hidden: skipHidden,
       };
       if (year) params.year = parseInt(year);
       await bridge.call("process_electrical", params);
@@ -513,10 +522,12 @@ function WorktimeCard({
   bridge,
   useEquipmentLedger,
   useOilLedger,
+  skipHidden,
 }: {
   bridge: BridgeProp;
   useEquipmentLedger: boolean;
   useOilLedger: boolean;
+  skipHidden: boolean;
 }) {
   const { notify } = useToast();
   const [path, setPath] = useState("");
@@ -541,6 +552,7 @@ function WorktimeCard({
         use_header_mapping: useHeaderMapping,
         use_equipment_ledger: useEquipmentLedger,
         use_oil_ledger: useOilLedger,
+        skip_hidden: skipHidden,
       };
       if (useHeaderMapping) {
         params.header_mode = headerMode;
@@ -629,10 +641,12 @@ function MergeCard({
   bridge,
   useEquipmentLedger,
   useOilLedger,
+  skipHidden,
 }: {
   bridge: BridgeProp;
   useEquipmentLedger: boolean;
   useOilLedger: boolean;
+  skipHidden: boolean;
 }) {
   const { notify } = useToast();
   const [folderPath, setFolderPath] = useState("");
@@ -673,6 +687,7 @@ function MergeCard({
           .map((s) => ({ column: s.column.trim(), ascending: s.ascending })),
         use_equipment_ledger: useEquipmentLedger,
         use_oil_ledger: useOilLedger,
+        skip_hidden: skipHidden,
       });
       const msg = res.output_file ? `输出: ${res.output_file}` : "合并完成";
       setResult(msg);
@@ -779,6 +794,7 @@ function MergeCard({
 export function DataProcessingPage({ bridge }: { bridge: BridgeProp }) {
   const [useEquipmentLedger, setUseEquipmentLedger] = useState(false);
   const [useOilLedger, setUseOilLedger] = useState(false);
+  const [skipHidden, setSkipHidden] = useState(false);
 
   return (
     <div className="space-y-5">
@@ -798,15 +814,20 @@ export function DataProcessingPage({ bridge }: { bridge: BridgeProp }) {
             onChange={setUseOilLedger}
             label="油品台账匹配"
           />
+          <StyledToggle
+            checked={skipHidden}
+            onChange={setSkipHidden}
+            label="跳过隐藏行/列"
+          />
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <FuelCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} />
-        <ProductionCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} />
-        <ElectricalCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} />
-        <WorktimeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} />
-        <MergeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} />
+        <FuelCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHidden={skipHidden} />
+        <ProductionCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHidden={skipHidden} />
+        <ElectricalCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHidden={skipHidden} />
+        <WorktimeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHidden={skipHidden} />
+        <MergeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHidden={skipHidden} />
       </div>
     </div>
   );

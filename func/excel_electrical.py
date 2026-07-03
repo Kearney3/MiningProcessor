@@ -9,19 +9,20 @@ import re
 import argparse
 
 from func.logger import get_logger
-from func.excel_utils import dedup_dataframe, detect_shift
+from func.excel_utils import dedup_dataframe, detect_shift, get_hidden_indices, filter_hidden_from_df
 from func.string_utils import clean_string
 
 logger = get_logger(__name__)
 
 
-def parse_excel_data(file_path, target_year=None, return_sheets=False, add_shift_column=False, default_shift="Day"):
+def parse_excel_data(file_path, target_year=None, return_sheets=False, add_shift_column=False, default_shift="Day", skip_hidden=False):
     """
     解析复杂的Excel电力消耗报表
     :param file_path: 输入文件路径
     :param target_year: 如果指定，则将所有日期的年份修改为此年份
     :param add_shift_column: 是否在日期列右侧新增班次列 (Day/Night)
     :param default_shift: 当无法从表头识别班次时使用的默认值，"Day" 或 "Night"
+    :param skip_hidden: 若为 True，跳过 Excel 中的隐藏行和隐藏列
     """
     all_extracted_data = []
 
@@ -32,6 +33,10 @@ def parse_excel_data(file_path, target_year=None, return_sheets=False, add_shift
         for sheet_name in sheet_names:
             logger.info(f"正在处理 Sheet: {sheet_name}")
             df = xl.parse(sheet_name, header=None)  # 不设表头，手动定位
+
+            if skip_hidden:
+                h_rows, h_cols = get_hidden_indices(file_path, sheet_name)
+                df = filter_hidden_from_df(df, h_rows, h_cols)
 
             if df.empty or df.shape[1] == 0:
                 logger.warning(f"跳过 Sheet {sheet_name}: 空表")
@@ -162,9 +167,11 @@ def main():
     parser.add_argument("--add-shift", action="store_true", help="在日期列右侧新增班次列 (Day/Night)")
     parser.add_argument("--default-shift", choices=["Day", "Night"], default="Day",
                         help="当无法从表头识别班次时使用的默认值 (默认: Day)")
+    parser.add_argument("--skiphidden", action="store_true", help="跳过 Excel 中的隐藏行和隐藏列")
     args = parser.parse_args()
     parse_excel_data(args.input_file, target_year=args.year,
-                     add_shift_column=args.add_shift, default_shift=args.default_shift)
+                     add_shift_column=args.add_shift, default_shift=args.default_shift,
+                     skip_hidden=args.skiphidden)
 
 
 # 统一命名别名（L-01）

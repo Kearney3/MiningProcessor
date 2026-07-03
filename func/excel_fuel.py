@@ -6,18 +6,19 @@ import numpy as np
 
 from func.logger import get_logger
 from func.string_utils import clean_string
-from func.excel_utils import dedup_dataframe, resolve_shift, detect_shift
+from func.excel_utils import dedup_dataframe, resolve_shift, detect_shift, get_hidden_indices, filter_hidden_from_df
 
 logger = get_logger(__name__)
 
 
-def process_diesel_data(file_path, target_year=None, return_sheets=False):
+def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_hidden=False):
     """处理设备柴油消耗报表，提取发动机与油耗数据。
 
     Args:
         file_path: Excel 文件路径。
         target_year: 覆盖日期年份，None 时使用原始年份。
         return_sheets: 若为 True，返回 {sheet_name: DataFrame} 字典而非写入文件。
+        skip_hidden: 若为 True，跳过 Excel 中的隐藏行和隐藏列。
 
     Returns:
         当 return_sheets=False 时返回输出文件路径 (str)；
@@ -39,6 +40,10 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False):
         for sheet in sheet_names:
             logger.info(f"正在处理 Sheet: {sheet}")
             df_raw = xl.parse(sheet, header=None)
+
+            if skip_hidden:
+                h_rows, h_cols = get_hidden_indices(file_path, sheet)
+                df_raw = filter_hidden_from_df(df_raw, h_rows, h_cols)
 
             try:
                 start_row_idx = df_raw[df_raw.iloc[:, 0] == 1].index[0]
@@ -233,8 +238,9 @@ def main():
     parser = argparse.ArgumentParser(description="处理设备柴油消耗报表")
     parser.add_argument("input_file", help="输入Excel文件路径")
     parser.add_argument("--year", type=int, help="目标年份")
+    parser.add_argument("--skiphidden", action="store_true", help="跳过 Excel 中的隐藏行和隐藏列")
     args = parser.parse_args()
-    process_diesel_data(args.input_file, args.year)
+    process_diesel_data(args.input_file, args.year, skip_hidden=args.skiphidden)
 
 
 # 统一命名别名（L-01）

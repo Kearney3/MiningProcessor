@@ -342,7 +342,7 @@ class TestProcessWorktimeRPC:
         """header_mode 和 header_fuzzy 应注入到 mapping 中。"""
         captured_mapping = {}
 
-        def fake_process(path, year, month, output_file=None, return_sheets=False, header_mapping=None):
+        def fake_process(path, year, month, output_file=None, return_sheets=False, header_mapping=None, **_kwargs):
             captured_mapping.update(header_mapping or {})
             return {}
 
@@ -388,6 +388,56 @@ class TestBatchProcessValidation:
                 "table_merge_config": {"base_type": "fuel"},
             })
         assert "error" not in result
+
+
+# ---------------------------------------------------------------------------
+# process_production RPC — single file must write output
+# ---------------------------------------------------------------------------
+
+
+class TestProcessProductionRPC:
+    """process_production handler 测试。"""
+
+    def test_single_file_returns_output_file(self, tmp_path):
+        """单文件处理必须生成输出文件并返回路径。"""
+        input_file = str(tmp_path / "2025.01.01 白班.xlsx")
+        pd.DataFrame({"a": [1]}).to_excel(input_file, index=False)
+
+        expected_output = str(tmp_path / "合并产量.xlsx")
+        with patch("func.excel_production_enhanced.MiningDataProcessor.process_single_file") as mock_proc, \
+             patch("func.excel_production_enhanced.MiningDataProcessor.__init__", return_value=None), \
+             patch.object(tauri_bridge, "_post_process_ledger") as mock_post:
+            result = tauri_bridge._process_production({
+                "path": input_file,
+                "use_equipment_ledger": True,
+                "use_oil_ledger": False,
+            })
+        assert result["output_file"] == expected_output
+        mock_proc.assert_called_once_with(input_file, expected_output)
+        mock_post.assert_called_once_with(
+            expected_output,
+            use_equipment_ledger=True,
+            use_oil_ledger=False,
+        )
+
+    def test_folder_returns_output_file(self, tmp_path):
+        """文件夹处理必须返回输出文件路径。"""
+        with patch("func.excel_production_enhanced.MiningDataProcessor.process_folder") as mock_proc, \
+             patch("func.excel_production_enhanced.MiningDataProcessor.__init__", return_value=None), \
+             patch.object(tauri_bridge, "_post_process_ledger") as mock_post:
+            result = tauri_bridge._process_production({
+                "path": str(tmp_path),
+                "use_equipment_ledger": False,
+                "use_oil_ledger": True,
+            })
+        expected_output = str(tmp_path / "合并产量.xlsx")
+        assert result["output_file"] == expected_output
+        mock_proc.assert_called_once()
+        mock_post.assert_called_once_with(
+            expected_output,
+            use_equipment_ledger=False,
+            use_oil_ledger=True,
+        )
 
 
 # ---------------------------------------------------------------------------

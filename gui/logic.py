@@ -162,12 +162,14 @@ def _get_output_file(module_type: str, path: str, **kwargs) -> str | None:
 # ---------------------------------------------------------------------------
 def _dispatch_module(module_type: str, path: str, **kwargs) -> object | None:
     """Dispatch to the appropriate processor. Returns worktime_sheets or None."""
+    skip_hidden = kwargs.get("skip_hidden", False)
     if module_type == "fuel":
-        process_fuel_data(path, kwargs.get("year"))
+        process_fuel_data(path, kwargs.get("year"), skip_hidden=skip_hidden)
     elif module_type == "production":
         raw_start = kwargs.get("raw_start", -1)
         device_load_map = config_loader.get_device_load_map()
-        processor = ProdProcessor(raw_start=raw_start, device_load_map=device_load_map)
+        processor = ProdProcessor(raw_start=raw_start, device_load_map=device_load_map,
+                                  skip_hidden=skip_hidden)
         logging.info(f"装载量参数：{device_load_map}")
         if os.path.isdir(path):
             output_file = os.path.join(path, "合并产量.xlsx")
@@ -178,7 +180,8 @@ def _dispatch_module(module_type: str, path: str, **kwargs) -> object | None:
     elif module_type == "electrical":
         process_electrical_data(path, kwargs.get("year"),
                          add_shift_column=kwargs.get("add_shift_column", False),
-                         default_shift=kwargs.get("default_shift", "Day"))
+                         default_shift=kwargs.get("default_shift", "Day"),
+                         skip_hidden=skip_hidden)
     elif module_type == "worktime":
         year = kwargs.get("year", datetime.now().year)
         month = kwargs.get("month", 1)
@@ -186,12 +189,14 @@ def _dispatch_module(module_type: str, path: str, **kwargs) -> object | None:
         file_dir = os.path.dirname(path) or "."
         output_file = os.path.join(file_dir, f"{year}{month:02d}_工作效率表.xlsx")
         return process_worktime_data(path, year, month, output_file,
-                                  return_sheets=True, header_mapping=header_mapping)
+                                  return_sheets=True, header_mapping=header_mapping,
+                                  skip_hidden=skip_hidden)
     elif module_type == "merge":
         keyword = kwargs.get("keyword", "")
         strip_time = kwargs.get("strip_time", False)
         sort_configs = kwargs.get("sort_configs", None)
-        merge_excel_files(path, keyword, strip_time=strip_time, sort_configs=sort_configs)
+        merge_excel_files(path, keyword, strip_time=strip_time, sort_configs=sort_configs,
+                          skip_hidden=skip_hidden)
     # batch 模块由 _execute_batch_task 单独处理
     return None
 
@@ -257,7 +262,7 @@ async def _safe_run_task(
 # ---------------------------------------------------------------------------
 # 各模块按钮回调
 # ---------------------------------------------------------------------------
-async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=None, oil_ledger=None) -> None:
+async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden=False) -> None:
     """燃油处理按钮回调"""
     btn = fuel_refs["btn"]
     path = fuel_refs["path"].value
@@ -270,10 +275,11 @@ async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=
         _log_message(log, "请先选择有效的年份", level=logging.WARNING)
         return
     await _safe_run_task(page, btn, "处理", path, log, "fuel",
-                         year=year, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
+                         year=year, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
+                         skip_hidden=skip_hidden)
 
 
-async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=None, oil_ledger=None) -> None:
+async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden=False) -> None:
     """生产处理按钮回调"""
     btn = prod_refs["btn"]
     path = prod_refs["path"].value
@@ -291,10 +297,11 @@ async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=
         return
 
     await _safe_run_task(page, btn, "处理", path, log, "production",
-                         raw_start=raw_start, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
+                         raw_start=raw_start, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
+                         skip_hidden=skip_hidden)
 
 
-async def on_elec_process(page: ft.Page, elec_refs: dict, log, equipment_ledger=None, oil_ledger=None) -> None:
+async def on_elec_process(page: ft.Page, elec_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden=False) -> None:
     """电力处理按钮回调"""
     btn = elec_refs["btn"]
     path = elec_refs["path"].value
@@ -315,10 +322,11 @@ async def on_elec_process(page: ft.Page, elec_refs: dict, log, equipment_ledger=
                          year=year,
                          add_shift_column=add_shift.value if add_shift else False,
                          default_shift=default_shift_ref.value if default_shift_ref else "Day",
-                         equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
+                         equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
+                         skip_hidden=skip_hidden)
 
 
-async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=None, oil_ledger=None) -> None:
+async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden=False) -> None:
     """工时处理按钮回调"""
     btn = work_refs["btn"]
     path = work_refs["path"].value
@@ -345,10 +353,10 @@ async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=
     await _safe_run_task(page, btn, "处理", path, log, "worktime",
                          year=year, month=month,
                          equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
-                         header_mapping=header_mapping)
+                         header_mapping=header_mapping, skip_hidden=skip_hidden)
 
 
-async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledger=None, oil_ledger=None) -> None:
+async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden=False) -> None:
     """Excel 合并按钮回调"""
     btn = merge_refs["btn"]
     path = merge_refs["path"].value
@@ -368,7 +376,8 @@ async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledge
     strip_time = bool(merge_refs["strip_time"].value)
     await _safe_run_task(page, btn, "合并", path, log, "merge",
                          keyword=keyword, strip_time=strip_time, sort_configs=sort_configs,
-                         equipment_ledger=equipment_ledger, oil_ledger=oil_ledger)
+                         equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
+                         skip_hidden=skip_hidden)
 
 
 def _set_controls_visible(controls: list, visible: bool):
@@ -578,6 +587,10 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
             )
 
         # ── 第三阶段：执行处理 ──
+        # 跳过隐藏行/列
+        skip_hidden_toggle = batch_refs.get("_skip_hidden_toggle")
+        skip_hidden = skip_hidden_toggle.value if skip_hidden_toggle else False
+
         set_btn_state(btn, False, "处理中...")
         done_flag = asyncio.Event()
         progress_poller = asyncio.create_task(
@@ -594,6 +607,7 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
                         table_merge_config,
                         progress_cb=progress_queue.put_nowait,
                         cancel_event=cancel_event,
+                        skip_hidden=skip_hidden,
                     )
                 except Exception as ex:
                     thread_result["error"] = ex
@@ -668,7 +682,10 @@ def _make_module_handler(
 
     async def handler(e: ft.ControlEvent) -> None:
         eq, oil = _get_ledgers_from_refs(module_refs, ledger_refs, oil_ledger_refs)
-        await callback(page, module_refs[module_key], log, equipment_ledger=eq, oil_ledger=oil)
+        skip_hidden_toggle = module_refs.get("_skip_hidden_toggle")
+        skip_hidden = skip_hidden_toggle.value if skip_hidden_toggle else False
+        await callback(page, module_refs[module_key], log,
+                       equipment_ledger=eq, oil_ledger=oil, skip_hidden=skip_hidden)
 
     return handler
 
