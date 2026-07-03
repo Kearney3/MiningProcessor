@@ -222,7 +222,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         _date_end_val.value = yesterday.isoformat()
         _update_displays()
 
-    yesterday_btn = ft.ElevatedButton(
+    yesterday_btn = ft.Button(
         "昨日",
         icon=ft.Icons.CALENDAR_TODAY,
         on_click=on_yesterday_click,
@@ -236,7 +236,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         _date_end_val.value = ""
         _update_displays()
 
-    clear_date_btn = ft.ElevatedButton(
+    clear_date_btn = ft.Button(
         "清除",
         icon=ft.Icons.CLEAR_ALL,
         on_click=on_clear_date,

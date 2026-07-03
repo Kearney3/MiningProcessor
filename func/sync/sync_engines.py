@@ -76,8 +76,8 @@ def sync_via_api(
                 for e in data["errors"][:5]:
                     logger.error("  [%s] 行%d: %s", data_type, e.get("row", "?"), e.get("message", ""))
 
-        # 确认导入
-        confirm_resp = api_client.confirm_import(table, session_id)
+        # 确认导入（batchIndex=0 处理所有 staging 数据）
+        confirm_resp = api_client.confirm_batch(table, session_id, batch_index=0)
         confirm_data = confirm_resp.get("data", {})
         inserted = confirm_data.get("inserted", 0)
         updated = confirm_data.get("updated", 0)

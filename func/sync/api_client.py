@@ -78,12 +78,11 @@ class MineBaseAPIClient:
         }
         return self._request("POST", f"/api/import/{table}/batch", payload)
 
-    def confirm_import(self, table: str, session_id: str) -> dict:
-        """确认导入，将 staging 数据写入目标表。"""
-        return self._request("POST", f"/api/import/{table}/confirm", {
+    def confirm_batch(self, table: str, session_id: str, batch_index: int = 0) -> dict:
+        """确认导入批次，将 staging 数据写入目标表。"""
+        return self._request("POST", f"/api/import/{table}/confirm-batch", {
             "sessionId": session_id,
-            "table": table,
-            "duplicateStrategy": "skip",
+            "batchIndex": batch_index,
         })
 
     def cancel_import(self, table: str, session_id: str) -> dict:
