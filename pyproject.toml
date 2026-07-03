@@ -1,6 +1,6 @@
 [project]
 name = "MiningProcessor"
-version = "1.0.0"
+version = "1.1.0"
 description = "矿山运营 Excel 报表批量处理工具 — 支持 CLI 与 Flet 桌面 GUI"
 readme = "README.md"
 requires-python = ">=3.12"
