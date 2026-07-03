@@ -106,12 +106,13 @@ def scan_files(folder_path: str, keywords: dict[str, list[str]] | None = None) -
 # ---------------------------------------------------------------------------
 
 
-def _process_fuel_module(files: list[str], year: int) -> dict[str, pd.DataFrame]:
+def _process_fuel_module(files: list[str], year: int, skip_hidden: bool = False) -> dict[str, pd.DataFrame]:
     """处理燃油数据文件列表，返回第一个成功的 sheets 字典。"""
     for fpath in files:
         try:
             logger.info(f"燃油数据源: {os.path.basename(fpath)}")
-            sheets = process_fuel_data(fpath, target_year=year, return_sheets=True)
+            sheets = process_fuel_data(fpath, target_year=year, return_sheets=True,
+                                       skip_hidden=skip_hidden)
             if sheets:
                 return sheets
         except Exception as e:
@@ -119,12 +120,13 @@ def _process_fuel_module(files: list[str], year: int) -> dict[str, pd.DataFrame]
     return {}
 
 
-def _process_electrical_module(files: list[str], year: int) -> dict[str, pd.DataFrame]:
+def _process_electrical_module(files: list[str], year: int, skip_hidden: bool = False) -> dict[str, pd.DataFrame]:
     """处理电力数据文件列表，返回第一个成功的 sheets 字典。"""
     for fpath in files:
         try:
             logger.info(f"电力数据源: {os.path.basename(fpath)}")
-            sheets = process_electrical_data(fpath, target_year=year, return_sheets=True)
+            sheets = process_electrical_data(fpath, target_year=year, return_sheets=True,
+                                             skip_hidden=skip_hidden)
             if sheets:
                 return sheets
         except Exception as e:
@@ -132,10 +134,10 @@ def _process_electrical_module(files: list[str], year: int) -> dict[str, pd.Data
     return {}
 
 
-def _process_production_module(folder_path: str, raw_start: int) -> dict[str, pd.DataFrame]:
+def _process_production_module(folder_path: str, raw_start: int, skip_hidden: bool = False) -> dict[str, pd.DataFrame]:
     """处理生产数据，返回 sheets 字典或空字典。"""
     try:
-        processor = MiningDataProcessor(version="new", raw_start=raw_start)
+        processor = MiningDataProcessor(version="new", raw_start=raw_start, skip_hidden=skip_hidden)
         sheets = processor.process_folder(folder_path, return_sheets=True)
         if sheets:
             return sheets
@@ -146,14 +148,14 @@ def _process_production_module(folder_path: str, raw_start: int) -> dict[str, pd
 
 
 def _process_worktime_module(
-    files: list[str], year: int, month: int, header_mapping: dict | None
+    files: list[str], year: int, month: int, header_mapping: dict | None, skip_hidden: bool = False,
 ) -> dict[str, pd.DataFrame]:
     """处理工时数据文件列表，返回第一个成功的 sheets 字典。"""
     for fpath in files:
         try:
             logger.info(f"工时数据源: {os.path.basename(fpath)}")
             sheets = process_worktime_data(fpath, year, month, return_sheets=True,
-                                        header_mapping=header_mapping)
+                                        header_mapping=header_mapping, skip_hidden=skip_hidden)
             if sheets:
                 return sheets
         except Exception as e:
@@ -175,6 +177,7 @@ def process_files(
     table_merge_config: dict | None = None,
     progress_cb=None,
     cancel_event=None,
+    skip_hidden: bool = False,
 ) -> dict[str, dict[str, pd.DataFrame]]:
     """
     根据已匹配的文件列表执行批量处理。
@@ -207,22 +210,22 @@ def process_files(
 
     # ── 燃油数据 ──
     if "fuel" in matched:
-        all_results["fuel"] = _process_fuel_module(matched["fuel"], year)
+        all_results["fuel"] = _process_fuel_module(matched["fuel"], year, skip_hidden)
 
     # ── 电力数据 ──
     if "electrical" in matched:
-        all_results["electrical"] = _process_electrical_module(matched["electrical"], year)
+        all_results["electrical"] = _process_electrical_module(matched["electrical"], year, skip_hidden)
 
     # ── 生产数据 ──
     if "production" in matched:
-        result = _process_production_module(folder_path, raw_start)
+        result = _process_production_module(folder_path, raw_start, skip_hidden)
         if result:
             all_results["production"] = result
 
     # ── 工时数据 ──
     if "worktime" in matched:
         all_results["worktime"] = _process_worktime_module(
-            matched["worktime"], year, month, worktime_header_mapping
+            matched["worktime"], year, month, worktime_header_mapping, skip_hidden,
         )
 
     # ── 日志摘要 ──

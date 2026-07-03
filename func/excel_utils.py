@@ -6,10 +6,12 @@ Excel 处理共享工具函数
 - 按日期+班次排序
 - 工时报表 Day/Night 班次分割与清洗
 - 最终 DataFrame 全列去重
+- 隐藏行/列检测与过滤
 """
 
 import logging
 import re
+from pathlib import Path
 
 import pandas as pd
 
@@ -45,6 +47,165 @@ def sanitize_filename(name: str) -> str:
     # Remove ".." sequences (they may appear after separator removal too)
     sanitized = re.sub(r'\.{2,}', '', sanitized)
     return sanitized
+
+
+# ---------------------------------------------------------------------------
+# Hidden rows / columns detection
+# ---------------------------------------------------------------------------
+
+def get_hidden_indices(
+    file_path: str,
+    sheet_name: str | int = 0,
+) -> tuple[set[int], set[str]]:
+    """Return hidden row numbers and column letters for a given sheet.
+
+    Args:
+        file_path: Path to the Excel file.
+        sheet_name: Sheet name (str) or index (int, default 0).
+
+    Returns:
+        ``(hidden_rows, hidden_cols)`` where *hidden_rows* is a set of
+        1-based row indices and *hidden_cols* is a set of column letters
+        (e.g. ``{'B', 'F'}``).  Both may be empty.
+    """
+    from openpyxl import load_workbook
+
+    wb = load_workbook(file_path, read_only=False, data_only=True)
+    try:
+        if isinstance(sheet_name, int):
+            ws = wb.worksheets[sheet_name]
+        else:
+            ws = wb[sheet_name]
+        hidden_rows = {idx for idx, dim in ws.row_dimensions.items() if dim.hidden}
+        hidden_cols = {col for col, dim in ws.column_dimensions.items() if dim.hidden}
+    finally:
+        wb.close()
+    return hidden_rows, hidden_cols
+
+
+def get_column_letter(col_idx: int) -> str:
+    """Convert a 1-based column number to a letter (1→A, 27→AA, …)."""
+    from openpyxl.utils import get_column_letter as _get_column_letter
+
+    return _get_column_letter(col_idx)
+
+
+def filter_hidden_from_df(
+    df: pd.DataFrame,
+    hidden_rows: set[int],
+    hidden_cols: set[str],
+    *,
+    has_header: bool = False,
+) -> pd.DataFrame:
+    """Remove hidden rows and columns from a pandas DataFrame.
+
+    *hidden_rows* uses **1-based** indices (matching openpyxl).
+    The DataFrame's own 0-based positional index is used for filtering.
+
+    *hidden_cols* is a set of column **letters** (e.g. ``{'B', 'D'}``).
+    This function assumes the DataFrame was read with ``header=None`` so
+    that positional column indices map directly to Excel columns.
+    When *has_header* is ``True`` the header row was consumed by pandas
+    and hidden-row indices must be offset by 1 (Excel row 2 → df index 0).
+
+    Args:
+        df: Input DataFrame (typically from ``pd.read_excel(…, header=None)``).
+        hidden_rows: Set of 1-based Excel row numbers to drop.
+        hidden_cols: Set of Excel column letters to drop.
+        has_header: Set ``True`` when the DataFrame was read with a header
+            row (the default ``pd.read_excel`` mode).  Defaults to ``False``.
+
+    Returns:
+        A new DataFrame with hidden rows/columns removed.
+    """
+    if not hidden_rows and not hidden_cols:
+        return df
+
+    result = df.copy()
+
+    # Drop hidden rows.
+    # When has_header=False (header=None): Excel row 1 → df index 0.
+    # When has_header=True: pandas consumed the header row, so Excel row 2 → df index 0.
+    header_offset = 1 if has_header else 0
+    if hidden_rows:
+        drop_indices = [
+            r - 1 - header_offset
+            for r in hidden_rows
+            if 0 <= r - 1 - header_offset < len(result)
+        ]
+        if drop_indices:
+            result = result.drop(index=drop_indices)
+
+    # Drop hidden columns
+    if hidden_cols:
+        drop_cols = []
+        for i in range(result.shape[1]):
+            letter = get_column_letter(i + 1)
+            if letter in hidden_cols:
+                drop_cols.append(result.columns[i])
+        if drop_cols:
+            result = result.drop(columns=drop_cols)
+            # Re-index columns to maintain sequential integer positions
+            result.columns = range(len(result.columns))
+
+    # IMPORTANT: Do NOT reset the row index when has_header=False.
+    # Preserving the original integer index lets all processors that use
+    # .iloc[] (positional access) work correctly after hidden rows are
+    # removed, while code that reads .index (e.g. fuel's
+    # ``df[df.iloc[:,0] == 1].index[0]``) continues to return meaningful
+    # original row numbers.
+    # For has_header=True (merger path) we do reset because pandas already
+    # consumed the header row, making index 0 correspond to Excel row 2;
+    # a reset keeps the offset arithmetic consistent.
+    if has_header:
+        result = result.reset_index(drop=True)
+
+    return result
+
+
+def adjust_index_for_hidden(
+    original_index: int,
+    hidden_set: set[int],
+    *,
+    one_based: bool = False,
+) -> int:
+    """Translate an original positional index to its new position after hidden removal.
+
+    After filtering hidden rows or columns, positional indices shift.
+    This function maps the original index to the corresponding index in
+    the filtered sequence.
+
+    Args:
+        original_index: The 0-based positional index in the unfiltered data.
+        hidden_set: Set of indices to remove.  Interpretation depends on
+            *one_based*: when ``False`` (default) the set contains 0-based
+            indices; when ``True`` it contains 1-based indices (Excel rows).
+        one_based: If ``True``, *hidden_set* uses 1-based numbering
+            (e.g. Excel row numbers).  *original_index* is always 0-based.
+
+    Returns:
+        The adjusted 0-based index in the filtered sequence.
+    """
+    offset = 0
+    for h in sorted(hidden_set):
+        h0 = h - 1 if one_based else h
+        if h0 <= original_index:
+            offset += 1
+        else:
+            break
+    return original_index - offset
+
+
+def letters_to_col_indices(letters: set[str]) -> set[int]:
+    """Convert a set of Excel column letters to 0-based positional indices.
+
+    >>> letters_to_col_indices({'A', 'C'})
+    {0, 2}
+    """
+    from openpyxl.utils import column_index_from_string
+
+    return {column_index_from_string(letter) - 1 for letter in letters}
+
 
 # All known shift patterns for text-based detection
 _SHIFT_PATTERNS: dict[str, list[str]] = {
@@ -200,8 +361,8 @@ def split_day_night_shifts(
         header_row_index: 表头行索引，默认 1。
         data_start_index: 数据起始行索引，默认 2。
         day_end_offset: Day 数据结束位置相对 split_idx 的偏移量。
-            默认 -1 表示 `df_raw.iloc[data_start:split_idx - 1]`（excel_worktime.py 行为）。
-            设为 0 表示 `df_raw.iloc[data_start:split_idx]`（excel_worktime_multifile.py 行为）。
+            默认 -1 表示 ``df_raw.iloc[data_start:split_idx - 1]``（excel_worktime.py 行为）。
+            设为 0 表示 ``df_raw.iloc[data_start:split_idx]``（excel_worktime_multifile.py 行为）。
 
     Returns:
         合并后的 DataFrame，包含 '班次' 列（'Day' 或 'Night'）。

@@ -7,7 +7,7 @@ from typing import List, Tuple
 import pandas as pd
 from func.logger import get_logger
 from func.string_utils import clean_string
-from func.excel_utils import dedup_dataframe, sanitize_filename
+from func.excel_utils import dedup_dataframe, sanitize_filename, get_hidden_indices, filter_hidden_from_df
 
 logger = get_logger(__name__)
 
@@ -41,6 +41,7 @@ def merge_excel_files(
         output_file: str | None = None,
         strip_time: bool = False,
         sort_configs: List[dict] | None = None,
+        skip_hidden: bool = False,
 ) -> str:
     """
     合并指定文件夹中包含关键字的 Excel 文件。
@@ -52,6 +53,7 @@ def merge_excel_files(
         strip_time: 为 True 时，第一个时间列仅保留日期部分（YYYY-MM-DD）
         sort_configs: 排序配置列表，如 [{"column": "日期", "ascending": True}, ...]
                       提供时优先使用，不再自动按日期排序
+        skip_hidden: 若为 True，跳过 Excel 中的隐藏行和隐藏列
 
     返回:
         输出文件的完整路径
@@ -113,6 +115,10 @@ def merge_excel_files(
             except (ValueError, KeyError, FileNotFoundError) as e:
                 logger.error(f"读取文件 '{fpath}' 的 Sheet '{sname}' 失败: {e}")
                 continue
+
+            if skip_hidden:
+                h_rows, h_cols = get_hidden_indices(fpath, sname)
+                df = filter_hidden_from_df(df, h_rows, h_cols, has_header=True)
 
             if df.empty:
                 logger.warning(f"  警告: {os.path.basename(fpath)} 的 Sheet '{sname}' 为空，已跳过")
@@ -233,6 +239,7 @@ def main():
     parser.add_argument("-o", "--output", help="输出文件路径（可选）")
     parser.add_argument("-s", "--strip-time", action="store_true", help="时间列仅保留日期（YYYY-MM-DD）")
     parser.add_argument("--sort", type=str, default=None, help='排序规则 JSON，如: [{"column":"日期","ascending":true}]')
+    parser.add_argument("--skiphidden", action="store_true", help="跳过 Excel 中的隐藏行和隐藏列")
     args = parser.parse_args()
 
     folder = os.path.abspath(args.folder)
@@ -250,7 +257,8 @@ def main():
             except Exception as e:
                 logger.error(f"错误: 排序规则 JSON 解析失败: {e}")
                 sys.exit(1)
-        merge_excel_files(folder, args.keyword, args.output, strip_time=args.strip_time, sort_configs=sort_configs)
+        merge_excel_files(folder, args.keyword, args.output, strip_time=args.strip_time, sort_configs=sort_configs,
+                          skip_hidden=args.skiphidden)
     except Exception as e:
         logger.error(f"错误: {e}")
         sys.exit(1)

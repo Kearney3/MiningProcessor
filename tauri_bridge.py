@@ -230,7 +230,8 @@ def _process_fuel(params: dict) -> dict:
     from func.excel_fuel import process_diesel_data
 
     safe_path = str(_sanitize_path(params["path"], must_exist=True))
-    result = process_diesel_data(safe_path, target_year=params.get("year"))
+    result = process_diesel_data(safe_path, target_year=params.get("year"),
+                                 skip_hidden=params.get("skip_hidden", False))
     output_file = str(result) if result else None
     if output_file:
         _post_process_ledger(
@@ -248,7 +249,8 @@ def _process_production(params: dict) -> dict:
 
     load_map = get_device_load_map()
     processor = MiningDataProcessor(
-        raw_start=params.get("raw_start", -1), device_load_map=load_map
+        raw_start=params.get("raw_start", -1), device_load_map=load_map,
+        skip_hidden=params.get("skip_hidden", False),
     )
     path = str(_sanitize_path(params["path"], must_exist=True))
     p = Path(path)
@@ -256,8 +258,8 @@ def _process_production(params: dict) -> dict:
         processor.process_folder(path)
         output_file = str(p / "合并产量.xlsx")
     else:
-        processor.process_single_file(path)
-        output_file = None
+        output_file = str(p.parent / "合并产量.xlsx")
+        processor.process_single_file(path, output_file)
     if output_file:
         _post_process_ledger(
             output_file,
@@ -277,6 +279,7 @@ def _process_electrical(params: dict) -> dict:
         target_year=params.get("year"),
         add_shift_column=params.get("add_shift_column", False),
         default_shift=params.get("default_shift", "Day"),
+        skip_hidden=params.get("skip_hidden", False),
     )
     output_file = str(Path(safe_path).parent / "电力消耗统计.xlsx")
     _post_process_ledger(
@@ -310,6 +313,7 @@ def _process_worktime(params: dict) -> dict:
         output_file=output_file,
         return_sheets=False,
         header_mapping=header_mapping,
+        skip_hidden=params.get("skip_hidden", False),
     )
     _post_process_ledger(
         output_file,
@@ -329,6 +333,7 @@ def _process_merge(params: dict) -> dict:
         params["keyword"],
         strip_time=params.get("strip_time", False),
         sort_configs=params.get("sort_configs"),
+        skip_hidden=params.get("skip_hidden", False),
     )
     if output:
         _post_process_ledger(
@@ -408,6 +413,7 @@ def _batch_process(params: dict) -> dict:
         table_merge_config=params.get("table_merge_config"),
         progress_cb=progress_cb,
         cancel_event=_cancel_event,
+        skip_hidden=params.get("skip_hidden", False),
     )
     return {"cancelled": _cancel_event.is_set()}
 

@@ -310,6 +310,11 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         label="油品台账匹配",
         value=False,
     )
+    skip_hidden_toggle = ft.Checkbox(
+        label="跳过隐藏行/列",
+        value=False,
+        tooltip="勾选后，Excel 中被隐藏的行和列将不会被读取",
+    )
 
     header_hint = ft.Row(
         [
@@ -362,7 +367,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                     ft.Row([sort_rules_column, add_sort_btn], spacing=8,
                            alignment=ft.MainAxisAlignment.START),
                 ], spacing=4),
-                ft.Row([match_eq_toggle, match_oil_toggle], spacing=8),
+                ft.Row([match_eq_toggle, match_oil_toggle, skip_hidden_toggle], spacing=8),
             ],
             spacing=8,
             expand=True,
@@ -377,6 +382,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     module_refs = {
         "_match_eq_toggle": match_eq_toggle,
         "_match_oil_toggle": match_oil_toggle,
+        "_skip_hidden_toggle": skip_hidden_toggle,
         "fuel": {"path": fuel_path, "year": fuel_year, "btn": fuel_btn},
         "prod": {"path": prod_path, "raw_start": prod_raw_start, "btn": prod_btn},
         "elec": {"path": elec_path, "year": elec_year, "btn": elec_btn, "add_shift": elec_add_shift, "default_shift": elec_default_shift},

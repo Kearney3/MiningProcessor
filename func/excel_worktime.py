@@ -5,13 +5,13 @@ import argparse
 # 假设 func.logger 已经正确配置
 from func.logger import get_logger
 from func.string_utils import clean_string
-from func.excel_utils import apply_header_mapping, split_day_night_shifts, clean_split_dataframe, strip_date_column, sort_by_date_shift, dedup_dataframe
+from func.excel_utils import apply_header_mapping, split_day_night_shifts, clean_split_dataframe, strip_date_column, sort_by_date_shift, dedup_dataframe, get_hidden_indices, filter_hidden_from_df, adjust_index_for_hidden
 
 logger = get_logger(__name__)
 
 
 def process_excel_data(file_path, year, month, output_file=None, return_sheets=False,
-                       header_mapping=None):
+                       header_mapping=None, skip_hidden=False):
     """
     解析非标准结构的Excel文件并合并数据
 
@@ -22,6 +22,7 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
         output_file: 输出文件路径（可选）
         return_sheets: 是否返回 sheets 字典（供批量处理用）
         header_mapping: 表头映射字典 {原始列名: 新列名}，为 None 或空时不映射
+        skip_hidden: 若为 True，跳过 Excel 中的隐藏行和隐藏列
     """
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"找不到输入文件 '{file_path}'")
@@ -47,13 +48,27 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
             # 读取整个sheet，不设表头
             df_raw = pd.read_excel(xls, sheet_name=sheet_name, header=None)
 
+            if skip_hidden:
+                h_rows, h_cols = get_hidden_indices(file_path, sheet_name)
+                df_raw = filter_hidden_from_df(df_raw, h_rows, h_cols)
+            else:
+                h_rows = set()
+
             # 1. 确定日期字符串 (YYYY-MM-DD)
             day = int(clean_string(sheet_name))
             date_str = f"{year}-{month:02d}-{day:02d}"
             day_list.append(day)
 
-            # 2. 分割 Day/Night 班次（day_end_offset=-1 对应原 worktime 行为）
-            combined_day_df = split_day_night_shifts(df_raw)
+            # 2. 分割 Day/Night 班次
+            # Adjust hardcoded row indices for hidden rows that were removed
+            if h_rows:
+                adj_header = adjust_index_for_hidden(1, h_rows, one_based=True)
+                adj_data = adjust_index_for_hidden(2, h_rows, one_based=True)
+                combined_day_df = split_day_night_shifts(
+                    df_raw, header_row_index=adj_header, data_start_index=adj_data,
+                )
+            else:
+                combined_day_df = split_day_night_shifts(df_raw)
 
             # 插入日期列到第一列
             combined_day_df.insert(0, '日期', date_str)
@@ -111,11 +126,13 @@ def main():
     parser.add_argument("input_file", help="输入Excel文件路径")
     parser.add_argument("--year", type=int, default=2025, help="目标年份")
     parser.add_argument("--month", type=int, default=1, help="目标月份")
+    parser.add_argument("--skiphidden", action="store_true", help="跳过 Excel 中的隐藏行和隐藏列")
     args = parser.parse_args()
     file_dir = os.path.dirname(args.input_file) or "."
     output_xlsx = os.path.join(file_dir, f"{args.year}{args.month:02d}_工作效率表.xlsx")
     if os.path.exists(args.input_file):
-        process_excel_data(args.input_file, args.year, args.month, output_xlsx)
+        process_excel_data(args.input_file, args.year, args.month, output_xlsx,
+                           skip_hidden=args.skiphidden)
     else:
         logger.error(f"错误：找不到输入文件 '{args.input_file}'！")
 

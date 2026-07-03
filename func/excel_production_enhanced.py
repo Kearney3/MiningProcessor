@@ -12,23 +12,27 @@ import re
 from func import config_loader
 from func.string_utils import clean_string
 from func.logger import get_logger
-from func.excel_utils import dedup_dataframe
+from func.excel_utils import dedup_dataframe, get_hidden_indices, filter_hidden_from_df, adjust_index_for_hidden, letters_to_col_indices
 
 logger = get_logger(__name__)
 
 
 class MiningDataProcessor:
     def __init__(self, version: str = "new", raw_start: int = -1, device_load_map: dict[str, int] | None = None,
-                 target_text: str = "Мото цагийн заалт"):
+                 target_text: str = "Мото цагийн заалт", skip_hidden: bool = False):
         """
         初始化数据处理器
         :param version: 版本，"new"或"old"
         :param raw_start: 开始行号，默认-1
         :param device_load_map: 自定义设备装载量映射
         :param target_text: 目标文本，默认"Мото цагийн заалт"
+        :param skip_hidden: 若为 True，跳过 Excel 中的隐藏行和隐藏列
         """
         self.version = version
         self.raw_start = raw_start
+        self.skip_hidden = skip_hidden
+        self._hidden_rows: set[int] = set()
+        self._hidden_cols: set[str] = set()
         if raw_start == -1:
             self.auto_detect = True
         else:
@@ -310,13 +314,22 @@ class MiningDataProcessor:
         B列设备名称, C列公司, F列小时数开始, G列小时数结束
         输出到运行数据表
         """
-        # HIGH-08 fix: Vectorized extraction instead of per-row iloc loop
-        start_row = 3
+        # Adjust start_row (0-based) and column indices for hidden rows/cols
+        _h_col_indices = letters_to_col_indices(self._hidden_cols)
+        start_row = adjust_index_for_hidden(3, self._hidden_rows, one_based=True)
+        _adj_col = lambda c: adjust_index_for_hidden(c, _h_col_indices)
+
         if len(df_raw) <= start_row:
             return pd.DataFrame()
 
         subset = df_raw.iloc[start_row:].copy()
-        device_names = subset.iloc[:, 1].apply(self.safe_str)
+        col_device = _adj_col(1)     # B列: 设备名称
+        col_company = _adj_col(2)    # C列: 公司
+        col_hour_start = _adj_col(5)  # F列: 小时数开始
+        col_hour_end = _adj_col(6)    # G列: 小时数结束
+        col_notes = _adj_col(8)       # I列: 备注
+
+        device_names = subset.iloc[:, col_device].apply(self.safe_str)
 
         # Filter out empty device names
         valid_mask = device_names.astype(bool)
@@ -330,14 +343,14 @@ class MiningDataProcessor:
             "日期": date_val,
             "班次": shift_val,
             "设备名称": device_names.values,
-            "公司": subset.iloc[:, 2].apply(self.safe_str).values,
-            "小时数仪表开始": subset.iloc[:, 5].apply(lambda v: self.safe_number(v)).values,
-            "小时数仪表结束": subset.iloc[:, 6].apply(lambda v: self.safe_number(v)).values,
+            "公司": subset.iloc[:, col_company].apply(self.safe_str).values,
+            "小时数仪表开始": subset.iloc[:, col_hour_start].apply(lambda v: self.safe_number(v)).values,
+            "小时数仪表结束": subset.iloc[:, col_hour_end].apply(lambda v: self.safe_number(v)).values,
             "公里数仪表开始": 0,
             "公里数仪表结束": 0,
             "运行里程": 0,
             "趟数": 0,
-            "备注": subset.iloc[:, 8].apply(self.safe_str).values if subset.shape[1] > 8 else "",
+            "备注": subset.iloc[:, col_notes].apply(self.safe_str).values if subset.shape[1] > col_notes else "",
         })
 
         result_df["运行小时数"] = result_df["小时数仪表结束"] - result_df["小时数仪表开始"]
@@ -351,6 +364,12 @@ class MiningDataProcessor:
         filename = os.path.basename(file_path)
         date_val, shift_val = self.parse_filename(filename)
 
+        # Pre-compute hidden row/col info once for the whole file
+        _h_rows_s1: set[int] = set()
+        _h_cols_s1: set[str] = set()
+        if self.skip_hidden:
+            _h_rows_s1, _h_cols_s1 = get_hidden_indices(file_path, 0)
+
         # 只打开一次 Excel 文件
         with pd.ExcelFile(file_path) as xls:
             if len(xls.sheet_names) < 2:
@@ -359,10 +378,32 @@ class MiningDataProcessor:
 
             # 用同一个 xls 解析，避免重复打开文件
             df_sheet1 = pd.read_excel(xls, sheet_name=0, header=None)
-            running_df_1, production_df = self.process_sheet1(df_sheet1, date_val, shift_val)
+            if self.skip_hidden:
+                df_sheet1 = filter_hidden_from_df(df_sheet1, _h_rows_s1, _h_cols_s1)
+
+            # Adjust raw_start for non-auto-detect when hidden rows are present
+            if not self.auto_detect and _h_rows_s1:
+                from func.excel_utils import adjust_index_for_hidden
+                adjusted_raw_start = adjust_index_for_hidden(
+                    self.raw_start - 1, _h_rows_s1, one_based=True,
+                ) + 1
+                logger.info(f"raw_start 从 {self.raw_start} 调整为 {adjusted_raw_start}（跳过隐藏行）")
+                # Temporarily override raw_start for this file
+                orig_raw_start = self.raw_start
+                self.raw_start = adjusted_raw_start
+                running_df_1, production_df = self.process_sheet1(df_sheet1, date_val, shift_val)
+                self.raw_start = orig_raw_start
+            else:
+                running_df_1, production_df = self.process_sheet1(df_sheet1, date_val, shift_val)
 
             if len(xls.sheet_names) > 1:
                 df_sheet2 = pd.read_excel(xls, sheet_name=1, header=None)
+                if self.skip_hidden:
+                    self._hidden_rows, self._hidden_cols = get_hidden_indices(file_path, 1)
+                    df_sheet2 = filter_hidden_from_df(df_sheet2, self._hidden_rows, self._hidden_cols)
+                else:
+                    self._hidden_rows = set()
+                    self._hidden_cols = set()
                 running_df_2 = self.process_sheet2(df_sheet2, date_val, shift_val)
             else:
                 running_df_2 = pd.DataFrame()
@@ -502,11 +543,13 @@ def main():
     parser.add_argument("--raw_start", type=int, default=6, help="复合表头起始行，默认 6, 使用-1自动检测")
     parser.add_argument("--target_text", type=str, default="Мото цагийн заалт",
                         help="目标文本，默认'Мото цагийн заалт'，当raw_start为-1时，根据此文本自动检测复合表头行号")
+    parser.add_argument("--skiphidden", action="store_true", help="跳过 Excel 中的隐藏行和隐藏列")
     args = parser.parse_args()
     input_file = args.input_file
     output_file = r"合并产量.xlsx"
     processor = MiningDataProcessor(
         version=args.version, raw_start=args.raw_start, target_text=args.target_text,
+        skip_hidden=args.skiphidden,
     )
     if os.path.isdir(input_file):
         logger.info(f"正在处理文件夹: {input_file}")
