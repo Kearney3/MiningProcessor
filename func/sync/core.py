@@ -65,6 +65,7 @@ def sync(
     use_ledger: bool = False,
     use_equipment_ledger: bool = False,
     use_oil_ledger: bool = True,
+    skip_hidden: bool = False,
 ) -> dict[str, dict[str, int]]:
     """执行同步的主入口。
 
@@ -221,14 +222,14 @@ def sync(
                 logger.info("  处理文件: %s", file_path.name)
                 try:
                     if data_type == "fuel":
-                        rows = _process_fuel(file_path, year)
+                        rows = _process_fuel(file_path, year, skip_hidden=skip_hidden)
                     elif data_type == "electrical":
-                        rows = _process_electrical(file_path, year)
+                        rows = _process_electrical(file_path, year, skip_hidden=skip_hidden)
                     elif data_type in ("production", "operation"):
                         # 缓存生产文件处理结果，避免同一文件处理两次
                         cache_key = str(file_path)
                         if _production_cache is None or cache_key not in _production_cache:
-                            result = _process_production(file_path)
+                            result = _process_production(file_path, skip_hidden=skip_hidden)
                             if _production_cache is None:
                                 _production_cache = {}
                             _production_cache[cache_key] = result
@@ -236,6 +237,7 @@ def sync(
                     elif data_type == "work_efficiency":
                         rows = _process_work_eff(
                             file_path, year, month, apply_header_mapping,
+                            skip_hidden=skip_hidden,
                         )
                     else:
                         rows = _read_and_map(file_path, DATA_TYPE_REGISTRY[data_type]["sheet"], mapping)

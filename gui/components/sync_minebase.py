@@ -126,6 +126,12 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         active_color=theme.PRIMARY,
         tooltip="使用油品台账标准化油品名称",
     )
+    skip_hidden_check = ft.Checkbox(
+        label="跳过隐藏行/列",
+        value=False,
+        active_color=theme.PRIMARY,
+        tooltip="勾选后，Excel 中被隐藏的行和列将不会被读取",
+    )
 
     # --- 年份/月份 ---
     year_dropdown = ft.Dropdown(
@@ -326,6 +332,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
                             header_mapping_check,
                             equipment_ledger_check,
                             oil_ledger_check,
+                            skip_hidden_check,
                             ft.Row(
                                 [sync_btn, result_text],
                                 alignment=ft.MainAxisAlignment.START,
@@ -362,6 +369,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "apply_header": header_mapping_check,
         "use_equipment_ledger": equipment_ledger_check,
         "use_oil_ledger": oil_ledger_check,
+        "skip_hidden": skip_hidden_check,
     }
 
     return container, refs
