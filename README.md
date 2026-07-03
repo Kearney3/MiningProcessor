@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="platform" />
   <img src="https://img.shields.io/badge/Tauri-v2-FFC131?style=flat-square&logo=tauri&logoColor=black" alt="tauri" />
   <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black" alt="react" />
-  <img src="https://img.shields.io/badge/tests-436%20passed-brightgreen?style=flat-square" alt="tests" />
+  <img src="https://img.shields.io/badge/tests-747%20passed-brightgreen?style=flat-square" alt="tests" />
 </p>
 
 <p>
@@ -64,6 +64,7 @@ pnpm dev:bridge
 **GUI 功能一览：**
 
 - 各类报表一键处理（电力模块可选添加班次列）
+- 跳过隐藏行/列开关（数据处理、批量处理、数据同步均支持）
 - 配置编辑（设备装载量映射、班次名称等）
 - 用户配置菜单（数据库连接、工作效率表头映射）
 - 实时日志展示
@@ -89,6 +90,9 @@ uv run production <输入文件或文件夹>
 
 # 批量合并
 uv run merge <输入文件夹> <关键字> [--strip-time] [--sort '<json>']
+
+# 所有命令均支持 --skiphidden 跳过 Excel 中的隐藏行和隐藏列
+uv run fuel <输入文件> --year 2025 --skiphidden
 ```
 
 也可使用传统 `python func/excel_*.py` 方式运行。
@@ -122,7 +126,7 @@ MiningProcessor/
 │   ├── oil_ledger.py           # 油品台账管理
 │   ├── logger.py               # 统一日志（CLI/GUI 共享）
 │   ├── string_utils.py         # 字符串清理工具
-│   ├── excel_utils.py          # Excel 共享工具（日期标准化、排序、班次分割）
+│   ├── excel_utils.py          # Excel 共享工具（日期标准化、排序、班次分割、隐藏行列过滤）
 │   └── excel_*.py              # 各报表处理器
 ├── gui/                        # Flet 桌面 GUI（保留，仍可独立运行）
 ├── public/fonts/               # 静态资源（MiSans 字体）
@@ -217,7 +221,7 @@ MiningProcessor/
 ## 🧪 测试
 
 ```bash
-# 运行全部测试（436 个用例）
+# 运行全部测试（747 个用例）
 uv run pytest
 
 # 运行指定测试文件
@@ -253,6 +257,7 @@ uv run pytest -v
 | `test_drag_resize.py` | 拖拽调整 |
 | `test_secret_store.py` | Keychain 凭证存储、密码迁移、故障回退 |
 | `test_tauri_bridge.py` | Tauri RPC 方法、连接测试、启动迁移 |
+| `test_hidden_rows.py` | 隐藏行/列检测、过滤与索引映射 |
 
 ---
 
@@ -284,6 +289,14 @@ uv run flet build windows # Windows
 
 ## 📋 更新日志
 
+### v1.1.0 · 2026-07-03
+
+- ✨ 跳过隐藏行/列功能（`--skiphidden` CLI 参数 + GUI/Tauri 全局开关）
+- 支持所有处理模块：油耗、电耗、工时、生产、合并、批量处理、数据同步
+- 智能表头检测：隐藏行移除后自动修正行号/列号偏移
+- 新增 `get_hidden_indices()` / `filter_hidden_from_df()` / `adjust_index_for_hidden()` 工具函数
+- 新增 16 个单元测试（`test_hidden_rows.py`），总计 747 个测试用例
+
 ### v1.0.0 · 2025-06-19
 
 - 🎉 首个正式版本
@@ -292,7 +305,6 @@ uv run flet build windows # Windows
 - 7 个 Excel 报表处理模块
 - 设备台账 / 油品台账 / 模糊匹配
 - Keychain 密码加密存储
-- 436 个自动化测试用例
 - GitHub Actions 手动构建 + artifacts 清理
 
 ---
