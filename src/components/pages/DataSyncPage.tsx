@@ -168,6 +168,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const [applyHeaderMapping, setApplyHeaderMapping] = useState(true);
   const [useEquipmentLedger, setUseEquipmentLedger] = useState(false);
   const [useOilLedger, setUseOilLedger] = useState(true);
+  const [skipHidden, setSkipHidden] = useState(false);
 
   // 启动时验证上次目录是否存在，不存在则清空
   useEffect(() => {
@@ -214,6 +215,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
         apply_header_mapping: applyHeaderMapping,
         use_equipment_ledger: useEquipmentLedger,
         use_oil_ledger: useOilLedger,
+        skip_hidden: skipHidden,
       });
       setResult(res);
       const total = Object.values(res.results).reduce(
@@ -486,6 +488,24 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
             <div>
               <div className="text-sm text-slate-700">油品台账匹配</div>
               <div className="text-xs text-slate-400 mt-0.5">使用油品台账标准化油品名称</div>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <button
+              role="switch"
+              aria-checked={skipHidden}
+              onClick={() => setSkipHidden(!skipHidden)}
+              className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors shrink-0 mt-0.5 ${
+                skipHidden ? "bg-blue-600" : "bg-slate-200"
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                skipHidden ? "translate-x-4" : "translate-x-0.5"
+              }`} />
+            </button>
+            <div>
+              <div className="text-sm text-slate-700">跳过隐藏行/列</div>
+              <div className="text-xs text-slate-400 mt-0.5">勾选后，Excel 中被隐藏的行和列将不会被读取</div>
             </div>
           </div>
         </div>

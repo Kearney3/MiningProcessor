@@ -85,6 +85,11 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         value=True,
         tooltip="批量处理时自动匹配油品台账",
     )
+    batch_skip_hidden = ft.Checkbox(
+        label="跳过隐藏行/列",
+        value=False,
+        tooltip="勾选后，Excel 中被隐藏的行和列将不会被读取",
+    )
 
     # --- 表内合并 ---
     batch_table_merge = ft.Checkbox(
@@ -267,7 +272,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         [
             ft.Container(ft.Row([batch_auto_detect, batch_raw_start], spacing=4), col={"xs": 12, "md": 6}),
             ft.Container(_batch_hmc.toggle, col={"xs": 12, "md": 6}),
-            ft.Container(ft.Row([batch_match_eq, batch_match_oil], spacing=4), col={"xs": 12, "md": 6}),
+            ft.Container(ft.Row([batch_match_eq, batch_match_oil, batch_skip_hidden], spacing=4), col={"xs": 12, "md": 6}),
             ft.Container(batch_merge, col={"xs": 12, "md": 6}),
             ft.Container(batch_table_merge, col={"xs": 12, "md": 6}),
             ft.Container(
@@ -354,6 +359,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "base_table": batch_base_table,
         "match_eq_toggle": batch_match_eq,
         "match_oil_toggle": batch_match_oil,
+        "_skip_hidden_toggle": batch_skip_hidden,
         "header_toggle": _batch_hmc.toggle,
         "header_mode": _batch_hmc.mode,
         "header_fuzzy": _batch_hmc.fuzzy,

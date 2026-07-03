@@ -772,6 +772,10 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log) -> None:
     use_equipment_ledger = eq_ledger_val.value if eq_ledger_val else False
     use_oil_ledger = oil_ledger_val.value if oil_ledger_val else True
 
+    # 跳过隐藏行/列
+    skip_hidden_val = sync_refs.get("skip_hidden")
+    skip_hidden = skip_hidden_val.value if skip_hidden_val else False
+
     set_btn_state(btn, False, "同步中...")
     result_text.visible = False
     result_text.update()
@@ -792,6 +796,7 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log) -> None:
                 apply_header_mapping=apply_header,
                 use_equipment_ledger=use_equipment_ledger,
                 use_oil_ledger=use_oil_ledger,
+                skip_hidden=skip_hidden,
             )
 
         results = await asyncio.to_thread(_do_sync)

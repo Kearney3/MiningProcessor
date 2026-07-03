@@ -443,6 +443,7 @@ def _sync_minebase(params: dict) -> dict:
         use_ledger=params.get("use_ledger", False),
         use_equipment_ledger=params.get("use_equipment_ledger", False),
         use_oil_ledger=params.get("use_oil_ledger", True),
+        skip_hidden=params.get("skip_hidden", False),
     )
     return {"results": results}
 
