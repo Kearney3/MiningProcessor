@@ -51,6 +51,8 @@ a = Analysis(
         'func.oil_ledger',
         'func.config_loader',
         'func.sync_to_minebase',
+        'func.orchestration',
+        'func.excel_formatter',
         'func.string_utils',
         'func.logger',
     ],

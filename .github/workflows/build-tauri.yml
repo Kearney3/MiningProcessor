@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  UV_PYTHON: "3.14"
+  UV_PYTHON: "3.13"
   PYTHONUTF8: 1
 
 # 防止同一分支多次触发
@@ -66,11 +66,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
-          releaseName: "矿山数据处理工具 ${{ github.ref_name }}"
-          releaseBody: "See the assets below for download links."
-          releaseDraft: true
-          prerelease: false
           args: "--target aarch64-apple-darwin --bundles app"
 
       - name: Embed sidecar into .app bundle
@@ -130,6 +125,14 @@ jobs:
           name: macos-arm64
           path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
           if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "矿山数据处理工具 ${{ github.ref_name }}"
+          draft: true
+          files: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
 
   # ══════════════════════════════════════════════════════════
   # Windows x64
