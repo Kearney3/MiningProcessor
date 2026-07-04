@@ -5,7 +5,7 @@ import argparse
 # 假设 func.logger 已经正确配置
 from func.logger import get_logger
 from func.string_utils import clean_string
-from func.excel_utils import apply_header_mapping, split_day_night_shifts, clean_split_dataframe, strip_date_column, sort_by_date_shift, dedup_dataframe, get_hidden_indices, filter_hidden_from_df, adjust_index_for_hidden
+from func.excel_utils import apply_header_mapping, split_day_night_shifts, clean_split_dataframe, strip_date_column, sort_by_date_shift, dedup_dataframe, get_hidden_indices, filter_hidden_from_df, adjust_index_for_hidden, open_workbook
 
 logger = get_logger(__name__)
 
@@ -39,46 +39,52 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
         success_count = 0
         day_list = []
 
-        for sheet_name in xls.sheet_names:
-            # 确保sheet名称是数字（代表日期）
-            if not clean_string(sheet_name).isdigit():
-                logger.warning(f"跳过非日期Sheet: {sheet_name}")
-                continue
+        # skip_hidden 时预先加载 workbook，避免每个 sheet 重复 load_workbook
+        hidden_wb = open_workbook(file_path) if skip_hidden else None
+        try:
+            for sheet_name in xls.sheet_names:
+                # 确保sheet名称是数字（代表日期）
+                if not clean_string(sheet_name).isdigit():
+                    logger.warning(f"跳过非日期Sheet: {sheet_name}")
+                    continue
 
-            # 读取整个sheet，不设表头
-            df_raw = pd.read_excel(xls, sheet_name=sheet_name, header=None)
+                # 读取整个sheet，不设表头
+                df_raw = pd.read_excel(xls, sheet_name=sheet_name, header=None)
 
-            if skip_hidden:
-                h_rows, h_cols = get_hidden_indices(file_path, sheet_name)
-                df_raw = filter_hidden_from_df(df_raw, h_rows, h_cols)
-            else:
-                h_rows = set()
+                if skip_hidden:
+                    h_rows, h_cols = get_hidden_indices(file_path, sheet_name, _workbook=hidden_wb)
+                    df_raw = filter_hidden_from_df(df_raw, h_rows, h_cols)
+                else:
+                    h_rows = set()
 
-            # 1. 确定日期字符串 (YYYY-MM-DD)
-            day = int(clean_string(sheet_name))
-            date_str = f"{year}-{month:02d}-{day:02d}"
-            day_list.append(day)
+                # 1. 确定日期字符串 (YYYY-MM-DD)
+                day = int(clean_string(sheet_name))
+                date_str = f"{year}-{month:02d}-{day:02d}"
+                day_list.append(day)
 
-            # 2. 分割 Day/Night 班次
-            # Adjust hardcoded row indices for hidden rows that were removed
-            if h_rows:
-                adj_header = adjust_index_for_hidden(1, h_rows, one_based=True)
-                adj_data = adjust_index_for_hidden(2, h_rows, one_based=True)
-                combined_day_df = split_day_night_shifts(
-                    df_raw, header_row_index=adj_header, data_start_index=adj_data,
-                )
-            else:
-                combined_day_df = split_day_night_shifts(df_raw)
+                # 2. 分割 Day/Night 班次
+                # Adjust hardcoded row indices for hidden rows that were removed
+                if h_rows:
+                    adj_header = adjust_index_for_hidden(1, h_rows, one_based=True)
+                    adj_data = adjust_index_for_hidden(2, h_rows, one_based=True)
+                    combined_day_df = split_day_night_shifts(
+                        df_raw, header_row_index=adj_header, data_start_index=adj_data,
+                    )
+                else:
+                    combined_day_df = split_day_night_shifts(df_raw)
 
-            # 插入日期列到第一列
-            combined_day_df.insert(0, '日期', date_str)
+                # 插入日期列到第一列
+                combined_day_df.insert(0, '日期', date_str)
 
-            # 3. 清洗
-            combined_day_df = clean_split_dataframe(combined_day_df)
+                # 3. 清洗
+                combined_day_df = clean_split_dataframe(combined_day_df)
 
-            all_data.append(combined_day_df)
-            success_count += 1
-            logger.info(f"成功处理日期: {day}, 有效数据行数: {len(combined_day_df)}")
+                all_data.append(combined_day_df)
+                success_count += 1
+                logger.info(f"成功处理日期: {day}, 有效数据行数: {len(combined_day_df)}")
+        finally:
+            if hidden_wb is not None:
+                hidden_wb.close()
 
         # 4. 合并所有日期的数据
         if not all_data:
