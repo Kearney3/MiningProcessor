@@ -565,20 +565,26 @@ def _get_oil_ledger_data(params: dict) -> dict:
 
 @_register("load_ledger_file_columns")
 def _load_ledger_file_columns(params: dict) -> dict:
-    """读取 Excel 文件的列名（用于列映射）。"""
+    """读取 Excel 文件的列名和 sheet 列表（用于列映射）。"""
     import pandas as pd
     safe_path = str(_sanitize_path(params["file_path"], must_exist=True, allow_dir=False))
-    df = pd.read_excel(safe_path, nrows=0)
-    return {"columns": [str(c) for c in df.columns]}
+    xl = pd.ExcelFile(safe_path)
+    sheet_names = xl.sheet_names
+    target_sheet = params.get("sheet_name", sheet_names[0] if sheet_names else 0)
+    df = pd.read_excel(safe_path, sheet_name=target_sheet, nrows=0)
+    return {"columns": [str(c) for c in df.columns], "sheets": sheet_names}
 
 
 @_register("load_oil_ledger_file_columns")
 def _load_oil_ledger_file_columns(params: dict) -> dict:
-    """读取 Excel 文件的列名（油品台账，用于列映射）。"""
+    """读取 Excel 文件的列名和 sheet 列表（油品台账，用于列映射）。"""
     import pandas as pd
     safe_path = str(_sanitize_path(params["file_path"], must_exist=True, allow_dir=False))
-    df = pd.read_excel(safe_path, nrows=0)
-    return {"columns": [str(c) for c in df.columns]}
+    xl = pd.ExcelFile(safe_path)
+    sheet_names = xl.sheet_names
+    target_sheet = params.get("sheet_name", sheet_names[0] if sheet_names else 0)
+    df = pd.read_excel(safe_path, sheet_name=target_sheet, nrows=0)
+    return {"columns": [str(c) for c in df.columns], "sheets": sheet_names}
 
 
 @_register("import_equipment_ledger")
@@ -589,7 +595,11 @@ def _import_equipment_ledger(params: dict) -> dict:
 
     safe_path = str(_sanitize_path(params["file_path"], must_exist=True, allow_dir=False))
     ledger = EquipmentLedger()
-    ledger.load(safe_path, column_mapping=params.get("column_mapping"))
+    ledger.load(
+        safe_path,
+        column_mapping=params.get("column_mapping"),
+        sheet_name=params.get("sheet_name"),
+    )
     records = ledger.to_dict()
     save_equipment_ledger_cache(records)
     return {"ok": True, "count": len(records)}
@@ -603,7 +613,11 @@ def _import_oil_ledger(params: dict) -> dict:
 
     safe_path = str(_sanitize_path(params["file_path"], must_exist=True, allow_dir=False))
     ledger = OilLedger()
-    ledger.load(safe_path, column_mapping=params.get("column_mapping"))
+    ledger.load(
+        safe_path,
+        column_mapping=params.get("column_mapping"),
+        sheet_name=params.get("sheet_name"),
+    )
     records = ledger.to_dict()
     save_oil_ledger_cache(records)
     return {"ok": True, "count": len(records)}

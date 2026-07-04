@@ -28,6 +28,8 @@ export interface LedgerPageConfig {
   clearMethod: string;
   /** Bridge method to load file columns for mapping */
   loadFileColumnsMethod: string;
+  /** Bridge method to list Excel sheets */
+  listSheetsMethod: string;
   /** Empty-state message when no rows exist */
   emptyMessage: string;
 }
@@ -128,6 +130,86 @@ const IconTable = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
   </svg>
 );
+
+// ---------------------------------------------------------------------------
+// Sheet Selection Modal
+// ---------------------------------------------------------------------------
+
+function SheetSelectionModal({
+  open: isOpen,
+  sheets,
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  sheets: string[];
+  onConfirm: (sheet: string) => void;
+  onCancel: () => void;
+}) {
+  const [selected, setSelected] = useState(sheets[0] || "");
+
+  useEffect(() => {
+    if (isOpen && sheets.length > 0) {
+      setSelected(sheets[0]);
+    }
+  }, [isOpen, sheets]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+      <div className="bg-white rounded-lg border border-slate-200 w-full max-w-sm mx-4 overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100">
+          <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+            <IconTable />
+            选择 Sheet
+          </h3>
+          <p className="text-xs text-slate-500 mt-0.5">
+            请选择要导入的 Sheet
+          </p>
+        </div>
+
+        <div className="px-5 py-3 max-h-60 overflow-y-auto space-y-1">
+          {sheets.map((sheet) => (
+            <label
+              key={sheet}
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer transition-colors ${
+                selected === sheet
+                  ? "bg-blue-50 border border-blue-200"
+                  : "hover:bg-slate-50 border border-transparent"
+              }`}
+            >
+              <input
+                type="radio"
+                name="sheet-select"
+                value={sheet}
+                checked={selected === sheet}
+                onChange={() => setSelected(sheet)}
+                className="accent-blue-600"
+              />
+              <span className="text-sm text-slate-700">{sheet}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="px-5 py-3 border-t border-slate-100 flex justify-end gap-2">
+          <button
+            onClick={onCancel}
+            className="btn-secondary text-sm px-4 py-1.5"
+          >
+            取消
+          </button>
+          <button
+            onClick={() => onConfirm(selected)}
+            className="btn-primary text-sm px-4 py-1.5"
+          >
+            下一步
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Column Mapping Modal
@@ -298,6 +380,9 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
   const [showMapping, setShowMapping] = useState(false);
   const [pendingFileColumns, setPendingFileColumns] = useState<string[]>([]);
   const [pendingFilePath, setPendingFilePath] = useState("");
+  const [pendingSheets, setPendingSheets] = useState<string[]>([]);
+  const [showSheetSelection, setShowSheetSelection] = useState(false);
+  const [pendingSheetName, setPendingSheetName] = useState<string>("");
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [showSetDefaultDialog, setShowSetDefaultDialog] = useState(false);
   const [showCancelDefaultDialog, setShowCancelDefaultDialog] = useState(false);
@@ -388,18 +473,47 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
       });
       if (!filePath) return;
       const path = typeof filePath === "string" ? filePath : filePath;
+      setPendingFilePath(path);
 
-      // Ask backend for file columns
-      const res = await bridge.call<{ columns: string[] }>(
+      // Get sheets list
+      const sheetsRes = await bridge.call<{ sheets: string[] }>(
+        config.listSheetsMethod,
+        { path }
+      );
+      const sheets = sheetsRes.sheets || [];
+
+      if (sheets.length <= 1) {
+        // Single sheet: skip selection, go directly to column mapping
+        const sheetName = sheets[0] || "";
+        setPendingSheetName(sheetName);
+        await loadColumnsForSheet(path, sheetName);
+      } else {
+        // Multiple sheets: show sheet selection
+        setPendingSheets(sheets);
+        setShowSheetSelection(true);
+      }
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const loadColumnsForSheet = async (path: string, sheetName: string) => {
+    try {
+      const res = await bridge.call<{ columns: string[]; sheets: string[] }>(
         config.loadFileColumnsMethod,
-        { file_path: path }
+        { file_path: path, sheet_name: sheetName }
       );
       setPendingFileColumns(res.columns || []);
-      setPendingFilePath(path);
       setShowMapping(true);
     } catch (e) {
       setError(String(e));
     }
+  };
+
+  const handleSheetConfirm = (sheetName: string) => {
+    setShowSheetSelection(false);
+    setPendingSheetName(sheetName);
+    loadColumnsForSheet(pendingFilePath, sheetName);
   };
 
   const handleMappingConfirm = async (mapping: Record<string, string>) => {
@@ -410,6 +524,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
       await bridge.call(config.importMethod, {
         file_path: pendingFilePath,
         column_mapping: mapping,
+        sheet_name: pendingSheetName || undefined,
       });
       await loadData();
       notify("导入成功", "success");
@@ -420,6 +535,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
       setImporting(false);
       setPendingFilePath("");
       setPendingFileColumns([]);
+      setPendingSheetName("");
     }
   };
 
@@ -710,13 +826,21 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
         </div>
       )}
 
+      {/* Sheet Selection Modal */}
+      <SheetSelectionModal
+        open={showSheetSelection}
+        sheets={pendingSheets}
+        onConfirm={handleSheetConfirm}
+        onCancel={() => { setShowSheetSelection(false); setPendingFilePath(""); setPendingSheets([]); }}
+      />
+
       {/* Column Mapping Modal */}
       <ColumnMappingModal
         open={showMapping}
         fileColumns={pendingFileColumns}
         standardColumns={config.standardColumns}
         onConfirm={handleMappingConfirm}
-        onCancel={() => { setShowMapping(false); setPendingFilePath(""); setPendingFileColumns([]); }}
+        onCancel={() => { setShowMapping(false); setPendingFilePath(""); setPendingFileColumns([]); setPendingSheetName(""); }}
       />
 
       {/* Confirm dialogs */}
