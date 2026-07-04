@@ -3,6 +3,7 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import type { BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
 import { inputClass, btnPrimaryClass, btnSecondaryClass } from "../../lib/ui-classes";
+import { useLastDirectory } from "../../hooks/useLastDirectory";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -200,6 +201,7 @@ function ToggleSwitch({
 
 export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
   const { notify } = useToast();
+  const { initialDir, saveDir } = useLastDirectory(bridge);
   const [filePath, setFilePath] = useState("");
   const [sheetName, setSheetName] = useState("");
   const [availableSheets, setAvailableSheets] = useState<string[]>([]);
@@ -251,12 +253,15 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
   const browseFile = async () => {
     const selected = await open({
       multiple: false,
+      defaultPath: initialDir || undefined,
       filters: [{ name: "Excel", extensions: ["xlsx", "xls"] }],
     });
     if (selected) {
-      setFilePath(selected as string);
+      const p = selected as string;
+      setFilePath(p);
+      saveDir(p);
       resetData();
-      loadSheets(selected as string);
+      loadSheets(p);
     }
   };
 
