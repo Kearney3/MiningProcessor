@@ -56,12 +56,16 @@ def sanitize_filename(name: str) -> str:
 def get_hidden_indices(
     file_path: str,
     sheet_name: str | int = 0,
+    _workbook=None,
 ) -> tuple[set[int], set[str]]:
     """Return hidden row numbers and column letters for a given sheet.
 
     Args:
         file_path: Path to the Excel file.
         sheet_name: Sheet name (str) or index (int, default 0).
+        _workbook: Optional pre-loaded openpyxl workbook. When provided the
+            file is **not** re-read, which avoids repeated ``load_workbook``
+            calls in loops that process many sheets.
 
     Returns:
         ``(hidden_rows, hidden_cols)`` where *hidden_rows* is a set of
@@ -70,7 +74,10 @@ def get_hidden_indices(
     """
     from openpyxl import load_workbook
 
-    wb = load_workbook(file_path, read_only=False, data_only=True)
+    should_close = _workbook is None
+    wb = _workbook if _workbook is not None else load_workbook(
+        file_path, read_only=False, data_only=True,
+    )
     try:
         if isinstance(sheet_name, int):
             ws = wb.worksheets[sheet_name]
@@ -79,8 +86,25 @@ def get_hidden_indices(
         hidden_rows = {idx for idx, dim in ws.row_dimensions.items() if dim.hidden}
         hidden_cols = {col for col, dim in ws.column_dimensions.items() if dim.hidden}
     finally:
-        wb.close()
+        if should_close:
+            wb.close()
     return hidden_rows, hidden_cols
+
+
+def open_workbook(file_path: str):
+    """Open an openpyxl workbook for reuse across multiple ``get_hidden_indices`` calls.
+
+    Usage::
+
+        wb = open_workbook(path)
+        try:
+            h_rows, h_cols = get_hidden_indices(path, "Sheet1", _workbook=wb)
+            ...
+        finally:
+            wb.close()
+    """
+    from openpyxl import load_workbook
+    return load_workbook(file_path, read_only=False, data_only=True)
 
 
 def get_column_letter(col_idx: int) -> str:
