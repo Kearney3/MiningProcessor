@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import type { BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
+import { useLastDirectory } from "../../hooks/useLastDirectory";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -367,6 +368,7 @@ function ConfirmDialog({
 
 export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: LedgerPageConfig }) {
   const { notify } = useToast();
+  const { initialDir, saveDir } = useLastDirectory(bridge);
   const [rows, setRows] = useState<LedgerRow[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -469,11 +471,13 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
     try {
       const filePath = await open({
         multiple: false,
+        defaultPath: initialDir || undefined,
         filters: [{ name: "Excel", extensions: ["xlsx", "xls"] }],
       });
       if (!filePath) return;
       const path = typeof filePath === "string" ? filePath : filePath;
       setPendingFilePath(path);
+      saveDir(path);
 
       // Get sheets list
       const sheetsRes = await bridge.call<{ sheets: string[] }>(

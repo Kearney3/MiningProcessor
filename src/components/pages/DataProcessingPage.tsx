@@ -4,6 +4,7 @@ import type { BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
 import { ChevronDownIcon, PlayIcon, FolderIcon, FileIcon, PlusIcon, TrashIcon, CheckCircleIcon, XCircleIcon, AlertTriangleIcon, FuelIcon, ProductionIcon, ElectricalIcon, WorktimeIcon, MergeIcon } from "../../lib/icons";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
+import { useLastDirectory } from "../../hooks/useLastDirectory";
 
 const currentYear = new Date().getFullYear();
 const yearOptions = Array.from({ length: 11 }, (_, i) => currentYear - 5 + i);
@@ -35,21 +36,30 @@ function PathInput({
   onChange,
   placeholder,
   directory = false,
+  defaultPath,
+  onFileSelected,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   directory?: boolean;
+  defaultPath?: string;
+  onFileSelected?: (path: string) => void;
 }) {
   const browse = async () => {
     const selected = await open({
       directory,
       multiple: false,
+      defaultPath,
       filters: directory
         ? undefined
         : [{ name: "Excel", extensions: ["xlsx", "xls"] }],
     });
-    if (selected) onChange(selected as string);
+    if (selected) {
+      const p = selected as string;
+      onChange(p);
+      onFileSelected?.(p);
+    }
   };
 
   return (
@@ -74,23 +84,36 @@ function PathInputDual({
   value,
   onChange,
   placeholder,
+  defaultPath,
+  onFileSelected,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  defaultPath?: string;
+  onFileSelected?: (path: string) => void;
 }) {
   const browseFile = async () => {
     const selected = await open({
       directory: false,
       multiple: false,
+      defaultPath,
       filters: [{ name: "Excel", extensions: ["xlsx", "xls"] }],
     });
-    if (selected) onChange(selected as string);
+    if (selected) {
+      const p = selected as string;
+      onChange(p);
+      onFileSelected?.(p);
+    }
   };
 
   const browseFolder = async () => {
-    const selected = await open({ directory: true, multiple: false });
-    if (selected) onChange(selected as string);
+    const selected = await open({ directory: true, multiple: false, defaultPath });
+    if (selected) {
+      const p = selected as string;
+      onChange(p);
+      onFileSelected?.(p);
+    }
   };
 
   return (
@@ -290,11 +313,15 @@ function FuelCard({
   useEquipmentLedger,
   useOilLedger,
   skipHidden,
+  defaultPath,
+  onFileSelected,
 }: {
   bridge: BridgeProp;
   useEquipmentLedger: boolean;
   useOilLedger: boolean;
   skipHidden: boolean;
+  defaultPath?: string;
+  onFileSelected?: (path: string) => void;
 }) {
   const { notify } = useToast();
   const [path, setPath] = useState("");
@@ -332,7 +359,7 @@ function FuelCard({
 
   return (
     <ModuleCard title="油耗处理" icon={<FuelIcon />}>
-      <PathInput value={path} onChange={setPath} placeholder="选择 Excel 文件" />
+      <PathInput value={path} onChange={setPath} placeholder="选择 Excel 文件" defaultPath={defaultPath} onFileSelected={onFileSelected} />
       {path === "" && <PathWarning />}
       <div className="mt-2">
         <StyledSelect
@@ -357,11 +384,15 @@ function ProductionCard({
   useEquipmentLedger,
   useOilLedger,
   skipHidden,
+  defaultPath,
+  onFileSelected,
 }: {
   bridge: BridgeProp;
   useEquipmentLedger: boolean;
   useOilLedger: boolean;
   skipHidden: boolean;
+  defaultPath?: string;
+  onFileSelected?: (path: string) => void;
 }) {
   const { notify } = useToast();
   const [path, setPath] = useState("");
@@ -398,6 +429,8 @@ function ProductionCard({
         value={path}
         onChange={setPath}
         placeholder="选择文件或文件夹"
+        defaultPath={defaultPath}
+        onFileSelected={onFileSelected}
       />
       {path === "" && <PathWarning />}
       <div className="mt-2">
@@ -428,11 +461,15 @@ function ElectricalCard({
   useEquipmentLedger,
   useOilLedger,
   skipHidden,
+  defaultPath,
+  onFileSelected,
 }: {
   bridge: BridgeProp;
   useEquipmentLedger: boolean;
   useOilLedger: boolean;
   skipHidden: boolean;
+  defaultPath?: string;
+  onFileSelected?: (path: string) => void;
 }) {
   const { notify } = useToast();
   const [path, setPath] = useState("");
@@ -470,7 +507,7 @@ function ElectricalCard({
 
   return (
     <ModuleCard title="电力消耗" icon={<ElectricalIcon />}>
-      <PathInput value={path} onChange={setPath} placeholder="选择 Excel 文件" />
+      <PathInput value={path} onChange={setPath} placeholder="选择 Excel 文件" defaultPath={defaultPath} onFileSelected={onFileSelected} />
       {path === "" && <PathWarning />}
       <div className="mt-2">
         <StyledSelect
@@ -523,11 +560,15 @@ function WorktimeCard({
   useEquipmentLedger,
   useOilLedger,
   skipHidden,
+  defaultPath,
+  onFileSelected,
 }: {
   bridge: BridgeProp;
   useEquipmentLedger: boolean;
   useOilLedger: boolean;
   skipHidden: boolean;
+  defaultPath?: string;
+  onFileSelected?: (path: string) => void;
 }) {
   const { notify } = useToast();
   const [path, setPath] = useState("");
@@ -571,7 +612,7 @@ function WorktimeCard({
 
   return (
     <ModuleCard title="工时处理" icon={<WorktimeIcon />}>
-      <PathInput value={path} onChange={setPath} placeholder="选择 Excel 文件" />
+      <PathInput value={path} onChange={setPath} placeholder="选择 Excel 文件" defaultPath={defaultPath} onFileSelected={onFileSelected} />
       {path === "" && <PathWarning />}
       <div className="mt-2 grid grid-cols-2 gap-2">
         <StyledSelect
@@ -642,11 +683,15 @@ function MergeCard({
   useEquipmentLedger,
   useOilLedger,
   skipHidden,
+  defaultPath,
+  onFileSelected,
 }: {
   bridge: BridgeProp;
   useEquipmentLedger: boolean;
   useOilLedger: boolean;
   skipHidden: boolean;
+  defaultPath?: string;
+  onFileSelected?: (path: string) => void;
 }) {
   const { notify } = useToast();
   const [folderPath, setFolderPath] = useState("");
@@ -702,7 +747,7 @@ function MergeCard({
 
   return (
     <ModuleCard title="文件合并" icon={<MergeIcon />}>
-      <PathInput value={folderPath} onChange={setFolderPath} placeholder="选择文件夹" directory />
+      <PathInput value={folderPath} onChange={setFolderPath} placeholder="选择文件夹" directory defaultPath={defaultPath} onFileSelected={onFileSelected} />
       {folderPath === "" && <PathWarning />}
       <div className="mt-2">
         <input
@@ -795,6 +840,7 @@ export function DataProcessingPage({ bridge }: { bridge: BridgeProp }) {
   const [useEquipmentLedger, setUseEquipmentLedger] = useState(false);
   const [useOilLedger, setUseOilLedger] = useState(false);
   const [skipHidden, setSkipHidden] = useState(false);
+  const { initialDir, saveDir } = useLastDirectory(bridge);
 
   return (
     <div className="space-y-5">
@@ -823,11 +869,11 @@ export function DataProcessingPage({ bridge }: { bridge: BridgeProp }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <FuelCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHidden={skipHidden} />
-        <ProductionCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHidden={skipHidden} />
-        <ElectricalCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHidden={skipHidden} />
-        <WorktimeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHidden={skipHidden} />
-        <MergeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHidden={skipHidden} />
+        <FuelCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHidden={skipHidden} defaultPath={initialDir} onFileSelected={saveDir} />
+        <ProductionCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHidden={skipHidden} defaultPath={initialDir} onFileSelected={saveDir} />
+        <ElectricalCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHidden={skipHidden} defaultPath={initialDir} onFileSelected={saveDir} />
+        <WorktimeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHidden={skipHidden} defaultPath={initialDir} onFileSelected={saveDir} />
+        <MergeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHidden={skipHidden} defaultPath={initialDir} onFileSelected={saveDir} />
       </div>
     </div>
   );

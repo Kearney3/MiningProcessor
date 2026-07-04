@@ -4,6 +4,7 @@ import type { BridgeProp, BatchProgress, ScanResult } from "../../lib/types";
 import { useToast } from "../Toast";
 import { FolderIcon } from "../../lib/icons";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
+import { useLastDirectory } from "../../hooks/useLastDirectory";
 
 // ═══════════════════════════════════════
 // Types
@@ -394,6 +395,7 @@ function ProgressBar({ percent, stage, detail }: { percent: number; stage: strin
 export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
   // -- Path & scan --
   const { notify } = useToast();
+  const { initialDir, saveDir } = useLastDirectory(bridge);
   const [folderPath, setFolderPath] = useState("");
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -434,10 +436,12 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
 
   // ── Handlers ──
   const browse = async () => {
-    const selected = await open({ directory: true, multiple: false });
+    const selected = await open({ directory: true, multiple: false, defaultPath: initialDir || undefined });
     if (selected) {
-      setFolderPath(selected as string);
+      const dir = selected as string;
+      setFolderPath(dir);
       setScanResult(null);
+      saveDir(dir);
     }
   };
 

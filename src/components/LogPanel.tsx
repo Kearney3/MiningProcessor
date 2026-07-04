@@ -1,4 +1,5 @@
 import { useRef, useEffect, useState, useCallback } from "react";
+import { save } from "@tauri-apps/plugin-dialog";
 import type { LogEntry } from "../lib/types";
 
 interface LogPanelProps {
@@ -41,6 +42,16 @@ function IconTrash() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="3 6 5 6 21 6" />
       <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  );
+}
+
+function IconDownload() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
     </svg>
   );
 }
@@ -89,6 +100,29 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  }, [filteredLogs]);
+
+  const handleExport = useCallback(async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const filePath = await save({
+      defaultPath: `logs-${today}.txt`,
+      filters: [{ name: "Text", extensions: ["txt", "log"] }],
+    });
+    if (!filePath) return;
+    const text = filteredLogs
+      .map((e) => `[${e.level}] ${e.message}`)
+      .join("\n");
+    // 通过 bridge 写入文件（Tauri 安全模型下前端无法直接写文件系统）
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("invoke_python", {
+        method: "write_text_file",
+        params: { path: filePath, content: text },
+      });
+    } catch {
+      // fallback: 复制到剪贴板
+      navigator.clipboard.writeText(text);
+    }
   }, [filteredLogs]);
 
   return (
@@ -143,6 +177,13 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
             className="p-1 rounded text-slate-400 hover:text-slate-600 cursor-pointer transition-colors"
           >
             {copied ? <IconCheck /> : <IconClipboard />}
+          </button>
+          <button
+            onClick={handleExport}
+            title="导出日志"
+            className="p-1 rounded text-slate-400 hover:text-slate-600 cursor-pointer transition-colors"
+          >
+            <IconDownload />
           </button>
           <button
             onClick={onClear}
