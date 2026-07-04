@@ -143,11 +143,9 @@ function DataTypeCheckbox({
 // Main page component
 // ═══════════════════════════════════════
 
-const STORAGE_KEY = "sync_last_input_dir";
-
 export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const { notify } = useToast();
-  const [inputDir, setInputDir] = useState(() => localStorage.getItem(STORAGE_KEY) || "");
+  const [inputDir, setInputDir] = useState("");
   const [mode, setMode] = useState<"api" | "database">("api");
   const [dataTypes, setDataTypes] = useState<string[]>(ALL_TYPES.map((t) => t.id));
   const [dryRun, setDryRun] = useState(false);
@@ -170,21 +168,22 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const [useOilLedger, setUseOilLedger] = useState(true);
   const [skipHidden, setSkipHidden] = useState(false);
 
-  // 启动时验证上次目录是否存在，不存在则清空
+  // 启动时从配置加载上次目录，不存在则清空
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return;
-    bridge.call<{ exists: boolean }>("check_directory_exists", { path: saved })
+    bridge.call<{ path: string }>("get_last_directory", { key: "sync_last_input_dir" })
       .then((res) => {
-        if (!res.exists) {
-          setInputDir("");
-          localStorage.removeItem(STORAGE_KEY);
-        }
+        const saved = res.path;
+        if (!saved) return;
+        return bridge.call<{ exists: boolean }>("check_directory_exists", { path: saved })
+          .then((r) => {
+            if (r.exists) {
+              setInputDir(saved);
+            } else {
+              bridge.call("save_last_directory", { key: "sync_last_input_dir", path: "" }).catch(() => {});
+            }
+          });
       })
-      .catch(() => {
-        setInputDir("");
-        localStorage.removeItem(STORAGE_KEY);
-      });
+      .catch(() => {});
   }, [bridge]);
 
   const allSelected = ALL_TYPES.length === dataTypes.length;
@@ -240,7 +239,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
     if (selected) {
       const dir = selected as string;
       setInputDir(dir);
-      localStorage.setItem(STORAGE_KEY, dir);
+      bridge.call("save_last_directory", { key: "sync_last_input_dir", path: dir }).catch(() => {});
     }
   };
 
