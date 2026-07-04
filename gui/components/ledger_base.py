@@ -14,7 +14,7 @@ import flet as ft
 from .common import (
     _log_message, _last_directory, _update_last_directory,
     SortState, create_sortable_columns, _cell_text,
-    create_column_mapping_dialog, PAGE_SIZE,
+    create_column_mapping_dialog, create_sheet_selection_dialog, PAGE_SIZE,
 )
 
 try:
@@ -192,8 +192,9 @@ def create_ledger_section_factory(
     next_btn.on_click = _on_next
 
     # --- 操作函数 ---
-    # 用于在 on_import 和 _do_import 之间传递选中的文件路径
+    # 用于在 on_import 和 _do_import 之间传递选中的文件路径和 sheet
     _selected_file = [None]
+    _selected_sheet = [None]
 
     def _do_import(mapping: dict, skip_header: bool):
         """列映射确认后的导入逻辑"""
@@ -204,7 +205,8 @@ def create_ledger_section_factory(
                 _log_message(log, "未选择文件")
                 return
 
-            df = pd.read_excel(file_path)
+            sheet_name = _selected_sheet[0]
+            df = pd.read_excel(file_path, sheet_name=sheet_name if sheet_name is not None else 0)
             if skip_header:
                 df = df.iloc[1:]
 
@@ -252,10 +254,31 @@ def create_ledger_section_factory(
         if not files:
             return
         file_path = files[0].path
-        _selected_file[0] = file_path  # 保存文件路径供 _do_import 使用
+        _selected_file[0] = file_path
         _update_last_directory(file_path)
         try:
-            df = pd.read_excel(file_path)
+            xl = pd.ExcelFile(file_path)
+            sheet_names = xl.sheet_names
+
+            if len(sheet_names) <= 1:
+                # 单 sheet 直接进入列映射
+                _show_column_mapping(sheet_names[0] if sheet_names else 0, file_path)
+            else:
+                # 多 sheet 先选择
+                dialog = create_sheet_selection_dialog(
+                    page, sheet_names,
+                    on_confirm=lambda sheet: _show_column_mapping(sheet, file_path),
+                )
+                page.show_dialog(dialog)
+                page.update()
+        except Exception as ex:
+            _log_message(log, f"读取{cfg.label_prefix}文件失败: {ex}", level=logging.ERROR)
+
+    def _show_column_mapping(sheet_name, file_path):
+        """选中 sheet 后显示列映射对话框"""
+        _selected_sheet[0] = sheet_name
+        try:
+            df = pd.read_excel(file_path, sheet_name=sheet_name, nrows=0)
             file_columns = list(df.columns)
             dialog = create_column_mapping_dialog(
                 page, file_columns, cfg.standard_cols, _do_import,
@@ -264,7 +287,7 @@ def create_ledger_section_factory(
             page.show_dialog(dialog)
             page.update()
         except Exception as ex:
-            _log_message(log, f"读取{cfg.label_prefix}文件失败: {ex}", level=logging.ERROR)
+            _log_message(log, f"读取{cfg.label_prefix} sheet 失败: {ex}", level=logging.ERROR)
 
     async def on_export_template(e):
         """导出模板"""

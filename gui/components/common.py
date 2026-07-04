@@ -466,3 +466,68 @@ def create_column_mapping_dialog(
         ],
         actions_alignment=ft.MainAxisAlignment.END,
     )
+
+
+def create_sheet_selection_dialog(
+    page: ft.Page,
+    sheet_names: list[str],
+    on_confirm,
+) -> ft.AlertDialog:
+    """创建 Sheet 选择对话框。
+
+    Args:
+        page: Flet 页面对象。
+        sheet_names: Excel 文件中的 sheet 名列表。
+        on_confirm: 回调 fn(sheet_name: str)，用户确认后触发。
+    """
+    selected = [sheet_names[0] if sheet_names else ""]
+
+    def _on_radio_change(e):
+        selected[0] = e.control.value
+
+    radio_group = ft.RadioGroup(
+        value=selected[0],
+        content=ft.Column(
+            [ft.Radio(value=s, label=s) for s in sheet_names],
+            spacing=4,
+            scroll=ft.ScrollMode.AUTO,
+        ),
+        on_change=_on_radio_change,
+    )
+
+    def on_cancel(e):
+        page.pop_dialog()
+        page.update()
+
+    def on_ok(e):
+        page.pop_dialog()
+        page.update()
+        on_confirm(selected[0])
+
+    return ft.AlertDialog(
+        title=ft.Text("选择 Sheet"),
+        content=ft.Container(
+            content=ft.Column(
+                [
+                    ft.Text("请选择要导入的 Sheet：", size=13),
+                    ft.Container(
+                        content=radio_group,
+                        expand=True,
+                    ),
+                ],
+                spacing=8,
+                expand=True,
+            ),
+            width=320,
+            height=min(len(sheet_names) * 36 + 80, 400),
+        ),
+        actions=[
+            ft.TextButton("取消", on_click=on_cancel),
+            ft.TextButton(
+                "下一步",
+                on_click=on_ok,
+                style=ft.ButtonStyle(bgcolor=ft.Colors.GREEN_700, color="#FFFFFF"),
+            ),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )

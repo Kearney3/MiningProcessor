@@ -23,6 +23,7 @@ const config: LedgerPageConfig = {
   loadDataMethod: "get_equipment_ledger_data",
   importMethod: "import_equipment_ledger",
   loadFileColumnsMethod: "load_ledger_file_columns",
+  listSheetsMethod: "list_excel_sheets",
   exportTemplateMethod: "export_equipment_ledger_template",
   setDefaultMethod: "set_default_equipment_ledger",
   cancelDefaultMethod: "cancel_default_equipment_ledger",

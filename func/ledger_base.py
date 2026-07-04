@@ -48,6 +48,7 @@ class LedgerBase:
         ledger_path: str,
         column_mapping: dict[str, str] | None = None,
         skip_header: bool = True,
+        sheet_name: str | int | None = None,
     ) -> pd.DataFrame:
         """
         从 Excel 文件加载台账。
@@ -56,13 +57,15 @@ class LedgerBase:
             ledger_path: Excel 文件路径
             column_mapping: 列映射 {标准列名: Excel列名}，None 时使用原始列名
             skip_header: 是否将第一行视为标题行（True 时第一行作为列名，False 时使用默认列名 Col0/Col1/...）
+            sheet_name: 指定读取的 sheet 名称或索引，None 时读取第一个 sheet
         """
         self.ledger_path = ledger_path
+        target_sheet = sheet_name if sheet_name is not None else 0
 
         if skip_header:
-            self._df = pd.read_excel(ledger_path)
+            self._df = pd.read_excel(ledger_path, sheet_name=target_sheet)
         else:
-            self._df = pd.read_excel(ledger_path, header=None)
+            self._df = pd.read_excel(ledger_path, sheet_name=target_sheet, header=None)
             self._df.columns = [f"Col{i}" for i in range(len(self._df.columns))]
 
         # 应用列映射
