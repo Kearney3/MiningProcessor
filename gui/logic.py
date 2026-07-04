@@ -11,10 +11,10 @@ import os
 import pandas as pd
 from func import config_loader
 from func.excel_utils import get_output_filename
-from func.excel_fuel import process_fuel_data
+from func.excel_fuel import process_diesel_data as process_fuel_data
 from func.excel_production_enhanced import MiningDataProcessor as ProdProcessor
-from func.excel_electrical import process_electrical_data
-from func.excel_worktime import process_worktime_data
+from func.excel_electrical import parse_excel_data as process_electrical_data
+from func.excel_worktime import process_excel_data as process_worktime_data
 from func.excel_merger import merge_excel_files
 from func.excel_batch import scan_files, process_files, MODULE_LABELS
 from func.sync_to_minebase import sync as sync_to_minebase

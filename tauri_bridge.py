@@ -43,17 +43,12 @@ def _sanitize_path(
     allow_file: bool = True,
     allow_dir: bool = True,
 ) -> Path:
-    """Validate and normalize a file path to prevent directory traversal."""
-    p = Path(raw).resolve()
-    if ".." in Path(raw).parts:
-        raise ValueError("Path must not contain ..")
-    if must_exist and not p.exists():
-        raise FileNotFoundError(f"Path does not exist: {p.name}")
-    if p.is_file() and not allow_file:
-        raise ValueError("Expected directory, got file")
-    if p.is_dir() and not allow_dir:
-        raise ValueError("Expected file, got directory")
-    return p
+    """Validate and normalize a file path to prevent directory traversal.
+
+    .. deprecated:: 使用 ``func.path_utils.sanitize_path`` 代替。
+    """
+    from func.path_utils import sanitize_path
+    return sanitize_path(raw, must_exist=must_exist, allow_file=allow_file, allow_dir=allow_dir)
 
 
 # ─── JSON 编码器（处理 pandas/numpy/datetime 等类型）───
@@ -839,6 +834,16 @@ def _ping(params: dict) -> dict:
     return {"pong": True, "pid": __import__("os").getpid(), "version": "1.0.0"}
 
 
+@_register("write_text_file")
+def _write_text_file(params: dict) -> dict:
+    """将文本内容写入指定路径（用于日志导出等）。"""
+    from func.path_utils import sanitize_path
+    safe_path = str(sanitize_path(params["path"], allow_dir=False))
+    content = params.get("content", "")
+    Path(safe_path).write_text(content, encoding="utf-8")
+    return {"ok": True}
+
+
 @_register("test_minebase_connection")
 def _test_minebase_connection(params: dict) -> dict:
     """测试 MineBase 连接（API 或数据库模式）。
@@ -874,6 +879,27 @@ def _test_minebase_connection(params: dict) -> dict:
             password=password,
         )
     return {"success": ok, "message": msg}
+
+
+# ─── last_directory 持久化（统一走 config.user.json）───
+
+
+@_register("get_last_directory")
+def _get_last_directory(params: dict) -> dict:
+    """获取指定 key 的上次使用目录。"""
+    from func.config_loader import get_user_config
+    key = params.get("key", "last_directory")
+    return {"path": get_user_config(key, "")}
+
+
+@_register("save_last_directory")
+def _save_last_directory(params: dict) -> dict:
+    """保存指定 key 的上次使用目录。"""
+    from func.config_loader import update_user_config
+    key = params.get("key", "last_directory")
+    path = params.get("path", "")
+    update_user_config({key: path})
+    return {"ok": True}
 
 
 # ═══════════════════════════════════════════════════════════

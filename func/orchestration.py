@@ -5,9 +5,13 @@
 """
 
 import logging
+import os
+from pathlib import Path
 from typing import Optional
 
 import pandas as pd
+
+from func.excel_utils import get_output_filename
 
 logger = logging.getLogger(__name__)
 
@@ -171,3 +175,132 @@ def build_worktime_header_mapping(
     elif fuzzy_match is not None:
         mapping["fuzzy"] = fuzzy_match
     return mapping
+
+
+# ---------------------------------------------------------------------------
+# 统一单报表处理入口
+# ---------------------------------------------------------------------------
+
+
+def process_single(
+    module_type: str,
+    path: str,
+    *,
+    year: int | None = None,
+    month: int = 1,
+    raw_start: int = -1,
+    keyword: str = "",
+    strip_time: bool = False,
+    sort_configs=None,
+    add_shift_column: bool = False,
+    default_shift: str = "Day",
+    header_mapping: dict | None = None,
+    skip_hidden: bool = False,
+    use_equipment_ledger: bool = False,
+    use_oil_ledger: bool = False,
+    equipment_ledger=None,
+    oil_ledger=None,
+) -> str | None:
+    """统一单报表处理入口，供 Flet GUI 和 Tauri bridge 共用。
+
+    按 module_type 分发到对应的 func/ 处理函数，计算输出文件路径，
+    可选执行台账匹配后处理。
+
+    外部可通过 equipment_ledger / oil_ledger 直接传入台账实例（Flet GUI 场景）；
+    未传入时根据 use_*_ledger 开关从缓存自动加载（Tauri bridge 场景）。
+
+    Args:
+        module_type: 模块类型 (fuel/production/electrical/worktime/merge)
+        path: 输入文件或文件夹路径（必须已由调用方校验）
+        year: 覆盖日期年份 (fuel/electrical)，或目标年份 (worktime)
+        month: 目标月份 (worktime)
+        raw_start: 生产报表起始行 (production)
+        keyword: 合并关键字 (merge)
+        strip_time: 是否去除时间 (merge)
+        sort_configs: 排序配置 (merge)
+        add_shift_column: 是否新增班次列 (electrical)
+        default_shift: 默认班次 (electrical)
+        header_mapping: 工时表头映射 (worktime)
+        skip_hidden: 是否跳过隐藏行/列
+        use_equipment_ledger: 是否使用设备台账
+        use_oil_ledger: 是否使用油品台账
+        equipment_ledger: 设备台账实例（None 时从缓存加载）
+        oil_ledger: 油品台账实例（None 时从缓存加载）
+
+    Returns:
+        输出文件路径，merge 无匹配时返回 None
+
+    Raises:
+        ValueError: module_type 不支持
+    """
+    from datetime import datetime
+
+    effective_year = year if year is not None else datetime.now().year
+
+    # ── 分发到各处理器 ──
+    if module_type == "fuel":
+        from func.excel_fuel import process_diesel_data
+        process_diesel_data(path, target_year=year, skip_hidden=skip_hidden)
+
+    elif module_type == "production":
+        from func.excel_production_enhanced import MiningDataProcessor
+        from func.config_loader import get_device_load_map
+        load_map = get_device_load_map()
+        processor = MiningDataProcessor(
+            raw_start=raw_start, device_load_map=load_map,
+            skip_hidden=skip_hidden,
+        )
+        if os.path.isdir(path):
+            processor.process_folder(path)
+        else:
+            output = os.path.join(os.path.dirname(path) or ".", "合并产量.xlsx")
+            processor.process_single_file(path, output)
+
+    elif module_type == "electrical":
+        from func.excel_electrical import parse_excel_data
+        parse_excel_data(
+            path, target_year=year,
+            add_shift_column=add_shift_column,
+            default_shift=default_shift,
+            skip_hidden=skip_hidden,
+        )
+
+    elif module_type == "worktime":
+        from func.excel_worktime import process_excel_data
+        return process_excel_data(
+            path, effective_year, month,
+            return_sheets=True,
+            header_mapping=header_mapping,
+            skip_hidden=skip_hidden,
+        )
+
+    elif module_type == "merge":
+        from func.excel_merger import merge_excel_files
+        return merge_excel_files(
+            path, keyword,
+            strip_time=strip_time,
+            sort_configs=sort_configs,
+            skip_hidden=skip_hidden,
+        )
+
+    else:
+        raise ValueError(f"不支持的模块类型: {module_type}")
+
+    # ── 计算输出文件路径 ──
+    base = path if os.path.isdir(path) else os.path.dirname(path)
+    output_file = os.path.join(base or ".", get_output_filename(
+        module_type, year=effective_year, month=month,
+    ))
+
+    # ── 台账匹配后处理 ──
+    if use_equipment_ledger or use_oil_ledger:
+        if equipment_ledger is None and oil_ledger is None:
+            postprocess_from_cache(
+                output_file,
+                use_equipment_ledger=use_equipment_ledger,
+                use_oil_ledger=use_oil_ledger,
+            )
+        else:
+            postprocess_with_ledgers(output_file, equipment_ledger, oil_ledger)
+
+    return output_file
