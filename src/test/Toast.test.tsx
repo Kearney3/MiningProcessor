@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
-import { ToastProvider, useToast } from "../components/Toast";
+import { ToastProvider, useToast, type ToastKind } from "../components/Toast";
 import React from "react";
 
-function TestConsumer({ onReady }: { onReady: (ctx: { notify: (msg: string, kind?: string) => void }) => void }) {
+function TestConsumer({ onReady }: { onReady: (ctx: { notify: (msg: string, kind?: ToastKind) => void }) => void }) {
   const ctx = useToast();
   React.useEffect(() => { onReady(ctx); }, [ctx, onReady]);
   return null;
@@ -18,7 +18,7 @@ describe("Toast", () => {
   });
 
   it("renders and shows a success toast", async () => {
-    let toastCtx: { notify: (msg: string, kind?: string) => void };
+    let toastCtx: { notify: (msg: string, kind?: ToastKind) => void };
     render(
       <ToastProvider>
         <TestConsumer onReady={(ctx) => { toastCtx = ctx; }} />
@@ -30,7 +30,7 @@ describe("Toast", () => {
   });
 
   it("shows error toast with correct styling", async () => {
-    let toastCtx: { notify: (msg: string, kind?: string) => void };
+    let toastCtx: { notify: (msg: string, kind?: ToastKind) => void };
     render(
       <ToastProvider>
         <TestConsumer onReady={(ctx) => { toastCtx = ctx; }} />
@@ -44,7 +44,7 @@ describe("Toast", () => {
   });
 
   it("removes toast on click", async () => {
-    let toastCtx: { notify: (msg: string, kind?: string) => void };
+    let toastCtx: { notify: (msg: string, kind?: ToastKind) => void };
     render(
       <ToastProvider>
         <TestConsumer onReady={(ctx) => { toastCtx = ctx; }} />
@@ -58,7 +58,7 @@ describe("Toast", () => {
   });
 
   it("auto-removes toast after timeout", async () => {
-    let toastCtx: { notify: (msg: string, kind?: string) => void };
+    let toastCtx: { notify: (msg: string, kind?: ToastKind) => void };
     render(
       <ToastProvider>
         <TestConsumer onReady={(ctx) => { toastCtx = ctx; }} />
