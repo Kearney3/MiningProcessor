@@ -4,6 +4,10 @@
 name: Build Tauri App
 
 on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main, 'releases/**']
   workflow_dispatch:
 
 env:
@@ -22,11 +26,16 @@ jobs:
   build-macos:
     name: macOS arm64
     runs-on: macos-latest  # Apple Silicon (M1+)
+    needs: []
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     permissions:
       contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
+          fetch-depth: 0
 
       - name: Setup uv
         uses: astral-sh/setup-uv@v4
@@ -140,9 +149,14 @@ jobs:
   build-windows-x64:
     name: Windows x64
     runs-on: windows-latest
+    needs: []
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
+          fetch-depth: 0
 
       - name: Setup uv
         uses: astral-sh/setup-uv@v4

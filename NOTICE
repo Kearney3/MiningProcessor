@@ -1,0 +1,22 @@
+MiningProcessor
+Copyright 2026 Kearney
+
+This product includes software developed at MiningProcessor.
+https://github.com/kearney/MiningProcessor
+
+This product depends on the following open source packages:
+
+Python Dependencies:
+- openpyxl (MIT License)
+- pandas (BSD 3-Clause License)
+- flet (Apache License 2.0)
+- xlsxwriter (BSD 2-Clause License)
+- rapidfuzz (MIT License)
+- cryptography (Apache License 2.0 / BSD License)
+- psycopg2-binary (GNU Lesser General Public License)
+
+JavaScript / Tauri Dependencies:
+- React (MIT License)
+- Tauri (MIT License / Apache License 2.0)
+- Tailwind CSS (MIT License)
+- Vite (MIT License)
