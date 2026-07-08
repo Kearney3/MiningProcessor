@@ -24,12 +24,23 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 # ─── 项目路径注册 ───
-# PyInstaller 打包模式：从临时解压目录加载
+# PyInstaller 打包模式：从临时解压目录加载，但持久化数据写入 Application Support
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
     PROJECT_ROOT = Path(sys._MEIPASS)
     # 切换工作目录到解压目录，让 config_loader 等模块能找到 config.json
     import os
     os.chdir(PROJECT_ROOT)
+
+    # 持久化数据目录：写入 Application Support，不会在重启时丢失
+    if sys.platform == "darwin":
+        _persistent_dir = Path.home() / "Library" / "Application Support" / "com.kearney.mining-processor"
+    elif sys.platform == "win32":
+        _persistent_dir = Path(os.environ.get("APPDATA", Path.home())) / "com.kearney.mining-processor"
+    else:
+        _persistent_dir = Path.home() / ".local" / "share" / "com.kearney.mining-processor"
+
+    _persistent_dir.mkdir(parents=True, exist_ok=True)
+    os.environ["MINING_PROCESSOR_DATA_DIR"] = str(_persistent_dir)
 else:
     PROJECT_ROOT = Path(__file__).resolve().parent
 
