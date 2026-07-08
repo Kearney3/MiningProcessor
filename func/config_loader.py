@@ -10,6 +10,8 @@ load_config() 合并两者返回（user 覆盖 default），save 时按目标分
 import copy
 import json
 import logging
+import os
+import sys
 import threading
 from pathlib import Path
 from typing import Any
@@ -43,10 +45,41 @@ class _LedgerEncoder(json.JSONEncoder):
 # 路径
 # ---------------------------------------------------------------------------
 
-_CONFIG_FILE = Path(__file__).parent.parent / "config.json"
-_USER_CONFIG_FILE = Path(__file__).parent.parent / "config.user.json"
+_BUNDLED_ROOT = Path(__file__).parent.parent
+
+# PyInstaller 打包模式下，__file__ 指向临时解压目录（_MEIPASS），重启即丢失。
+# 持久化目录优先级：环境变量 > sys.frozen 自动检测 > 开发模式（项目根目录）
+if os.environ.get("MINING_PROCESSOR_DATA_DIR"):
+    _persistent_root = Path(os.environ["MINING_PROCESSOR_DATA_DIR"])
+elif getattr(sys, 'frozen', False):
+    # Flet 或其他冻结构建，未显式设置环境变量时自动检测
+    if sys.platform == "darwin":
+        _persistent_root = Path.home() / "Library" / "Application Support" / "com.kearney.mining-processor"
+    elif sys.platform == "win32":
+        _persistent_root = Path(os.environ.get("APPDATA", str(Path.home()))) / "com.kearney.mining-processor"
+    else:
+        _persistent_root = Path.home() / ".local" / "share" / "com.kearney.mining-processor"
+    _persistent_root.mkdir(parents=True, exist_ok=True)
+else:
+    _persistent_root = _BUNDLED_ROOT
+
+# config.json: 打包默认值（只读 fallback）
+_BUNDLED_CONFIG_FILE = _BUNDLED_ROOT / "config.json"
+# 用户可修改的配置文件：持久化目录优先
+_CONFIG_FILE = _persistent_root / "config.json"
+_USER_CONFIG_FILE = _persistent_root / "config.user.json"
 
 _USER_CONFIG_SECTION = "user_config"
+
+
+def _init_persistent_defaults() -> None:
+    """首次运行时，将打包的默认配置复制到持久化目录。"""
+    if _persistent_root == _BUNDLED_ROOT:
+        return  # 开发模式，无需复制
+    if _BUNDLED_CONFIG_FILE.exists() and not _CONFIG_FILE.exists():
+        import shutil
+        shutil.copy2(_BUNDLED_CONFIG_FILE, _CONFIG_FILE)
+        logger.info("已将默认配置复制到持久化目录: %s", _CONFIG_FILE)
 
 
 # ---------------------------------------------------------------------------
@@ -197,25 +230,34 @@ def get_user_config_file_path() -> Path:
 def load_config() -> dict[str, Any]:
     """加载合并后的配置（系统默认 + 用户覆盖）。
 
-    先读 config.json，再用 config.user.json 深合并覆盖。
-    任何一侧文件不存在都不报错，返回另一侧的内容。
+    冻结模式下合并顺序：打包默认 → 持久化 config.json → config.user.json。
+    开发模式下合并顺序：config.json → config.user.json。
     使用基于文件 mtime 的缓存，避免重复读盘 (M1)。
     """
     global _config_cache, _config_cache_mtime
 
     mt1 = _CONFIG_FILE.stat().st_mtime if _CONFIG_FILE.exists() else 0.0
     mt2 = _USER_CONFIG_FILE.stat().st_mtime if _USER_CONFIG_FILE.exists() else 0.0
+    # 冻结模式下还需检查打包默认配置是否更新
+    mt_bundled = _BUNDLED_CONFIG_FILE.stat().st_mtime if _BUNDLED_CONFIG_FILE.exists() else 0.0
 
     with _config_lock:
-        if _config_cache is not None and (mt1, mt2) == _config_cache_mtime:
+        if _config_cache is not None and (mt1, mt2, mt_bundled) == _config_cache_mtime:
             return _config_cache
 
-        base = _load_json(_CONFIG_FILE)
+        # 冻结模式：打包默认作为底层，持久化配置覆盖
+        if _persistent_root != _BUNDLED_ROOT and _BUNDLED_CONFIG_FILE.exists():
+            base = _load_json(_BUNDLED_CONFIG_FILE)
+            persistent = _load_json(_CONFIG_FILE)
+            base = _deep_merge(base, persistent) if persistent else base
+        else:
+            base = _load_json(_CONFIG_FILE)
+
         user = _load_json(_USER_CONFIG_FILE)
         result = _deep_merge(base, user) if user else base
 
         _config_cache = result
-        _config_cache_mtime = (mt1, mt2)
+        _config_cache_mtime = (mt1, mt2, mt_bundled)
         return result
 
 
@@ -420,7 +462,7 @@ def save_worktime_header_mapping(mapping: dict) -> None:
 # 台账缓存（JSON 格式持久化）
 # ---------------------------------------------------------------------------
 
-_DATA_DIR = Path(__file__).parent.parent / "data"
+_DATA_DIR = _persistent_root / "data"
 _EQUIPMENT_LEDGER_CACHE = _DATA_DIR / "equipment_ledger_cache.json"
 _OIL_LEDGER_CACHE = _DATA_DIR / "oil_ledger_cache.json"
 
@@ -552,7 +594,10 @@ def save_minebase_config(minebase_cfg: dict[str, Any]) -> None:
 # ---------------------------------------------------------------------------
 
 # 用户自定义映射的独立文件路径（不在 config.user.json 中，方便单独管理）
-_MINEBASE_MAPPING_FILE = Path(__file__).parent.parent / "minebase_column_mapping.json"
+_MINEBASE_MAPPING_FILE = _persistent_root / "minebase_column_mapping.json"
+
+# 模块加载时初始化持久化目录（仅冻结模式）
+_init_persistent_defaults()
 
 
 def get_minebase_column_mapping() -> dict[str, dict[str, str]]:
