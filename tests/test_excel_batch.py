@@ -100,11 +100,15 @@ class TestProcessFilesAllModulesCalled:
             merge_output=True,
         )
 
-        mock_fuel.assert_called_once_with(matched["fuel"], 2025, False)
-        mock_electrical.assert_called_once_with(matched["electrical"], 2025, False)
-        mock_production.assert_called_once_with("/data", -1, False)
+        mock_fuel.assert_called_once_with(matched["fuel"], 2025,
+                                          skip_hidden_rows=False, skip_hidden_cols=False)
+        mock_electrical.assert_called_once_with(matched["electrical"], 2025,
+                                                skip_hidden_rows=False, skip_hidden_cols=False)
+        mock_production.assert_called_once_with("/data", -1,
+                                                skip_hidden_rows=False, skip_hidden_cols=False)
         mock_worktime.assert_called_once_with(
-            matched["worktime"], 2025, 6, None, False,
+            matched["worktime"], 2025, 6, None,
+            skip_hidden_rows=False, skip_hidden_cols=False,
         )
 
         assert "fuel" in result

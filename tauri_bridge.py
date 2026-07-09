@@ -236,8 +236,12 @@ def _process_fuel(params: dict) -> dict:
     from func.excel_fuel import process_diesel_data
 
     safe_path = str(_sanitize_path(params["path"], must_exist=True))
-    result = process_diesel_data(safe_path, target_year=params.get("year"),
-                                 skip_hidden=params.get("skip_hidden", False))
+    result = process_diesel_data(
+        safe_path, target_year=params.get("year"),
+        skip_hidden=params.get("skip_hidden", False),
+        skip_hidden_rows=params.get("skip_hidden_rows", False),
+        skip_hidden_cols=params.get("skip_hidden_cols", False),
+    )
     output_file = str(result) if result else None
     if output_file:
         _post_process_ledger(
@@ -257,6 +261,8 @@ def _process_production(params: dict) -> dict:
     processor = MiningDataProcessor(
         raw_start=params.get("raw_start", -1), device_load_map=load_map,
         skip_hidden=params.get("skip_hidden", False),
+        skip_hidden_rows=params.get("skip_hidden_rows", False),
+        skip_hidden_cols=params.get("skip_hidden_cols", False),
     )
     path = str(_sanitize_path(params["path"], must_exist=True))
     p = Path(path)
@@ -286,6 +292,8 @@ def _process_electrical(params: dict) -> dict:
         add_shift_column=params.get("add_shift_column", False),
         default_shift=params.get("default_shift", "Day"),
         skip_hidden=params.get("skip_hidden", False),
+        skip_hidden_rows=params.get("skip_hidden_rows", False),
+        skip_hidden_cols=params.get("skip_hidden_cols", False),
     )
     output_file = str(Path(safe_path).parent / "电力消耗统计.xlsx")
     _post_process_ledger(
@@ -320,6 +328,8 @@ def _process_worktime(params: dict) -> dict:
         return_sheets=False,
         header_mapping=header_mapping,
         skip_hidden=params.get("skip_hidden", False),
+        skip_hidden_rows=params.get("skip_hidden_rows", False),
+        skip_hidden_cols=params.get("skip_hidden_cols", False),
     )
     _post_process_ledger(
         output_file,
@@ -340,6 +350,8 @@ def _process_merge(params: dict) -> dict:
         strip_time=params.get("strip_time", False),
         sort_configs=params.get("sort_configs"),
         skip_hidden=params.get("skip_hidden", False),
+        skip_hidden_rows=params.get("skip_hidden_rows", False),
+        skip_hidden_cols=params.get("skip_hidden_cols", False),
     )
     if output:
         _post_process_ledger(
@@ -420,6 +432,8 @@ def _batch_process(params: dict) -> dict:
         progress_cb=progress_cb,
         cancel_event=_cancel_event,
         skip_hidden=params.get("skip_hidden", False),
+        skip_hidden_rows=params.get("skip_hidden_rows", False),
+        skip_hidden_cols=params.get("skip_hidden_cols", False),
     )
     return {"cancelled": _cancel_event.is_set()}
 
@@ -450,6 +464,8 @@ def _sync_minebase(params: dict) -> dict:
         use_equipment_ledger=params.get("use_equipment_ledger", False),
         use_oil_ledger=params.get("use_oil_ledger", True),
         skip_hidden=params.get("skip_hidden", False),
+        skip_hidden_rows=params.get("skip_hidden_rows", False),
+        skip_hidden_cols=params.get("skip_hidden_cols", False),
     )
     return {"results": results}
 

@@ -312,14 +312,16 @@ function FuelCard({
   bridge,
   useEquipmentLedger,
   useOilLedger,
-  skipHidden,
+  skipHiddenRows,
+  skipHiddenCols,
   defaultPath,
   onFileSelected,
 }: {
   bridge: BridgeProp;
   useEquipmentLedger: boolean;
   useOilLedger: boolean;
-  skipHidden: boolean;
+  skipHiddenRows: boolean;
+  skipHiddenCols: boolean;
   defaultPath?: string;
   onFileSelected?: (path: string) => void;
 }) {
@@ -339,7 +341,8 @@ function FuelCard({
         path,
         use_equipment_ledger: useEquipmentLedger,
         use_oil_ledger: useOilLedger,
-        skip_hidden: skipHidden,
+        skip_hidden_rows: skipHiddenRows,
+        skip_hidden_cols: skipHiddenCols,
       };
       if (year) params.year = parseInt(year);
       const res = await bridge.call<{ output_file?: string }>(
@@ -383,14 +386,16 @@ function ProductionCard({
   bridge,
   useEquipmentLedger,
   useOilLedger,
-  skipHidden,
+  skipHiddenRows,
+  skipHiddenCols,
   defaultPath,
   onFileSelected,
 }: {
   bridge: BridgeProp;
   useEquipmentLedger: boolean;
   useOilLedger: boolean;
-  skipHidden: boolean;
+  skipHiddenRows: boolean;
+  skipHiddenCols: boolean;
   defaultPath?: string;
   onFileSelected?: (path: string) => void;
 }) {
@@ -411,7 +416,8 @@ function ProductionCard({
         raw_start: parseInt(rawStart),
         use_equipment_ledger: useEquipmentLedger,
         use_oil_ledger: useOilLedger,
-        skip_hidden: skipHidden,
+        skip_hidden_rows: skipHiddenRows,
+        skip_hidden_cols: skipHiddenCols,
       });
       setResult("处理完成");
       notify("生产数据处理完成", "success");
@@ -460,14 +466,16 @@ function ElectricalCard({
   bridge,
   useEquipmentLedger,
   useOilLedger,
-  skipHidden,
+  skipHiddenRows,
+  skipHiddenCols,
   defaultPath,
   onFileSelected,
 }: {
   bridge: BridgeProp;
   useEquipmentLedger: boolean;
   useOilLedger: boolean;
-  skipHidden: boolean;
+  skipHiddenRows: boolean;
+  skipHiddenCols: boolean;
   defaultPath?: string;
   onFileSelected?: (path: string) => void;
 }) {
@@ -491,7 +499,8 @@ function ElectricalCard({
         default_shift: defaultShift,
         use_equipment_ledger: useEquipmentLedger,
         use_oil_ledger: useOilLedger,
-        skip_hidden: skipHidden,
+        skip_hidden_rows: skipHiddenRows,
+        skip_hidden_cols: skipHiddenCols,
       };
       if (year) params.year = parseInt(year);
       await bridge.call("process_electrical", params);
@@ -559,14 +568,16 @@ function WorktimeCard({
   bridge,
   useEquipmentLedger,
   useOilLedger,
-  skipHidden,
+  skipHiddenRows,
+  skipHiddenCols,
   defaultPath,
   onFileSelected,
 }: {
   bridge: BridgeProp;
   useEquipmentLedger: boolean;
   useOilLedger: boolean;
-  skipHidden: boolean;
+  skipHiddenRows: boolean;
+  skipHiddenCols: boolean;
   defaultPath?: string;
   onFileSelected?: (path: string) => void;
 }) {
@@ -593,7 +604,8 @@ function WorktimeCard({
         use_header_mapping: useHeaderMapping,
         use_equipment_ledger: useEquipmentLedger,
         use_oil_ledger: useOilLedger,
-        skip_hidden: skipHidden,
+        skip_hidden_rows: skipHiddenRows,
+        skip_hidden_cols: skipHiddenCols,
       };
       if (useHeaderMapping) {
         params.header_mode = headerMode;
@@ -682,14 +694,16 @@ function MergeCard({
   bridge,
   useEquipmentLedger,
   useOilLedger,
-  skipHidden,
+  skipHiddenRows,
+  skipHiddenCols,
   defaultPath,
   onFileSelected,
 }: {
   bridge: BridgeProp;
   useEquipmentLedger: boolean;
   useOilLedger: boolean;
-  skipHidden: boolean;
+  skipHiddenRows: boolean;
+  skipHiddenCols: boolean;
   defaultPath?: string;
   onFileSelected?: (path: string) => void;
 }) {
@@ -732,7 +746,8 @@ function MergeCard({
           .map((s) => ({ column: s.column.trim(), ascending: s.ascending })),
         use_equipment_ledger: useEquipmentLedger,
         use_oil_ledger: useOilLedger,
-        skip_hidden: skipHidden,
+        skip_hidden_rows: skipHiddenRows,
+        skip_hidden_cols: skipHiddenCols,
       });
       const msg = res.output_file ? `输出: ${res.output_file}` : "合并完成";
       setResult(msg);
@@ -839,7 +854,8 @@ function MergeCard({
 export function DataProcessingPage({ bridge }: { bridge: BridgeProp }) {
   const [useEquipmentLedger, setUseEquipmentLedger] = useState(false);
   const [useOilLedger, setUseOilLedger] = useState(false);
-  const [skipHidden, setSkipHidden] = useState(false);
+  const [skipHiddenRows, setSkipHiddenRows] = useState(false);
+  const [skipHiddenCols, setSkipHiddenCols] = useState(false);
   const { initialDir, saveDir } = useLastDirectory(bridge);
 
   return (
@@ -861,19 +877,24 @@ export function DataProcessingPage({ bridge }: { bridge: BridgeProp }) {
             label="油品台账匹配"
           />
           <StyledToggle
-            checked={skipHidden}
-            onChange={setSkipHidden}
-            label="跳过隐藏行/列"
+            checked={skipHiddenRows}
+            onChange={setSkipHiddenRows}
+            label="跳过隐藏行"
+          />
+          <StyledToggle
+            checked={skipHiddenCols}
+            onChange={setSkipHiddenCols}
+            label="跳过隐藏列"
           />
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <FuelCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHidden={skipHidden} defaultPath={initialDir} onFileSelected={saveDir} />
-        <ProductionCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHidden={skipHidden} defaultPath={initialDir} onFileSelected={saveDir} />
-        <ElectricalCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHidden={skipHidden} defaultPath={initialDir} onFileSelected={saveDir} />
-        <WorktimeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHidden={skipHidden} defaultPath={initialDir} onFileSelected={saveDir} />
-        <MergeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHidden={skipHidden} defaultPath={initialDir} onFileSelected={saveDir} />
+        <FuelCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
+        <ProductionCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
+        <ElectricalCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
+        <WorktimeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
+        <MergeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
       </div>
     </div>
   );

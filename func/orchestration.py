@@ -196,6 +196,8 @@ def process_single(
     default_shift: str = "Day",
     header_mapping: dict | None = None,
     skip_hidden: bool = False,
+    skip_hidden_rows: bool = False,
+    skip_hidden_cols: bool = False,
     use_equipment_ledger: bool = False,
     use_oil_ledger: bool = False,
     equipment_ledger=None,
@@ -221,7 +223,9 @@ def process_single(
         add_shift_column: 是否新增班次列 (electrical)
         default_shift: 默认班次 (electrical)
         header_mapping: 工时表头映射 (worktime)
-        skip_hidden: 是否跳过隐藏行/列
+        skip_hidden: 向后兼容，True 时等价于 skip_hidden_rows=True, skip_hidden_cols=True
+        skip_hidden_rows: 是否跳过隐藏行
+        skip_hidden_cols: 是否跳过隐藏列
         use_equipment_ledger: 是否使用设备台账
         use_oil_ledger: 是否使用油品台账
         equipment_ledger: 设备台账实例（None 时从缓存加载）
@@ -235,12 +239,19 @@ def process_single(
     """
     from datetime import datetime
 
+    # 向后兼容
+    if skip_hidden:
+        skip_hidden_rows = True
+        skip_hidden_cols = True
+
     effective_year = year if year is not None else datetime.now().year
 
     # ── 分发到各处理器 ──
     if module_type == "fuel":
         from func.excel_fuel import process_diesel_data
-        process_diesel_data(path, target_year=year, skip_hidden=skip_hidden)
+        process_diesel_data(path, target_year=year,
+                            skip_hidden_rows=skip_hidden_rows,
+                            skip_hidden_cols=skip_hidden_cols)
 
     elif module_type == "production":
         from func.excel_production_enhanced import MiningDataProcessor
@@ -248,7 +259,8 @@ def process_single(
         load_map = get_device_load_map()
         processor = MiningDataProcessor(
             raw_start=raw_start, device_load_map=load_map,
-            skip_hidden=skip_hidden,
+            skip_hidden_rows=skip_hidden_rows,
+            skip_hidden_cols=skip_hidden_cols,
         )
         if os.path.isdir(path):
             processor.process_folder(path)
@@ -262,7 +274,8 @@ def process_single(
             path, target_year=year,
             add_shift_column=add_shift_column,
             default_shift=default_shift,
-            skip_hidden=skip_hidden,
+            skip_hidden_rows=skip_hidden_rows,
+            skip_hidden_cols=skip_hidden_cols,
         )
 
     elif module_type == "worktime":
@@ -271,7 +284,8 @@ def process_single(
             path, effective_year, month,
             return_sheets=True,
             header_mapping=header_mapping,
-            skip_hidden=skip_hidden,
+            skip_hidden_rows=skip_hidden_rows,
+            skip_hidden_cols=skip_hidden_cols,
         )
 
     elif module_type == "merge":
@@ -280,7 +294,8 @@ def process_single(
             path, keyword,
             strip_time=strip_time,
             sort_configs=sort_configs,
-            skip_hidden=skip_hidden,
+            skip_hidden_rows=skip_hidden_rows,
+            skip_hidden_cols=skip_hidden_cols,
         )
 
     else:

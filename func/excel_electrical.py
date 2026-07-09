@@ -15,31 +15,43 @@ from func.string_utils import clean_string
 logger = get_logger(__name__)
 
 
-def parse_excel_data(file_path, target_year=None, return_sheets=False, add_shift_column=False, default_shift="Day", skip_hidden=False):
+def parse_excel_data(file_path, target_year=None, return_sheets=False, add_shift_column=False, default_shift="Day", skip_hidden=False,
+                     skip_hidden_rows=False, skip_hidden_cols=False):
     """
     解析复杂的Excel电力消耗报表
     :param file_path: 输入文件路径
     :param target_year: 如果指定，则将所有日期的年份修改为此年份
     :param add_shift_column: 是否在日期列右侧新增班次列 (Day/Night)
     :param default_shift: 当无法从表头识别班次时使用的默认值，"Day" 或 "Night"
-    :param skip_hidden: 若为 True，跳过 Excel 中的隐藏行和隐藏列
+    :param skip_hidden: 向后兼容，True 时等价于 skip_hidden_rows=True, skip_hidden_cols=True。
+    :param skip_hidden_rows: 若为 True，跳过 Excel 中的隐藏行。
+    :param skip_hidden_cols: 若为 True，跳过 Excel 中的隐藏列。
     """
+    if skip_hidden:
+        skip_hidden_rows = True
+        skip_hidden_cols = True
+    need_hidden = skip_hidden_rows or skip_hidden_cols
+
     all_extracted_data = []
 
     # 1. 加载Excel，读取所有Sheet
     with pd.ExcelFile(file_path) as xl:
         sheet_names = [s for s in xl.sheet_names if "Electrical" in s]
 
-        # skip_hidden 时预先加载 workbook，避免每个 sheet 重复 load_workbook
-        hidden_wb = open_workbook(file_path) if skip_hidden else None
+        # 需要检测隐藏属性时预先加载 workbook，避免每个 sheet 重复 load_workbook
+        hidden_wb = open_workbook(file_path) if need_hidden else None
         try:
             for sheet_name in sheet_names:
                 logger.info(f"正在处理 Sheet: {sheet_name}")
                 df = xl.parse(sheet_name, header=None)  # 不设表头，手动定位
 
-                if skip_hidden:
+                if need_hidden:
                     h_rows, h_cols = get_hidden_indices(file_path, sheet_name, _workbook=hidden_wb)
-                    df = filter_hidden_from_df(df, h_rows, h_cols)
+                    df = filter_hidden_from_df(
+                        df,
+                        h_rows if skip_hidden_rows else set(),
+                        h_cols if skip_hidden_cols else set(),
+                    )
 
                 if df.empty or df.shape[1] == 0:
                     logger.warning(f"跳过 Sheet {sheet_name}: 空表")
@@ -173,11 +185,16 @@ def main():
     parser.add_argument("--add-shift", action="store_true", help="在日期列右侧新增班次列 (Day/Night)")
     parser.add_argument("--default-shift", choices=["Day", "Night"], default="Day",
                         help="当无法从表头识别班次时使用的默认值 (默认: Day)")
-    parser.add_argument("--skiphidden", action="store_true", help="跳过 Excel 中的隐藏行和隐藏列")
+    parser.add_argument("--skiphidden", action="store_true",
+                        help="跳过 Excel 中的隐藏行和隐藏列（向后兼容）")
+    parser.add_argument("--skip-hidden-rows", action="store_true", help="跳过 Excel 中的隐藏行")
+    parser.add_argument("--skip-hidden-cols", action="store_true", help="跳过 Excel 中的隐藏列")
     args = parser.parse_args()
     parse_excel_data(args.input_file, target_year=args.year,
                      add_shift_column=args.add_shift, default_shift=args.default_shift,
-                     skip_hidden=args.skiphidden)
+                     skip_hidden=args.skiphidden,
+                     skip_hidden_rows=args.skip_hidden_rows,
+                     skip_hidden_cols=args.skip_hidden_cols)
 
 
 # 统一命名别名（L-01）

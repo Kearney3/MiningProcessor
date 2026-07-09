@@ -66,6 +66,8 @@ def sync(
     use_equipment_ledger: bool = False,
     use_oil_ledger: bool = True,
     skip_hidden: bool = False,
+    skip_hidden_rows: bool = False,
+    skip_hidden_cols: bool = False,
 ) -> dict[str, dict[str, int]]:
     """执行同步的主入口。
 
@@ -85,6 +87,9 @@ def sync(
         use_ledger: 向后兼容参数，True 时同时启用设备和油品台账。
         use_equipment_ledger: 是否使用设备台账标准化设备名称。
         use_oil_ledger: 是否使用油品台账标准化油品名称（默认开启）。
+        skip_hidden: 向后兼容，True 时等价于 skip_hidden_rows=True, skip_hidden_cols=True。
+        skip_hidden_rows: 是否跳过隐藏行。
+        skip_hidden_cols: 是否跳过隐藏列。
 
     Returns:
         {data_type: {"success": N, "skipped": N, "failed": N}}
@@ -114,6 +119,11 @@ def sync(
     _process_production = _mod._process_production_file
     _process_work_eff = _mod._process_work_efficiency_file
     _read_and_map = _mod.read_and_map_excel
+
+    # 向后兼容：skip_hidden=True 等价于同时启用行和列
+    if skip_hidden:
+        skip_hidden_rows = True
+        skip_hidden_cols = True
 
     input_path = Path(input_dir)
     if not input_path.is_dir():
@@ -222,14 +232,20 @@ def sync(
                 logger.info("  处理文件: %s", file_path.name)
                 try:
                     if data_type == "fuel":
-                        rows = _process_fuel(file_path, year, skip_hidden=skip_hidden)
+                        rows = _process_fuel(file_path, year,
+                                             skip_hidden_rows=skip_hidden_rows,
+                                             skip_hidden_cols=skip_hidden_cols)
                     elif data_type == "electrical":
-                        rows = _process_electrical(file_path, year, skip_hidden=skip_hidden)
+                        rows = _process_electrical(file_path, year,
+                                                   skip_hidden_rows=skip_hidden_rows,
+                                                   skip_hidden_cols=skip_hidden_cols)
                     elif data_type in ("production", "operation"):
                         # 缓存生产文件处理结果，避免同一文件处理两次
                         cache_key = str(file_path)
                         if _production_cache is None or cache_key not in _production_cache:
-                            result = _process_production(file_path, skip_hidden=skip_hidden)
+                            result = _process_production(file_path,
+                                                         skip_hidden_rows=skip_hidden_rows,
+                                                         skip_hidden_cols=skip_hidden_cols)
                             if _production_cache is None:
                                 _production_cache = {}
                             _production_cache[cache_key] = result
@@ -237,7 +253,8 @@ def sync(
                     elif data_type == "work_efficiency":
                         rows = _process_work_eff(
                             file_path, year, month, apply_header_mapping,
-                            skip_hidden=skip_hidden,
+                            skip_hidden_rows=skip_hidden_rows,
+                            skip_hidden_cols=skip_hidden_cols,
                         )
                     else:
                         rows = _read_and_map(file_path, DATA_TYPE_REGISTRY[data_type]["sheet"], mapping)
