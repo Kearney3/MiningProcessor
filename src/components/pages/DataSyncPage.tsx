@@ -166,7 +166,8 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const [applyHeaderMapping, setApplyHeaderMapping] = useState(true);
   const [useEquipmentLedger, setUseEquipmentLedger] = useState(false);
   const [useOilLedger, setUseOilLedger] = useState(true);
-  const [skipHidden, setSkipHidden] = useState(false);
+  const [skipHiddenRows, setSkipHiddenRows] = useState(false);
+  const [skipHiddenCols, setSkipHiddenCols] = useState(false);
 
   // 启动时从配置加载上次目录，不存在则清空
   useEffect(() => {
@@ -214,7 +215,8 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
         apply_header_mapping: applyHeaderMapping,
         use_equipment_ledger: useEquipmentLedger,
         use_oil_ledger: useOilLedger,
-        skip_hidden: skipHidden,
+        skip_hidden_rows: skipHiddenRows,
+        skip_hidden_cols: skipHiddenCols,
       });
       setResult(res);
       const total = Object.values(res.results).reduce(
@@ -492,19 +494,37 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
           <div className="flex items-start gap-3">
             <button
               role="switch"
-              aria-checked={skipHidden}
-              onClick={() => setSkipHidden(!skipHidden)}
+              aria-checked={skipHiddenRows}
+              onClick={() => setSkipHiddenRows(!skipHiddenRows)}
               className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors shrink-0 mt-0.5 ${
-                skipHidden ? "bg-blue-600" : "bg-slate-200"
+                skipHiddenRows ? "bg-blue-600" : "bg-slate-200"
               }`}
             >
               <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                skipHidden ? "translate-x-4" : "translate-x-0.5"
+                skipHiddenRows ? "translate-x-4" : "translate-x-0.5"
               }`} />
             </button>
             <div>
-              <div className="text-sm text-slate-700">跳过隐藏行/列</div>
-              <div className="text-xs text-slate-400 mt-0.5">勾选后，Excel 中被隐藏的行和列将不会被读取</div>
+              <div className="text-sm text-slate-700">跳过隐藏行</div>
+              <div className="text-xs text-slate-400 mt-0.5">勾选后，Excel 中被隐藏的行将不会被读取</div>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <button
+              role="switch"
+              aria-checked={skipHiddenCols}
+              onClick={() => setSkipHiddenCols(!skipHiddenCols)}
+              className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors shrink-0 mt-0.5 ${
+                skipHiddenCols ? "bg-blue-600" : "bg-slate-200"
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                skipHiddenCols ? "translate-x-4" : "translate-x-0.5"
+              }`} />
+            </button>
+            <div>
+              <div className="text-sm text-slate-700">跳过隐藏列</div>
+              <div className="text-xs text-slate-400 mt-0.5">勾选后，Excel 中被隐藏的列将不会被读取</div>
             </div>
           </div>
         </div>

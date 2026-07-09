@@ -11,7 +11,8 @@ logger = get_logger(__name__)
 
 
 def process_excel_data(file_path, year, month, output_file=None, return_sheets=False,
-                       header_mapping=None, skip_hidden=False):
+                       header_mapping=None, skip_hidden=False,
+                       skip_hidden_rows=False, skip_hidden_cols=False):
     """
     解析非标准结构的Excel文件并合并数据
 
@@ -22,10 +23,18 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
         output_file: 输出文件路径（可选）
         return_sheets: 是否返回 sheets 字典（供批量处理用）
         header_mapping: 表头映射字典 {原始列名: 新列名}，为 None 或空时不映射
-        skip_hidden: 若为 True，跳过 Excel 中的隐藏行和隐藏列
+        skip_hidden: 若为 True，跳过 Excel 中的隐藏行和隐藏列（兼容旧调用）
+        skip_hidden_rows: 若为 True，仅跳过 Excel 中的隐藏行
+        skip_hidden_cols: 若为 True，仅跳过 Excel 中的隐藏列
     """
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"找不到输入文件 '{file_path}'")
+
+    # 向后兼容：skip_hidden 打开时同时跳过隐藏行和列
+    if skip_hidden:
+        skip_hidden_rows = True
+        skip_hidden_cols = True
+    need_hidden = skip_hidden_rows or skip_hidden_cols
 
     logger.info(f"正在读取文件: {file_path} ...")
     try:
@@ -39,8 +48,8 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
         success_count = 0
         day_list = []
 
-        # skip_hidden 时预先加载 workbook，避免每个 sheet 重复 load_workbook
-        hidden_wb = open_workbook(file_path) if skip_hidden else None
+        # 需要跳过隐藏行列时预先加载 workbook，避免每个 sheet 重复 load_workbook
+        hidden_wb = open_workbook(file_path) if need_hidden else None
         try:
             for sheet_name in xls.sheet_names:
                 # 确保sheet名称是数字（代表日期）
@@ -51,9 +60,13 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
                 # 读取整个sheet，不设表头
                 df_raw = pd.read_excel(xls, sheet_name=sheet_name, header=None)
 
-                if skip_hidden:
+                if need_hidden:
                     h_rows, h_cols = get_hidden_indices(file_path, sheet_name, _workbook=hidden_wb)
-                    df_raw = filter_hidden_from_df(df_raw, h_rows, h_cols)
+                    df_raw = filter_hidden_from_df(
+                        df_raw,
+                        h_rows if skip_hidden_rows else set(),
+                        h_cols if skip_hidden_cols else set(),
+                    )
                 else:
                     h_rows = set()
 
@@ -132,13 +145,17 @@ def main():
     parser.add_argument("input_file", help="输入Excel文件路径")
     parser.add_argument("--year", type=int, default=2025, help="目标年份")
     parser.add_argument("--month", type=int, default=1, help="目标月份")
-    parser.add_argument("--skiphidden", action="store_true", help="跳过 Excel 中的隐藏行和隐藏列")
+    parser.add_argument("--skiphidden", action="store_true", help="跳过 Excel 中的隐藏行和隐藏列（等价于同时指定 --skip-hidden-rows 和 --skip-hidden-cols）")
+    parser.add_argument("--skip-hidden-rows", action="store_true", help="跳过 Excel 中的隐藏行")
+    parser.add_argument("--skip-hidden-cols", action="store_true", help="跳过 Excel 中的隐藏列")
     args = parser.parse_args()
     file_dir = os.path.dirname(args.input_file) or "."
     output_xlsx = os.path.join(file_dir, f"{args.year}{args.month:02d}_工作效率表.xlsx")
     if os.path.exists(args.input_file):
         process_excel_data(args.input_file, args.year, args.month, output_xlsx,
-                           skip_hidden=args.skiphidden)
+                           skip_hidden=args.skiphidden,
+                           skip_hidden_rows=args.skip_hidden_rows,
+                           skip_hidden_cols=args.skip_hidden_cols)
     else:
         logger.error(f"错误：找不到输入文件 '{args.input_file}'！")
 

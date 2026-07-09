@@ -19,18 +19,27 @@ logger = get_logger(__name__)
 
 class MiningDataProcessor:
     def __init__(self, version: str = "new", raw_start: int = -1, device_load_map: dict[str, int] | None = None,
-                 target_text: str = "Мото цагийн заалт", skip_hidden: bool = False):
+                 target_text: str = "Мото цагийн заалт", skip_hidden: bool = False,
+                 skip_hidden_rows: bool = False, skip_hidden_cols: bool = False):
         """
         初始化数据处理器
         :param version: 版本，"new"或"old"
         :param raw_start: 开始行号，默认-1
         :param device_load_map: 自定义设备装载量映射
         :param target_text: 目标文本，默认"Мото цагийн заалт"
-        :param skip_hidden: 若为 True，跳过 Excel 中的隐藏行和隐藏列
+        :param skip_hidden: 若为 True，跳过 Excel 中的隐藏行和隐藏列（向后兼容）
+        :param skip_hidden_rows: 若为 True，跳过 Excel 中的隐藏行
+        :param skip_hidden_cols: 若为 True，跳过 Excel 中的隐藏列
         """
         self.version = version
         self.raw_start = raw_start
         self.skip_hidden = skip_hidden
+        if skip_hidden:
+            skip_hidden_rows = True
+            skip_hidden_cols = True
+        self.skip_hidden_rows = skip_hidden_rows
+        self.skip_hidden_cols = skip_hidden_cols
+        self.need_hidden = skip_hidden_rows or skip_hidden_cols
         self._hidden_rows: set[int] = set()
         self._hidden_cols: set[str] = set()
         if raw_start == -1:
@@ -367,7 +376,7 @@ class MiningDataProcessor:
         # Pre-compute hidden row/col info once for the whole file
         _h_rows_s1: set[int] = set()
         _h_cols_s1: set[str] = set()
-        if self.skip_hidden:
+        if self.need_hidden:
             _h_rows_s1, _h_cols_s1 = get_hidden_indices(file_path, 0)
 
         # 只打开一次 Excel 文件
@@ -378,8 +387,10 @@ class MiningDataProcessor:
 
             # 用同一个 xls 解析，避免重复打开文件
             df_sheet1 = pd.read_excel(xls, sheet_name=0, header=None)
-            if self.skip_hidden:
-                df_sheet1 = filter_hidden_from_df(df_sheet1, _h_rows_s1, _h_cols_s1)
+            if self.need_hidden:
+                _h_rows_filtered = _h_rows_s1 if self.skip_hidden_rows else set()
+                _h_cols_filtered = _h_cols_s1 if self.skip_hidden_cols else set()
+                df_sheet1 = filter_hidden_from_df(df_sheet1, _h_rows_filtered, _h_cols_filtered)
 
             # Adjust raw_start for non-auto-detect when hidden rows are present
             if not self.auto_detect and _h_rows_s1:
@@ -398,9 +409,11 @@ class MiningDataProcessor:
 
             if len(xls.sheet_names) > 1:
                 df_sheet2 = pd.read_excel(xls, sheet_name=1, header=None)
-                if self.skip_hidden:
+                if self.need_hidden:
                     self._hidden_rows, self._hidden_cols = get_hidden_indices(file_path, 1)
-                    df_sheet2 = filter_hidden_from_df(df_sheet2, self._hidden_rows, self._hidden_cols)
+                    _h_rows_filtered = self._hidden_rows if self.skip_hidden_rows else set()
+                    _h_cols_filtered = self._hidden_cols if self.skip_hidden_cols else set()
+                    df_sheet2 = filter_hidden_from_df(df_sheet2, _h_rows_filtered, _h_cols_filtered)
                 else:
                     self._hidden_rows = set()
                     self._hidden_cols = set()
@@ -543,13 +556,17 @@ def main():
     parser.add_argument("--raw_start", type=int, default=6, help="复合表头起始行，默认 6, 使用-1自动检测")
     parser.add_argument("--target_text", type=str, default="Мото цагийн заалт",
                         help="目标文本，默认'Мото цагийн заалт'，当raw_start为-1时，根据此文本自动检测复合表头行号")
-    parser.add_argument("--skiphidden", action="store_true", help="跳过 Excel 中的隐藏行和隐藏列")
+    parser.add_argument("--skiphidden", action="store_true", help="跳过 Excel 中的隐藏行和隐藏列（向后兼容）")
+    parser.add_argument("--skiphiddenrows", action="store_true", help="仅跳过 Excel 中的隐藏行")
+    parser.add_argument("--skiphiddencols", action="store_true", help="仅跳过 Excel 中的隐藏列")
     args = parser.parse_args()
     input_file = args.input_file
     output_file = r"合并产量.xlsx"
     processor = MiningDataProcessor(
         version=args.version, raw_start=args.raw_start, target_text=args.target_text,
         skip_hidden=args.skiphidden,
+        skip_hidden_rows=args.skiphiddenrows,
+        skip_hidden_cols=args.skiphiddencols,
     )
     if os.path.isdir(input_file):
         logger.info(f"正在处理文件夹: {input_file}")

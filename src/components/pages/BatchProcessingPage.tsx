@@ -420,7 +420,8 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
   // -- Ledger --
   const [useEquipmentLedger, setUseEquipmentLedger] = useState(false);
   const [useOilLedger, setUseOilLedger] = useState(false);
-  const [skipHidden, setSkipHidden] = useState(false);
+  const [skipHiddenRows, setSkipHiddenRows] = useState(false);
+  const [skipHiddenCols, setSkipHiddenCols] = useState(false);
 
   // -- Date filter --
   const [dateFilterEnabled, setDateFilterEnabled] = useState(false);
@@ -478,7 +479,8 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
         raw_start: parseInt(rawStart),
         use_equipment_ledger: useEquipmentLedger,
         use_oil_ledger: useOilLedger,
-        skip_hidden: skipHidden,
+        skip_hidden_rows: skipHiddenRows,
+        skip_hidden_cols: skipHiddenCols,
       };
 
       if (tableMergeMode === "merge") {
@@ -516,7 +518,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
       setProcessing(false);
       bridge.setProgress(null);
     }
-  }, [scanResult, folderPath, year, month, rawStart, useEquipmentLedger, useOilLedger, skipHidden, tableMergeMode, baseTableType, dateFilterEnabled, filterDate, useHeaderMapping, headerMode, fuzzyMatch, bridge]);
+  }, [scanResult, folderPath, year, month, rawStart, useEquipmentLedger, useOilLedger, skipHiddenRows, skipHiddenCols, tableMergeMode, baseTableType, dateFilterEnabled, filterDate, useHeaderMapping, headerMode, fuzzyMatch, bridge]);
 
   const handleProcess = () => {
     if (hasMissing) {
@@ -668,9 +670,16 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
           </div>
           <div className="flex items-end pb-0.5">
             <Toggle
-              checked={skipHidden}
-              onChange={setSkipHidden}
-              label="跳过隐藏行/列"
+              checked={skipHiddenRows}
+              onChange={setSkipHiddenRows}
+              label="跳过隐藏行"
+            />
+          </div>
+          <div className="flex items-end pb-0.5">
+            <Toggle
+              checked={skipHiddenCols}
+              onChange={setSkipHiddenCols}
+              label="跳过隐藏列"
             />
           </div>
         </div>

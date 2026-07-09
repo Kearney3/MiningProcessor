@@ -42,6 +42,8 @@ def merge_excel_files(
         strip_time: bool = False,
         sort_configs: List[dict] | None = None,
         skip_hidden: bool = False,
+        skip_hidden_rows: bool = False,
+        skip_hidden_cols: bool = False,
 ) -> str:
     """
     合并指定文件夹中包含关键字的 Excel 文件。
@@ -53,11 +55,19 @@ def merge_excel_files(
         strip_time: 为 True 时，第一个时间列仅保留日期部分（YYYY-MM-DD）
         sort_configs: 排序配置列表，如 [{"column": "日期", "ascending": True}, ...]
                       提供时优先使用，不再自动按日期排序
-        skip_hidden: 若为 True，跳过 Excel 中的隐藏行和隐藏列
+        skip_hidden: 若为 True，跳过 Excel 中的隐藏行和隐藏列（向后兼容）
+        skip_hidden_rows: 若为 True，仅跳过 Excel 中的隐藏行
+        skip_hidden_cols: 若为 True，仅跳过 Excel 中的隐藏列
 
     返回:
         输出文件的完整路径
     """
+    # 兼容旧版单一 skip_hidden 参数
+    if skip_hidden:
+        skip_hidden_rows = True
+        skip_hidden_cols = True
+    need_hidden = skip_hidden_rows or skip_hidden_cols
+
     # 1. 收集匹配的 Excel 文件
     matched_files: List[str] = []
     for fname in sorted(os.listdir(folder_path)):
@@ -116,9 +126,14 @@ def merge_excel_files(
                 logger.error(f"读取文件 '{fpath}' 的 Sheet '{sname}' 失败: {e}")
                 continue
 
-            if skip_hidden:
+            if need_hidden:
                 h_rows, h_cols = get_hidden_indices(fpath, sname)
-                df = filter_hidden_from_df(df, h_rows, h_cols, has_header=True)
+                df = filter_hidden_from_df(
+                    df,
+                    h_rows if skip_hidden_rows else set(),
+                    h_cols if skip_hidden_cols else set(),
+                    has_header=True,
+                )
 
             if df.empty:
                 logger.warning(f"  警告: {os.path.basename(fpath)} 的 Sheet '{sname}' 为空，已跳过")
@@ -239,7 +254,9 @@ def main():
     parser.add_argument("-o", "--output", help="输出文件路径（可选）")
     parser.add_argument("-s", "--strip-time", action="store_true", help="时间列仅保留日期（YYYY-MM-DD）")
     parser.add_argument("--sort", type=str, default=None, help='排序规则 JSON，如: [{"column":"日期","ascending":true}]')
-    parser.add_argument("--skiphidden", action="store_true", help="跳过 Excel 中的隐藏行和隐藏列")
+    parser.add_argument("--skiphidden", action="store_true", help="跳过 Excel 中的隐藏行和隐藏列（向后兼容）")
+    parser.add_argument("--skip-hidden-rows", action="store_true", help="跳过 Excel 中的隐藏行")
+    parser.add_argument("--skip-hidden-cols", action="store_true", help="跳过 Excel 中的隐藏列")
     args = parser.parse_args()
 
     folder = os.path.abspath(args.folder)
@@ -258,7 +275,9 @@ def main():
                 logger.error(f"错误: 排序规则 JSON 解析失败: {e}")
                 sys.exit(1)
         merge_excel_files(folder, args.keyword, args.output, strip_time=args.strip_time, sort_configs=sort_configs,
-                          skip_hidden=args.skiphidden)
+                          skip_hidden=args.skiphidden,
+                          skip_hidden_rows=args.skip_hidden_rows,
+                          skip_hidden_cols=args.skip_hidden_cols)
     except Exception as e:
         logger.error(f"错误: {e}")
         sys.exit(1)

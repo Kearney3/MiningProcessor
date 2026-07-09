@@ -11,14 +11,17 @@ from func.excel_utils import dedup_dataframe, resolve_shift, detect_shift, get_h
 logger = get_logger(__name__)
 
 
-def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_hidden=False):
+def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_hidden=False,
+                        skip_hidden_rows=False, skip_hidden_cols=False):
     """处理设备柴油消耗报表，提取发动机与油耗数据。
 
     Args:
         file_path: Excel 文件路径。
         target_year: 覆盖日期年份，None 时使用原始年份。
         return_sheets: 若为 True，返回 {sheet_name: DataFrame} 字典而非写入文件。
-        skip_hidden: 若为 True，跳过 Excel 中的隐藏行和隐藏列。
+        skip_hidden: 向后兼容，True 时等价于 skip_hidden_rows=True, skip_hidden_cols=True。
+        skip_hidden_rows: 若为 True，跳过 Excel 中的隐藏行。
+        skip_hidden_cols: 若为 True，跳过 Excel 中的隐藏列。
 
     Returns:
         当 return_sheets=False 时返回输出文件路径 (str)；
@@ -28,6 +31,10 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
     Raises:
         ValueError: 未找到匹配的柴油消耗 Sheet，或 Sheet 中无有效数据。
     """
+    if skip_hidden:
+        skip_hidden_rows = True
+        skip_hidden_cols = True
+    need_hidden = skip_hidden_rows or skip_hidden_cols
     with pd.ExcelFile(file_path) as xl:
         sheet_names = [s for s in xl.sheet_names if "设备柴油消耗" in s or "Техник" in s]
 
@@ -37,16 +44,20 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
         engine_data_list = []
         fuel_data_list = []
 
-        # skip_hidden 时预先加载 workbook，避免每个 sheet 重复 load_workbook
-        hidden_wb = open_workbook(file_path) if skip_hidden else None
+        # 需要检测隐藏属性时预先加载 workbook，避免每个 sheet 重复 load_workbook
+        hidden_wb = open_workbook(file_path) if need_hidden else None
         try:
             for sheet in sheet_names:
                 logger.info(f"正在处理 Sheet: {sheet}")
                 df_raw = xl.parse(sheet, header=None)
 
-                if skip_hidden:
+                if need_hidden:
                     h_rows, h_cols = get_hidden_indices(file_path, sheet, _workbook=hidden_wb)
-                    df_raw = filter_hidden_from_df(df_raw, h_rows, h_cols)
+                    df_raw = filter_hidden_from_df(
+                        df_raw,
+                        h_rows if skip_hidden_rows else set(),
+                        h_cols if skip_hidden_cols else set(),
+                    )
 
                 try:
                     start_row_idx = df_raw[df_raw.iloc[:, 0] == 1].index[0]
@@ -64,8 +75,29 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
 
                 # 备份最原始的日期行（用于判断该列是否是Excel中真实存在的日期格）
                 raw_header_date_row = header_rows.iloc[0, :].copy()
-                # 填充日期和班组长
-                header_rows.iloc[0, :] = header_rows.iloc[0, :].ffill()
+                # 填充日期（块感知 ffill，不跨越日期头边界）和班组长
+                _date_positions = []
+                for _ci in range(header_rows.shape[1]):
+                    _h2_raw = header_rows.iloc[0, _ci]
+                    if pd.notna(_h2_raw):
+                        try:
+                            pd.to_datetime(_h2_raw)
+                            _date_positions.append(_ci)
+                        except (ValueError, TypeError):
+                            pass
+                if _date_positions:
+                    # info 列区间（首个日期之前）做全局 ffill
+                    _first_date_col = _date_positions[0]
+                    header_rows.iloc[0, :_first_date_col] = header_rows.iloc[0, :_first_date_col].ffill()
+                    # 日期头之间的区间做局部 ffill（不跨越日期块边界）
+                    for _i in range(len(_date_positions) - 1):
+                        _start = _date_positions[_i]
+                        _end = _date_positions[_i + 1]
+                        header_rows.iloc[0, _start:_end] = header_rows.iloc[0, _start:_end].ffill()
+                    # 最后一个日期头之后的列
+                    header_rows.iloc[0, _date_positions[-1]:] = header_rows.iloc[0, _date_positions[-1]:].ffill()
+                else:
+                    header_rows.iloc[0, :] = header_rows.iloc[0, :].ffill()
                 header_rows.iloc[1, :] = header_rows.iloc[1, :].ffill()
                 header_rows.iloc[2, :] = header_rows.iloc[2, :].ffill()
                 # 3. 预解析班次位置
@@ -244,9 +276,15 @@ def main():
     parser = argparse.ArgumentParser(description="处理设备柴油消耗报表")
     parser.add_argument("input_file", help="输入Excel文件路径")
     parser.add_argument("--year", type=int, help="目标年份")
-    parser.add_argument("--skiphidden", action="store_true", help="跳过 Excel 中的隐藏行和隐藏列")
+    parser.add_argument("--skiphidden", action="store_true",
+                        help="跳过 Excel 中的隐藏行和隐藏列（向后兼容）")
+    parser.add_argument("--skip-hidden-rows", action="store_true", help="跳过 Excel 中的隐藏行")
+    parser.add_argument("--skip-hidden-cols", action="store_true", help="跳过 Excel 中的隐藏列")
     args = parser.parse_args()
-    process_diesel_data(args.input_file, args.year, skip_hidden=args.skiphidden)
+    process_diesel_data(args.input_file, args.year,
+                        skip_hidden=args.skiphidden,
+                        skip_hidden_rows=args.skip_hidden_rows,
+                        skip_hidden_cols=args.skip_hidden_cols)
 
 
 # 统一命名别名（L-01）
