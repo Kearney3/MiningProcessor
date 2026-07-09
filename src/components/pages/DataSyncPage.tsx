@@ -166,7 +166,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const [applyHeaderMapping, setApplyHeaderMapping] = useState(true);
   const [useEquipmentLedger, setUseEquipmentLedger] = useState(false);
   const [useOilLedger, setUseOilLedger] = useState(true);
-  const [skipHiddenRows, setSkipHiddenRows] = useState(false);
+  const [skipHiddenRows, setSkipHiddenRows] = useState(true);
   const [skipHiddenCols, setSkipHiddenCols] = useState(false);
 
   // 启动时从配置加载上次目录，不存在则清空
