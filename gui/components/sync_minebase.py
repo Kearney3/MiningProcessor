@@ -128,7 +128,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     )
     skip_hidden_rows_check = ft.Checkbox(
         label="跳过隐藏行",
-        value=False,
+        value=True,
         active_color=theme.PRIMARY,
         tooltip="勾选后，Excel 中被隐藏的行将不会被读取",
     )
