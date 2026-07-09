@@ -25,8 +25,8 @@
 |------|----------|------|------|------|
 | `excel_fuel.py` | `fuel` | 设备柴油消耗统计 | 设备柴油消耗表 | `Fuel.xlsx` |
 | `excel_electrical.py` | `electrical` | 设备电耗统计 | 含 `Electrical` 的 sheet | 电耗汇总表（可选班次列） |
-| `excel_worktime.py` | `worktime` | 工作效率统计 | 工时报表文件/文件夹 | 按年月命名的效率表 |
-| `excel_worktime_multifile.py` | `worktime-batch` | 工时批量处理 | 工时报表文件夹 | 多文件汇总 |
+| `excel_worktime.py` | `worktime` | 工作效率统计 | 工时报表文件或文件夹（自动识别） | 按年月命名的效率表 |
+| `excel_worktime_multifile.py` | — | 多文件夹工时处理（由 `worktime` 自动调用） | 按日期分子文件夹的工时报表 | 多文件汇总 |
 | `excel_production_enhanced.py` | `production` | 增强版生产报表解析（GUI 默认） | 生产报表文件/文件夹 | 生产数据汇总 |
 | `excel_merger.py` | `merge` | 按关键字批量合并同结构 Excel | 文件夹 + 关键字 | 合并后的 Excel |
 | `excel_batch.py` | — | 批量多报表综合处理 | 文件夹 | 综合统计表 |
@@ -64,7 +64,7 @@ pnpm dev:bridge
 **GUI 功能一览：**
 
 - 各类报表一键处理（电力模块可选添加班次列）
-- 跳过隐藏行/列开关（数据处理、批量处理、数据同步均支持）
+- 跳过隐藏行 / 跳过隐藏列（独立开关，数据处理、批量处理、数据同步均支持；同步模块默认开启跳过隐藏行）
 - 配置编辑（设备装载量映射、班次名称等）
 - 用户配置菜单（数据库连接、工作效率表头映射）
 - 实时日志展示
@@ -82,7 +82,7 @@ uv run fuel <输入文件> --year 2025
 uv run electrical <输入文件> --year 2025
 uv run electrical <输入文件> --year 2025 --add-shift  # 新增班次列 (Day/Night)
 
-# 工时统计
+# 工时统计（支持单文件或文件夹，自动识别）
 uv run worktime <输入文件或文件夹> --year 2025 --month 1
 
 # 生产报表（增强版）
@@ -91,8 +91,10 @@ uv run production <输入文件或文件夹>
 # 批量合并
 uv run merge <输入文件夹> <关键字> [--strip-time] [--sort '<json>']
 
-# 所有命令均支持 --skiphidden 跳过 Excel 中的隐藏行和隐藏列
-uv run fuel <输入文件> --year 2025 --skiphidden
+# 所有命令均支持跳过隐藏行/列
+uv run fuel <输入文件> --year 2025 --skip-hidden-rows           # 仅跳过隐藏行
+uv run fuel <输入文件> --year 2025 --skip-hidden-cols           # 仅跳过隐藏列
+uv run fuel <输入文件> --year 2025 --skiphidden                 # 同时跳过（向后兼容）
 ```
 
 也可使用传统 `python func/excel_*.py` 方式运行。
@@ -284,7 +286,7 @@ uv run pytest tests/test_gui_components.py -k config
 uv run pytest -v
 ```
 
-**测试覆盖范围（37 个测试文件）：**
+**测试覆盖范围（38 个测试文件）：**
 
 | 测试文件 | 覆盖内容 |
 |----------|----------|
@@ -351,8 +353,12 @@ uv run flet build windows # Windows
 
 ### v1.1.0 · 2026-07-03
 
-- ✨ 跳过隐藏行/列功能（`--skiphidden` CLI 参数 + GUI/Tauri 全局开关）
+- ✨ 跳过隐藏行 / 跳过隐藏列独立开关（`--skip-hidden-rows` / `--skip-hidden-cols`，`--skiphidden` 向后兼容）
 - 支持所有处理模块：油耗、电耗、工时、生产、合并、批量处理、数据同步
+- 数据同步模块默认开启「跳过隐藏行」
+- 柴油报表隐藏日期列场景：块感知日期 ffill，避免隐藏列移除后数据丢失
+- 工时模块支持文件/文件夹自动识别（GUI 输入框可直接粘贴文件夹路径）
+- `excel_worktime_multifile.py` 重构：对齐 `excel_worktime.py` 接口，支持隐藏行列、表头映射、return_sheets
 - 智能表头检测：隐藏行移除后自动修正行号/列号偏移
 - 新增 `get_hidden_indices()` / `filter_hidden_from_df()` / `adjust_index_for_hidden()` 工具函数
 - 新增 16 个单元测试（`test_hidden_rows.py`），总计 747 个测试用例
