@@ -93,7 +93,10 @@ function PathInputDual({
   defaultPath?: string;
   onFileSelected?: (path: string) => void;
 }) {
+  const [openMenu, setOpenMenu] = useState(false);
+
   const browseFile = async () => {
+    setOpenMenu(false);
     const selected = await open({
       directory: false,
       multiple: false,
@@ -108,6 +111,7 @@ function PathInputDual({
   };
 
   const browseFolder = async () => {
+    setOpenMenu(false);
     const selected = await open({ directory: true, multiple: false, defaultPath });
     if (selected) {
       const p = selected as string;
@@ -125,14 +129,25 @@ function PathInputDual({
         placeholder={placeholder}
         className={`${inputClass} flex-1 ${value === "" ? "border-amber-300 bg-amber-50/30" : ""}`}
       />
-      <button onClick={browseFile} className={btnSecondaryClass} title="选择文件">
-        <FileIcon />
-        <span>选文件</span>
-      </button>
-      <button onClick={browseFolder} className={btnSecondaryClass} title="选择文件夹">
-        <FolderIcon />
-        <span>选文件夹</span>
-      </button>
+      <div className="relative">
+        <button onClick={() => setOpenMenu(!openMenu)} className={btnSecondaryClass} title="浏览">
+          <FolderIcon />
+          <ChevronDownIcon />
+        </button>
+        {openMenu && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setOpenMenu(false)} />
+            <div className="absolute right-0 top-full mt-1 z-20 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[120px]">
+              <button onClick={browseFile} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
+                <FileIcon /> 选文件
+              </button>
+              <button onClick={browseFolder} className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-2">
+                <FolderIcon /> 选文件夹
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
