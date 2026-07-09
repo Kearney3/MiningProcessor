@@ -99,7 +99,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     # --- Work time ---
     work_path = ft.TextField(
         label="工时数据处理",
-        hint_text="输入路径或点击浏览选择文件，也可直接输入文件夹路径...",
+        hint_text="输入路径或点击按钮选择...",
         expand=2,
         read_only=False,
         color=theme.TEXT_PRIMARY,

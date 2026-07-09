@@ -116,7 +116,7 @@ function PathInputDual({
         placeholder={placeholder}
         className={`${inputClass} flex-1 ${value === "" ? "border-amber-300 bg-amber-50/30" : ""}`}
       />
-      <button onClick={browseFile} className={btnSecondaryClass} title="选择文件（也可直接输入文件夹路径）">
+      <button onClick={browseFile} className={btnSecondaryClass} title="输入路径或点击按钮选择">
         <FolderIcon />
       </button>
     </div>
@@ -420,7 +420,7 @@ function ProductionCard({
       <PathInputDual
         value={path}
         onChange={setPath}
-        placeholder="选择文件或文件夹"
+        placeholder="选择 Excel 文件或文件夹"
         defaultPath={defaultPath}
         onFileSelected={onFileSelected}
       />
