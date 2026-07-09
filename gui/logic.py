@@ -149,6 +149,11 @@ def _get_output_file(module_type: str, path: str, **kwargs) -> str | None:
 
     year = kwargs.get("year", datetime.now().year)
     month = kwargs.get("month", 1)
+
+    # 工时文件夹模式：输出文件名不同
+    if module_type == "worktime" and os.path.isdir(path):
+        return os.path.join(path, f"{year}{month:02d}_多文件合并_工作效率表.xlsx")
+
     filename = get_output_filename(module_type, year=year, month=month)
     if not filename:
         return None
@@ -188,11 +193,18 @@ def _dispatch_module(module_type: str, path: str, **kwargs) -> object | None:
         year = kwargs.get("year", datetime.now().year)
         month = kwargs.get("month", 1)
         header_mapping = kwargs.get("header_mapping", None)
-        file_dir = os.path.dirname(path) or "."
-        output_file = os.path.join(file_dir, f"{year}{month:02d}_工作效率表.xlsx")
-        return process_worktime_data(path, year, month, output_file,
-                                  return_sheets=True, header_mapping=header_mapping,
-                                  skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols)
+        if os.path.isdir(path):
+            from func.excel_worktime_multifile import process_directory
+            output_file = os.path.join(path, f"{year}{month:02d}_多文件合并_工作效率表.xlsx")
+            return process_directory(path, year, month, output_file,
+                                    return_sheets=True, header_mapping=header_mapping,
+                                    skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols)
+        else:
+            file_dir = os.path.dirname(path) or "."
+            output_file = os.path.join(file_dir, f"{year}{month:02d}_工作效率表.xlsx")
+            return process_worktime_data(path, year, month, output_file,
+                                      return_sheets=True, header_mapping=header_mapping,
+                                      skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols)
     elif module_type == "merge":
         keyword = kwargs.get("keyword", "")
         strip_time = kwargs.get("strip_time", False)

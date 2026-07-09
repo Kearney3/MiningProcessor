@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import secrets
 import sys
 import threading
@@ -319,18 +320,31 @@ def _process_worktime(params: dict) -> dict:
 
     year, month = params["year"], params["month"]
     safe_path = str(_sanitize_path(params["path"], must_exist=True))
-    output_file = str(Path(safe_path).parent / f"{year}{month:02d}_工作效率表.xlsx")
-    process_excel_data(
-        safe_path,
-        year=year,
-        month=month,
-        output_file=output_file,
-        return_sheets=False,
-        header_mapping=header_mapping,
-        skip_hidden=params.get("skip_hidden", False),
-        skip_hidden_rows=params.get("skip_hidden_rows", False),
-        skip_hidden_cols=params.get("skip_hidden_cols", False),
-    )
+
+    if os.path.isdir(safe_path):
+        from func.excel_worktime_multifile import process_directory
+        output_file = str(Path(safe_path) / f"{year}{month:02d}_多文件合并_工作效率表.xlsx")
+        process_directory(
+            safe_path, year, month,
+            output_file=output_file,
+            header_mapping=header_mapping,
+            skip_hidden=params.get("skip_hidden", False),
+            skip_hidden_rows=params.get("skip_hidden_rows", False),
+            skip_hidden_cols=params.get("skip_hidden_cols", False),
+        )
+    else:
+        output_file = str(Path(safe_path).parent / f"{year}{month:02d}_工作效率表.xlsx")
+        process_excel_data(
+            safe_path,
+            year=year,
+            month=month,
+            output_file=output_file,
+            return_sheets=False,
+            header_mapping=header_mapping,
+            skip_hidden=params.get("skip_hidden", False),
+            skip_hidden_rows=params.get("skip_hidden_rows", False),
+            skip_hidden_cols=params.get("skip_hidden_cols", False),
+        )
     _post_process_ledger(
         output_file,
         use_equipment_ledger=params.get("use_equipment_ledger", False),

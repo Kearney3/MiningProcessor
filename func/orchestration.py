@@ -279,14 +279,24 @@ def process_single(
         )
 
     elif module_type == "worktime":
-        from func.excel_worktime import process_excel_data
-        return process_excel_data(
-            path, effective_year, month,
-            return_sheets=True,
-            header_mapping=header_mapping,
-            skip_hidden_rows=skip_hidden_rows,
-            skip_hidden_cols=skip_hidden_cols,
-        )
+        if os.path.isdir(path):
+            from func.excel_worktime_multifile import process_directory
+            return process_directory(
+                path, effective_year, month,
+                return_sheets=True,
+                header_mapping=header_mapping,
+                skip_hidden_rows=skip_hidden_rows,
+                skip_hidden_cols=skip_hidden_cols,
+            )
+        else:
+            from func.excel_worktime import process_excel_data
+            return process_excel_data(
+                path, effective_year, month,
+                return_sheets=True,
+                header_mapping=header_mapping,
+                skip_hidden_rows=skip_hidden_rows,
+                skip_hidden_cols=skip_hidden_cols,
+            )
 
     elif module_type == "merge":
         from func.excel_merger import merge_excel_files
