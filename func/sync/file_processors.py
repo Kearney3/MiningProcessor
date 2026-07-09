@@ -329,39 +329,6 @@ def _process_work_efficiency_file(
             return _apply_hdr_map(df, hdr)
         return df
 
-    # 文件夹路径：使用多文件夹处理器
-    if file_path.is_dir():
-        from func.excel_worktime_multifile import process_directory
-
-        def _dir_extractor(sheets):
-            if not sheets:
-                return None
-            df = sheets.get("工时数据")
-            if df is None or df.empty:
-                return None
-            if apply_header_mapping:
-                from func.config_loader import get_worktime_header_mapping
-                hdr = get_worktime_header_mapping()
-                if hdr and hdr.get("entries"):
-                    from func.excel_utils import apply_header_mapping as _apply_hdr_map
-                    df = _apply_hdr_map(df, hdr)
-            return df
-
-        result = process_file_generic(
-            file_path,
-            processor_fn=lambda p, **kw: process_directory(p, year or 2025, month or 1, **kw),
-            sheet_extractor=_dir_extractor,
-            row_mapper=_map_and_log,
-            module_type="work_efficiency",
-            empty_result=[],
-            return_sheets=True,
-            skip_hidden=skip_hidden,
-            skip_hidden_rows=skip_hidden_rows,
-            skip_hidden_cols=skip_hidden_cols,
-        )
-        if result:
-            return result
-
     # 优先用工时处理器（需要 year/month）
     if year and month:
         from func.excel_worktime import process_excel_data
@@ -479,41 +446,6 @@ def read_and_map_excel(
 # ---------------------------------------------------------------------------
 # 文件发现
 # ---------------------------------------------------------------------------
-# 多文件夹工时目录检测
-# ---------------------------------------------------------------------------
-
-_MULTIFILE_KEYWORDS = ("Tsag", "工作效率", "Цаг")
-
-
-def _detect_multifile_dir(base_dir: Path) -> Path | None:
-    """检测 base_dir 是否为多文件夹工时目录结构。
-
-    判断条件：
-    1. base_dir 下存在以数字开头的子文件夹
-    2. 该子文件夹内存在文件名含工时关键字的 Excel 文件
-
-    Returns:
-        匹配的目录 Path，未检测到返回 None。
-    """
-    try:
-        entries = list(base_dir.iterdir())
-    except OSError:
-        return None
-
-    for entry in entries:
-        if not entry.is_dir():
-            continue
-        # 文件夹名以数字开头
-        import re
-        if not re.match(r"^\d+", entry.name):
-            continue
-        # 检查子文件夹中是否有工时 Excel 文件
-        for f in entry.iterdir():
-            if f.suffix.lower() not in (".xlsx", ".xls") or f.name.startswith("~$"):
-                continue
-            if any(kw in f.name for kw in _MULTIFILE_KEYWORDS):
-                return base_dir
-    return None
 
 
 def discover_files(
@@ -581,14 +513,7 @@ def discover_files(
             found["work_efficiency"] = [matches[0]]
             logger.info("Glob 匹配: work_efficiency → %s", matches[0].name)
 
-    # 3. 多文件夹工时目录检测：含数字开头子文件夹 + 工时 Excel 文件
-    if "work_efficiency" not in found:
-        multifile_dir = _detect_multifile_dir(input_dir)
-        if multifile_dir:
-            found["work_efficiency"] = [multifile_dir]
-            logger.info("多文件夹匹配: work_efficiency → %s", multifile_dir.name)
-
-    # 4. 关键字回退: 仅对尚未找到的类型使用关键字匹配（收集所有匹配文件）
+    # 3. 关键字回退: 仅对尚未找到的类型使用关键字匹配（收集所有匹配文件）
     kw_type_map = {
         "fuel": "fuel",
         "electrical": "electrical",
