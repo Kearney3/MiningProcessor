@@ -99,10 +99,14 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     # --- Work time ---
     work_path = ft.TextField(
         label="工时数据处理",
-        hint_text="输入路径或点击按钮选择文件/文件夹...",
+        hint_text="输入路径或点击浏览选择文件，也可直接输入文件夹路径...",
         expand=2,
         read_only=False,
         color=theme.TEXT_PRIMARY,
+        suffix=ft.IconButton(
+            icon=ft.Icons.FOLDER_OPEN,
+            tooltip="浏览",
+        ),
     )
     work_year = ft.Dropdown(
         label="年份",
@@ -279,13 +283,8 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         log_fn=lambda msg: _log_message(page.logger.error, msg),
     )
     on_work_browse = make_browse_handler(
-        _work_picker, work_path, work_btn, "选择工时数据文件",
+        _work_picker, work_path, work_btn, "选择工时数据文件或文件夹",
         extensions=["xlsx", "xls"],
-        log_fn=lambda msg: _log_message(page.logger.error, msg),
-    )
-    on_work_folder_browse = make_browse_handler(
-        _work_picker, work_path, work_btn, "选择工时数据文件夹",
-        mode="folder",
         log_fn=lambda msg: _log_message(page.logger.error, msg),
     )
     on_merge_browse = make_browse_handler(
@@ -299,17 +298,8 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     prod_file_btn.on_click = on_prod_pick_file
     prod_folder_btn.on_click = on_prod_pick_folder
     elec_path.suffix.on_click = on_elec_browse
+    work_path.suffix.on_click = on_work_browse
     merge_path.suffix.on_click = on_merge_browse
-
-    # 工时浏览按钮：单个下拉菜单，支持选文件或选文件夹
-    work_browse_menu = ft.PopupMenuButton(
-        icon=ft.Icons.FOLDER_OPEN,
-        tooltip="浏览",
-        items=[
-            ft.PopupMenuItem(content=ft.Text("选文件"), icon=ft.Icons.UPLOAD_FILE, on_click=on_work_browse),
-            ft.PopupMenuItem(content=ft.Text("选文件夹"), icon=ft.Icons.FOLDER_OPEN, on_click=on_work_folder_browse),
-        ],
-    )
 
     # --- 台账匹配开关（设备 / 油品 独立控制） ---
     match_eq_toggle = ft.Checkbox(
@@ -367,7 +357,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                     ft.Row([elec_path, elec_year, elec_add_shift, elec_default_shift, elec_btn], spacing=8),
                 ]),
                 theme.module_card([
-                    ft.Row([work_path, work_browse_menu, work_year, work_month, work_btn], spacing=6),
+                    ft.Row([work_path, work_year, work_month, work_btn], spacing=6),
                     ft.Row(
                         [_work_hmc.toggle, _work_hmc.mode.row, _work_hmc.fuzzy],
                         spacing=theme.SPACING_SM,
