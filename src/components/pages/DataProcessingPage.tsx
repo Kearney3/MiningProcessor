@@ -624,7 +624,7 @@ function WorktimeCard({
 
   return (
     <ModuleCard title="工时处理" icon={<WorktimeIcon />}>
-      <PathInput value={path} onChange={setPath} placeholder="选择 Excel 文件" defaultPath={defaultPath} onFileSelected={onFileSelected} />
+      <PathInputDual value={path} onChange={setPath} placeholder="选择 Excel 文件或文件夹" defaultPath={defaultPath} onFileSelected={onFileSelected} />
       {path === "" && <PathWarning />}
       <div className="mt-2 grid grid-cols-2 gap-2">
         <StyledSelect

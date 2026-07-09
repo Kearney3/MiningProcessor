@@ -99,14 +99,10 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     # --- Work time ---
     work_path = ft.TextField(
         label="工时数据处理",
-        hint_text="输入路径或点击按钮选择...",
+        hint_text="输入路径或点击按钮选择文件/文件夹...",
         expand=2,
         read_only=False,
         color=theme.TEXT_PRIMARY,
-        suffix=ft.IconButton(
-            icon=ft.Icons.FOLDER_OPEN,
-            tooltip="浏览",
-        ),
     )
     work_year = ft.Dropdown(
         label="年份",
@@ -126,6 +122,8 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     )
 
     work_btn = theme.primary_btn("处理", icon=ft.Icons.PLAY_ARROW, disabled=False)
+    work_file_btn = theme.secondary_btn("选文件", icon=ft.Icons.UPLOAD_FILE)
+    work_folder_btn = theme.secondary_btn("选文件夹", icon=ft.Icons.FOLDER_OPEN)
 
     # --- Excel Merger ---
     merge_path = ft.TextField(
@@ -256,10 +254,11 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     _prod_folder_picker = ft.FilePicker()
     _elec_picker = ft.FilePicker()
     _work_picker = ft.FilePicker()
+    _work_folder_picker = ft.FilePicker()
     _merge_picker = ft.FilePicker()
     page.services.extend([
         _fuel_picker, _prod_file_picker, _prod_folder_picker,
-        _elec_picker, _work_picker, _merge_picker,
+        _elec_picker, _work_picker, _work_folder_picker, _merge_picker,
     ])
 
     on_fuel_browse = make_browse_handler(
@@ -287,6 +286,11 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         extensions=["xlsx", "xls"],
         log_fn=lambda msg: _log_message(page.logger.error, msg),
     )
+    on_work_folder_browse = make_browse_handler(
+        _work_folder_picker, work_path, work_btn, "选择工时数据文件夹",
+        mode="folder",
+        log_fn=lambda msg: _log_message(page.logger.error, msg),
+    )
     on_merge_browse = make_browse_handler(
         _merge_picker, merge_path, merge_btn, "选择包含 Excel 文件的文件夹",
         mode="folder",
@@ -298,7 +302,8 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     prod_file_btn.on_click = on_prod_pick_file
     prod_folder_btn.on_click = on_prod_pick_folder
     elec_path.suffix.on_click = on_elec_browse
-    work_path.suffix.on_click = on_work_browse
+    work_file_btn.on_click = on_work_browse
+    work_folder_btn.on_click = on_work_folder_browse
     merge_path.suffix.on_click = on_merge_browse
 
     # --- 台账匹配开关（设备 / 油品 独立控制） ---
@@ -357,7 +362,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                     ft.Row([elec_path, elec_year, elec_add_shift, elec_default_shift, elec_btn], spacing=8),
                 ]),
                 theme.module_card([
-                    ft.Row([work_path, work_year, work_month, work_btn], spacing=6),
+                    ft.Row([work_path, work_file_btn, work_folder_btn, work_year, work_month, work_btn], spacing=6),
                     ft.Row(
                         [_work_hmc.toggle, _work_hmc.mode.row, _work_hmc.fuzzy],
                         spacing=theme.SPACING_SM,
