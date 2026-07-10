@@ -886,7 +886,7 @@ function MaintenanceCard({
 
   return (
     <ModuleCard title="维修记录处理" icon={<MaintenanceIcon />}>
-      <PathInput value={path} onChange={setPath} placeholder="选择出勤统计表文件或文件夹" defaultPath={defaultPath} onFileSelected={onFileSelected} />
+      <PathInputDual value={path} onChange={setPath} placeholder="选择出勤统计表文件或文件夹" defaultPath={defaultPath} onFileSelected={onFileSelected} />
       {path === "" && <PathWarning />}
       <div className="mt-2">
         <StyledToggle checked={splitByYear} onChange={setSplitByYear} label="按年份拆分输出" />

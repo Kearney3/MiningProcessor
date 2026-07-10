@@ -257,11 +257,9 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         expand=2,
         read_only=False,
         color=theme.TEXT_PRIMARY,
-        suffix=ft.IconButton(
-            icon=ft.Icons.FOLDER_OPEN,
-            tooltip="浏览",
-        ),
     )
+    maint_file_btn = theme.secondary_btn("选文件", icon=ft.Icons.UPLOAD_FILE)
+    maint_folder_btn = theme.secondary_btn("选文件夹", icon=ft.Icons.FOLDER_OPEN)
     maint_btn = theme.primary_btn("处理", icon=ft.Icons.PLAY_ARROW, disabled=False)
     maint_split_year = ft.Checkbox(
         label="按年份拆分输出",
@@ -276,10 +274,12 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     _elec_picker = ft.FilePicker()
     _work_picker = ft.FilePicker()
     _merge_picker = ft.FilePicker()
-    _maint_picker = ft.FilePicker()
+    _maint_file_picker = ft.FilePicker()
+    _maint_folder_picker = ft.FilePicker()
     page.services.extend([
         _fuel_picker, _prod_file_picker, _prod_folder_picker,
-        _elec_picker, _work_picker, _merge_picker, _maint_picker,
+        _elec_picker, _work_picker, _merge_picker,
+        _maint_file_picker, _maint_folder_picker,
     ])
 
     on_fuel_browse = make_browse_handler(
@@ -312,9 +312,14 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         mode="folder",
         log_fn=lambda msg: _log_message(page.logger.error, msg),
     )
-    on_maint_browse = make_browse_handler(
-        _maint_picker, maint_path, maint_btn, "选择出勤统计表文件或文件夹",
+    on_maint_pick_file = make_browse_handler(
+        _maint_file_picker, maint_path, maint_btn, "选择出勤统计表文件",
         extensions=["xlsx", "xls"],
+        log_fn=lambda msg: _log_message(page.logger.error, msg),
+    )
+    on_maint_pick_folder = make_browse_handler(
+        _maint_folder_picker, maint_path, maint_btn, "选择出勤统计表文件夹",
+        mode="folder",
         log_fn=lambda msg: _log_message(page.logger.error, msg),
     )
 
@@ -325,7 +330,8 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     elec_path.suffix.on_click = on_elec_browse
     work_path.suffix.on_click = on_work_browse
     merge_path.suffix.on_click = on_merge_browse
-    maint_path.suffix.on_click = on_maint_browse
+    maint_file_btn.on_click = on_maint_pick_file
+    maint_folder_btn.on_click = on_maint_pick_folder
 
     # --- 台账匹配开关（设备 / 油品 独立控制） ---
     match_eq_toggle = ft.Checkbox(
@@ -400,7 +406,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                 ], spacing=4),
                 theme.module_card([
                     ft.Row([maint_path, maint_btn], spacing=8),
-                    ft.Row([maint_split_year], spacing=8),
+                    ft.Row([maint_file_btn, maint_folder_btn, maint_split_year], spacing=8),
                 ]),
                 ft.Row([match_eq_toggle, match_oil_toggle, skip_hidden_rows_toggle, skip_hidden_cols_toggle], spacing=8),
             ],
