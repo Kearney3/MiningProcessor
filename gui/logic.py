@@ -230,14 +230,15 @@ def _dispatch_module(module_type: str, path: str, **kwargs) -> object | None:
 
 def _execute_task(module_type: str, path: str, **kwargs) -> str | None:
     """在后台线程中执行处理任务，返回错误信息或 None"""
-    equipment_ledger = kwargs.pop("equipment_ledger", None)
-    oil_ledger = kwargs.pop("oil_ledger", None)
-
     try:
         worktime_sheets = _dispatch_module(module_type, path, **kwargs)
     except Exception:
         logger.exception("Task execution failed: module=%s path=%s", module_type, path)
         return traceback.format_exc()
+
+    # dispatch 完成后才 pop，确保维护模块等内部需要台账的模块能正常读取
+    equipment_ledger = kwargs.pop("equipment_ledger", None)
+    oil_ledger = kwargs.pop("oil_ledger", None)
 
     if not (equipment_ledger or oil_ledger):
         return None
