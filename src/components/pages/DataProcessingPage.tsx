@@ -2,7 +2,7 @@ import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
-import { ChevronDownIcon, PlayIcon, FolderIcon, FileIcon, PlusIcon, TrashIcon, CheckCircleIcon, XCircleIcon, AlertTriangleIcon, FuelIcon, ProductionIcon, ElectricalIcon, WorktimeIcon, MergeIcon } from "../../lib/icons";
+import { ChevronDownIcon, PlayIcon, FolderIcon, FileIcon, PlusIcon, TrashIcon, CheckCircleIcon, XCircleIcon, AlertTriangleIcon, FuelIcon, ProductionIcon, ElectricalIcon, WorktimeIcon, MergeIcon, MaintenanceIcon } from "../../lib/icons";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { useLastDirectory } from "../../hooks/useLastDirectory";
 
@@ -835,6 +835,67 @@ function MergeCard({
 }
 
 // ═══════════════════════════════════════
+// Maintenance record processing
+// ═══════════════════════════════════════
+function MaintenanceCard({
+  bridge,
+  useEquipmentLedger,
+  skipHiddenRows,
+  defaultPath,
+  onFileSelected,
+}: {
+  bridge: BridgeProp;
+  useEquipmentLedger: boolean;
+  skipHiddenRows: boolean;
+  defaultPath?: string;
+  onFileSelected?: (path: string) => void;
+}) {
+  const { notify } = useToast();
+  const [path, setPath] = useState("");
+  const [splitByYear, setSplitByYear] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleProcess = async () => {
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await bridge.call<{ output_file?: string; output_files?: string[] }>("process_maintenance", {
+        path,
+        use_equipment_ledger: useEquipmentLedger,
+        skip_hidden_rows: skipHiddenRows,
+        split_by_year: splitByYear,
+      });
+      const msg = res.output_files
+        ? `输出: ${res.output_files.length} 个文件`
+        : res.output_file ? `输出: ${res.output_file}` : "处理完成";
+      setResult(msg);
+      notify("维修记录处理完成", "success");
+    } catch (e) {
+      setError(String(e));
+      notify(`维修记录处理失败: ${e}`, "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <ModuleCard title="维修记录处理" icon={<MaintenanceIcon />}>
+      <PathInput value={path} onChange={setPath} placeholder="选择出勤统计表文件或文件夹" defaultPath={defaultPath} onFileSelected={onFileSelected} />
+      {path === "" && <PathWarning />}
+      <div className="mt-2">
+        <StyledToggle checked={splitByYear} onChange={setSplitByYear} label="按年份拆分输出" />
+      </div>
+      <ProcessButton loading={loading} onClick={handleProcess} disabled={path === ""} />
+      {result && <SuccessBadge message={result} />}
+      {error && <ErrorBadge message={error} />}
+    </ModuleCard>
+  );
+}
+
+// ═══════════════════════════════════════
 // Data processing page
 // ═══════════════════════════════════════
 export function DataProcessingPage({ bridge }: { bridge: BridgeProp }) {
@@ -881,6 +942,7 @@ export function DataProcessingPage({ bridge }: { bridge: BridgeProp }) {
         <ElectricalCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
         <WorktimeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
         <MergeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
+        <MaintenanceCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} skipHiddenRows={skipHiddenRows} defaultPath={initialDir} onFileSelected={saveDir} />
       </div>
     </div>
   );

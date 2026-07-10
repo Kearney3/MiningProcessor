@@ -46,7 +46,7 @@ class TestGetOutputFilename:
         assert get_output_filename("unknown") is None
 
     def test_module_output_files_contains_expected_keys(self):
-        assert set(MODULE_OUTPUT_FILES.keys()) == {"fuel", "electrical", "production"}
+        assert set(MODULE_OUTPUT_FILES.keys()) == {"fuel", "electrical", "production", "maintenance"}
 
 
 # ---------------------------------------------------------------------------

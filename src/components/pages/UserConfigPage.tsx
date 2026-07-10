@@ -7,6 +7,7 @@ interface FileKeywords {
   electrical: string[];
   production: string[];
   worktime: string[];
+  maintenance: string[];
 }
 
 interface HeaderMappingEntry {
@@ -46,6 +47,7 @@ const DEFAULT_FILE_KEYWORDS: FileKeywords = {
   electrical: ["Цахилгааны хэлтэс"],
   production: ["白班", "夜班"],
   worktime: ["工作效率表"],
+  maintenance: ["设备出勤统计表"],
 };
 
 const DEFAULT_HEADER_MAPPING: HeaderMappingConfig = {
@@ -321,6 +323,7 @@ function FileKeywordsSection({ bridge }: { bridge: BridgeProp }) {
           electrical: raw.electrical ?? DEFAULT_FILE_KEYWORDS.electrical,
           production: raw.production ?? DEFAULT_FILE_KEYWORDS.production,
           worktime: raw.worktime ?? DEFAULT_FILE_KEYWORDS.worktime,
+          maintenance: raw.maintenance ?? DEFAULT_FILE_KEYWORDS.maintenance,
         });
       } else {
         setKeywords({ ...DEFAULT_FILE_KEYWORDS });
@@ -366,6 +369,7 @@ function FileKeywordsSection({ bridge }: { bridge: BridgeProp }) {
     { key: "electrical", label: "电力关键字", hint: "例如: Electrical, Цахилгааны хэлтэс" },
     { key: "production", label: "生产关键字", hint: "例如: 白班, 夜班" },
     { key: "worktime", label: "工时关键字", hint: "例如: 工作效率表, 工时" },
+    { key: "maintenance", label: "维修关键字", hint: "例如: 设备出勤统计表" },
   ];
 
   return (

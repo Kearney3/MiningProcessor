@@ -17,6 +17,7 @@ from func.excel_electrical import parse_excel_data as process_electrical_data
 from func.excel_worktime import process_excel_data as process_worktime_data
 from func.excel_merger import merge_excel_files
 from func.excel_batch import scan_files, process_files, MODULE_LABELS
+from func.excel_maintenance import process_maintenance_data
 from func.sync_to_minebase import sync as sync_to_minebase
 from func.sync_to_minebase import test_db_connection
 from func.sync_to_minebase import test_api_connection
@@ -40,6 +41,7 @@ _LOADING_STYLE = ft.ButtonStyle(bgcolor="#CBD5E1", color="#64748B")
 _MODULE_LABELS = {
     **MODULE_LABELS,
     "merge": "文件合并",
+    "maint": "维修记录",
     "batch": "批量处理",
 }
 
@@ -211,6 +213,16 @@ def _dispatch_module(module_type: str, path: str, **kwargs) -> object | None:
         sort_configs = kwargs.get("sort_configs", None)
         merge_excel_files(path, keyword, strip_time=strip_time, sort_configs=sort_configs,
                           skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols)
+    elif module_type == "maint":
+        eq_ledger = kwargs.get("equipment_ledger")
+        classifications = config_loader.get_maintenance_classifications()
+        process_maintenance_data(
+            path,
+            eq_ledger=eq_ledger,
+            classifications=classifications,
+            skip_hidden_rows=skip_hidden_rows,
+            split_by_year=kwargs.get("split_by_year", False),
+        )
     # batch 模块由 _execute_batch_task 单独处理
     return None
 
@@ -393,6 +405,20 @@ async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledge
                          keyword=keyword, strip_time=strip_time, sort_configs=sort_configs,
                          equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols)
+
+
+async def on_maint_process(page: ft.Page, maint_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False) -> None:
+    """维修记录处理按钮回调"""
+    btn = maint_refs["btn"]
+    path = maint_refs["path"].value
+    if not path:
+        _log_message(log, "请先选择出勤统计表文件或文件夹", level=logging.WARNING)
+        return
+    split_by_year = bool(maint_refs.get("split_year") and maint_refs["split_year"].value)
+    await _safe_run_task(page, btn, "处理", path, log, "maint",
+                         equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
+                         skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
+                         split_by_year=split_by_year)
 
 
 def _set_controls_visible(controls: list, visible: bool):
@@ -739,6 +765,7 @@ def wire_processing_buttons(
         ("elec", on_elec_process),
         ("work", on_work_process),
         ("merge", on_merge_process),
+        ("maint", on_maint_process),
     ]
 
     for key, callback in _MODULE_CALLBACKS:

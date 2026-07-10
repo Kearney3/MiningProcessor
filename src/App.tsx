@@ -12,6 +12,7 @@ import { LedgerMatchPage } from "./components/pages/LedgerMatchPage";
 import { EquipmentLedgerPage } from "./components/pages/EquipmentLedgerPage";
 import { OilLedgerPage } from "./components/pages/OilLedgerPage";
 import { LoadConfigPage } from "./components/pages/LoadConfigPage";
+import { MaintConfigPage } from "./components/pages/MaintConfigPage";
 import { UserConfigPage } from "./components/pages/UserConfigPage";
 
 function App() {
@@ -84,6 +85,9 @@ function App() {
           </div>
           <div style={{ display: currentPage === "load-config" ? "block" : "none" }}>
             <LoadConfigPage bridge={bridge} />
+          </div>
+          <div style={{ display: currentPage === "maint-config" ? "block" : "none" }}>
+            <MaintConfigPage bridge={bridge} />
           </div>
           <div style={{ display: currentPage === "user-config" ? "block" : "none" }}>
             <UserConfigPage bridge={bridge} />
