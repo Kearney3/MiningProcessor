@@ -198,7 +198,7 @@ def build_sheets(
         lambda: {"count": 0, "minutes": 0, "model": ""}
     )
     dev_major_minutes: dict[str, int] = defaultdict(int)
-    total_fault_minutes = 0
+    dev_total_minutes: dict[str, int] = defaultdict(int)
     for rec in fault_records:
         key = (rec["标准设备名称"], rec["大类"], rec["小类"])
         ds = dev_sub_stats[key]
@@ -207,7 +207,7 @@ def build_sheets(
         mins = _safe_minutes(rec["工时_分钟"])
         ds["minutes"] += mins
         dev_major_minutes[rec["标准设备名称"] + "|" + rec["大类"]] += mins
-        total_fault_minutes += mins
+        dev_total_minutes[rec["标准设备名称"]] += mins
 
     # 每台设备的有效记录天数
     dev_record_days: dict[str, set] = defaultdict(set)
@@ -220,6 +220,7 @@ def build_sheets(
         min_d, max_d = _device_date_range(device_dates, v)
         total_days = _total_span_days(min_d, max_d)
         major_mins = dev_major_minutes.get(f"{v}|{major}", 1)
+        dev_mins = dev_total_minutes.get(v, 1)
         row = {
             "标准设备名称": v,
             "设备型号": ds["model"],
@@ -230,7 +231,7 @@ def build_sheets(
             "总故障小时": round(ds["minutes"] / 60, 1),
             "故障率": _fault_rate(ds["minutes"], min_d, max_d),
             "小类故障占比": ds["minutes"] / major_mins if major_mins else 0,
-            "大类故障占比": ds["minutes"] / total_fault_minutes if total_fault_minutes else 0,
+            "大类故障占比": ds["minutes"] / dev_mins if dev_mins else 0,
         }
         sheet4_rows.append(row)
     sheets["全周期设备故障汇总"] = pd.DataFrame(sheet4_rows)
@@ -324,12 +325,11 @@ def build_sheets(
     sheets["全周期设备型号故障统计"] = pd.DataFrame(sheet6_rows)
 
     # ── Sheet 7: 全周期设备故障汇总（型号×大类×小类）──
-    # 注意：Sheet 4 和 Sheet 7 中文名相同但内容不同
     model_sub_stats: dict[tuple, dict] = defaultdict(
         lambda: {"count": 0, "minutes": 0, "devices": set()}
     )
     model_major_minutes: dict[str, int] = defaultdict(int)
-    total_fault_minutes_all = 0
+    model_total_minutes: dict[str, int] = defaultdict(int)
     for rec in fault_records:
         key = (rec["设备型号"], rec["大类"], rec["小类"])
         ms = model_sub_stats[key]
@@ -338,7 +338,7 @@ def build_sheets(
         ms["minutes"] += mins
         ms["devices"].add(rec["标准设备名称"])
         model_major_minutes[rec["设备型号"] + "|" + rec["大类"]] += mins
-        total_fault_minutes_all += mins
+        model_total_minutes[rec["设备型号"]] += mins
 
     sheet7_rows = []
     for (model, major, minor), ms in sorted(model_sub_stats.items(), key=lambda x: (x[0][0], x[0][1], -x[1]["minutes"])):
@@ -347,19 +347,20 @@ def build_sheets(
             for v in ms["devices"]
         )
         major_mins = model_major_minutes.get(f"{model}|{major}", 1)
+        mod_mins = model_total_minutes.get(model, 1)
         rate = ms["minutes"] / (model_total_days * 24 * 60) if model_total_days else 0
         sheet7_rows.append({
             "设备型号": model,
             "有效台数": len(ms["devices"]),
             "总记录天数": model_total_days,
-            "总故障天数": 0,  # 型号级别较难精算，后续完善
+            "总故障天数": 0,
             "大类": major,
             "小类": minor,
             "总故障分钟": ms["minutes"],
             "总故障小时": round(ms["minutes"] / 60, 1),
             "故障率": rate,
             "小类故障占比": ms["minutes"] / major_mins if major_mins else 0,
-            "大类故障占比": ms["minutes"] / total_fault_minutes_all if total_fault_minutes_all else 0,
+            "大类故障占比": ms["minutes"] / mod_mins if mod_mins else 0,
         })
     sheets["全周期设备故障汇总(型号)"] = pd.DataFrame(sheet7_rows)
 
@@ -368,7 +369,7 @@ def build_sheets(
         lambda: {"count": 0, "minutes": 0}
     )
     month_major_minutes: dict[tuple, int] = defaultdict(int)
-    total_minutes_all = 0
+    month_total_minutes: dict[str, int] = defaultdict(int)
     for rec in fault_records:
         if not rec["日期"]:
             continue
@@ -379,11 +380,12 @@ def build_sheets(
         ts["count"] += 1
         ts["minutes"] += mins
         month_major_minutes[(mk, rec["大类"])] += mins
-        total_minutes_all += mins
+        month_total_minutes[mk] += mins
 
     sheet8_rows = []
     for (mk, major, minor), ts in sorted(type_stats.items(), key=lambda x: (x[0][0], x[0][1], -x[1]["minutes"])):
         major_mins = month_major_minutes.get((mk, major), 1)
+        month_mins = month_total_minutes.get(mk, 1)
         row = {
             "年月": mk,
             "大类": major,
@@ -392,7 +394,8 @@ def build_sheets(
             "维修工时（分钟）": ts["minutes"],
             "维修工时（小时）": round(ts["minutes"] / 60, 1),
             "占大类比": ts["minutes"] / major_mins if major_mins else 0,
-            "占总故障时间比例": ts["minutes"] / total_minutes_all if total_minutes_all else 0,
+            "占总故障时间比例": ts["minutes"] / month_mins if month_mins else 0,
+            "大类故障占比": major_mins / month_mins if month_mins else 0,
         }
         sheet8_rows.append(row)
     sheets["故障类型统计"] = pd.DataFrame(sheet8_rows)
