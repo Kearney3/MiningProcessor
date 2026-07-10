@@ -221,6 +221,7 @@ def _dispatch_module(module_type: str, path: str, **kwargs) -> object | None:
             eq_ledger=eq_ledger,
             classifications=classifications,
             skip_hidden_rows=skip_hidden_rows,
+            skip_hidden_cols=skip_hidden_cols,
             split_by_year=kwargs.get("split_by_year", False),
         )
     # batch 模块由 _execute_batch_task 单独处理

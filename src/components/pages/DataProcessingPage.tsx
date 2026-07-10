@@ -841,12 +841,14 @@ function MaintenanceCard({
   bridge,
   useEquipmentLedger,
   skipHiddenRows,
+  skipHiddenCols,
   defaultPath,
   onFileSelected,
 }: {
   bridge: BridgeProp;
   useEquipmentLedger: boolean;
   skipHiddenRows: boolean;
+  skipHiddenCols: boolean;
   defaultPath?: string;
   onFileSelected?: (path: string) => void;
 }) {
@@ -866,6 +868,7 @@ function MaintenanceCard({
         path,
         use_equipment_ledger: useEquipmentLedger,
         skip_hidden_rows: skipHiddenRows,
+        skip_hidden_cols: skipHiddenCols,
         split_by_year: splitByYear,
       });
       const msg = res.output_files
@@ -942,7 +945,7 @@ export function DataProcessingPage({ bridge }: { bridge: BridgeProp }) {
         <ElectricalCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
         <WorktimeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
         <MergeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
-        <MaintenanceCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} skipHiddenRows={skipHiddenRows} defaultPath={initialDir} onFileSelected={saveDir} />
+        <MaintenanceCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
       </div>
     </div>
   );

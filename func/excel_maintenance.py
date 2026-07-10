@@ -179,13 +179,20 @@ def _write_sheet(
 
 # ── 记录提取 ──────────────────────────────────────────────────
 
-def extract_sheet_records(ws, year: int, month: int) -> list[dict]:
+def extract_sheet_records(
+    ws, year: int, month: int,
+    *,
+    skip_hidden_rows: bool = False,
+    skip_hidden_cols: bool = False,
+) -> list[dict]:
     """从单个工作表提取维修记录。
 
     Args:
         ws: openpyxl Worksheet。
         year: 年份。
         month: 月份。
+        skip_hidden_rows: 跳过 Excel 中的隐藏行。
+        skip_hidden_cols: 跳过 Excel 中的隐藏列对应的日期数据。
 
     Returns:
         记录列表，每条包含 原始设备名称、原因、班次、维修内容、工时_分钟、日期。
@@ -193,6 +200,24 @@ def extract_sheet_records(ws, year: int, month: int) -> list[dict]:
     reason_col, day_col_map = detect_header_layout(ws)
     records: list[dict] = []
     current_vehicle: str | None = None
+
+    # 预计算隐藏行集合（1-based 行号）
+    hidden_rows: set[int] = set()
+    if skip_hidden_rows:
+        hidden_rows = {idx for idx, dim in ws.row_dimensions.items() if dim.hidden}
+
+    # 预计算隐藏列集合（列字母），用于过滤日期列
+    hidden_cols: set[int] = set()
+    if skip_hidden_cols:
+        hidden_col_letters = {col for col, dim in ws.column_dimensions.items() if dim.hidden}
+        for day_num, col in day_col_map.items():
+            col_letter = openpyxl.utils.get_column_letter(col)
+            if col_letter in hidden_col_letters:
+                hidden_cols.add(day_num)
+
+    for row_num in range(2, ws.max_row + 1):
+        if row_num in hidden_rows:
+            continue
 
     for row_num in range(2, ws.max_row + 1):
         cell_a = ws.cell(row=row_num, column=1)
@@ -208,6 +233,8 @@ def extract_sheet_records(ws, year: int, month: int) -> list[dict]:
         reason_type = str(reason_type).strip()
 
         for day_num, col in day_col_map.items():
+            if day_num in hidden_cols:
+                continue
             cell = ws.cell(row=row_num, column=col)
 
             has_comment = cell.comment is not None
@@ -279,12 +306,20 @@ def _discover_files(file_path: str, file_keywords: list[str]) -> list[str]:
     return files
 
 
-def extract_all_records(file_path: str, file_keywords: list[str]) -> list[dict]:
+def extract_all_records(
+    file_path: str,
+    file_keywords: list[str],
+    *,
+    skip_hidden_rows: bool = False,
+    skip_hidden_cols: bool = False,
+) -> list[dict]:
     """从文件或文件夹提取全部维修记录（去重）。
 
     Args:
         file_path: 文件或文件夹路径。
         file_keywords: 文件名关键字。
+        skip_hidden_rows: 跳过隐藏行。
+        skip_hidden_cols: 跳过隐藏列。
 
     Returns:
         合并后的记录列表。
@@ -325,7 +360,11 @@ def extract_all_records(file_path: str, file_keywords: list[str]) -> list[dict]:
                 continue
 
             ws = wb[sheetname]
-            records = extract_sheet_records(ws, year, month)
+            records = extract_sheet_records(
+                ws, year, month,
+                skip_hidden_rows=skip_hidden_rows,
+                skip_hidden_cols=skip_hidden_cols,
+            )
             all_records.extend(records)
             processed_months.add(key)
             logger.info("  sheet '%s' -> %d年%d月: %d 条记录", sheetname, year, month, len(records))
@@ -345,6 +384,7 @@ def process_maintenance_data(
     classifications: dict | None = None,
     file_keywords: list[str] | None = None,
     skip_hidden_rows: bool = False,
+    skip_hidden_cols: bool = False,
     return_sheets: bool = False,
     split_by_year: bool = False,
 ) -> str | list[str] | dict[str, pd.DataFrame]:
@@ -358,6 +398,7 @@ def process_maintenance_data(
         classifications: 分类配置 dict（None 时从 config 加载或使用默认值）。
         file_keywords: 文件名关键字（None 时从 config 加载）。
         skip_hidden_rows: 跳过隐藏行。
+        skip_hidden_cols: 跳过隐藏列。
         return_sheets: True 时返回 dict[str, DataFrame]，False 时写文件。
         split_by_year: True 时按年份拆分输出为多个文件。
 
@@ -383,7 +424,11 @@ def process_maintenance_data(
     reason_rules = classifications.get("reason_rules", {})
 
     # 1. 提取记录
-    raw_records = extract_all_records(file_path, file_keywords)
+    raw_records = extract_all_records(
+        file_path, file_keywords,
+        skip_hidden_rows=skip_hidden_rows,
+        skip_hidden_cols=skip_hidden_cols,
+    )
     if not raw_records:
         msg = "未提取到任何维修记录"
         logger.warning(msg)
