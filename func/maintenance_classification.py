@@ -226,7 +226,7 @@ def is_fault_record(
         return True
 
     # check_content: 检查内容是否有实质故障描述
-    if not content or content in noise_exact or content == "(无注释)":
+    if not content or content in noise_exact:
         return False
     for pat in _compile_noise_patterns(noise_patterns):
         if pat.match(content.strip()):
@@ -266,7 +266,7 @@ def classify(
     if noise_patterns is None:
         noise_patterns = _DEFAULT_NOISE_PATTERNS
 
-    if not content or content in noise_exact or content == "(无注释)":
+    if not content or content in noise_exact:
         return None, None
     for pat in _compile_noise_patterns(noise_patterns):
         if pat.match(content.strip()):
