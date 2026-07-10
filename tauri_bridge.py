@@ -394,6 +394,7 @@ def _process_maintenance(params: dict) -> dict:
         eq_ledger=eq_ledger,
         classifications=classifications,
         skip_hidden_rows=params.get("skip_hidden_rows", False),
+        skip_hidden_cols=params.get("skip_hidden_cols", False),
         split_by_year=params.get("split_by_year", False),
     )
     # split_by_year 时返回列表
