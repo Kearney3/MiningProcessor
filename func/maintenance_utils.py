@@ -34,15 +34,16 @@ def parse_comment(comment_text: str) -> list[tuple[str, str]]:
         return []
 
     entries = []
-    # 按班次标记拆分
-    parts = re.split(r'\n*(?=白班：|夜班：)', text)
+    # 按班次标记拆分（支持中文冒号、中文分号、英文冒号/分号、空格作为分隔符）
+    _SEP = r'[：:；; \t　]'  # 中文全角冒号/分号、英文冒号/分号、空格、全角空格
+    parts = re.split(rf'\n*(?=白班{_SEP}|夜班{_SEP})', text)
 
     for part in parts:
         part = part.strip()
         if not part:
             continue
 
-        shift_match = re.match(r'^(白班|夜班)：\s*(.*)', part, re.DOTALL)
+        shift_match = re.match(rf'^(白班|夜班){_SEP}\s*(.*)', part, re.DOTALL)
         if shift_match:
             shift = shift_match.group(1)
             content = shift_match.group(2).strip()

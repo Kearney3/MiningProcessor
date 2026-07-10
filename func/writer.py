@@ -1,147 +1,143 @@
-"""维修记录 Excel 写入
+"""维修记录统计 Excel 写入
 
-使用 xlsxwriter 将统计 DataFrame 写入格式化的 Excel 文件。
+用 xlsxwriter 将所有 sheet 写入格式化的 Excel 文件。
+支持交替行底色、自适应列宽、冻结首行、自动筛选。
 """
+import calendar
 from datetime import date
 
 import pandas as pd
 import xlsxwriter
 
+logger = __import__("logging").getLogger(__name__)
+
 
 # ── 样式常量 ──────────────────────────────────────────────────
 
-_DATE_FMT = "yyyy-mm-dd"
-_PCT_FMT = "0.00%"
-_HOUR_FMT = "0.0"
 _HEADER_BG = "#4472C4"
 _HEADER_FG = "#FFFFFF"
 _ALT_ROW_BG = "#F2F7FB"
+_DATE_FMT = "yyyy-mm-dd"
+_PCT_FMT = "0.00%"
+_HOUR_FMT = "0.0"
 
 
-# ── xlsxwriter 样式工厂 ───────────────────────────────────────
+# ── sheet 调色板（不同 sheet 不同表头色）──
+_SHEET_COLORS = [
+    "#4472C4",  # 蓝
+    "#548235",  # 绿
+    "#BF8F00",  # 金
+    "#843C0C",  # 棕
+    "#44546A",  # 深灰
+    "#E7792B",  # 橙
+    "#3B7DD8",  # 亮蓝
+    "#70AD47",  # 草绿
+]
 
-def _make_formats(wb: xlsxwriter.Workbook) -> dict:
-    """创建统一的格式集，避免重复定义。"""
+
+def _make_formats(wb: xlsxwriter.Workbook, header_bg: str) -> dict:
+    """创建格式集。"""
+    hdr = wb.add_format({
+        "bold": True, "font_color": _HEADER_FG, "bg_color": header_bg,
+        "border": 1, "align": "center", "valign": "vcenter",
+        "text_wrap": True,
+    })
+    f_int = wb.add_format({"border": 1, "align": "center"})
+    f_txt_center = wb.add_format({"border": 1, "align": "center", "valign": "vcenter"})
+    f_txt = wb.add_format({"border": 1, "text_wrap": True, "valign": "top"})
+    f_date = wb.add_format({"num_format": _DATE_FMT, "border": 1, "align": "center"})
+    f_pct = wb.add_format({"num_format": _PCT_FMT, "border": 1, "align": "center"})
+    f_hour = wb.add_format({"num_format": _HOUR_FMT, "border": 1, "align": "center"})
+    # 交替行
+    bg_alt = _ALT_ROW_BG
+    a_int = wb.add_format({"border": 1, "align": "center", "bg_color": bg_alt})
+    a_txt_center = wb.add_format({"border": 1, "align": "center", "valign": "vcenter", "bg_color": bg_alt})
+    a_txt = wb.add_format({"border": 1, "text_wrap": True, "valign": "top", "bg_color": bg_alt})
+    a_date = wb.add_format({"num_format": _DATE_FMT, "border": 1, "align": "center", "bg_color": bg_alt})
+    a_pct = wb.add_format({"num_format": _PCT_FMT, "border": 1, "align": "center", "bg_color": bg_alt})
+    a_hour = wb.add_format({"num_format": _HOUR_FMT, "border": 1, "align": "center", "bg_color": bg_alt})
     return {
-        "header": wb.add_format({
-            "bold": True, "font_color": _HEADER_FG, "bg_color": _HEADER_BG,
-            "border": 1, "align": "center", "valign": "vcenter",
-            "text_wrap": True,
-        }),
-        "date": wb.add_format({"num_format": _DATE_FMT, "border": 1, "align": "center"}),
-        "pct": wb.add_format({"num_format": _PCT_FMT, "border": 1, "align": "center"}),
-        "hour": wb.add_format({"num_format": _HOUR_FMT, "border": 1, "align": "center"}),
-        "int": wb.add_format({"border": 1, "align": "center"}),
-        "text": wb.add_format({"border": 1, "text_wrap": True, "valign": "top"}),
-        "text_center": wb.add_format({"border": 1, "align": "center", "valign": "vcenter"}),
-        "bold_int": wb.add_format({"bold": True, "border": 1, "align": "center"}),
-        "bold_text": wb.add_format({"bold": True, "border": 1}),
-        "alt_row": wb.add_format({"border": 1, "bg_color": _ALT_ROW_BG}),
-        "alt_date": wb.add_format({
-            "num_format": _DATE_FMT, "border": 1, "align": "center",
-            "bg_color": _ALT_ROW_BG,
-        }),
-        "alt_pct": wb.add_format({
-            "num_format": _PCT_FMT, "border": 1, "align": "center",
-            "bg_color": _ALT_ROW_BG,
-        }),
-        "alt_hour": wb.add_format({
-            "num_format": _HOUR_FMT, "border": 1, "align": "center",
-            "bg_color": _ALT_ROW_BG,
-        }),
-        "alt_int": wb.add_format({
-            "border": 1, "align": "center", "bg_color": _ALT_ROW_BG,
-        }),
-        "alt_text": wb.add_format({
-            "border": 1, "text_wrap": True, "valign": "top", "bg_color": _ALT_ROW_BG,
-        }),
-        "alt_text_center": wb.add_format({
-            "border": 1, "align": "center", "valign": "vcenter",
-            "bg_color": _ALT_ROW_BG,
-        }),
+        "hdr": hdr,
+        "int": f_int, "txt_center": f_txt_center, "txt": f_txt,
+        "date": f_date, "pct": f_pct, "hour": f_hour,
+        "a_int": a_int, "a_txt_center": a_txt_center, "a_txt": a_txt,
+        "a_date": a_date, "a_pct": a_pct, "a_hour": a_hour,
     }
-
-
-# ── 列宽计算 ─────────────────────────────────────────────────
-
-def _char_width(text: str) -> int:
-    """计算字符串显示宽度（CJK 宽字符计 2）。"""
-    w = 0
-    for ch in str(text):
-        cp = ord(ch)
-        if 0x4E00 <= cp <= 0x9FFF or 0xFF00 <= cp <= 0xFFEF or 0x3000 <= cp <= 0x303F:
-            w += 2
-        else:
-            w += 1
-    return w
 
 
 def _auto_col_width(headers: list[str], rows: list[tuple], min_w: int = 8, max_w: int = 50) -> list[int]:
     """计算自适应列宽（支持 CJK 宽字符）。"""
-    widths = [_char_width(h) + 2 for h in headers]
+    def _width(text: str) -> int:
+        w = 0
+        for ch in str(text):
+            cp = ord(ch)
+            if 0x4E00 <= cp <= 0x9FFF or 0xFF00 <= cp <= 0xFFEF or 0x3000 <= cp <= 0x303F:
+                w += 2
+            else:
+                w += 1
+        return w
+    widths = [_width(h) + 2 for h in headers]
     for row in rows[:500]:
         for i, val in enumerate(row):
             if val is None:
                 continue
-            cell_w = 12 if isinstance(val, (date, pd.Timestamp)) else _char_width(str(val)) + 2
+            cell_w = 12 if isinstance(val, (date, pd.Timestamp)) else _width(str(val)) + 2
             if i < len(widths):
                 widths[i] = max(widths[i], cell_w)
     return [min(max(w, min_w), max_w) for w in widths]
 
 
-# ── Sheet 写入 ────────────────────────────────────────────────
+def _detect_stats(headers: list[str], rows: list[tuple]) -> tuple[set[int], set[int], set[int], set[int]]:
+    """自动检测日期/百分比/小时/wrap 列的索引。"""
+    date_cols: set[int] = set()
+    pct_cols: set[int] = set()
+    hour_cols: set[int] = set()
+    wrap_cols: set[int] = set()
+    for i, h in enumerate(headers):
+        if "日期" in h and "占比" not in h and "占比" not in h:
+            date_cols.add(i)
+        if "占比" in h or "故障率" in h:
+            pct_cols.add(i)
+        if "小时" in h:
+            hour_cols.add(i)
+        if "维修内容" in h:
+            wrap_cols.add(i)
+    return date_cols, pct_cols, hour_cols, wrap_cols
 
-def _write_sheet(
-    wb: xlsxwriter.Workbook,
-    sheet_name: str,
-    headers: list[str],
-    rows: list[tuple],
-    fmts: dict,
-    col_formats: list[str] | None = None,
-    date_cols: set[int] | None = None,
-    pct_cols: set[int] | None = None,
-    hour_cols: set[int] | None = None,
-    wrap_cols: set[int] | None = None,
-):
-    """通用 sheet 写入：表头 + 数据行 + 自适应列宽 + 冻结 + 筛选。"""
-    ws = wb.add_worksheet(sheet_name)
-    date_cols = date_cols or set()
-    pct_cols = pct_cols or set()
-    hour_cols = hour_cols or set()
-    wrap_cols = wrap_cols or set()
+
+def _write_sheet(wb: xlsxwriter.Workbook, ws_name: str, df: pd.DataFrame, color_idx: int):
+    """写入一个 sheet。"""
+    if df is None or df.empty:
+        return
+    ws = wb.add_worksheet(ws_name)
+    fmts = _make_formats(wb, _SHEET_COLORS[color_idx % len(_SHEET_COLORS)])
+
+    headers = list(df.columns)
+    rows = df.values.tolist()
+    date_cols, pct_cols, hour_cols, wrap_cols = _detect_stats(headers, rows)
 
     # 表头
     for col, h in enumerate(headers):
-        ws.write(0, col, h, fmts["header"])
+        ws.write(0, col, h, fmts["hdr"])
 
-    # 数据行（交替底色）
+    # 数据行
     for row_idx, row in enumerate(rows):
         is_alt = row_idx % 2 == 1
         for col_idx, val in enumerate(row):
             if val is None:
-                fmt = fmts["alt_text"] if is_alt else fmts["text"]
-                ws.write(row_idx + 1, col_idx, "", fmt)
-            elif col_idx in date_cols:
-                fmt = fmts["alt_date"] if is_alt else fmts["date"]
-                if isinstance(val, (date, pd.Timestamp)):
-                    ws.write_datetime(row_idx + 1, col_idx, pd.Timestamp(val).to_pydatetime(), fmt)
-                else:
-                    ws.write(row_idx + 1, col_idx, str(val), fmt)
+                ws.write(row_idx + 1, col_idx, "", fmts["a_txt"] if is_alt else fmts["txt"])
+            elif col_idx in date_cols and isinstance(val, (date, pd.Timestamp)):
+                ws.write_datetime(row_idx + 1, col_idx, pd.Timestamp(val).to_pydatetime(), fmts["a_date"] if is_alt else fmts["date"])
             elif col_idx in pct_cols:
-                fmt = fmts["alt_pct"] if is_alt else fmts["pct"]
-                ws.write_number(row_idx + 1, col_idx, float(val) if val else 0, fmt)
+                ws.write_number(row_idx + 1, col_idx, float(val) if val else 0, fmts["a_pct"] if is_alt else fmts["pct"])
             elif col_idx in hour_cols:
-                fmt = fmts["alt_hour"] if is_alt else fmts["hour"]
-                ws.write_number(row_idx + 1, col_idx, float(val) if val else 0, fmt)
+                ws.write_number(row_idx + 1, col_idx, float(val) if val else 0, fmts["a_hour"] if is_alt else fmts["hour"])
             elif col_idx in wrap_cols:
-                fmt = fmts["alt_text"] if is_alt else fmts["text"]
-                ws.write(row_idx + 1, col_idx, str(val), fmt)
+                ws.write(row_idx + 1, col_idx, str(val), fmts["a_txt"] if is_alt else fmts["txt"])
             elif isinstance(val, (int, float)) and not isinstance(val, bool):
-                fmt = fmts["alt_int"] if is_alt else fmts["int"]
-                ws.write_number(row_idx + 1, col_idx, float(val), fmt)
+                ws.write_number(row_idx + 1, col_idx, float(val), fmts["a_int"] if is_alt else fmts["int"])
             else:
-                fmt = fmts["alt_text_center"] if is_alt else fmts["text_center"]
-                ws.write(row_idx + 1, col_idx, str(val) if val is not None else "", fmt)
+                ws.write(row_idx + 1, col_idx, str(val) if val is not None else "", fmts["a_txt_center"] if is_alt else fmts["txt_center"])
 
     # 列宽
     widths = _auto_col_width(headers, rows)
@@ -151,47 +147,35 @@ def _write_sheet(
     # 冻结首行 + 自动筛选
     ws.freeze_panes(1, 0)
     if rows:
-        last_col = len(headers) - 1
-        ws.autofilter(0, 0, len(rows), last_col)
-
-
-# ── 数据驱动 Excel 输出 ──────────────────────────────────────
-
-# (sheet_name, date_col_indices, pct_col_indices, hour_col_indices, wrap_col_indices)
-_SHEET_SPECS: list[tuple[str, set[int], set[int], set[int], set[int]]] = [
-    ("维修明细",         {0},     set(),  set(),  {9}),
-    ("大类汇总",         set(),   {4, 5}, {3},    set()),
-    ("大类×小类",        set(),   {5},    {4},    set()),
-    ("按设备统计",       {2, 3},  {8},    {7},    set()),
-    ("按设备型号统计",   set(),   {7},    {4},    set()),
-    ("大类×年月",        set(),   set(),  {4},    set()),
-    ("设备名称×大类小类", set(),  {6},    {5},    set()),
-    ("型号×大类小类",    set(),   {7},    {6},    set()),
-    ("设备名称×原因",    {4, 5},  {10},   {9},    set()),
-    ("发动机故障深挖",   {2},     set(),  set(),  {5}),
-]
+        ws.autofilter(0, 0, len(rows), len(headers) - 1)
 
 
 def write_excel(output_file: str, sheets: dict[str, pd.DataFrame]) -> None:
-    """用 xlsxwriter 将所有 sheet 写入 Excel。
+    """将所有 sheet 写入格式化的 Excel 文件。
 
-    Args:
-        output_file: 输出文件路径。
-        sheets: {sheet_name: DataFrame} 字典。
+    sheet 写入顺序：
+    1. 维修明细
+    2. 每月设备故障统计
+    3. 全周期设备故障统计
+    4. 全周期设备故障汇总
+    5. 每月设备型号故障统计
+    6. 全周期设备型号故障统计
+    7. 全周期设备故障汇总(型号)
+    8. 故障类型统计
     """
+    ORDER = [
+        "维修明细",
+        "每月设备故障统计",
+        "全周期设备故障统计",
+        "全周期设备故障汇总",
+        "每月设备型号故障统计",
+        "全周期设备型号故障统计",
+        "全周期设备故障汇总(型号)",
+        "故障类型统计",
+    ]
     wb = xlsxwriter.Workbook(output_file, {"strings_to_urls": False, "nan_inf_to_errors": True})
-    fmts = _make_formats(wb)
-
-    for name, date_cols, pct_cols, hour_cols, wrap_cols in _SHEET_SPECS:
-        if name not in sheets:
-            continue
-        df = sheets[name]
-        headers = list(df.columns)
-        rows = [tuple(row) for row in df.itertuples(index=False, name=None)]
-        _write_sheet(
-            wb, name, headers, rows, fmts,
-            date_cols=date_cols, pct_cols=pct_cols,
-            hour_cols=hour_cols, wrap_cols=wrap_cols,
-        )
-
+    for idx, name in enumerate(ORDER):
+        if name in sheets:
+            _write_sheet(wb, name, sheets[name], idx)
     wb.close()
+    logger.info("输出完成: %s (8 sheets)", output_file)
