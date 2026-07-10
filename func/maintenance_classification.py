@@ -178,8 +178,17 @@ def get_default_classifications() -> dict:
     }
 
 
-def _compile_noise_patterns(patterns: list[str]) -> list[re.Pattern]:
-    """编译正则模式列表，跳过无效模式并记录警告。"""
+def compile_noise_patterns(patterns: list[str]) -> list[re.Pattern]:
+    """编译正则模式列表，跳过无效模式并记录警告。
+
+    供调用方预编译一次后传入 is_fault_record / classify，避免每条记录重复编译。
+
+    Args:
+        patterns: 正则模式字符串列表。
+
+    Returns:
+        编译后的 re.Pattern 列表。
+    """
     compiled = []
     for pat in patterns:
         try:
@@ -195,6 +204,7 @@ def is_fault_record(
     *,
     noise_exact: set[str] | None = None,
     noise_patterns: list[str] | None = None,
+    compiled_noise: list[re.Pattern] | None = None,
     reason_rules: dict[str, str] | None = None,
 ) -> bool:
     """根据原因和维修内容判断是否为故障记录。
@@ -203,7 +213,9 @@ def is_fault_record(
         reason: 原因类型（检修/点检/保养/待机）。
         content: 维修内容文本。
         noise_exact: 精确匹配噪声集合，None 时使用默认值。
-        noise_patterns: 正则噪声模式列表，None 时使用默认值。
+        noise_patterns: 正则噪声模式列表（字符串），None 时使用默认值。
+            如果提供了 compiled_noise，则忽略此参数。
+        compiled_noise: 预编译的噪声正则列表，优先于 noise_patterns 使用。
         reason_rules: 原因判定规则，None 时使用默认值。
 
     Returns:
@@ -211,10 +223,11 @@ def is_fault_record(
     """
     if noise_exact is None:
         noise_exact = _DEFAULT_NOISE_EXACT
-    if noise_patterns is None:
-        noise_patterns = _DEFAULT_NOISE_PATTERNS
     if reason_rules is None:
         reason_rules = _DEFAULT_REASON_RULES
+    if compiled_noise is None:
+        patterns = noise_patterns if noise_patterns is not None else _DEFAULT_NOISE_PATTERNS
+        compiled_noise = compile_noise_patterns(patterns)
 
     rule = reason_rules.get(reason, "check_content")
 
@@ -228,7 +241,7 @@ def is_fault_record(
     # check_content: 检查内容是否有实质故障描述
     if not content or content in noise_exact:
         return False
-    for pat in _compile_noise_patterns(noise_patterns):
+    for pat in compiled_noise:
         if pat.match(content.strip()):
             return False
     # 含"正常"且无其他实质描述 → 非故障
@@ -245,6 +258,7 @@ def classify(
     classifications: list[dict] | None = None,
     noise_exact: set[str] | None = None,
     noise_patterns: list[str] | None = None,
+    compiled_noise: list[re.Pattern] | None = None,
 ) -> tuple[str | None, str | None]:
     """对维修内容进行大类+小类分类。
 
@@ -254,7 +268,9 @@ def classify(
         content: 维修内容文本。
         classifications: 分类规则列表，None 时使用默认值。
         noise_exact: 精确噪声集合，None 时使用默认值。
-        noise_patterns: 正则噪声列表，None 时使用默认值。
+        noise_patterns: 正则噪声列表（字符串），None 时使用默认值。
+            如果提供了 compiled_noise，则忽略此参数。
+        compiled_noise: 预编译的噪声正则列表，优先于 noise_patterns 使用。
 
     Returns:
         (大类, 小类)，无实质内容时返回 (None, None)。
@@ -263,12 +279,13 @@ def classify(
         classifications = _DEFAULT_CLASSIFICATIONS
     if noise_exact is None:
         noise_exact = _DEFAULT_NOISE_EXACT
-    if noise_patterns is None:
-        noise_patterns = _DEFAULT_NOISE_PATTERNS
+    if compiled_noise is None:
+        patterns = noise_patterns if noise_patterns is not None else _DEFAULT_NOISE_PATTERNS
+        compiled_noise = compile_noise_patterns(patterns)
 
     if not content or content in noise_exact:
         return None, None
-    for pat in _compile_noise_patterns(noise_patterns):
+    for pat in compiled_noise:
         if pat.match(content.strip()):
             return None, None
     for entry in classifications:
