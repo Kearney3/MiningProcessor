@@ -362,7 +362,7 @@ def build_sheets(
             "小类故障占比": ms["minutes"] / major_mins if major_mins else 0,
             "大类故障占比": ms["minutes"] / mod_mins if mod_mins else 0,
         })
-    sheets["全周期设备故障汇总(型号)"] = pd.DataFrame(sheet7_rows)
+    sheets["全周期设备型号故障汇总"] = pd.DataFrame(sheet7_rows)
 
     # ── Sheet 8: 故障类型统计 ──
     type_stats: dict[tuple, dict] = defaultdict(

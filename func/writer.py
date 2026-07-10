@@ -22,8 +22,8 @@ _PCT_FMT = "0.00%"
 _HOUR_FMT = "0.0"
 
 
-# ── sheet 调色板（不同 sheet 不同表头色）──
-_SHEET_COLORS = [
+# ── sheet 标签调色板（不同 sheet 不同标签色，表头统一蓝色）──
+_TAB_COLORS = [
     "#4472C4",  # 蓝
     "#548235",  # 绿
     "#BF8F00",  # 金
@@ -35,10 +35,10 @@ _SHEET_COLORS = [
 ]
 
 
-def _make_formats(wb: xlsxwriter.Workbook, header_bg: str) -> dict:
-    """创建格式集。"""
+def _make_formats(wb: xlsxwriter.Workbook) -> dict:
+    """创建格式集（所有 sheet 共用同一套格式）。"""
     hdr = wb.add_format({
-        "bold": True, "font_color": _HEADER_FG, "bg_color": header_bg,
+        "bold": True, "font_color": _HEADER_FG, "bg_color": _HEADER_BG,
         "border": 1, "align": "center", "valign": "vcenter",
         "text_wrap": True,
     })
@@ -105,12 +105,14 @@ def _detect_stats(headers: list[str], rows: list[tuple]) -> tuple[set[int], set[
     return date_cols, pct_cols, hour_cols, wrap_cols
 
 
-def _write_sheet(wb: xlsxwriter.Workbook, ws_name: str, df: pd.DataFrame, color_idx: int):
+def _write_sheet(wb: xlsxwriter.Workbook, ws_name: str, df: pd.DataFrame, fmts: dict, color_idx: int):
     """写入一个 sheet。"""
     if df is None or df.empty:
         return
     ws = wb.add_worksheet(ws_name)
-    fmts = _make_formats(wb, _SHEET_COLORS[color_idx % len(_SHEET_COLORS)])
+
+    # 设置 sheet 标签颜色
+    ws.set_tab_color(_TAB_COLORS[color_idx % len(_TAB_COLORS)])
 
     headers = list(df.columns)
     rows = df.values.tolist()
@@ -170,12 +172,13 @@ def write_excel(output_file: str, sheets: dict[str, pd.DataFrame]) -> None:
         "全周期设备故障汇总",
         "每月设备型号故障统计",
         "全周期设备型号故障统计",
-        "全周期设备故障汇总(型号)",
+        "全周期设备型号故障汇总",
         "故障类型统计",
     ]
     wb = xlsxwriter.Workbook(output_file, {"strings_to_urls": False, "nan_inf_to_errors": True})
+    fmts = _make_formats(wb)
     for idx, name in enumerate(ORDER):
         if name in sheets:
-            _write_sheet(wb, name, sheets[name], idx)
+            _write_sheet(wb, name, sheets[name], fmts, idx)
     wb.close()
     logger.info("输出完成: %s (8 sheets)", output_file)
