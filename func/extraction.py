@@ -151,6 +151,10 @@ def extract_sheet_records(
                     # 回退：尝试解析简单公式字符串（如 "=25+30"）
                     minutes = _safe_eval_formula(minutes)
 
+            # 有批注但无数值时，工时记为 0
+            if minutes is None:
+                minutes = 0
+
             # 构造日期
             try:
                 dt = date(year, month, day_num)
@@ -159,6 +163,8 @@ def extract_sheet_records(
 
             entries = parse_comment(comment_text)
             if entries:
+                # 多班次时平分工时
+                per_shift_minutes = round(minutes / len(entries)) if minutes and len(entries) > 1 else minutes
                 for shift, content in entries:
                     records.append({
                         "日期": dt,
@@ -166,7 +172,7 @@ def extract_sheet_records(
                         "原因": reason_type,
                         "班次": shift,
                         "维修内容": content,
-                        "工时_分钟": minutes,
+                        "工时_分钟": per_shift_minutes,
                     })
             elif minutes is not None:
                 records.append({
