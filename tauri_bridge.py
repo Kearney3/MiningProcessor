@@ -376,6 +376,45 @@ def _process_merge(params: dict) -> dict:
     return {"output_file": output}
 
 
+@_register("process_maintenance")
+def _process_maintenance(params: dict) -> dict:
+    from func.excel_maintenance import process_maintenance_data
+    from func.config_loader import get_maintenance_classifications
+
+    safe_path = str(_sanitize_path(params["path"], must_exist=True))
+
+    # 加载台账
+    eq_ledger = None
+    if params.get("use_equipment_ledger", False):
+        eq_ledger = _load_equipment_ledger_from_cache()
+
+    classifications = get_maintenance_classifications()
+    output_file = process_maintenance_data(
+        safe_path,
+        eq_ledger=eq_ledger,
+        classifications=classifications,
+        skip_hidden_rows=params.get("skip_hidden_rows", False),
+        split_by_year=params.get("split_by_year", False),
+    )
+    # split_by_year 时返回列表
+    if isinstance(output_file, list):
+        return {"output_files": [str(f) for f in output_file], "output_file": output_file[-1] if output_file else None}
+    return {"output_file": str(output_file)}
+
+
+@_register("export_maintenance_template")
+def _export_maintenance_template(params: dict) -> dict:
+    from func.config_loader import export_maintenance_classification_template
+
+    path = params.get("path", "")
+    if not path:
+        from func.config_loader import _DATA_DIR
+        path = str(_DATA_DIR / "维修分类配置模板.xlsx")
+    with_defaults = params.get("with_defaults", False)
+    output = export_maintenance_classification_template(path, with_defaults=with_defaults)
+    return {"output_file": output}
+
+
 @_register("batch_scan")
 def _batch_scan(params: dict) -> dict:
     from func.excel_batch import scan_files
@@ -552,6 +591,39 @@ def _get_default_load_map(params: dict) -> dict:
     from func.config_loader import get_default_load_map
 
     return get_default_load_map(params.get("version", "new"))
+
+
+# ─── 维修分类配置 ───
+
+@_register("get_maintenance_classifications")
+def _get_maintenance_classifications(params: dict) -> dict:
+    from func.config_loader import get_maintenance_classifications
+
+    rules = get_maintenance_classifications()
+    # 序列化 set → list（JSON 不支持 set）
+    rules["noise_exact"] = sorted(rules.get("noise_exact", set()))
+    return rules
+
+
+@_register("import_maintenance_classifications")
+def _import_maintenance_classifications(params: dict) -> dict:
+    from func.config_loader import import_maintenance_classifications
+
+    safe_path = str(_sanitize_path(params["path"], must_exist=True))
+    rules = import_maintenance_classifications(safe_path)
+    rules["noise_exact"] = sorted(rules.get("noise_exact", set()))
+    return rules
+
+
+@_register("update_maintenance_classifications")
+def _update_maintenance_classifications(params: dict) -> dict:
+    from func.config_loader import update_maintenance_classifications
+
+    rules = params["rules"]
+    if "noise_exact" in rules and isinstance(rules["noise_exact"], list):
+        rules["noise_exact"] = set(rules["noise_exact"])
+    update_maintenance_classifications(rules)
+    return {"ok": True}
 
 
 # ─── 列映射配置方法 ───

@@ -41,6 +41,7 @@ def _create_keywords_section(page: ft.Page, log):
     kw_electrical = ft.TextField(label="电力数据", hint_text="例如: Electrical", expand=True, color=theme.TEXT_PRIMARY)
     kw_production = ft.TextField(label="生产数据", hint_text="例如: 白班,夜班", expand=True, color=theme.TEXT_PRIMARY)
     kw_worktime = ft.TextField(label="工时数据", hint_text="例如: 工时", expand=True, color=theme.TEXT_PRIMARY)
+    kw_maintenance = ft.TextField(label="维修数据", hint_text="例如: 设备出勤统计表", expand=True, color=theme.TEXT_PRIMARY)
     kw_status_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
 
     def _kw_defaults() -> dict[str, str]:
@@ -51,6 +52,7 @@ def _create_keywords_section(page: ft.Page, log):
         kw_electrical.value = ",".join(kw.get("electrical", []))
         kw_production.value = ",".join(kw.get("production", []))
         kw_worktime.value = ",".join(kw.get("worktime", []))
+        kw_maintenance.value = ",".join(kw.get("maintenance", []))
         try:
             page.update()
         except (RuntimeError, AttributeError):
@@ -64,6 +66,7 @@ def _create_keywords_section(page: ft.Page, log):
             "electrical": _split(kw_electrical.value),
             "production": _split(kw_production.value),
             "worktime": _split(kw_worktime.value),
+            "maintenance": _split(kw_maintenance.value),
         }
 
     def _reload_keywords():
@@ -118,6 +121,7 @@ def _create_keywords_section(page: ft.Page, log):
             kw_electrical,
             kw_production,
             kw_worktime,
+            kw_maintenance,
             ft.Row(kw_action_buttons, spacing=8, wrap=True, alignment=ft.MainAxisAlignment.START),
             kw_status_text,
         ],

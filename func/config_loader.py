@@ -110,6 +110,7 @@ DEFAULT_FILE_KEYWORDS: dict[str, list[str]] = {
     "electrical": ["Цахилгааны хэлтэс"],
     "production": ["白班", "夜班"],
     "worktime": ["工作效率表"],
+    "maintenance": ["设备出勤统计表"],
 }
 
 DEFAULT_WORKTIME_HEADER_MAPPING: dict = {
@@ -422,6 +423,138 @@ def get_file_keywords() -> dict[str, list[str]]:
                 merged[k] = v
         return merged
     return dict(DEFAULT_FILE_KEYWORDS)
+
+
+def get_maintenance_file_keywords() -> list[str]:
+    """获取维修记录文件名关键字列表。
+
+    合并 config.json 的 maintenance_file_keywords 和
+    user_config 的 file_keywords.maintenance。
+
+    Returns:
+        关键字列表，默认 ["设备出勤统计表"]。
+    """
+    config = load_config()
+    base = config.get("maintenance_file_keywords", ["设备出勤统计表"])
+    user_kw = get_user_config("file_keywords", {}).get("maintenance", [])
+    merged = list(base)
+    for kw in user_kw:
+        if kw not in merged:
+            merged.append(kw)
+    return merged
+
+
+# ---------------------------------------------------------------------------
+# 维修分类配置
+# ---------------------------------------------------------------------------
+
+
+def get_maintenance_classifications() -> dict:
+    """获取维修分类配置。
+
+    优先读取 config.json 的 maintenance_classifications 等字段，
+    为空时返回硬编码默认值。
+
+    Returns:
+        分类配置 dict，结构同
+        maintenance_classification.get_default_classifications()。
+    """
+    from func.maintenance_classification import get_default_classifications
+
+    config = load_config()
+    class_data = config.get("maintenance_classifications")
+    if class_data and isinstance(class_data, list):
+        noise_exact = set(config.get("maintenance_noise_exact", []))
+        noise_patterns = config.get("maintenance_noise_patterns", [])
+        reason_rules = config.get("maintenance_reason_rules", {})
+        if not noise_exact:
+            defaults = get_default_classifications()
+            noise_exact = defaults["noise_exact"]
+        if not noise_patterns:
+            defaults = get_default_classifications()
+            noise_patterns = defaults["noise_patterns"]
+        if not reason_rules:
+            defaults = get_default_classifications()
+            reason_rules = defaults["reason_rules"]
+        return {
+            "classifications": class_data,
+            "noise_exact": noise_exact,
+            "noise_patterns": noise_patterns,
+            "reason_rules": reason_rules,
+        }
+    return get_default_classifications()
+
+
+def apply_maintenance_classifications(rules: dict) -> dict:
+    """仅在当前运行时应用维修分类配置，不持久化到文件。
+
+    Args:
+        rules: 分类配置 dict。
+
+    Returns:
+        应用后的分类配置。
+    """
+    global _runtime_config
+    with _runtime_lock:
+        config = load_config()
+        config["maintenance_classifications"] = rules.get("classifications", [])
+        config["maintenance_noise_exact"] = list(rules.get("noise_exact", []))
+        config["maintenance_noise_patterns"] = rules.get("noise_patterns", [])
+        config["maintenance_reason_rules"] = rules.get("reason_rules", {})
+        _runtime_config = config
+        return rules
+
+
+def update_maintenance_classifications(rules: dict) -> dict:
+    """更新维修分类配置（写入 config.json）。
+
+    Args:
+        rules: 分类配置 dict。
+
+    Returns:
+        写入后的分类配置。
+    """
+    global _runtime_config
+    config = _load_json(_CONFIG_FILE)
+    config["maintenance_classifications"] = rules.get("classifications", [])
+    config["maintenance_noise_exact"] = list(rules.get("noise_exact", []))
+    config["maintenance_noise_patterns"] = rules.get("noise_patterns", [])
+    config["maintenance_reason_rules"] = rules.get("reason_rules", {})
+    _save_json(_CONFIG_FILE, config)
+    _invalidate_config_cache()
+    with _runtime_lock:
+        _runtime_config = None
+    return rules
+
+
+def export_maintenance_classification_template(path: str, *, with_defaults: bool = False) -> str:
+    """导出维修分类配置 Excel 模板。
+
+    Args:
+        path: 输出文件路径。
+        with_defaults: True 时填充默认数据。
+
+    Returns:
+        输出文件路径。
+    """
+    from func.maintenance_classification import export_classification_template
+    return export_classification_template(path, with_defaults=with_defaults)
+
+
+def import_maintenance_classifications(path: str) -> dict:
+    """从 Excel 导入维修分类配置并写入 config.json。
+
+    Args:
+        path: Excel 配置文件路径。
+
+    Returns:
+        导入的分类配置 dict。
+    """
+    from func.maintenance_classification import import_classifications_from_excel
+    rules = import_classifications_from_excel(path)
+    update_maintenance_classifications(rules)
+    logger.info("维修分类配置已从 %s 导入并保存", path)
+    return rules
 
 
 # ---------------------------------------------------------------------------

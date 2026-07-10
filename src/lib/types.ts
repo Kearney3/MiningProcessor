@@ -91,4 +91,5 @@ export type PageId =
   | "equipment-ledger"
   | "oil-ledger"
   | "load-config"
+  | "maint-config"
   | "user-config";

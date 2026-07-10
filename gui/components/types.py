@@ -46,6 +46,12 @@ class MergeRefs(TypedDict):
     sort_configs_state: list[dict]
 
 
+class MaintRefs(TypedDict):
+    path: ft.TextField
+    btn: ft.Button
+    split_year: ft.Checkbox
+
+
 class ModuleRefs(TypedDict):
     _match_eq_toggle: ft.Checkbox
     _match_oil_toggle: ft.Checkbox
@@ -54,6 +60,7 @@ class ModuleRefs(TypedDict):
     elec: ElecRefs
     work: WorkRefs
     merge: MergeRefs
+    maint: MaintRefs
 
 
 class ConfigRefs(TypedDict):

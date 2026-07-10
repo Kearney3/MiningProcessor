@@ -93,6 +93,17 @@ function IconUserCog() {
   );
 }
 
+function IconCategory() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 3h7v7H3z" />
+      <path d="M14 3h7v7h-7z" />
+      <path d="M3 14h7v7H3z" />
+      <path d="M14 14h7v7h-7z" />
+    </svg>
+  );
+}
+
 // --- Icon registry ---
 
 const ICONS: Record<string, () => JSX.Element> = {
@@ -103,6 +114,7 @@ const ICONS: Record<string, () => JSX.Element> = {
   "equipment-ledger": IconTruck,
   "oil-ledger": IconDroplet,
   "load-config": IconSlidersHorizontal,
+  "maint-config": IconCategory,
   "user-config": IconUserCog,
 };
 
@@ -124,6 +136,7 @@ const MANAGEMENT_ITEMS: NavItem[] = [
   { id: "equipment-ledger", label: "设备台账" },
   { id: "oil-ledger", label: "油品台账" },
   { id: "load-config", label: "装载量配置" },
+  { id: "maint-config", label: "维修分类配置" },
   { id: "user-config", label: "用户配置" },
 ];
 
