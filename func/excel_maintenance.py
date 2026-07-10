@@ -33,6 +33,35 @@ from func.maintenance_classification import (
 )
 from func.string_utils import clean_string
 
+
+# ── 公式解析辅助 ──────────────────────────────────────────────
+
+def _try_eval_formula(value) -> int | None:
+    """尝试解析简单公式字符串为整数。
+
+    支持 "=25+30"、"=100-20"、"=5*6" 等四则运算公式。
+    复杂公式或解析失败时返回 None。
+
+    Args:
+        value: 单元格值（可能是公式字符串）。
+
+    Returns:
+        计算结果的整数值，失败返回 None。
+    """
+    s = str(value).strip()
+    if not s.startswith("="):
+        return None
+    expr = s[1:]  # 去掉 "="
+    # 仅允许数字、运算符、空格、括号
+    import re
+    if not re.match(r'^[\d\s+\-*/().]+$', expr):
+        return None
+    try:
+        result = eval(expr)  # noqa: S307 — 已严格校验输入
+        return int(float(result))
+    except (ZeroDivisionError, SyntaxError, ValueError, TypeError):
+        return None
+
 logger = get_logger(__name__)
 
 
@@ -184,15 +213,18 @@ def extract_sheet_records(
     *,
     skip_hidden_rows: bool = False,
     skip_hidden_cols: bool = False,
+    ws_values=None,
 ) -> list[dict]:
     """从单个工作表提取维修记录。
 
     Args:
-        ws: openpyxl Worksheet。
+        ws: openpyxl Worksheet（用于读取批注）。
         year: 年份。
         month: 月份。
         skip_hidden_rows: 跳过 Excel 中的隐藏行。
         skip_hidden_cols: 跳过 Excel 中的隐藏列对应的日期数据。
+        ws_values: data_only=True 模式的 Worksheet（用于读取公式计算结果）。
+                   为 None 时回退到 ws.cell.value。
 
     Returns:
         记录列表，每条包含 原始设备名称、原因、班次、维修内容、工时_分钟、日期。
@@ -238,17 +270,24 @@ def extract_sheet_records(
             cell = ws.cell(row=row_num, column=col)
 
             has_comment = cell.comment is not None
-            has_value = cell.value is not None and str(cell.value).strip() != ""
+            # 从 data_only 工作表读取数值（正确处理公式结果）
+            if ws_values is not None:
+                val_cell = ws_values.cell(row=row_num, column=col)
+                raw_value = val_cell.value
+            else:
+                raw_value = cell.value
+            has_value = raw_value is not None and str(raw_value).strip() != ""
             if not has_comment and not has_value:
                 continue
 
             comment_text = cell.comment.text if cell.comment else ""
-            minutes = cell.value
+            minutes = raw_value
             if minutes is not None:
                 try:
                     minutes = int(float(str(minutes)))
                 except (ValueError, TypeError):
-                    minutes = None
+                    # 回退：尝试解析简单公式字符串（如 "=25+30"）
+                    minutes = _try_eval_formula(minutes)
 
             # 构造日期
             try:
@@ -343,6 +382,12 @@ def extract_all_records(
             logger.error("无法打开文件 %s: %s", filepath, e)
             continue
 
+        # 第二个 workbook 用于读取公式单元格的计算结果
+        try:
+            wb_values = openpyxl.load_workbook(filepath, data_only=True)
+        except Exception:
+            wb_values = None
+
         multi_sheet = len(wb.sheetnames) > 1
 
         for sheetname in wb.sheetnames:
@@ -360,16 +405,20 @@ def extract_all_records(
                 continue
 
             ws = wb[sheetname]
+            ws_values = wb_values[sheetname] if wb_values and sheetname in wb_values.sheetnames else None
             records = extract_sheet_records(
                 ws, year, month,
                 skip_hidden_rows=skip_hidden_rows,
                 skip_hidden_cols=skip_hidden_cols,
+                ws_values=ws_values,
             )
             all_records.extend(records)
             processed_months.add(key)
             logger.info("  sheet '%s' -> %d年%d月: %d 条记录", sheetname, year, month, len(records))
 
         wb.close()
+        if wb_values:
+            wb_values.close()
 
     logger.info("共提取 %d 条维修记录 (%d 个月)", len(all_records), len(processed_months))
     return all_records
