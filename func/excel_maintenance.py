@@ -643,6 +643,7 @@ def _build_sheets(
             "维修内容": rec["维修内容"],
             "工时_分钟": rec["工时_分钟"],
         })
+    detail_rows.sort(key=lambda r: (r["日期"] or date.min, r["标准设备名称"] or ""))
     sheets["维修明细"] = pd.DataFrame(detail_rows)
 
     # ── 设备日期范围（全量记录用于计算统计跨度）──
@@ -723,7 +724,7 @@ def _build_sheets(
             ds["days"].add(rec["日期"])
 
     dev_rows = []
-    for v, ds in sorted(dev_stats.items()):
+    for v, ds in sorted(dev_stats.items(), key=lambda x: (x[1]["model"], x[0])):
         dd = device_dates.get(v, {})
         min_d = dd.get("min_date")
         max_d = dd.get("max_date")
@@ -822,6 +823,7 @@ def _build_sheets(
             "总故障小时": round(ds["minutes"] / 60, 1),
             "故障率": rate,
         })
+    dev_sub_rows.sort(key=lambda r: (r["设备型号"], r["标准设备名称"], r["大类"]))
     sheets["设备名称×大类小类"] = pd.DataFrame(dev_sub_rows)
 
     # ── Sheet 8: 型号×大类小类 ──
@@ -891,6 +893,7 @@ def _build_sheets(
             "总故障小时": round(rs["minutes"] / 60, 1),
             "故障率": rate,
         })
+    reason_rows.sort(key=lambda r: (r["设备型号"], r["标准设备名称"], r["原因"]))
     sheets["设备名称×原因"] = pd.DataFrame(reason_rows)
 
     # ── Sheet 10: 发动机故障深挖 ──
