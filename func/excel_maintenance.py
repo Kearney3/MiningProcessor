@@ -312,7 +312,7 @@ def extract_sheet_records(
                     "原始设备名称": current_vehicle or "",
                     "原因": reason_type,
                     "班次": "未标注",
-                    "维修内容": "(无注释)",
+                    "维修内容": "",
                     "工时_分钟": minutes,
                 })
 
