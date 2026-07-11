@@ -7,7 +7,7 @@ import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-cla
 import { useLastDirectory } from "../../hooks/useLastDirectory";
 
 const currentYear = new Date().getFullYear();
-const yearOptions = Array.from({ length: 11 }, (_, i) => currentYear - 5 + i);
+const yearOptions = Array.from({ length: 61 }, (_, i) => currentYear - 30 + i);
 const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
 
 function ModuleCard({
