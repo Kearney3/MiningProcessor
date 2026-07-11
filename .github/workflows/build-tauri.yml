@@ -68,7 +68,9 @@ jobs:
           uv run pyinstaller tauri_bridge.spec \
             --distpath build-sidecar \
             --clean --noconfirm
-          ls -lh build-sidecar/tauri-bridge
+          # Tauri externalBin 期望文件名带目标架构后缀
+          mv build-sidecar/tauri-bridge build-sidecar/tauri-bridge-aarch64-apple-darwin
+          ls -lh build-sidecar/tauri-bridge-aarch64-apple-darwin
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -77,34 +79,13 @@ jobs:
         with:
           args: "--target aarch64-apple-darwin --bundles app"
 
-      - name: Embed sidecar into .app bundle
-        shell: bash
-        run: |
-          BUNDLE_DIR="src-tauri/target/aarch64-apple-darwin/release/bundle"
-          APP_DIR=$(find "$BUNDLE_DIR/macos" -name "*.app" -maxdepth 1 | head -1)
-          if [ -n "$APP_DIR" ]; then
-            cp build-sidecar/tauri-bridge "$APP_DIR/Contents/MacOS/tauri-bridge"
-            chmod +x "$APP_DIR/Contents/MacOS/tauri-bridge"
-            codesign --force --sign - "$APP_DIR/Contents/MacOS/tauri-bridge" || true
-            codesign --force --sign - "$APP_DIR" || true
-            echo "✅ Sidecar embedded in $APP_DIR"
-            ls -lh "$APP_DIR/Contents/MacOS/"
-          else
-            echo "⚠️ .app bundle not found in $BUNDLE_DIR"
-            ls -R "$BUNDLE_DIR" || true
-          fi
-
       - name: Create DMG
         shell: bash
         run: |
           BUNDLE_DIR="src-tauri/target/aarch64-apple-darwin/release/bundle"
           DMG_DIR="$BUNDLE_DIR/dmg"
 
-          # 检查 tauri-action 是否已经创建了 DMG
-          echo "=== Pre-existing DMG files ==="
-          find "$BUNDLE_DIR" -name "*.dmg" -exec ls -lh {} \; 2>/dev/null || echo "(none)"
-
-          # 删除 tauri-action 可能创建的旧 DMG，避免 -ov 覆盖出问题
+          # 删除 tauri-action 可能创建的旧 DMG
           rm -f "$DMG_DIR"/*.dmg 2>/dev/null || true
 
           APP_DIR=$(find "$BUNDLE_DIR/macos" -name "*.app" -maxdepth 1 | head -1)
@@ -123,7 +104,6 @@ jobs:
             "$DMG_PATH"
           rm -rf "$STAGING"
 
-          # 验证 DMG
           echo "=== DMG verification ==="
           ls -lh "$DMG_PATH"
           hdiutil verify "$DMG_PATH" && echo "✅ DMG integrity OK" || echo "❌ DMG corrupted"
@@ -189,7 +169,9 @@ jobs:
           uv run pyinstaller tauri_bridge.spec \
             --distpath build-sidecar \
             --clean --noconfirm
-          ls -lh build-sidecar/tauri-bridge.exe
+          # Tauri externalBin 期望文件名带目标架构后缀
+          mv build-sidecar/tauri-bridge.exe build-sidecar/tauri-bridge-x86_64-pc-windows-msvc.exe
+          ls -lh build-sidecar/tauri-bridge-x86_64-pc-windows-msvc.exe
 
       - name: Build frontend
         run: pnpm build
@@ -201,23 +183,9 @@ jobs:
         with:
           args: "--target x86_64-pc-windows-msvc"
 
-      - name: Embed sidecar into NSIS installer
-        shell: bash
-        run: |
-          NSIS_DIR="src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis"
-          if [ -d "$NSIS_DIR" ]; then
-            cp build-sidecar/tauri-bridge.exe "$NSIS_DIR/tauri-bridge.exe"
-            echo "✅ Sidecar copied to $NSIS_DIR"
-            ls -lh "$NSIS_DIR/"
-          else
-            echo "⚠️ NSIS output not found at $NSIS_DIR"
-          fi
-
       - name: Upload Windows x64 artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-x64
-          path: |
-            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
-            build-sidecar/tauri-bridge.exe
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
           if-no-files-found: warn
