@@ -26,8 +26,8 @@ def _get_initial_directory() -> str | None:
     return None
 
 
-def year_options(start_offset: int = -5, end_offset: int = 10) -> list[ft.dropdown.Option]:
-    """生成年份下拉选项列表，基于当前年份动态计算范围。"""
+def year_options(start_offset: int = -30, end_offset: int = 30) -> list[ft.dropdown.Option]:
+    """生成年份下拉选项列表，基于当前年份动态计算范围（默认前后30年）。"""
     current = datetime.now().year
     return [ft.dropdown.Option(str(y)) for y in range(current + start_offset, current + end_offset + 1)]
 

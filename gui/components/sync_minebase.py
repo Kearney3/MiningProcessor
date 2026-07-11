@@ -27,9 +27,9 @@ DATA_TYPES = [
     ("work_efficiency", "工作效率"),
 ]
 
-# 年份范围：当前年 ± 2
+# 年份范围：当前年 ± 30
 _CURRENT_YEAR = date.today().year
-_YEAR_OPTIONS = [str(y) for y in range(_CURRENT_YEAR - 2, _CURRENT_YEAR + 3)]
+_YEAR_OPTIONS = [str(y) for y in range(_CURRENT_YEAR - 30, _CURRENT_YEAR + 31)]
 _MONTH_OPTIONS = [str(m) for m in range(1, 13)]
 
 
