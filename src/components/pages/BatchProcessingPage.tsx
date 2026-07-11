@@ -626,23 +626,27 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
             <label className="text-xs text-slate-500 mb-1 block">年份</label>
-            <input
-              type="number"
+            <select
               value={year}
               onChange={(e) => setYear(e.target.value)}
               className={inputClass}
-            />
+            >
+              {Array.from({ length: 61 }, (_, i) => new Date().getFullYear() - 30 + i).map((y) => (
+                <option key={y} value={y}>{y}年</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="text-xs text-slate-500 mb-1 block">月份</label>
-            <input
-              type="number"
+            <select
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              min={1}
-              max={12}
               className={inputClass}
-            />
+            >
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                <option key={m} value={m}>{m}月</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="text-xs text-slate-500 mb-1 block">表头起始行</label>

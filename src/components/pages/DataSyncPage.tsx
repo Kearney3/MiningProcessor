@@ -370,7 +370,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
                 onChange={(e) => setYear(e.target.value)}
                 className={`${inputClass} w-full`}
               >
-                {Array.from({ length: 5 }, (_, i) => currentYear - 2 + i).map((y) => (
+                {Array.from({ length: 61 }, (_, i) => currentYear - 30 + i).map((y) => (
                   <option key={y} value={y}>{y}</option>
                 ))}
               </select>
