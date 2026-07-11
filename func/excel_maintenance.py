@@ -97,6 +97,25 @@ def process_maintenance_data(
             return {}
         raise ValueError(msg)
 
+    # 1b. 基于原始日期 + 原始设备名称 + 原始维修工时 + 原始批注去重
+    seen: set[tuple] = set()
+    deduped: list[dict] = []
+    dup_count = 0
+    for rec in raw_records:
+        key = (rec["日期"], rec["原始设备名称"], rec["工时_分钟"], rec["维修内容"])
+        # 处理可能不可哈希的类型
+        try:
+            if key in seen:
+                dup_count += 1
+                continue
+            seen.add(key)
+        except TypeError:
+            pass  # 遇到不可哈希值时保留该记录
+        deduped.append(rec)
+    if dup_count:
+        logger.warning("去重: 移除 %d 条重复记录, 保留 %d 条", dup_count, len(deduped))
+    raw_records = deduped
+
     # 2. 预处理 + 台账匹配 + 分类
     classified: list[dict] = []
     fault_records: list[dict] = []
