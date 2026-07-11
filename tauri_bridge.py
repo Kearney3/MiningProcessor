@@ -945,7 +945,7 @@ def _check_directory_exists(params: dict) -> dict:
 
 @_register("ping")
 def _ping(params: dict) -> dict:
-    return {"pong": True, "pid": __import__("os").getpid(), "version": "1.1.0"}
+    return {"pong": True, "pid": __import__("os").getpid(), "version": "1.2.0"}
 
 
 @_register("write_text_file")
