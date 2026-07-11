@@ -35,6 +35,7 @@
     ],
     "resources": [
       "../config.json"
-    ]
+    ],
+    "externalBin": ["../build-sidecar/tauri-bridge"]
   }
 }

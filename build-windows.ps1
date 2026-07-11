@@ -3,8 +3,8 @@
 #
 # 流程：
 #   1. PyInstaller 打包 Python → build-sidecar/tauri-bridge.exe
-#   2. pnpm tauri build（前端 + Rust，生成 NSIS 安装包）
-#   3. 将 tauri-bridge.exe 嵌入 NSIS 输出目录
+#   2. 重命名为 Tauri externalBin 期望的带架构后缀格式
+#   3. pnpm tauri build（externalBin 自动嵌入 NSIS 安装包）
 # ═══════════════════════════════════════════════════════════
 
 $ErrorActionPreference = "Stop"
@@ -18,7 +18,7 @@ $SIDECAR_BIN = "$SIDECAR_DIR\tauri-bridge.exe"
 Write-Host "═══ MiningProcessor Tauri Build (Windows) ═══" -ForegroundColor Cyan
 
 # ─── 1. PyInstaller ───
-Write-Host "[1/3] Building Python sidecar with PyInstaller..." -ForegroundColor Yellow
+Write-Host "[1/2] Building Python sidecar with PyInstaller..." -ForegroundColor Yellow
 uv run pyinstaller tauri_bridge.spec `
     --distpath $SIDECAR_DIR `
     --clean --noconfirm 2>&1 | Select-Object -Last 5
@@ -30,23 +30,16 @@ if (-not (Test-Path $SIDECAR_BIN)) {
 $size = (Get-Item $SIDECAR_BIN).Length / 1MB
 Write-Host "  -> $SIDECAR_BIN ($([math]::Round($size, 1)) MB)" -ForegroundColor Green
 
-# ─── 2. Tauri build（NSIS）───
-Write-Host "[2/3] Building Tauri application (NSIS)..." -ForegroundColor Yellow
+# ─── 2. 重命名为 Tauri externalBin 期望的格式 ───
+$SIDECAR_TARGET = "$SIDECAR_DIR\tauri-bridge-x86_64-pc-windows-msvc.exe"
+Rename-Item $SIDECAR_BIN $SIDECAR_TARGET -Force
+Write-Host "  -> Renamed to: $SIDECAR_TARGET" -ForegroundColor Green
+
+# ─── 3. Tauri build（externalBin 自动嵌入 NSIS 安装包）───
+Write-Host "[2/2] Building Tauri application (NSIS)..." -ForegroundColor Yellow
 cargo tauri build --bundles nsis
 
-# ─── 3. 嵌入 sidecar 到 NSIS 输出目录 ───
-Write-Host "[3/3] Embedding sidecar into NSIS output..." -ForegroundColor Yellow
-
 $NSIS_DIR = "src-tauri\target\release\bundle\nsis"
-
-if (-not (Test-Path $NSIS_DIR)) {
-    Write-Host "ERROR: NSIS output not found at $NSIS_DIR" -ForegroundColor Red
-    exit 1
-}
-
-Copy-Item $SIDECAR_BIN "$NSIS_DIR\tauri-bridge.exe" -Force
-Write-Host "  -> Embedded: $NSIS_DIR\tauri-bridge.exe" -ForegroundColor Green
-
 Write-Host ""
 Write-Host "═══ Build Complete ═══" -ForegroundColor Cyan
 Get-ChildItem $NSIS_DIR | Format-Table Name, Length -AutoSize
