@@ -63,6 +63,8 @@ jobs:
 
       - name: Build Python sidecar (PyInstaller)
         shell: bash
+        env:
+          UV_PYTHON: "3.12"
         run: |
           uv sync --dev
           uv run pyinstaller tauri_bridge.spec \
@@ -164,6 +166,8 @@ jobs:
 
       - name: Build Python sidecar (PyInstaller)
         shell: bash
+        env:
+          UV_PYTHON: "3.12"
         run: |
           uv sync --dev
           uv run pyinstaller tauri_bridge.spec \

@@ -22,9 +22,9 @@ SIDECAR_BIN="$SIDECAR_DIR/tauri-bridge"
 
 echo "═══ MiningProcessor Tauri Build ═══"
 
-# ─── 1. PyInstaller ───
+# ─── 1. PyInstaller（使用 Python 3.12，3.13 兼容性问题）───
 echo "[1/3] Building Python sidecar with PyInstaller..."
-uv run pyinstaller tauri_bridge.spec \
+UV_PYTHON=3.12 uv run pyinstaller tauri_bridge.spec \
     --distpath "$SIDECAR_DIR" \
     --clean --noconfirm 2>&1 | tail -5
 
