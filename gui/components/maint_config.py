@@ -197,11 +197,16 @@ def create_maint_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]
     # --- 导入 ---
     _import_picker = ft.FilePicker()
     page.services.append(_import_picker)
+    import_btn = theme.secondary_btn("从 Excel 导入", icon=ft.Icons.UPLOAD_FILE)
 
-    def on_import_result(e: ft.FilePickerResultEvent):
-        if not e.files:
+    async def _on_import_click(_):
+        files = await _import_picker.pick_files(
+            allowed_extensions=["xlsx", "xls"],
+            dialog_title="选择维修分类配置 Excel",
+        )
+        if not files:
             return
-        filepath = e.files[0].path
+        filepath = files[0].path
         try:
             config_loader.import_maintenance_classifications(filepath)
             _log_message(log, f"分类配置已从 {filepath} 导入")
@@ -209,57 +214,32 @@ def create_maint_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]
         except Exception as ex:
             _log_message(log, f"导入失败: {ex}", level=logging.ERROR)
 
-    _import_picker.on_result = on_import_result
-    import_btn = theme.secondary_btn("从 Excel 导入", icon=ft.Icons.UPLOAD_FILE)
-
-    async def _on_import_click(_):
-        await _import_picker.pick_files(
-            allowed_extensions=["xlsx", "xls"],
-            dialog_title="选择维修分类配置 Excel",
-        )
-
     import_btn.on_click = _on_import_click
 
-    # --- 导出模板 ---
+    # --- 导出模板 / 默认配置 ---
     _export_picker = ft.FilePicker()
     page.services.append(_export_picker)
 
-    def on_export_result(e: ft.FilePickerResultEvent, with_defaults: bool):
-        if not e.path:
+    async def _do_export(with_defaults: bool):
+        label = "含默认数据" if with_defaults else "空白模板"
+        path = await _export_picker.save_file(
+            dialog_title=f"保存分类配置 ({label})",
+            file_name="维修分类配置模板.xlsx",
+            allowed_extensions=["xlsx"],
+        )
+        if not path:
             return
         try:
-            config_loader.export_maintenance_classification_template(e.path, with_defaults=with_defaults)
-            label = "含默认数据" if with_defaults else "空白模板"
-            _log_message(log, f"分类配置模板已导出 ({label}): {e.path}")
+            config_loader.export_maintenance_classification_template(path, with_defaults=with_defaults)
+            _log_message(log, f"分类配置模板已导出 ({label}): {path}")
         except Exception as ex:
             _log_message(log, f"导出失败: {ex}", level=logging.ERROR)
 
     export_template_btn = theme.secondary_btn("导出空白模板", icon=ft.Icons.FILE_DOWNLOAD)
-
-    async def _on_export_template_click(_):
-        await _export_picker.save_file(
-            dialog_title="保存分类配置模板",
-            file_name="维修分类配置模板.xlsx",
-            allowed_extensions=["xlsx"],
-        )
-
-    export_template_btn.on_click = _on_export_template_click
-    # 用闭包捕获 with_defaults 参数
-    _export_picker.on_result = lambda e: on_export_result(e, with_defaults=False)
+    export_template_btn.on_click = lambda _: _do_export(with_defaults=False)
 
     export_default_btn = theme.secondary_btn("导出默认配置", icon=ft.Icons.FILE_DOWNLOAD)
-    _export_default_picker = ft.FilePicker()
-    page.services.append(_export_default_picker)
-    _export_default_picker.on_result = lambda e: on_export_result(e, with_defaults=True)
-
-    async def _on_export_default_click(_):
-        await _export_default_picker.save_file(
-            dialog_title="保存默认分类配置",
-            file_name="维修分类配置_默认.xlsx",
-            allowed_extensions=["xlsx"],
-        )
-
-    export_default_btn.on_click = _on_export_default_click
+    export_default_btn.on_click = lambda _: _do_export(with_defaults=True)
 
     # --- 恢复默认 ---
     def on_restore(e):
