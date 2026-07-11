@@ -17,10 +17,9 @@ $SIDECAR_BIN = "$SIDECAR_DIR\tauri-bridge.exe"
 
 Write-Host "═══ MiningProcessor Tauri Build (Windows) ═══" -ForegroundColor Cyan
 
-# ─── 1. PyInstaller（使用 Python 3.12，3.13 兼容性问题）───
+# ─── 1. PyInstaller（使用 Python 3.12，高版本兼容性问题）───
 Write-Host "[1/2] Building Python sidecar with PyInstaller..." -ForegroundColor Yellow
-$env:UV_PYTHON = "3.12"
-uv run pyinstaller tauri_bridge.spec `
+uv run --python 3.12 pyinstaller tauri_bridge.spec `
     --distpath $SIDECAR_DIR `
     --clean --noconfirm 2>&1 | Select-Object -Last 5
 
