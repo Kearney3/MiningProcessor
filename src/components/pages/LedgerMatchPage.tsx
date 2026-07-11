@@ -4,6 +4,7 @@ import type { BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
 import { inputClass, btnPrimaryClass, btnSecondaryClass } from "../../lib/ui-classes";
 import { useLastDirectory } from "../../hooks/useLastDirectory";
+import { FileIcon } from "../../lib/icons";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -547,7 +548,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
           >
             <IconUploadCloud />
             <p className="text-sm text-slate-500 mt-2">
-              拖拽 Excel 文件到此处，或点击浏览
+              拖拽 Excel 文件到此处，或点击选择
             </p>
             <p className="text-xs text-slate-400 mt-0.5">支持 .xlsx / .xls 格式</p>
           </div>
@@ -562,8 +563,8 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
               placeholder="选择 Excel 文件"
               className={`${inputClass} flex-1`}
             />
-            <button onClick={browseFile} className={btnSecondaryClass}>
-              浏览
+            <button onClick={browseFile} className={btnSecondaryClass} title="选择文件">
+              <FileIcon />
             </button>
             <button
               onClick={() => setShowClearDialog(true)}
