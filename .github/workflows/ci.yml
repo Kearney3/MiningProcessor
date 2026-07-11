@@ -112,6 +112,11 @@ jobs:
         with:
           workspaces: src-tauri
 
+      - name: Create placeholder sidecar
+        run: |
+          mkdir -p build-sidecar
+          touch build-sidecar/tauri-bridge-x86_64-unknown-linux-gnu
+
       - name: Check
         working-directory: src-tauri
         run: cargo check
