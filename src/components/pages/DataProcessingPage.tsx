@@ -71,9 +71,8 @@ function PathInput({
         placeholder={placeholder}
         className={`${inputClass} flex-1 ${value === "" ? "border-amber-300 bg-amber-50/30" : ""}`}
       />
-      <button onClick={browse} className={btnSecondaryClass}>
+      <button onClick={browse} className={btnSecondaryClass} title={directory ? "选择文件夹" : "选择文件"}>
         {directory ? <FolderIcon /> : <FileIcon />}
-        <span>浏览</span>
       </button>
     </div>
   );

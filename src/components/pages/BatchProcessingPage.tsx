@@ -558,9 +558,8 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
             placeholder="选择包含报表的文件夹"
             className={`${inputClass} flex-1 ${folderPath === "" ? "border-amber-300 bg-amber-50/30" : ""}`}
           />
-          <button onClick={browse} className={btnSecondaryClass}>
+          <button onClick={browse} className={btnSecondaryClass} title="选择文件夹">
             <FolderIcon />
-            浏览
           </button>
           <button
             onClick={handleScan}

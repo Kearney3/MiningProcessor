@@ -264,9 +264,8 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
               placeholder="选择包含已处理数据的文件夹"
               className={`${inputClass} flex-1`}
             />
-            <button onClick={browse} className={btnSecondaryClass}>
+            <button onClick={browse} className={btnSecondaryClass} title="选择文件夹">
               <FolderIcon />
-              浏览
             </button>
           </div>
         </div>
