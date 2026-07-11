@@ -11,7 +11,7 @@ describe("usePythonBridge", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-    mockInvoke.mockResolvedValue({ pong: true, pid: 1234, version: "1.1.0" });
+    mockInvoke.mockResolvedValue({ pong: true, pid: 1234, version: "1.2.0" });
     mockListen.mockResolvedValue(() => {});
   });
 
@@ -31,7 +31,7 @@ describe("usePythonBridge", () => {
   });
 
   it("provides call function", async () => {
-    mockInvoke.mockResolvedValue({ pong: true, pid: 1, version: "1.1.0" });
+    mockInvoke.mockResolvedValue({ pong: true, pid: 1, version: "1.2.0" });
 
     const { result } = renderHook(() => usePythonBridge());
     await act(async () => {

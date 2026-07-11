@@ -3,7 +3,7 @@
 > 矿山运营 Excel 报表批量处理工具
 
 <p>
-  <img src="https://img.shields.io/badge/version-v1.1.0-blue?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-v1.2.0-blue?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/Python-≥3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="python" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square" alt="license" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="platform" />
@@ -350,6 +350,18 @@ uv run flet build windows # Windows
 ---
 
 ## 📋 更新日志
+
+### v1.2.0 · 2026-07-11
+
+- 🆕 维修记录处理模块：从出勤统计表批注自动提取维修记录，经台账匹配和故障分类后生成含 8 个统计 sheet 的 Excel 报告
+- 维修记录去重：基于（日期 + 设备名称 + 维修工时 + 批注）四字段去重，避免重复数据污染统计
+- 维修分类配置管理（Flet GUI）：支持从 Excel 导入、导出模板、导出默认配置、恢复默认
+- 维修报告结构重构：全周期设备型号故障汇总、大类统计、小类统计等 8 个 sheet
+- 百分比计算修复：修复维修报告中部分占比列数值错误的问题
+- 年份选择范围统一扩大到 ±30 年（Flet + Tauri）
+- Tauri 界面文件选择器改进：生产/工时/维修模块增加文件夹浏览按钮，所有浏览按钮统一为图标样式
+- Tauri 批量处理年/月改为下拉列表选择
+- 修复 flet 新版 `FilePickerResultEvent` 废弃导致的测试失败
 
 ### v1.1.0 · 2026-07-03
 
