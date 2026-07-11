@@ -393,7 +393,7 @@ def build_sheets(
             "记录数": ts["count"],
             "维修工时（分钟）": ts["minutes"],
             "维修工时（小时）": round(ts["minutes"] / 60, 1),
-            "占大类比": ts["minutes"] / major_mins if major_mins else 0,
+            "占大类故障时间比例": ts["minutes"] / major_mins if major_mins else 0,
             "占总故障时间比例": ts["minutes"] / month_mins if month_mins else 0,
             "大类故障占比": major_mins / month_mins if month_mins else 0,
         }
