@@ -96,7 +96,7 @@ def _detect_stats(headers: list[str], rows: list[tuple]) -> tuple[set[int], set[
     for i, h in enumerate(headers):
         if "日期" in h and "占比" not in h and "占比" not in h:
             date_cols.add(i)
-        if "占比" in h or "故障率" in h:
+        if "占比" in h or "故障率" in h or "比例" in h:
             pct_cols.add(i)
         if "小时" in h:
             hour_cols.add(i)
