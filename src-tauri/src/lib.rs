@@ -69,18 +69,36 @@ fn find_bridge_script() -> Result<std::path::PathBuf, String> {
     Err("tauri_bridge.py not found".into())
 }
 
+/// 查找 sidecar 二进制的候选路径（跨平台）
+fn sidecar_candidates(exe_dir: &std::path::Path) -> Vec<std::path::PathBuf> {
+    let mut candidates = vec![
+        exe_dir.join("tauri-bridge"),
+    ];
+
+    // Windows: 带 .exe 后缀
+    #[cfg(target_os = "windows")]
+    {
+        candidates.push(exe_dir.join("tauri-bridge.exe"));
+    }
+
+    // macOS .app bundle 结构
+    #[cfg(target_os = "macos")]
+    {
+        candidates.push(exe_dir.join("../MacOS/tauri-bridge"));
+        candidates.push(exe_dir.join("../../MacOS/tauri-bridge"));
+    }
+
+    candidates
+}
+
 /// 尝试以 sidecar 模式启动（打包后）
 ///
 /// 在可执行文件同目录下查找 `tauri-bridge` 二进制。
 /// 对于 macOS .app bundle，位于 Contents/MacOS/tauri-bridge。
+/// 对于 Windows NSIS，位于与主 .exe 同目录的 tauri-bridge.exe。
 fn try_start_sidecar() -> Option<PythonBridge> {
     let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-
-    let candidates = [
-        exe_dir.join("tauri-bridge"),
-        exe_dir.join("../MacOS/tauri-bridge"),      // 从 Resources 目录
-        exe_dir.join("../../MacOS/tauri-bridge"),    // 从嵌套目录
-    ];
+    let candidates = sidecar_candidates(&exe_dir);
 
     for candidate in &candidates {
         if candidate.exists() {
@@ -173,10 +191,16 @@ fn init_bridge(app: &tauri::App) -> Result<(), String> {
         .ok()
         .and_then(|p| p.parent().map(|d| d.to_string_lossy().to_string()))
         .unwrap_or_else(|| "unknown".into());
+    let searched: Vec<String> = sidecar_candidates(std::path::Path::new(&exe_dir))
+        .iter()
+        .map(|p| p.display().to_string())
+        .collect();
     let msg = format!(
-        "Python bridge 未找到。已搜索：{}/tauri-bridge（sidecar）和系统 Python（dev 模式）。\
-         请确保已运行 build.sh 打包 sidecar，或在开发模式下运行 pnpm tauri dev。",
-        exe_dir
+        "Python bridge 未找到。已搜索：{}（sidecar）和系统 Python（dev 模式）。\
+         请确保已运行 PyInstaller 打包 sidecar 并将 tauri-bridge{} 放在应用目录下，\
+         或在开发模式下运行 pnpm tauri dev。",
+        searched.join("、"),
+        if cfg!(target_os = "windows") { ".exe" } else { "" }
     );
     eprintln!("Warning: {}", msg);
     let _ = app.handle().emit("python-log", &serde_json::json!({
