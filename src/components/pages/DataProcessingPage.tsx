@@ -107,6 +107,19 @@ function PathInputDual({
     }
   };
 
+  const browseFolder = async () => {
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      defaultPath,
+    });
+    if (selected) {
+      const p = selected as string;
+      onChange(p);
+      onFileSelected?.(p);
+    }
+  };
+
   return (
     <div className="flex gap-2">
       <input
@@ -116,7 +129,10 @@ function PathInputDual({
         placeholder={placeholder}
         className={`${inputClass} flex-1 ${value === "" ? "border-amber-300 bg-amber-50/30" : ""}`}
       />
-      <button onClick={browseFile} className={btnSecondaryClass} title="输入路径或点击按钮选择">
+      <button onClick={browseFile} className={btnSecondaryClass} title="选择文件">
+        <FileIcon />
+      </button>
+      <button onClick={browseFolder} className={btnSecondaryClass} title="选择文件夹">
         <FolderIcon />
       </button>
     </div>
