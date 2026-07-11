@@ -63,11 +63,9 @@ jobs:
 
       - name: Build Python sidecar (PyInstaller)
         shell: bash
-        env:
-          UV_PYTHON: "3.12"
         run: |
           uv sync --dev
-          uv run pyinstaller tauri_bridge.spec \
+          uv run --python 3.12 pyinstaller tauri_bridge.spec \
             --distpath build-sidecar \
             --clean --noconfirm
           # Tauri externalBin 期望文件名带目标架构后缀
@@ -166,11 +164,9 @@ jobs:
 
       - name: Build Python sidecar (PyInstaller)
         shell: bash
-        env:
-          UV_PYTHON: "3.12"
         run: |
           uv sync --dev
-          uv run pyinstaller tauri_bridge.spec \
+          uv run --python 3.12 pyinstaller tauri_bridge.spec \
             --distpath build-sidecar \
             --clean --noconfirm
           # Tauri externalBin 期望文件名带目标架构后缀
