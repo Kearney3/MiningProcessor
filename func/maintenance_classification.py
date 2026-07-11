@@ -19,98 +19,100 @@ _DEFAULT_CLASSIFICATIONS: list[dict] = [
     # ── 发动机 ──
     {"major": "发动机", "minor": "报警/故障灯", "keywords": ["发动机报警", "发动机黄灯", "发动机故障", "发动机故障代码"]},
     {"major": "发动机", "minor": "增压器故障", "keywords": ["增压器", "涡轮增压", "涡轮"]},
-    {"major": "发动机", "minor": "内部机械故障", "keywords": ["拉缸", "曲轴", "止推瓦", "缸套", "活塞", "凸轮轴", "连杆", "缸垫", "缸盖漏油", "气门"]},
+    {"major": "发动机", "minor": "内部机械故障", "keywords": ["拉缸", "曲轴", "止推瓦", "缸套", "活塞", "凸轮轴", "连杆", "缸垫", "气门"]},
     {"major": "发动机", "minor": "启动故障", "keywords": ["不着火", "着不了火", "着不了车", "启动不了", "启动不着", "启动困难", "起动机", "启动马达", "打不着", "盘动飞轮", "旋转飞轮", "转飞轮", "盘车", "撞击飞轮"]},
-    {"major": "发动机", "minor": "停机/熄火", "keywords": ["灭火", "熄火", "停了"]},
     {"major": "发动机", "minor": "动力不足", "keywords": ["没劲儿", "没劲", "无力"]},
-    {"major": "发动机", "minor": "异响", "keywords": ["异响", "有异响"]},
-    {"major": "发动机", "minor": "冒烟", "keywords": ["冒黑烟", "冒白烟", "冒蓝烟", "冒烟"]},
-    {"major": "发动机", "minor": "漏油/渗油", "keywords": ["发动机漏油", "发动机渗油", "发动机坏", "发动机烂", "机油进柴油"]},
+    {"major": "发动机", "minor": "异响/冒烟", "keywords": ["异响", "有异响", "冒黑烟", "冒白烟", "冒蓝烟", "冒烟"]},
+    {"major": "发动机", "minor": "漏油/渗油", "keywords": ["发动机漏油", "发动机渗油", "机油进柴油", "缸盖漏油"]},
     {"major": "发动机", "minor": "喷油系统", "keywords": ["喷油器", "喷油嘴", "高压泵", "共轨", "柴油泵"]},
     {"major": "发动机", "minor": "冷却系统故障", "keywords": ["水箱漏", "冷却液漏", "水温高", "水温报警"]},
     {"major": "发动机", "minor": "排气异常", "keywords": ["排气大", "下排气", "排温", "排气温度"]},
     {"major": "发动机", "minor": "ECM/ECU", "keywords": ["ECM", "ECU"]},
-    {"major": "发动机", "minor": "发动机大修", "keywords": ["发动机维修", "维修发动机", "装发动机", "发动机大修"]},
+    {"major": "发动机", "minor": "发动机大修", "keywords": ["发动机维修", "维修发动机", "装发动机", "发动机大修", "大修"]},
     {"major": "发动机", "minor": "发动机通用", "keywords": ["发动机"]},
     # ── 变速箱 ──
-    {"major": "变速箱", "minor": "变速箱报警", "keywords": ["变速箱报警", "变速箱故障"]},
-    {"major": "变速箱", "minor": "变速箱漏油", "keywords": ["变速箱漏油", "变速箱渗油", "变速箱油冷却器"]},
+    {"major": "变速箱", "minor": "报警", "keywords": ["变速箱报警", "变速箱故障"]},
+    {"major": "变速箱", "minor": "漏油/渗油", "keywords": ["变速箱漏油", "变速箱渗油", "变速箱油冷却器"]},
     {"major": "变速箱", "minor": "换挡/离合器", "keywords": ["换挡", "挡位", "离合器", "倒挡", "不增档", "不减档"]},
     {"major": "变速箱", "minor": "变速箱保养", "keywords": ["变速箱油", "变速箱滤芯"]},
     {"major": "变速箱", "minor": "变速箱通用", "keywords": ["变速箱", "变矩器"]},
     # ── 液压系统 ──
     {"major": "液压系统", "minor": "液压泵/马达", "keywords": ["液压泵", "液压马达"]},
-    {"major": "液压系统", "minor": "液压油缸", "keywords": ["油缸"]},
+    {"major": "液压系统", "minor": "液压油缸", "keywords": ["油缸", "漏液压油", "液压油箱"]},
     {"major": "液压系统", "minor": "液压阀", "keywords": ["分配器", "溢流阀", "多路阀", "阀门"]},
-    {"major": "液压系统", "minor": "漏液压油", "keywords": ["漏液压油", "液压油箱"]},
     {"major": "液压系统", "minor": "液压通用", "keywords": ["液压"]},
     # ── 电气系统 ──
     {"major": "电气系统", "minor": "传感器", "keywords": ["传感器"]},
-    {"major": "电气系统", "minor": "继电器", "keywords": ["继电器"]},
     {"major": "电气系统", "minor": "电瓶/电池", "keywords": ["电瓶", "电池"]},
-    {"major": "电气系统", "minor": "发电机", "keywords": ["发电机"]},
+    {"major": "电气系统", "minor": "发电机", "keywords": ["发电机", "电机"]},
     {"major": "电气系统", "minor": "线束/电线", "keywords": ["电线", "线束"]},
     {"major": "电气系统", "minor": "灯泡/灯光", "keywords": ["灯泡", "灯光"]},
     {"major": "电气系统", "minor": "显示器/控制器", "keywords": ["显示屏", "控制器", "电脑板", "IGBT"]},
     {"major": "电气系统", "minor": "喇叭/雨刷", "keywords": ["喇叭", "雨刷"]},
-    {"major": "电气系统", "minor": "保险丝", "keywords": ["保险丝"]},
-    {"major": "电气系统", "minor": "电气通用", "keywords": ["电气报警", "电气故障"]},
+    {"major": "电气系统", "minor": "电气通用", "keywords": ["电气报警", "电气故障", "电气", "继电器", "保险丝"]},
     # ── 制动系统 ──
-    {"major": "制动系统", "minor": "刹车片/刹车盘", "keywords": ["刹车片", "刹车盘"]},
     {"major": "制动系统", "minor": "制动管路", "keywords": ["制动管", "制动压力管", "刹车管"]},
     {"major": "制动系统", "minor": "刹车报警", "keywords": ["刹车报警", "制动报警"]},
-    {"major": "制动系统", "minor": "驻车制动", "keywords": ["驻车"]},
-    {"major": "制动系统", "minor": "制动通用", "keywords": ["刹车", "制动"]},
+    {"major": "制动系统", "minor": "制动通用", "keywords": ["刹车", "制动", "驻车", "刹车片", "刹车盘"]},
     # ── 转向系统 ──
-    {"major": "转向系统", "minor": "转向泵", "keywords": ["转向泵"]},
-    {"major": "转向系统", "minor": "转向缸", "keywords": ["转向缸"]},
-    {"major": "转向系统", "minor": "转向报警", "keywords": ["转向报警"]},
-    {"major": "转向系统", "minor": "转向通用", "keywords": ["转向", "方向盘"]},
+    {"major": "转向系统", "minor": "转向故障", "keywords": ["转向泵", "转向缸", "转向", "方向盘", "转向报警"]},
     # ── 悬挂/车架 ──
-    {"major": "悬挂/车架", "minor": "悬挂油缸", "keywords": ["悬挂油缸"]},
-    {"major": "悬挂/车架", "minor": "悬挂漏油", "keywords": ["悬挂漏油", "悬挂渗油"]},
-    {"major": "悬挂/车架", "minor": "氮气", "keywords": ["氮气", "充氮气"]},
-    {"major": "悬挂/车架", "minor": "大梁/车架", "keywords": ["大梁", "车架"]},
-    {"major": "悬挂/车架", "minor": "支重轮/托轮", "keywords": ["支重轮", "托轮", "平衡梁"]},
+    {"major": "悬挂/车架", "minor": "悬挂油缸", "keywords": ["悬挂油缸", "悬挂漏油", "悬挂渗油"]},
+    {"major": "悬挂/车架", "minor": "大梁/车架", "keywords": ["大梁", "车架", "支重轮", "托轮", "平衡梁"]},
     {"major": "悬挂/车架", "minor": "悬挂通用", "keywords": ["悬挂"]},
     # ── 轮胎/轮马达 ──
     {"major": "轮胎/轮马达", "minor": "轮马达报警", "keywords": ["轮马达报警", "电动轮报警", "轮马达"]},
-    {"major": "轮胎/轮马达", "minor": "轮胎更换", "keywords": ["换轮胎", "更换轮胎"]},
-    {"major": "轮胎/轮马达", "minor": "轮胎补气", "keywords": ["轮胎补气", "调节胎压", "补气"]},
     {"major": "轮胎/轮马达", "minor": "轮胎损伤", "keywords": ["轮胎花纹", "轮胎脱空", "轮胎漏气", "油封漏油", "背靠背"]},
     {"major": "轮胎/轮马达", "minor": "轮胎通用", "keywords": ["轮胎", "轮辋"]},
     # ── 润滑系统 ──
     {"major": "润滑系统", "minor": "润滑报警", "keywords": ["润滑报警"]},
-    {"major": "润滑系统", "minor": "加注黄油", "keywords": ["加注黄油", "充黄油", "打点油", "打点润滑"]},
     {"major": "润滑系统", "minor": "润滑管路", "keywords": ["润滑管", "润滑软管"]},
     {"major": "润滑系统", "minor": "润滑通用", "keywords": ["润滑"]},
     # ── 空调 ──
-    {"major": "空调", "minor": "空调不工作", "keywords": ["空调不工作", "空调没有"]},
-    {"major": "空调", "minor": "加制冷剂", "keywords": ["制冷剂", "冷却剂"]},
-    {"major": "空调", "minor": "空调通用", "keywords": ["空调"]},
-    # ── 排气/尾气处理 ──
-    {"major": "排气/尾气处理", "minor": "排气管", "keywords": ["排气管"]},
-    {"major": "排气/尾气处理", "minor": "SCR/DPF", "keywords": ["SCR", "DPF", "尿素"]},
-    {"major": "排气/尾气处理", "minor": "排气通用", "keywords": ["消声器"]},
+    {"major": "空调", "minor": "空调异响", "keywords": ["异响"]},
+    {"major": "空调", "minor": "空调故障", "keywords": ["空调不工作", "空调没有", "空调异响", "空调"]},
+    # ── 排气系统 ──
+    {"major": "排气系统", "minor": "排气通用", "keywords": ["消声器", "排气管", "SCR", "DPF", "尿素", "排气管异响", "排气异响"]},
     # ── 事故/损失 ──
-    {"major": "事故/损失", "minor": "烧车/火灾", "keywords": ["烧车", "起火", "着火", "防火系统"]},
-    {"major": "事故/损失", "minor": "资产损失", "keywords": ["资产损失", "报废", "财产损失"]},
+    {"major": "事故/损失", "minor": "资产损失", "keywords": ["资产损失", "报废", "财产损失", "烧车", "起火", "着火", "防火系统"]},
     {"major": "事故/损失", "minor": "碰撞/倾覆", "keywords": ["碰撞", "倾覆", "翻车"]},
     # ── 日常维护 ──
-    {"major": "日常维护", "minor": "加注机油", "keywords": ["补加机油", "升机油", "加油"]},
+    {"major": "日常维护", "minor": "动力系统保养", "keywords": ["补加机油", "升机油", "加油", "机油"]},
+    {"major": "日常维护", "minor": "轮胎更换", "keywords": ["换轮胎", "更换轮胎"]},
+    {"major": "日常维护", "minor": "轮胎保养", "keywords": ["轮胎补气", "调节胎压", "补气", "氮气", "充氮气"]},
+    {"major": "日常维护", "minor": "润滑系统保养", "keywords": ["加注黄油", "充黄油", "打点油", "打点润滑"]},
+    {"major": "日常维护", "minor": "加制冷剂", "keywords": ["制冷剂", "冷却剂"]},
     {"major": "日常维护", "minor": "加注黄油", "keywords": ["补加黄油", "已充.*黄油", "已加注.*黄油", "公斤黄油", "黄油箱"]},
-    {"major": "日常维护", "minor": "吹空滤", "keywords": ["吹清空滤", "空滤吹风", "吹空滤"]},
+    {"major": "日常维护", "minor": "空滤", "keywords": ["滤芯", "吹清空滤", "空滤吹风", "吹空滤"]},
     {"major": "日常维护", "minor": "加注防冻液", "keywords": ["补加防冻液", "升防冻液"]},
-    {"major": "日常维护", "minor": "加注液压油", "keywords": ["补加液压油", "升液压油"]},
+    {"major": "日常维护", "minor": "液压油系统保养", "keywords": ["补加液压油", "升液压油"]},
     {"major": "日常维护", "minor": "保养", "keywords": ["小时保养"]},
 ]
 
 _DEFAULT_NOISE_EXACT: set[str] = {
-    "出车", "已点检", "正常", "出车了", "启动检查", "点检时",
-    "点检", "均为正常", "夜班", "白班", "交接班",
-    "已吹清空滤", "已吹清空滤，出车。", "已吹清空滤，出车",
-    "升机油", "升防冻液", "已补加机油", "着车", "着车，出车。",
-    "着车，出车", "出车。", "停车", "计划点检",
+    "交接班",
+    "停车",
+    "出车",
+    "出车。",
+    "出车了",
+    "升机油",
+    "升防冻液",
+    "启动检查",
+    "均为正常",
+    "夜班",
+    "已吹清空滤",
+    "已吹清空滤，出车",
+    "已吹清空滤，出车。",
+    "已点检",
+    "已补加机油",
+    "正常",
+    "点检",
+    "点检时",
+    "白班",
+    "着车",
+    "着车，出车",
+    "着车，出车。",
+    "计划点检",
 }
 
 _DEFAULT_NOISE_PATTERNS: list[str] = [
@@ -252,6 +254,58 @@ def is_fault_record(
     return True
 
 
+def _group_by_major(classifications: list[dict]) -> dict[str, list[dict]]:
+    """按大类分组，保留各组内原始顺序。
+
+    Args:
+        classifications: 分类规则列表。
+
+    Returns:
+        按大类分组的 OrderedDict，值为该大类下的规则列表（保持原顺序）。
+    """
+    grouped: dict[str, list[dict]] = {}
+    for entry in classifications:
+        major = entry["major"]
+        grouped.setdefault(major, []).append(entry)
+    return grouped
+
+
+def _best_major(content: str, grouped: dict[str, list[dict]]) -> str | None:
+    """从所有大选中选出最佳大类。
+
+    评分规则（元组比较）：
+      主指标 = 该大类下命中关键词的小类数量（entry_count）
+      次指标 = 该大类下所有命中关键词中的最长字符数（max_keyword_len）
+      两个指标均更高者胜出；平局时优先返回列表靠前的大类。
+
+    Args:
+        content: 维修内容文本。
+        grouped: 按大类的分组数据（顺序保留）。
+
+    Returns:
+        最佳大类名称，无任何关键字匹配时返回 None。
+    """
+    best = None
+    best_score = (0, 0)
+    for major, entries in grouped.items():
+        entry_count = 0
+        max_len = 0
+        for entry in entries:
+            matched_any = False
+            for kw in entry["keywords"]:
+                if kw in content:
+                    kw_len = len(kw)
+                    if kw_len > max_len:
+                        max_len = kw_len
+                    matched_any = True
+            if matched_any:
+                entry_count += 1
+        if entry_count > 0 and (entry_count, max_len) > best_score:
+            best_score = (entry_count, max_len)
+            best = major
+    return best
+
+
 def classify(
     content: str,
     *,
@@ -262,7 +316,10 @@ def classify(
 ) -> tuple[str | None, str | None]:
     """对维修内容进行大类+小类分类。
 
-    按配置行顺序匹配，先命中先分类。
+    两级层次匹配：
+      1. 先按 (entry_count, max_keyword_len) 评分选出最佳大类；
+      2. 再在大类内按原顺序（具体优先）匹配小类。
+      entry_count = 命中关键词的小类数量，max_keyword_len = 最长匹配关键词字符数。
 
     Args:
         content: 维修内容文本。
@@ -288,13 +345,17 @@ def classify(
     for pat in compiled_noise:
         if pat.match(content.strip()):
             return None, None
-    for entry in classifications:
-        major = entry["major"]
-        minor = entry["minor"]
-        keywords = entry["keywords"]
-        if any(kw in content for kw in keywords):
-            return major, minor
-    return "其他", "未分类"
+
+    # 两级层次匹配：先确定大类，再在大类内匹配小类
+    grouped = _group_by_major(classifications)
+    best_major = _best_major(content, grouped)
+    if best_major is None:
+        return "其他", "未分类"
+
+    for entry in grouped[best_major]:
+        if any(kw in content for kw in entry["keywords"]):
+            return best_major, entry["minor"]
+    return best_major, "未分类"
 
 
 def import_classifications_from_excel(path: str) -> dict:
