@@ -100,37 +100,67 @@ fn sidecar_candidates(exe_dir: &std::path::Path) -> Vec<std::path::PathBuf> {
     candidates
 }
 
+/// 在目录中递归查找 sidecar 二进制（最大深度 4 层）
+fn find_sidecar_binary(root: &std::path::Path, max_depth: u32) -> Option<std::path::PathBuf> {
+    let target = if cfg!(target_os = "windows") {
+        "tauri-bridge.exe"
+    } else {
+        "tauri-bridge"
+    };
+    if max_depth == 0 {
+        return None;
+    }
+    let entries = std::fs::read_dir(root).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            if let Some(found) = find_sidecar_binary(&path, max_depth - 1) {
+                return Some(found);
+            }
+        } else if path.file_name().map_or(false, |n| n == target) {
+            // onedir 模式需要 _internal 目录在同级
+            if path.parent().map_or(false, |p| p.join("_internal").exists()) {
+                return Some(path);
+            }
+        }
+    }
+    None
+}
+
 /// 尝试以 sidecar 模式启动（打包后）
 ///
-/// 按优先级在多个路径查找 sidecar 二进制。
+/// 递归搜索 sidecar 二进制，找到后尝试启动。
 fn try_start_sidecar(app: &tauri::App) -> Option<PythonBridge> {
     let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-
-    // Tauri resource_dir 提供最准确的资源目录路径
     let resource_dir = app.path().resource_dir().ok();
-    let mut candidates = sidecar_candidates(&exe_dir);
 
-    // 追加 resource_dir 下的候选路径
+    // 收集搜索根目录
+    let mut search_roots = vec![exe_dir.clone()];
     if let Some(ref res_dir) = resource_dir {
-        #[cfg(target_os = "windows")]
-        {
-            candidates.push(res_dir.join("build-sidecar/tauri-bridge/tauri-bridge.exe"));
-            candidates.push(res_dir.join("tauri-bridge/tauri-bridge.exe"));
-            candidates.push(res_dir.join("tauri-bridge.exe"));
-        }
-        #[cfg(target_os = "macos")]
-        {
-            candidates.push(res_dir.join("build-sidecar/tauri-bridge/tauri-bridge"));
-            candidates.push(res_dir.join("tauri-bridge/tauri-bridge"));
-            candidates.push(res_dir.join("tauri-bridge"));
+        if res_dir != &exe_dir {
+            search_roots.push(res_dir.clone());
         }
     }
 
+    // 递归搜索 + 尝试启动
+    for root in &search_roots {
+        if let Some(binary) = find_sidecar_binary(root, 4) {
+            if let Ok(bridge) = PythonBridge::from_command(&binary) {
+                return Some(bridge);
+            }
+        }
+    }
+
+    // 回退：静态候选路径
+    let candidates = sidecar_candidates(&exe_dir);
     for candidate in &candidates {
         if candidate.exists() {
-            return PythonBridge::from_command(candidate).ok();
+            if let Ok(bridge) = PythonBridge::from_command(candidate) {
+                return Some(bridge);
+            }
         }
     }
+
     None
 }
 
