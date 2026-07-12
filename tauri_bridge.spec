@@ -8,6 +8,8 @@ PyInstaller spec — 将 tauri_bridge.py + func/* + 依赖打包为单文件可�
 """
 
 import os
+import sys
+import glob
 
 block_cipher = None
 
@@ -29,10 +31,16 @@ data_dir = os.path.join(os.path.dirname(os.path.abspath(SPEC)), 'data')
 if os.path.isdir(data_dir):
     func_datas.append((data_dir, 'data'))
 
+# Windows: 显式收集 Python DLL（含 VC++ 运行时依赖）
+python_dlls = []
+if os.name == 'nt':
+    for dll in glob.glob(os.path.join(sys.prefix, '*.dll')):
+        python_dlls.append((dll, '.'))
+
 a = Analysis(
     ['tauri_bridge.py'],
     pathex=[],
-    binaries=[],
+    binaries=python_dlls,
     datas=func_datas,
     hiddenimports=[
         'pandas',
