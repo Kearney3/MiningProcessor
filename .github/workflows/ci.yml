@@ -114,8 +114,8 @@ jobs:
 
       - name: Create placeholder sidecar
         run: |
-          mkdir -p build-sidecar
-          touch build-sidecar/tauri-bridge-x86_64-unknown-linux-gnu
+          mkdir -p build-sidecar/tauri-bridge
+          touch build-sidecar/tauri-bridge/tauri-bridge
 
       - name: Check
         working-directory: src-tauri
