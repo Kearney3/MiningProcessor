@@ -22,6 +22,13 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+# ─── 强制 UTF-8 编码 ───
+# PyInstaller 打包后 PYTHONUTF8 环境变量可能不生效，
+# 需要在代码中显式设置，避免中文 Windows 使用 GBK 编码
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 logger = logging.getLogger(__name__)
 
 # ─── 项目路径注册 ───
