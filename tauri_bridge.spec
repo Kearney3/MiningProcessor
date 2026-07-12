@@ -1,10 +1,13 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PyInstaller spec — 将 tauri_bridge.py + func/* + 依赖打包为单文件可执行程序。
+PyInstaller spec — 将 tauri_bridge.py + func/* + 依赖打包为可执行程序。
 
 用法:
   pyinstaller tauri_bridge.spec
-  输出: dist/tauri-bridge (macOS) 或 dist/tauri-bridge.exe (Windows)
+  输出: dist/tauri-bridge/ 目录（onedir 模式，避免 Windows Defender 误杀）
+
+注意: 使用 onedir 而非 onefile，因为 onefile 解压到 %TEMP%\_MEI* 会被
+      Windows Defender 立即删除，导致 LoadLibrary 失败。
 """
 
 import os
@@ -34,8 +37,13 @@ if os.path.isdir(data_dir):
 # Windows: 显式收集 Python DLL（含 VC++ 运行时依赖）
 python_dlls = []
 if os.name == 'nt':
-    for dll in glob.glob(os.path.join(sys.prefix, '*.dll')):
+    dll_src = sys.base_prefix if hasattr(sys, 'base_prefix') else sys.prefix
+    for dll in glob.glob(os.path.join(dll_src, '*.dll')):
         python_dlls.append((dll, '.'))
+    dlls_subdir = os.path.join(dll_src, 'DLLs')
+    if os.path.isdir(dlls_subdir):
+        for dll in glob.glob(os.path.join(dlls_subdir, '*.dll')):
+            python_dlls.append((dll, '.'))
 
 a = Analysis(
     ['tauri_bridge.py'],
@@ -66,7 +74,7 @@ a = Analysis(
     ],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=['runtime_hook_dll_path.py'] if os.name == 'nt' else [],
     excludes=[
         'tkinter',
         'matplotlib',
@@ -86,30 +94,38 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+# onedir 模式：exe 不内嵌二进制，文件放在同目录下
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='tauri-bridge',
     debug=False,
     bootloader_ignore_signals=False,
-    strip=True,             # 去掉调试符号，减小体积
-    upx=True,               # 压缩（需安装 upx）
-    console=True,           # 需要 stdin/stdout/stderr 通信
+    console=True,
 )
 
-# macOS .app bundle 图标（sidecar 是 console 应用，图标由 Tauri 管理）
+# 收集所有依赖到目录
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=False,
+    name='tauri-bridge',
+)
+
+# macOS .app bundle
 _spec_dir = os.path.dirname(os.path.abspath(SPEC))
 app_icon = os.path.join(_spec_dir, 'assets', 'app_icon.icns')
 if not os.path.isfile(app_icon):
     app_icon = os.path.join(_spec_dir, 'src-tauri', 'icons', 'icon.icns')
 
-if os.name == 'posix':  # macOS / Linux
+if os.name == 'posix':
     app = BUNDLE(
-        exe,
+        coll,
         name='MiningProcessor.app',
         icon=app_icon if os.path.isfile(app_icon) else None,
         bundle_identifier='com.kearney.mining-processor',
