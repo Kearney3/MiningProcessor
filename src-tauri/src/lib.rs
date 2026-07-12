@@ -70,15 +70,18 @@ fn find_bridge_script() -> Result<std::path::PathBuf, String> {
 }
 
 /// 查找 sidecar 二进制的候选路径（跨平台）
+/// onedir 模式下 sidecar 是一个目录，exe 在目录内
 fn sidecar_candidates(exe_dir: &std::path::Path) -> Vec<std::path::PathBuf> {
     let mut candidates = vec![
         exe_dir.join("tauri-bridge"),
     ];
 
-    // Windows: 带 .exe 后缀
+    // Windows: 带 .exe 后缀 + onedir 目录结构
     #[cfg(target_os = "windows")]
     {
         candidates.push(exe_dir.join("tauri-bridge.exe"));
+        // onedir 模式：sidecar 目录在 exe 同级（resources 目录）
+        candidates.push(exe_dir.join("tauri-bridge/tauri-bridge.exe"));
     }
 
     // macOS .app bundle 结构
@@ -86,6 +89,9 @@ fn sidecar_candidates(exe_dir: &std::path::Path) -> Vec<std::path::PathBuf> {
     {
         candidates.push(exe_dir.join("../MacOS/tauri-bridge"));
         candidates.push(exe_dir.join("../../MacOS/tauri-bridge"));
+        // onedir 模式：sidecar 目录在 Resources 目录
+        candidates.push(exe_dir.join("../Resources/tauri-bridge/tauri-bridge"));
+        candidates.push(exe_dir.join("../../Resources/tauri-bridge/tauri-bridge"));
     }
 
     candidates
