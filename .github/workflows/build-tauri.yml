@@ -1,5 +1,5 @@
 # docs: https://v2.tauri.app/distribute/pipelines/github/
-# 构建 Tauri 桌面应用：macOS (arm64) + Windows (x64 / ARM64)
+# 构建 Tauri 桌面应用：macOS (arm64) + Windows (x64)
 
 name: Build Tauri App
 
@@ -25,7 +25,7 @@ jobs:
   # ══════════════════════════════════════════════════════════
   build-macos:
     name: macOS arm64
-    runs-on: macos-latest  # Apple Silicon (M1+)
+    runs-on: macos-latest
     needs: []
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     permissions:
@@ -68,7 +68,7 @@ jobs:
           uv run pyinstaller tauri_bridge.spec \
             --distpath build-sidecar \
             --clean --noconfirm
-          ls -la build-sidecar/tauri-bridge/
+          ls -lh build-sidecar/tauri-bridge/tauri-bridge
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -77,12 +77,29 @@ jobs:
         with:
           args: "--target aarch64-apple-darwin --bundles app"
 
+      - name: Embed sidecar into .app bundle
+        shell: bash
+        run: |
+          BUNDLE_DIR="src-tauri/target/aarch64-apple-darwin/release/bundle"
+          APP_DIR=$(find "$BUNDLE_DIR/macos" -name "*.app" -maxdepth 1 | head -1)
+          if [ -n "$APP_DIR" ]; then
+            # onedir 模式：复制整个 sidecar 目录到 Resources
+            cp -R build-sidecar/tauri-bridge "$APP_DIR/Contents/Resources/tauri-bridge"
+            chmod +x "$APP_DIR/Contents/Resources/tauri-bridge/tauri-bridge"
+            codesign --force --sign - "$APP_DIR/Contents/Resources/tauri-bridge/tauri-bridge" || true
+            codesign --force --sign - "$APP_DIR" || true
+            echo "✅ Sidecar embedded in $APP_DIR/Contents/Resources/tauri-bridge/"
+            ls -lh "$APP_DIR/Contents/Resources/tauri-bridge/"
+          else
+            echo "⚠️ .app bundle not found"
+            exit 1
+          fi
+
       - name: Create DMG
         shell: bash
         run: |
           BUNDLE_DIR="src-tauri/target/aarch64-apple-darwin/release/bundle"
           DMG_DIR="$BUNDLE_DIR/dmg"
-
           rm -f "$DMG_DIR"/*.dmg 2>/dev/null || true
 
           APP_DIR=$(find "$BUNDLE_DIR/macos" -name "*.app" -maxdepth 1 | head -1)
@@ -94,16 +111,11 @@ jobs:
           STAGING=$(mktemp -d)
           cp -R "$APP_DIR" "$STAGING/"
           ln -s /Applications "$STAGING/Applications"
-          hdiutil create \
-            -volname "$APP_NAME" \
-            -srcfolder "$STAGING" \
-            -ov -format UDZO \
-            "$DMG_PATH"
+          hdiutil create -volname "$APP_NAME" -srcfolder "$STAGING" -ov -format UDZO "$DMG_PATH"
           rm -rf "$STAGING"
 
-          echo "=== DMG verification ==="
           ls -lh "$DMG_PATH"
-          hdiutil verify "$DMG_PATH" && echo "✅ DMG integrity OK" || echo "❌ DMG corrupted"
+          hdiutil verify "$DMG_PATH" && echo "✅ DMG OK" || echo "❌ DMG corrupted"
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
@@ -166,7 +178,7 @@ jobs:
           uv run pyinstaller tauri_bridge.spec \
             --distpath build-sidecar \
             --clean --noconfirm
-          ls -la build-sidecar/tauri-bridge/
+          ls -lh build-sidecar/tauri-bridge/tauri-bridge.exe
 
       - name: Build frontend
         run: pnpm build
@@ -178,74 +190,23 @@ jobs:
         with:
           args: "--target x86_64-pc-windows-msvc"
 
+      - name: Embed sidecar into NSIS output
+        shell: bash
+        run: |
+          NSIS_DIR="src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis"
+          if [ -d "$NSIS_DIR" ]; then
+            cp -R build-sidecar/tauri-bridge "$NSIS_DIR/tauri-bridge"
+            echo "✅ Sidecar copied to $NSIS_DIR/tauri-bridge/"
+            ls -lh "$NSIS_DIR/tauri-bridge/"
+          else
+            echo "⚠️ NSIS output not found"
+            exit 1
+          fi
+
       - name: Upload Windows x64 artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-x64
-          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
-          if-no-files-found: warn
-
-  # ══════════════════════════════════════════════════════════
-  # Windows ARM64
-  # ══════════════════════════════════════════════════════════
-  build-windows-arm64:
-    name: Windows ARM64
-    runs-on: windows-11-arm
-    needs: []
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
-          fetch-depth: 0
-
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-pc-windows-msvc
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Install pnpm
-        run: npm install -g pnpm
-
-      - name: Install frontend dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build Python sidecar (PyInstaller)
-        shell: bash
-        run: |
-          uv sync --dev
-          uv run pyinstaller tauri_bridge.spec \
-            --distpath build-sidecar \
-            --clean --noconfirm
-          ls -la build-sidecar/tauri-bridge/
-
-      - name: Build frontend
-        run: pnpm build
-
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: "--target aarch64-pc-windows-msvc"
-
-      - name: Upload Windows ARM64 artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-arm64
-          path: src-tauri/target/aarch64-pc-windows-msvc/release/bundle/nsis/*.exe
+          path: |
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
           if-no-files-found: warn
