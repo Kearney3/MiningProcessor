@@ -99,12 +99,27 @@ fn sidecar_candidates(exe_dir: &std::path::Path) -> Vec<std::path::PathBuf> {
 
 /// 尝试以 sidecar 模式启动（打包后）
 ///
-/// 在可执行文件同目录下查找 `tauri-bridge` 二进制。
-/// 对于 macOS .app bundle，位于 Contents/MacOS/tauri-bridge。
-/// 对于 Windows NSIS，位于与主 .exe 同目录的 tauri-bridge.exe。
-fn try_start_sidecar() -> Option<PythonBridge> {
+/// 按优先级在多个路径查找 sidecar 二进制。
+fn try_start_sidecar(app: &tauri::App) -> Option<PythonBridge> {
     let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-    let candidates = sidecar_candidates(&exe_dir);
+
+    // Tauri resource_dir 提供最准确的资源目录路径
+    let resource_dir = app.path().resource_dir().ok();
+    let mut candidates = sidecar_candidates(&exe_dir);
+
+    // 追加 resource_dir 下的候选路径
+    if let Some(ref res_dir) = resource_dir {
+        #[cfg(target_os = "windows")]
+        {
+            candidates.push(res_dir.join("tauri-bridge").join("tauri-bridge.exe"));
+            candidates.push(res_dir.join("tauri-bridge.exe"));
+        }
+        #[cfg(target_os = "macos")]
+        {
+            candidates.push(res_dir.join("tauri-bridge").join("tauri-bridge"));
+            candidates.push(res_dir.join("tauri-bridge"));
+        }
+    }
 
     for candidate in &candidates {
         if candidate.exists() {
@@ -159,7 +174,7 @@ fn spawn_stderr_logger(bridge: &PythonBridge, handle: &tauri::AppHandle) {
 /// 在 setup 中调用，直接写入 AppState。
 fn init_bridge(app: &tauri::App) -> Result<(), String> {
     // 优先尝试 sidecar 模式（打包后）
-    if let Some(bridge) = try_start_sidecar() {
+    if let Some(bridge) = try_start_sidecar(app) {
         let pid = bridge.pid();
         spawn_stderr_logger(&bridge, app.handle());
         let _ = app.handle().emit("python-log", &serde_json::json!({
@@ -197,16 +212,17 @@ fn init_bridge(app: &tauri::App) -> Result<(), String> {
         .ok()
         .and_then(|p| p.parent().map(|d| d.to_string_lossy().to_string()))
         .unwrap_or_else(|| "unknown".into());
+    let resource_dir = app.path().resource_dir()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|_| "unknown".into());
     let searched: Vec<String> = sidecar_candidates(std::path::Path::new(&exe_dir))
         .iter()
         .map(|p| p.display().to_string())
         .collect();
     let msg = format!(
-        "Python bridge 未找到。已搜索：{}（sidecar）和系统 Python（dev 模式）。\
-         请确保已运行 PyInstaller 打包 sidecar 并将 tauri-bridge{} 放在应用目录下，\
-         或在开发模式下运行 pnpm tauri dev。",
-        searched.join("、"),
-        if cfg!(target_os = "windows") { ".exe" } else { "" }
+        "Python bridge 未找到。已搜索：exe_dir={} resource_dir={} 候选={}。\
+         请确保已运行 PyInstaller 打包 sidecar 并嵌入应用。",
+        exe_dir, resource_dir, searched.join("、")
     );
     eprintln!("Warning: {}", msg);
     let _ = app.handle().emit("python-log", &serde_json::json!({
