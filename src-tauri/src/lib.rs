@@ -80,7 +80,8 @@ fn sidecar_candidates(exe_dir: &std::path::Path) -> Vec<std::path::PathBuf> {
     #[cfg(target_os = "windows")]
     {
         candidates.push(exe_dir.join("tauri-bridge.exe"));
-        // onedir 模式：sidecar 目录在 exe 同级（resources 目录）
+        // bundle.resources 保留完整目录结构
+        candidates.push(exe_dir.join("build-sidecar/tauri-bridge/tauri-bridge.exe"));
         candidates.push(exe_dir.join("tauri-bridge/tauri-bridge.exe"));
     }
 
@@ -89,7 +90,9 @@ fn sidecar_candidates(exe_dir: &std::path::Path) -> Vec<std::path::PathBuf> {
     {
         candidates.push(exe_dir.join("../MacOS/tauri-bridge"));
         candidates.push(exe_dir.join("../../MacOS/tauri-bridge"));
-        // onedir 模式：sidecar 目录在 Resources 目录
+        // bundle.resources 保留完整目录结构
+        candidates.push(exe_dir.join("../Resources/build-sidecar/tauri-bridge/tauri-bridge"));
+        candidates.push(exe_dir.join("../../Resources/build-sidecar/tauri-bridge/tauri-bridge"));
         candidates.push(exe_dir.join("../Resources/tauri-bridge/tauri-bridge"));
         candidates.push(exe_dir.join("../../Resources/tauri-bridge/tauri-bridge"));
     }
@@ -111,12 +114,14 @@ fn try_start_sidecar(app: &tauri::App) -> Option<PythonBridge> {
     if let Some(ref res_dir) = resource_dir {
         #[cfg(target_os = "windows")]
         {
-            candidates.push(res_dir.join("tauri-bridge").join("tauri-bridge.exe"));
+            candidates.push(res_dir.join("build-sidecar/tauri-bridge/tauri-bridge.exe"));
+            candidates.push(res_dir.join("tauri-bridge/tauri-bridge.exe"));
             candidates.push(res_dir.join("tauri-bridge.exe"));
         }
         #[cfg(target_os = "macos")]
         {
-            candidates.push(res_dir.join("tauri-bridge").join("tauri-bridge"));
+            candidates.push(res_dir.join("build-sidecar/tauri-bridge/tauri-bridge"));
+            candidates.push(res_dir.join("tauri-bridge/tauri-bridge"));
             candidates.push(res_dir.join("tauri-bridge"));
         }
     }
