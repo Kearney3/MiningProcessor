@@ -77,24 +77,6 @@ jobs:
         with:
           args: "--target aarch64-apple-darwin --bundles app"
 
-      - name: Embed sidecar into .app bundle
-        shell: bash
-        run: |
-          BUNDLE_DIR="src-tauri/target/aarch64-apple-darwin/release/bundle"
-          APP_DIR=$(find "$BUNDLE_DIR/macos" -name "*.app" -maxdepth 1 | head -1)
-          if [ -n "$APP_DIR" ]; then
-            # onedir 模式：复制整个 sidecar 目录到 Resources
-            cp -R build-sidecar/tauri-bridge "$APP_DIR/Contents/Resources/tauri-bridge"
-            chmod +x "$APP_DIR/Contents/Resources/tauri-bridge/tauri-bridge"
-            codesign --force --sign - "$APP_DIR/Contents/Resources/tauri-bridge/tauri-bridge" || true
-            codesign --force --sign - "$APP_DIR" || true
-            echo "✅ Sidecar embedded in $APP_DIR/Contents/Resources/tauri-bridge/"
-            ls -lh "$APP_DIR/Contents/Resources/tauri-bridge/"
-          else
-            echo "⚠️ .app bundle not found"
-            exit 1
-          fi
-
       - name: Create DMG
         shell: bash
         run: |
@@ -190,23 +172,9 @@ jobs:
         with:
           args: "--target x86_64-pc-windows-msvc"
 
-      - name: Embed sidecar into NSIS output
-        shell: bash
-        run: |
-          NSIS_DIR="src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis"
-          if [ -d "$NSIS_DIR" ]; then
-            cp -R build-sidecar/tauri-bridge "$NSIS_DIR/tauri-bridge"
-            echo "✅ Sidecar copied to $NSIS_DIR/tauri-bridge/"
-            ls -lh "$NSIS_DIR/tauri-bridge/"
-          else
-            echo "⚠️ NSIS output not found"
-            exit 1
-          fi
-
       - name: Upload Windows x64 artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-x64
-          path: |
-            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
           if-no-files-found: warn
