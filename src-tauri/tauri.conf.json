@@ -34,8 +34,7 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "../config.json",
-      "../build-sidecar/tauri-bridge/**"
+      "../config.json"
     ]
   }
 }
