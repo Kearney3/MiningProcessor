@@ -60,7 +60,18 @@ impl PythonBridge {
         let mut cmd = Command::new(binary_path);
         cmd.stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+            .stderr(Stdio::piped())
+            // 强制 UTF-8 输出，避免中文 Windows 使用 GBK 编码
+            .env("PYTHONUTF8", "1")
+            .env("PYTHONIOENCODING", "utf-8");
+
+        // Windows: 隐藏控制台窗口
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            // CREATE_NO_WINDOW = 0x08000000
+            cmd.creation_flags(0x08000000);
+        }
 
         let mut child = cmd
             .spawn()
