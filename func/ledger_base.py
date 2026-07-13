@@ -1,21 +1,16 @@
 """
 台账基类模块
 为 EquipmentLedger 和 OilLedger 提供共享的通用台账逻辑：
-加载、模糊匹配、搜索缓存、模板导出、字典转换。
+加载、名称匹配、搜索缓存、模板导出、字典转换。
 """
 
 import pandas as pd
 from pathlib import Path
 from typing import Optional
-from rapidfuzz import fuzz, process
-
 from func.logger import get_logger
 from func.string_utils import clean_string
 
 logger = get_logger(__name__)
-
-# 共用模糊匹配阈值（相似度 >= 此值视为匹配）
-FUZZY_THRESHOLD = 70
 
 
 class LedgerBase:
@@ -127,7 +122,7 @@ class LedgerBase:
 
     def match(self, raw_name: str) -> Optional[dict]:
         """
-        模糊匹配名称
+        精确匹配名称
         返回: {"标准名称": str, "原始名称": str, "匹配方式": str, "相似度": int} 或 None
         """
         if self._df is None or not raw_name:
@@ -137,7 +132,7 @@ class LedgerBase:
         if not raw_name:
             return None
 
-        # 精确匹配：O(1) 字典查找替代遍历 (H6)
+        # O(1) 字典精确查找
         matched_standards = self._search_cache.get(raw_name)
         if matched_standards:
             return {
@@ -147,32 +142,6 @@ class LedgerBase:
                 "相似度": 100,
             }
 
-        # 2. 前缀匹配
-        for keyword, matched_standards in self._search_cache.items():
-            if raw_name.startswith(keyword) or keyword.startswith(raw_name):
-                return {
-                    "标准名称": matched_standards[0],
-                    "原始名称": raw_name,
-                    "匹配方式": "前缀",
-                    "相似度": 80,
-                }
-
-        # 3. 相似度匹配（使用 rapidfuzz）
-        all_keywords = list(self._search_cache.keys())
-        if all_keywords:
-            best_match = process.extractOne(
-                raw_name, all_keywords, scorer=fuzz.ratio
-            )
-            if best_match and best_match[1] >= FUZZY_THRESHOLD:
-                matched_standards = self._search_cache[best_match[0]]
-                return {
-                    "标准名称": matched_standards[0],
-                    "原始名称": raw_name,
-                    "匹配方式": "相似度",
-                    "相似度": int(best_match[1]),
-                }
-
-        # 4. 无匹配
         return None
 
     def to_dict(self) -> list[dict]:

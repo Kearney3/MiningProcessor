@@ -1,6 +1,6 @@
 """
 设备台账模块
-用于导入和管理设备台账表，提供设备名称模糊匹配功能
+用于导入和管理设备台账表，提供设备名称精确匹配功能
 """
 
 from typing import Optional
@@ -30,12 +30,11 @@ class EquipmentLedger(LedgerBase):
 
     匹配策略（优先级由高到低）：
     1. 设备编号精确匹配（match_by_id）—— O(1) 缓存查找
-    2. 设备名称前缀匹配（继承自 LedgerBase.match）
-    3. rapidfuzz 模糊匹配（继承自 LedgerBase.match）
+    2. 设备名称精确匹配（继承自 LedgerBase.match）
 
     典型用法：
         ledger = EquipmentLedger("设备台账.xlsx")
-        result = ledger.match_device(name="CAT785D-01", device_id="#1101")
+        result = ledger.match_device(name="NTE240 #1101", device_id="#1101")
         # -> {"标准设备名称": "NTE240 HT#1101", "标准设备编号": "HT#1101", "标准公司名称": "A公司"}
     """
     def __init__(self, ledger_path: Optional[str] = None):
@@ -108,29 +107,44 @@ class EquipmentLedger(LedgerBase):
 
     def match_device(self, name: Optional[str] = None, device_id: Optional[str] = None) -> Optional[dict]:
         """
-        组合匹配：优先用设备编号精确匹配，其次用设备名称模糊匹配。
+        组合匹配：按以下优先级尝试，命中即返回。
+        1. 同时有编号和名称 → 先编号，未命中再名称
+        2. 只有编号 → 编号匹配
+        3. 只有名称 → 名称匹配
+        4. 都没有 → None
+
+        未匹配的记录会输出 warning 日志。
         返回 {"标准设备名称", "标准设备编号", "标准公司名称"} 或 None
         """
-        # 优先用编号精确匹配
-        if device_id:
-            result = self.match_by_id(device_id)
-            if result:
-                return result
+        cleaned_name = clean_string(name) if name else None
+        cleaned_id = clean_string(device_id) if device_id else None
 
-        # 其次用名称模糊匹配
-        if name:
-            name_result = self.match(clean_string(name))
+        # 都没有
+        if not cleaned_id and not cleaned_name:
+            return None
+
+        result = None
+
+        if cleaned_id:
+            # 编号匹配（优先级最高）
+            result = self.match_by_id(cleaned_id)
+
+        if not result and cleaned_name:
+            # 名称匹配（编号未命中或无编号时）
+            name_result = self.match(cleaned_name)
             if name_result:
-                # 补充编号和公司信息：O(1) 反向索引查找 (H7)
                 std_name = name_result["标准名称"]
                 info = self._name_to_info.get(std_name)
                 if info:
-                    return info
-                # 没有完整信息，返回部分
-                return {
-                    "标准设备名称": std_name,
-                    "标准设备编号": "",
-                    "标准公司名称": "",
-                }
+                    result = info
+                else:
+                    result = {
+                        "标准设备名称": std_name,
+                        "标准设备编号": "",
+                        "标准公司名称": "",
+                    }
 
-        return None
+        if not result:
+            logger.warning(f"设备台账未匹配: 名称={name!r}, 编号={device_id!r}")
+
+        return result

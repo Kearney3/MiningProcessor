@@ -151,6 +151,8 @@ def _batch_match(
     cancelled = cancel_event or threading.Event()
     results: dict[str, list] = {k: [] for k in result_keys}
     total_rows = len(df)
+    matched_count = 0
+    unmatched_count = 0
 
     for start in range(0, total_rows, BATCH_SIZE):
         if cancelled.is_set():
@@ -167,10 +169,20 @@ def _batch_match(
             r = match_fn(name=n, device_id=i_val) if id_col else (match_fn(n) if n else None)
             for k in result_keys:
                 results[k].append(r.get(k, "") if r else "")
+            if r:
+                matched_count += 1
+            elif n or i_val:
+                unmatched_count += 1
 
         if progress_cb and total_work > 0:
             processed = min(start + BATCH_SIZE, total_rows)
             progress_cb(processed / total_work, f"{progress_label}: {processed}/{total_work}")
+
+    logger.info(
+        "台账匹配[%s]: 成功 %d, 失败 %d, 共 %d 条",
+        progress_label or source_col, matched_count, unmatched_count,
+        matched_count + unmatched_count,
+    )
 
     return results
 
