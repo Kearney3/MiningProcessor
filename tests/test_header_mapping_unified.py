@@ -107,11 +107,11 @@ class TestPositionMatching:
 # ---------------------------------------------------------------------------
 
 
-class TestFuzzyMatching:
-    """Fuzzy column-name matching via rapidfuzz."""
+class TestFuzzyFlagDeprecated:
+    """fuzzy=True 时回退到精确匹配（rapidfuzz 已移除）"""
 
-    def test_fuzzy_close_match(self):
-        df = pd.DataFrame({"equipment name": [1], "company": [2]})
+    def test_fuzzy_flag_falls_back_to_exact(self):
+        df = pd.DataFrame({"Equipment Name": [1], "Company": [2]})
         cfg = {
             "mode": "name",
             "fuzzy": True,
@@ -120,33 +120,20 @@ class TestFuzzyMatching:
                 {"original": "Company", "new": "公司"},
             ],
         }
-        result = apply_header_mapping(df, cfg, fuzzy_threshold=60)
+        # 精确匹配应正常工作
+        result = apply_header_mapping(df, cfg)
         assert list(result.columns) == ["设备名称", "公司"]
 
-    def test_fuzzy_no_match_below_threshold(self):
-        df = pd.DataFrame({"xyz": [1]})
+    def test_fuzzy_flag_no_partial_match(self):
+        """fuzzy=True 不再进行模糊匹配，不精确的名称不会被重命名"""
+        df = pd.DataFrame({"equipment name": [1]})
         cfg = {
             "mode": "name",
             "fuzzy": True,
             "entries": [{"original": "Equipment Name", "new": "设备名称"}],
         }
-        result = apply_header_mapping(df, cfg, fuzzy_threshold=80)
-        assert list(result.columns) == ["xyz"]
-
-    def test_fuzzy_threshold_parameter_respected(self):
-        df = pd.DataFrame({"equip name": [1]})
-        cfg = {
-            "mode": "name",
-            "fuzzy": True,
-            "entries": [{"original": "Equipment Name", "new": "设备名称"}],
-        }
-        # Low threshold should match
-        result_low = apply_header_mapping(df, cfg, fuzzy_threshold=40)
-        assert list(result_low.columns) == ["设备名称"]
-
-        # High threshold should not match
-        result_high = apply_header_mapping(df, cfg, fuzzy_threshold=99)
-        assert list(result_high.columns) == ["equip name"]
+        result = apply_header_mapping(df, cfg)
+        assert list(result.columns) == ["equipment name"]
 
 
 # ---------------------------------------------------------------------------

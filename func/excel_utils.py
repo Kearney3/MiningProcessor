@@ -517,20 +517,17 @@ def apply_header_mapping(
     Supports two modes:
 
     - ``"position"``: match columns by 1-based index.
-    - ``"name"``: match columns by original name (exact or fuzzy via rapidfuzz).
+    - ``"name"``: match columns by original name (exact match only).
 
-    When *fuzzy* is enabled in the config **and** ``rapidfuzz`` is installed,
-    each column is matched against all mapping entries and the best match above
-    *fuzzy_threshold* wins.  When ``rapidfuzz`` is not installed the function
-    silently falls back to exact matching.
+    When *fuzzy* is enabled in the config, it falls back to exact matching
+    (fuzzy matching via rapidfuzz has been removed).
 
     Args:
         df: The source DataFrame (returned as a new object).
         mapping_config: A dict with ``mode``, ``fuzzy``, and ``entries`` keys.
             ``entries`` is a list of dicts with ``index``, ``original``, and
             ``new`` keys.
-        fuzzy_threshold: Minimum rapidfuzz score (0-100) to accept a fuzzy
-            match.  Defaults to 70.
+        fuzzy_threshold: Deprecated, kept for API compatibility.
 
     Returns:
         A new DataFrame with matched columns renamed.
@@ -569,26 +566,11 @@ def apply_header_mapping(
                 orig_to_new[orig] = new_name
 
         if fuzzy:
-            try:
-                from rapidfuzz import fuzz
-
-                for col in cols:
-                    col_str = clean_string(col)
-                    best_score = 0
-                    best_target = None
-                    for orig, new_name in orig_to_new.items():
-                        score = fuzz.ratio(col_str, orig)
-                        if score > best_score:
-                            best_score = score
-                            best_target = new_name
-                    if best_score >= fuzzy_threshold and best_target:
-                        rename_map[col] = best_target
-            except ImportError:
-                logger.warning("rapidfuzz 未安装，回退到精确匹配")
-                for col in cols:
-                    col_str = clean_string(col)
-                    if col_str in orig_to_new:
-                        rename_map[col] = orig_to_new[col_str]
+            logger.info("模糊匹配已禁用，回退到精确匹配")
+            for col in cols:
+                col_str = clean_string(col)
+                if col_str in orig_to_new:
+                    rename_map[col] = orig_to_new[col_str]
         else:
             for col in cols:
                 col_str = clean_string(col)

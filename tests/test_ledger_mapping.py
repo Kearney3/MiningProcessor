@@ -248,7 +248,7 @@ class TestMatchById:
 
 class TestMatchDevice:
     def test_match_by_id_priority(self, std_ledger):
-        """编号精确匹配优先于名称模糊匹配"""
+        """编号精确匹配优先于名称匹配"""
         result = std_ledger.match_device(name="不存在", device_id="002")
         assert result is not None
         assert result["标准设备名称"] == "标准卡车B"

@@ -48,6 +48,9 @@ def _match_equipment_rows(
     def _extract(result, key):
         return result.get(key, "") if result else ""
 
+    matched_count = 0
+    unmatched_count = 0
+
     if id_col:
         # Composite key: batch match on unique (name, id) pairs
         unique_pairs = df[[name_col, id_col]].drop_duplicates()
@@ -55,9 +58,14 @@ def _match_equipment_rows(
         for _, row in unique_pairs.iterrows():
             name_str = clean_string(row[name_col]) or None
             id_str = clean_string(row[id_col]) or None
-            pair_to_result[(row[name_col], row[id_col])] = equipment_ledger.match_device(
+            result = equipment_ledger.match_device(
                 name=name_str, device_id=id_str
             )
+            pair_to_result[(row[name_col], row[id_col])] = result
+            if result:
+                matched_count += 1
+            else:
+                unmatched_count += 1
 
         df[result_name_col] = df.apply(
             lambda r: _extract(pair_to_result.get((r[name_col], r[id_col])), "标准设备名称"),
@@ -77,7 +85,12 @@ def _match_equipment_rows(
         name_to_result: dict = {}
         for name in unique_names:
             name_str = clean_string(name) or None
-            name_to_result[name] = equipment_ledger.match_device(name=name_str)
+            result = equipment_ledger.match_device(name=name_str)
+            name_to_result[name] = result
+            if result:
+                matched_count += 1
+            else:
+                unmatched_count += 1
 
         df[result_name_col] = df[name_col].map(
             lambda n: _extract(name_to_result.get(n), "标准设备名称")
@@ -88,6 +101,12 @@ def _match_equipment_rows(
         df[result_company_col] = df[name_col].map(
             lambda n: _extract(name_to_result.get(n), "标准公司名称")
         )
+
+    label = f"设备{suffix}" if suffix else "设备"
+    logger.info(
+        "台账匹配[%s]: 成功 %d, 失败 %d, 共 %d 条",
+        label, matched_count, unmatched_count, matched_count + unmatched_count,
+    )
 
     return True
 
@@ -101,6 +120,8 @@ def _match_oil_rows(
     对 DataFrame 中的油品列进行台账匹配，原地添加标准列。
     返回 True 表示有匹配发生。
     """
+    matched_count = 0
+    unmatched_count = 0
     std_oils = []
     for row in df.itertuples(index=False):
         val = getattr(row, oil_col, None)
@@ -109,8 +130,17 @@ def _match_oil_rows(
             std_oils.append("")
         else:
             r = oil_ledger.match(cleaned)
-            std_oils.append(r["标准名称"] if r else "")
+            if r:
+                std_oils.append(r["标准名称"])
+                matched_count += 1
+            else:
+                std_oils.append("")
+                unmatched_count += 1
     df["标准油品名称"] = std_oils
+    logger.info(
+        "台账匹配[油品]: 成功 %d, 失败 %d, 共 %d 条",
+        matched_count, unmatched_count, matched_count + unmatched_count,
+    )
     return True
 
 
