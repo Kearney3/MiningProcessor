@@ -87,7 +87,7 @@ def _get_machine_id() -> str:
         try:
             result = subprocess.run(
                 ["ioreg", "-d2", "-c", "IOPlatformExpertDevice"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True, text=True, encoding="utf-8", timeout=5,
             )
             for line in result.stdout.splitlines():
                 if "IOPlatformUUID" in line:
@@ -109,7 +109,7 @@ def _get_machine_id() -> str:
         try:
             result = subprocess.run(
                 ["wmic", "csproduct", "get", "uuid"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True, text=True, encoding="utf-8", timeout=5,
             )
             lines = [ln.strip() for ln in result.stdout.splitlines() if ln.strip()]
             if len(lines) > 1:

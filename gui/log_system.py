@@ -313,4 +313,9 @@ class LogSystem:
                             pass
             except Exception as ex:
                 import sys
+                if hasattr(sys.stderr, 'reconfigure'):
+                    try:
+                        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+                    except Exception:
+                        pass
                 print(f"[日志消费线程异常] {ex}", file=sys.stderr)
