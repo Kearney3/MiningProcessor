@@ -69,6 +69,9 @@ def setup_logging(level=logging.INFO, force: bool = False):
     handler = logging.StreamHandler(sys.stdout)
     handler.setLevel(level)
     handler.setFormatter(logging.Formatter(DEFAULT_FORMAT, datefmt="%Y-%m-%d %H:%M:%S"))
+    # Windows 中文系统默认 GBK 编码，强制 UTF-8 避免 UnicodeEncodeError
+    if hasattr(handler.stream, 'reconfigure'):
+        handler.stream.reconfigure(encoding='utf-8', errors='replace')
     root.addHandler(handler)
     _setup_done = True
 
