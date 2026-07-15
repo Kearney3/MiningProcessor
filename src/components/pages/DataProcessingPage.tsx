@@ -870,6 +870,7 @@ function MaintenanceCard({
   const { notify } = useToast();
   const [path, setPath] = useState("");
   const [splitByYear, setSplitByYear] = useState(false);
+  const [detailsOnly, setDetailsOnly] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -885,6 +886,7 @@ function MaintenanceCard({
         skip_hidden_rows: skipHiddenRows,
         skip_hidden_cols: skipHiddenCols,
         split_by_year: splitByYear,
+        details_only: detailsOnly,
       });
       const msg = res.output_files
         ? `输出: ${res.output_files.length} 个文件`
@@ -905,6 +907,9 @@ function MaintenanceCard({
       {path === "" && <PathWarning />}
       <div className="mt-2">
         <StyledToggle checked={splitByYear} onChange={setSplitByYear} label="按年份拆分输出" />
+      </div>
+      <div className="mt-2">
+        <StyledToggle checked={detailsOnly} onChange={setDetailsOnly} label="仅导出明细" />
       </div>
       <ProcessButton loading={loading} onClick={handleProcess} disabled={path === ""} />
       {result && <SuccessBadge message={result} />}

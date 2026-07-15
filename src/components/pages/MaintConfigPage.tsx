@@ -80,7 +80,7 @@ export function MaintConfigPage({ bridge }: { bridge: BridgeProp }) {
   };
 
   const handleRestore = async () => {
-    if (!confirm("将恢复为系统默认的 14 大类 × 60 小类分类规则，自定义配置将丢失。确认？")) return;
+    if (!confirm("将恢复为系统默认分类规则，自定义配置将丢失。确认？")) return;
     setLoading(true);
     try {
       await bridge.call("update_maintenance_classifications", {

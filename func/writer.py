@@ -181,4 +181,4 @@ def write_excel(output_file: str, sheets: dict[str, pd.DataFrame]) -> None:
         if name in sheets:
             _write_sheet(wb, name, sheets[name], fmts, idx)
     wb.close()
-    logger.info("输出完成: %s (8 sheets)", output_file)
+    logger.info("输出完成: %s (%d sheets)", output_file, len(sheets))
