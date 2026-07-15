@@ -57,66 +57,198 @@
         "mode": "position",
         "fuzzy": false,
         "entries": [
-            {"index": 1, "original": "", "new": "日期"},
-            {"index": 2, "original": "", "new": "班次"},
-            {"index": 3, "original": "", "new": "序号"},
-            {"index": 4, "original": "", "new": "设备名称"},
-            {"index": 5, "original": "", "new": "公司"},
-            {"index": 6, "original": "", "new": "应运行分钟"},
-            {"index": 7, "original": "", "new": "应运行小时数"},
-            {"index": 8, "original": "", "new": "停车/换班"},
-            {"index": 9, "original": "", "new": "转移"},
-            {"index": 10, "original": "", "new": "挖机场地推土/清理墙壁"},
-            {"index": 11, "original": "", "new": "等待装货"},
-            {"index": 12, "original": "", "new": "爆破"},
-            {"index": 13, "original": "", "new": "就餐/休息时间"},
-            {"index": 14, "original": "", "new": "柴油"},
-            {"index": 15, "original": "", "new": "计划维修/润滑"},
-            {"index": 16, "original": "", "new": "未计划/故障"},
-            {"index": 17, "original": "", "new": "待命"},
-            {"index": 18, "original": "", "new": "因天气：大风暴，雨，雪"},
-            {"index": 19, "original": "", "new": "扬尘：洒水车不足"},
-            {"index": 20, "original": "", "new": "排队/装水"},
-            {"index": 21, "original": "", "new": "总产量生产运行分钟"},
-            {"index": 22, "original": "", "new": "因电力原因停车/计划"},
-            {"index": 23, "original": "", "new": "因电力原因停车/未计划"},
-            {"index": 24, "original": "", "new": "总产量生产运行小时"},
-            {"index": 25, "original": "", "new": "注释"}
+            {
+                "index": 1,
+                "original": "",
+                "new": "日期"
+            },
+            {
+                "index": 2,
+                "original": "",
+                "new": "班次"
+            },
+            {
+                "index": 3,
+                "original": "",
+                "new": "序号"
+            },
+            {
+                "index": 4,
+                "original": "",
+                "new": "设备名称"
+            },
+            {
+                "index": 5,
+                "original": "",
+                "new": "公司"
+            },
+            {
+                "index": 6,
+                "original": "",
+                "new": "应运行分钟"
+            },
+            {
+                "index": 7,
+                "original": "",
+                "new": "应运行小时数"
+            },
+            {
+                "index": 8,
+                "original": "",
+                "new": "停车/换班"
+            },
+            {
+                "index": 9,
+                "original": "",
+                "new": "转移"
+            },
+            {
+                "index": 10,
+                "original": "",
+                "new": "挖机场地推土/清理墙壁"
+            },
+            {
+                "index": 11,
+                "original": "",
+                "new": "等待装货"
+            },
+            {
+                "index": 12,
+                "original": "",
+                "new": "爆破"
+            },
+            {
+                "index": 13,
+                "original": "",
+                "new": "就餐/休息时间"
+            },
+            {
+                "index": 14,
+                "original": "",
+                "new": "柴油"
+            },
+            {
+                "index": 15,
+                "original": "",
+                "new": "计划维修/润滑"
+            },
+            {
+                "index": 16,
+                "original": "",
+                "new": "未计划/故障"
+            },
+            {
+                "index": 17,
+                "original": "",
+                "new": "待命"
+            },
+            {
+                "index": 18,
+                "original": "",
+                "new": "因天气：大风暴，雨，雪"
+            },
+            {
+                "index": 19,
+                "original": "",
+                "new": "扬尘：洒水车不足"
+            },
+            {
+                "index": 20,
+                "original": "",
+                "new": "排队/装水"
+            },
+            {
+                "index": 21,
+                "original": "",
+                "new": "总产量生产运行分钟"
+            },
+            {
+                "index": 22,
+                "original": "",
+                "new": "因电力原因停车/计划"
+            },
+            {
+                "index": 23,
+                "original": "",
+                "new": "因电力原因停车/未计划"
+            },
+            {
+                "index": 24,
+                "original": "",
+                "new": "总产量生产运行小时"
+            },
+            {
+                "index": 25,
+                "original": "",
+                "new": "注释"
+            }
         ]
     },
     "minebase_column_mapping": {
         "work_efficiency": {
-            "日期": "date", "班次": "shiftType",
-            "设备名称": "equipmentName", "设备编号": "equipmentCode", "公司": "company",
-            "应运行分钟": "plannedMinutes", "应运行小时数": "plannedHours",
-            "停车/换班": "parkShift", "转移": "transfer", "挖机场地推土/清理墙壁": "auxiliaryWork",
-            "等待装货": "waitingLoad", "爆破": "blasting", "就餐/休息时间": "mealBreak",
-            "柴油": "refueling", "计划维修/润滑": "plannedMaintenance",
-            "未计划/故障": "unplannedFault", "待命": "standby",
-            "因天气：大风暴，雨，雪": "weatherSnow", "扬尘：洒水车不足": "weatherDust",
-            "排队/装水": "fillWater", "总产量生产运行分钟": "totalProductionMinutes",
-            "因电力原因停车/计划": "powerIssuePlanned", "因电力原因停车/未计划": "powerIssueUnplanned",
-            "总产量生产运行小时": "totalProductionHours", "注释": "remark"
+            "日期": "date",
+            "班次": "shiftType",
+            "设备名称": "equipmentName",
+            "设备编号": "equipmentCode",
+            "公司": "company",
+            "应运行分钟": "plannedMinutes",
+            "应运行小时数": "plannedHours",
+            "停车/换班": "parkShift",
+            "转移": "transfer",
+            "挖机场地推土/清理墙壁": "auxiliaryWork",
+            "等待装货": "waitingLoad",
+            "爆破": "blasting",
+            "就餐/休息时间": "mealBreak",
+            "柴油": "refueling",
+            "计划维修/润滑": "plannedMaintenance",
+            "未计划/故障": "unplannedFault",
+            "待命": "standby",
+            "因天气：大风暴，雨，雪": "weatherSnow",
+            "扬尘：洒水车不足": "weatherDust",
+            "排队/装水": "fillWater",
+            "总产量生产运行分钟": "totalProductionMinutes",
+            "因电力原因停车/计划": "powerIssuePlanned",
+            "因电力原因停车/未计划": "powerIssueUnplanned",
+            "总产量生产运行小时": "totalProductionHours",
+            "注释": "remark"
         },
         "fuel_consumption": {
-            "日期": "date", "班次": "shiftType", "设备名称": "equipmentName",
-            "设备编号": "equipmentCode", "油品种类": "fuelName", "油品消耗": "consumption"
+            "日期": "date",
+            "班次": "shiftType",
+            "设备名称": "equipmentName",
+            "设备编号": "equipmentCode",
+            "油品种类": "fuelName",
+            "油品消耗": "consumption"
         },
         "electricity_consumption": {
-            "日期": "date", "班次": "shiftType", "设备名称": "equipmentName",
-            "设备编号": "equipmentCode", "电力消耗": "consumption"
+            "日期": "date",
+            "班次": "shiftType",
+            "设备名称": "equipmentName",
+            "设备编号": "equipmentCode",
+            "电力消耗": "consumption"
         },
         "equipment_operation": {
-            "日期": "date", "班次": "shiftType", "设备名称": "equipmentName", "公司": "company",
-            "小时数仪表开始": "engineHoursStart", "小时数仪表结束": "engineHoursEnd",
-            "运行小时数": "runningHours", "公里数仪表开始": "milemeterStart",
-            "公里数仪表结束": "milemeterEnd", "运行里程": "mileage", "趟数": "tripCount",
+            "日期": "date",
+            "班次": "shiftType",
+            "设备名称": "equipmentName",
+            "公司": "company",
+            "小时数仪表开始": "engineHoursStart",
+            "小时数仪表结束": "engineHoursEnd",
+            "运行小时数": "runningHours",
+            "公里数仪表开始": "milemeterStart",
+            "公里数仪表结束": "milemeterEnd",
+            "运行里程": "mileage",
+            "趟数": "tripCount",
             "备注": "remark"
         },
         "production_record": {
-            "日期": "date", "班次": "shiftType", "矿卡名称": "truckName",
-            "挖机名称": "excavatorName", "矿石类型": "materialTypeName",
-            "运次": "tripCount", "产量": "production",
+            "日期": "date",
+            "班次": "shiftType",
+            "矿卡名称": "truckName",
+            "挖机名称": "excavatorName",
+            "矿石类型": "materialTypeName",
+            "运次": "tripCount",
+            "产量": "production",
             "备注": "remark"
         }
     },
@@ -137,10 +269,615 @@
     },
     "user_config_default": {
         "file_keywords": {
-            "fuel": ["Fuel report "],
-            "electrical": ["Цахилгааны хэлтэс"],
-            "production": ["白班", "夜班"],
-            "worktime": ["工作效率表"]
+            "fuel": [
+                "Fuel report "
+            ],
+            "electrical": [
+                "Цахилгааны хэлтэс"
+            ],
+            "production": [
+                "白班",
+                "夜班"
+            ],
+            "worktime": [
+                "工作效率表"
+            ]
         }
+    },
+    "maintenance_classifications": [
+        {
+            "major": "发动机",
+            "minor": "报警/故障灯",
+            "keywords": [
+                "发动机报警",
+                "发动机黄灯",
+                "发动机故障",
+                "发动机故障代码"
+            ]
+        },
+        {
+            "major": "发动机",
+            "minor": "增压器故障",
+            "keywords": [
+                "增压器",
+                "涡轮增压",
+                "涡轮"
+            ]
+        },
+        {
+            "major": "发动机",
+            "minor": "内部机械故障",
+            "keywords": [
+                "拉缸",
+                "曲轴",
+                "止推瓦",
+                "缸套",
+                "活塞",
+                "凸轮轴",
+                "连杆",
+                "缸垫",
+                "气门"
+            ]
+        },
+        {
+            "major": "发动机",
+            "minor": "启动故障",
+            "keywords": [
+                "不着火",
+                "着不了火",
+                "着不了车",
+                "启动不了",
+                "启动不着",
+                "启动困难",
+                "起动机",
+                "启动马达",
+                "打不着",
+                "盘动飞轮",
+                "旋转飞轮",
+                "转飞轮",
+                "盘车",
+                "撞击飞轮"
+            ]
+        },
+        {
+            "major": "发动机",
+            "minor": "动力不足",
+            "keywords": [
+                "没劲儿",
+                "没劲",
+                "无力"
+            ]
+        },
+        {
+            "major": "发动机",
+            "minor": "异响/冒烟",
+            "keywords": [
+                "异响",
+                "有异响",
+                "冒黑烟",
+                "冒白烟",
+                "冒蓝烟",
+                "冒烟"
+            ]
+        },
+        {
+            "major": "发动机",
+            "minor": "漏油/渗油",
+            "keywords": [
+                "发动机漏油",
+                "发动机渗油",
+                "机油进柴油",
+                "缸盖漏油"
+            ]
+        },
+        {
+            "major": "发动机",
+            "minor": "喷油系统",
+            "keywords": [
+                "喷油器",
+                "喷油嘴",
+                "高压泵",
+                "共轨",
+                "柴油泵"
+            ]
+        },
+        {
+            "major": "发动机",
+            "minor": "冷却系统故障",
+            "keywords": [
+                "水箱漏",
+                "冷却液漏",
+                "水温高",
+                "水温报警"
+            ]
+        },
+        {
+            "major": "发动机",
+            "minor": "排气异常",
+            "keywords": [
+                "排气大",
+                "下排气",
+                "排温",
+                "排气温度",
+                "消声器",
+                "排气管",
+                "SCR",
+                "DPF",
+                "尿素",
+                "排气管异响",
+                "排气异响"
+            ]
+        },
+        {
+            "major": "发动机",
+            "minor": "ECM/ECU",
+            "keywords": [
+                "ECM",
+                "ECU"
+            ]
+        },
+        {
+            "major": "发动机",
+            "minor": "发动机大修",
+            "keywords": [
+                "发动机维修",
+                "维修发动机",
+                "装发动机",
+                "发动机大修",
+                "大修"
+            ]
+        },
+        {
+            "major": "发动机",
+            "minor": "发动机通用",
+            "keywords": [
+                "发动机"
+            ]
+        },
+        {
+            "major": "变速箱",
+            "minor": "报警",
+            "keywords": [
+                "变速箱报警",
+                "变速箱故障"
+            ]
+        },
+        {
+            "major": "变速箱",
+            "minor": "漏油/渗油",
+            "keywords": [
+                "变速箱漏油",
+                "变速箱渗油",
+                "变速箱油冷却器"
+            ]
+        },
+        {
+            "major": "变速箱",
+            "minor": "换挡/离合器",
+            "keywords": [
+                "换挡",
+                "挡位",
+                "离合器",
+                "倒挡",
+                "不增档",
+                "不减档",
+                "变速箱异响"
+            ]
+        },
+        {
+            "major": "变速箱",
+            "minor": "变速箱保养",
+            "keywords": [
+                "变速箱油",
+                "变速箱滤芯"
+            ]
+        },
+        {
+            "major": "变速箱",
+            "minor": "变速箱通用",
+            "keywords": [
+                "变速箱",
+                "变矩器"
+            ]
+        },
+        {
+            "major": "液压系统",
+            "minor": "液压泵/马达",
+            "keywords": [
+                "液压泵",
+                "液压马达"
+            ]
+        },
+        {
+            "major": "液压系统",
+            "minor": "液压油缸",
+            "keywords": [
+                "油缸",
+                "漏液压油",
+                "液压油箱"
+            ]
+        },
+        {
+            "major": "液压系统",
+            "minor": "液压阀",
+            "keywords": [
+                "分配器",
+                "溢流阀",
+                "多路阀",
+                "阀门"
+            ]
+        },
+        {
+            "major": "液压系统",
+            "minor": "液压通用",
+            "keywords": [
+                "液压",
+                "液压异响"
+            ]
+        },
+        {
+            "major": "电气系统",
+            "minor": "传感器",
+            "keywords": [
+                "传感器"
+            ]
+        },
+        {
+            "major": "电气系统",
+            "minor": "电瓶/电池",
+            "keywords": [
+                "电瓶",
+                "电池"
+            ]
+        },
+        {
+            "major": "电气系统",
+            "minor": "发电机",
+            "keywords": [
+                "发电机",
+                "电机"
+            ]
+        },
+        {
+            "major": "电气系统",
+            "minor": "线束/电线",
+            "keywords": [
+                "电线",
+                "线束"
+            ]
+        },
+        {
+            "major": "电气系统",
+            "minor": "灯泡/灯光",
+            "keywords": [
+                "灯泡",
+                "灯光"
+            ]
+        },
+        {
+            "major": "电气系统",
+            "minor": "显示器/控制器",
+            "keywords": [
+                "显示屏",
+                "控制器",
+                "电脑板",
+                "IGBT"
+            ]
+        },
+        {
+            "major": "电气系统",
+            "minor": "喇叭/雨刷",
+            "keywords": [
+                "喇叭",
+                "雨刷"
+            ]
+        },
+        {
+            "major": "电气系统",
+            "minor": "电气通用",
+            "keywords": [
+                "电气报警",
+                "电气故障",
+                "电气",
+                "继电器",
+                "保险丝"
+            ]
+        },
+        {
+            "major": "制动系统",
+            "minor": "制动管路",
+            "keywords": [
+                "制动管",
+                "制动压力管",
+                "刹车管"
+            ]
+        },
+        {
+            "major": "制动系统",
+            "minor": "刹车报警",
+            "keywords": [
+                "刹车报警",
+                "制动报警"
+            ]
+        },
+        {
+            "major": "制动系统",
+            "minor": "制动通用",
+            "keywords": [
+                "刹车",
+                "制动",
+                "驻车",
+                "刹车片",
+                "刹车盘",
+                "刹车异响",
+                "制动异响"
+            ]
+        },
+        {
+            "major": "转向系统",
+            "minor": "转向故障",
+            "keywords": [
+                "转向泵",
+                "转向缸",
+                "转向",
+                "方向盘",
+                "转向报警"
+            ]
+        },
+        {
+            "major": "悬挂/车架",
+            "minor": "悬挂油缸",
+            "keywords": [
+                "悬挂油缸",
+                "悬挂漏油",
+                "悬挂渗油"
+            ]
+        },
+        {
+            "major": "悬挂/车架",
+            "minor": "大梁/车架",
+            "keywords": [
+                "大梁",
+                "车架",
+                "支重轮",
+                "托轮",
+                "平衡梁"
+            ]
+        },
+        {
+            "major": "悬挂/车架",
+            "minor": "悬挂通用",
+            "keywords": [
+                "悬挂"
+            ]
+        },
+        {
+            "major": "轮胎/轮马达",
+            "minor": "轮马达报警",
+            "keywords": [
+                "轮马达报警",
+                "电动轮报警",
+                "轮马达"
+            ]
+        },
+        {
+            "major": "轮胎/轮马达",
+            "minor": "轮胎损伤",
+            "keywords": [
+                "轮胎花纹",
+                "轮胎脱空",
+                "轮胎漏气",
+                "油封漏油",
+                "背靠背"
+            ]
+        },
+        {
+            "major": "轮胎/轮马达",
+            "minor": "轮胎通用",
+            "keywords": [
+                "轮胎",
+                "轮辋"
+            ]
+        },
+        {
+            "major": "润滑系统",
+            "minor": "润滑报警",
+            "keywords": [
+                "润滑报警"
+            ]
+        },
+        {
+            "major": "润滑系统",
+            "minor": "润滑管路",
+            "keywords": [
+                "润滑管",
+                "润滑软管"
+            ]
+        },
+        {
+            "major": "润滑系统",
+            "minor": "润滑通用",
+            "keywords": [
+                "润滑"
+            ]
+        },
+        {
+            "major": "空调",
+            "minor": "空调异响",
+            "keywords": [
+                "异响"
+            ]
+        },
+        {
+            "major": "空调",
+            "minor": "空调故障",
+            "keywords": [
+                "空调不工作",
+                "空调没有",
+                "空调异响",
+                "空调",
+                "不制冷",
+                "无冷气"
+            ]
+        },
+        {
+            "major": "事故/损失",
+            "minor": "资产损失",
+            "keywords": [
+                "资产损失",
+                "报废",
+                "财产损失",
+                "烧车",
+                "起火",
+                "着火",
+                "防火系统"
+            ]
+        },
+        {
+            "major": "事故/损失",
+            "minor": "碰撞/倾覆",
+            "keywords": [
+                "碰撞",
+                "倾覆",
+                "翻车"
+            ]
+        },
+        {
+            "major": "日常维护",
+            "minor": "动力系统保养",
+            "keywords": [
+                "补加机油",
+                "升机油",
+                "加油",
+                "机油"
+            ]
+        },
+        {
+            "major": "日常维护",
+            "minor": "轮胎更换",
+            "keywords": [
+                "换轮胎",
+                "更换轮胎"
+            ]
+        },
+        {
+            "major": "日常维护",
+            "minor": "轮胎保养",
+            "keywords": [
+                "轮胎补气",
+                "调节胎压",
+                "补气",
+                "氮气",
+                "充氮气"
+            ]
+        },
+        {
+            "major": "日常维护",
+            "minor": "润滑系统保养",
+            "keywords": [
+                "加注黄油",
+                "充黄油",
+                "打点油",
+                "打点润滑",
+                "补加黄油",
+                "已充.*黄油",
+                "已加注.*黄油",
+                "公斤黄油",
+                "黄油箱"
+            ]
+        },
+        {
+            "major": "日常维护",
+            "minor": "加制冷剂",
+            "keywords": [
+                "制冷剂",
+                "冷却剂"
+            ]
+        },
+        {
+            "major": "日常维护",
+            "minor": "空滤",
+            "keywords": [
+                "滤芯",
+                "吹清空滤",
+                "空滤吹风",
+                "吹空滤"
+            ]
+        },
+        {
+            "major": "日常维护",
+            "minor": "加注防冻液",
+            "keywords": [
+                "补加防冻液",
+                "升防冻液"
+            ]
+        },
+        {
+            "major": "日常维护",
+            "minor": "液压油系统保养",
+            "keywords": [
+                "补加液压油",
+                "升液压油"
+            ]
+        },
+        {
+            "major": "日常维护",
+            "minor": "保养通用",
+            "keywords": [
+                "保养"
+            ]
+        }
+    ],
+    "maintenance_noise_exact": [
+        "着车，出车。",
+        "着车，出车",
+        "已吹清空滤，出车。",
+        "夜班",
+        "已吹清空滤",
+        "启动检查",
+        "着车",
+        "计划点检",
+        "已补加机油",
+        "已吹清空滤，出车",
+        "点检时",
+        "出车。",
+        "交接班",
+        "点检",
+        "均为正常",
+        "停车",
+        "升机油",
+        "出车了",
+        "已点检",
+        "正常",
+        "升防冻液",
+        "白班",
+        "出车"
+    ],
+    "maintenance_noise_patterns": [
+        "^已?点检[，,/\\s]*正常[。]?\\s*$",
+        "^Author:.*",
+        "^MTC Translator:",
+        "^[已点检正常，,/\\s\\.。]+$",
+        "^已吹清空滤[，,\\s]*(出车)?[。]?\\s*$",
+        "^(已点检|点检)[，,/\\s]+.*正常.*$",
+        "^\\d+\\s*小时保养[，,\\s]*.*$",
+        "^(白班|夜班)[：:]?\\s*(已?点检)?[，,/\\s]*正常[。]?\\s*$",
+        "^(着车|搭接着车|外接电源启动)[，,\\s]*出车[。]?\\s*$",
+        "^(夜班|白班)[：:]?\\s*$",
+        "^\\d+PM\\s*$",
+        "^计划点检[：:]?\\s*(已?点检)?[，,/\\s]*(正常)?[。]?\\s*$",
+        "^(已点检|点检)[，,/\\s]*(左侧|右侧)?[。]?\\s*$",
+        "^(对设备)?进行检查[，,\\s]*出车[。]?\\s*$",
+        "^(等待配件|待配件|等待备件)[，,\\s]*(停车)?[。]?\\s*$",
+        "^打着\\s*$",
+        "^已?充好?黄油[箱]?[。]?\\s*$",
+        "^已?加注?\\d*公斤黄油[箱]?[。]?\\s*$",
+        "^(由)?ETT验车[，,\\s]*停车[。]?\\s*$"
+    ],
+    "maintenance_reason_rules": {
+        "检修": "fault",
+        "点检": "check_content",
+        "保养": "non_fault",
+        "待机": "skip"
     }
 }
