@@ -45,6 +45,7 @@ def process_maintenance_data(
     skip_hidden_cols: bool = False,
     return_sheets: bool = False,
     split_by_year: bool = False,
+    details_only: bool = False,
 ) -> str | list[str] | dict:
     """维修记录处理统一入口。
 
@@ -59,6 +60,7 @@ def process_maintenance_data(
         skip_hidden_cols: 跳过隐藏列。
         return_sheets: True 时返回 dict[str, DataFrame]，False 时写文件。
         split_by_year: True 时按年份拆分输出为多个文件。
+        details_only: True 时只输出维修明细 sheet（不含统计表）。
 
     Returns:
         输出文件路径（str）、文件路径列表（split_by_year=True）或 sheets 字典。
@@ -186,14 +188,18 @@ def process_maintenance_data(
 
     # 4. 输出
     if return_sheets:
+        if details_only:
+            sheets = {k: v for k, v in sheets.items() if k == "维修明细"}
         return sheets
 
     output_dir = file_path if os.path.isdir(file_path) else os.path.dirname(file_path) or "."
 
     if split_by_year:
-        output_files = _write_split_by_year(output_dir, classified, fault_records)
+        output_files = _write_split_by_year(output_dir, classified, fault_records, details_only=details_only)
         return output_files
 
+    if details_only:
+        sheets = {k: v for k, v in sheets.items() if k == "维修明细"}
     output_file = os.path.join(output_dir, "维修记录统计.xlsx")
     write_excel(output_file, sheets)
     logger.info("输出完成: %s", output_file)
@@ -206,11 +212,15 @@ def _write_split_by_year(
     output_dir: str,
     classified: list[dict],
     fault_records: list[dict],
+    details_only: bool = False,
 ) -> list[str]:
     """按年份拆分输出为多个 Excel 文件。
 
     每个年份生成一个独立文件，另外生成一个汇总文件。
     汇总文件额外包含大类×年月和设备名称×原因两个跨年统计 sheet。
+
+    Args:
+        details_only: True 时只输出维修明细 sheet。
 
     Returns:
         输出文件路径列表。
@@ -232,6 +242,8 @@ def _write_split_by_year(
     # 每年一个文件
     for year in sorted(year_classified.keys()):
         sheets = build_sheets(year_classified[year], year_faults.get(year, []))
+        if details_only:
+            sheets = {k: v for k, v in sheets.items() if k == "维修明细"}
         output_file = os.path.join(output_dir, f"维修记录统计_{year}年.xlsx")
         write_excel(output_file, sheets)
         output_files.append(output_file)
@@ -239,6 +251,8 @@ def _write_split_by_year(
 
     # 汇总文件
     all_sheets = build_sheets(classified, fault_records)
+    if details_only:
+        all_sheets = {k: v for k, v in all_sheets.items() if k == "维修明细"}
     summary_file = os.path.join(output_dir, "维修记录统计_汇总.xlsx")
     write_excel(summary_file, all_sheets)
     output_files.append(summary_file)
@@ -256,6 +270,7 @@ def main():
     parser.add_argument("--config", help="维修分类配置 Excel 文件路径", default=None)
     parser.add_argument("--skip-hidden-rows", action="store_true", help="跳过隐藏行")
     parser.add_argument("--skip-hidden-cols", action="store_true", help="跳过隐藏列")
+    parser.add_argument("--details-only", action="store_true", help="只导出维修明细 sheet（不含统计表）")
     args = parser.parse_args()
 
     setup_logging()
@@ -280,6 +295,7 @@ def main():
         classifications=classifications,
         skip_hidden_rows=args.skip_hidden_rows,
         skip_hidden_cols=args.skip_hidden_cols,
+        details_only=args.details_only,
     )
     print(f"\n输出: {output}")
 

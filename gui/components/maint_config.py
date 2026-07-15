@@ -157,6 +157,19 @@ def _build_rules_display(rules: dict) -> ft.Column:
     return ft.Column(sections, spacing=0)
 
 
+def _build_desc_text() -> ft.Text:
+    """构建分类配置说明文字，动态显示实际大类数量。"""
+    from func.maintenance_classification import get_default_classifications
+    defs = get_default_classifications()
+    num_majors = len({c["major"] for c in defs["classifications"]})
+    return ft.Text(
+        "管理维修记录的故障分类规则。支持从 Excel 导入自定义配置，"
+        f"或使用系统默认的 {num_majors} 大类分类体系。",
+        size=13,
+        color=theme.TEXT_SECONDARY,
+    )
+
+
 def create_maint_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
     """创建维修分类配置管理区域。
 
@@ -166,8 +179,12 @@ def create_maint_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]
     from func import config_loader
 
     # --- 状态 ---
+    from func.maintenance_classification import get_default_classifications
+    _defs = get_default_classifications()
+    _num_majors = len({c["major"] for c in _defs["classifications"]})
+    _num_minors = len(_defs["classifications"])
     status_text = ft.Text(
-        "使用默认分类配置（14 大类 × 60 小类）",
+        f"使用默认分类配置（{_num_majors} 大类 × {_num_minors} 小类）",
         size=13,
         color=theme.TEXT_SECONDARY,
     )
@@ -236,16 +253,24 @@ def create_maint_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]
             _log_message(log, f"导出失败: {ex}", level=logging.ERROR)
 
     export_template_btn = theme.secondary_btn("导出空白模板", icon=ft.Icons.FILE_DOWNLOAD)
-    export_template_btn.on_click = lambda _: _do_export(with_defaults=False)
 
     export_default_btn = theme.secondary_btn("导出默认配置", icon=ft.Icons.FILE_DOWNLOAD)
-    export_default_btn.on_click = lambda _: _do_export(with_defaults=True)
+
+    async def _on_export_template(e):
+        await _do_export(with_defaults=False)
+
+    async def _on_export_default(e):
+        await _do_export(with_defaults=True)
+
+    export_template_btn.on_click = _on_export_template
+    export_default_btn.on_click = _on_export_default
 
     # --- 恢复默认 ---
     def on_restore(e):
         def confirm(e):
             try:
-                defaults = config_loader.get_maintenance_classifications()
+                from func.maintenance_classification import get_default_classifications
+                defaults = get_default_classifications()
                 config_loader.update_maintenance_classifications(defaults)
                 _log_message(log, "已恢复默认分类配置")
                 _refresh_status()
@@ -258,9 +283,13 @@ def create_maint_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]
             dialog.open = False
             page.update()
 
+        from func.maintenance_classification import get_default_classifications
+        defs = get_default_classifications()
+        num_majors = len({c["major"] for c in defs["classifications"]})
+        num_minors = len(defs["classifications"])
         dialog = ft.AlertDialog(
             title=ft.Text("确认恢复默认"),
-            content=ft.Text("将恢复为系统默认的 14 大类 × 60 小类分类规则，自定义配置将丢失。"),
+            content=ft.Text(f"将恢复为系统默认的 {num_majors} 大类 × {num_minors} 小类分类规则，自定义配置将丢失。"),
             actions=[
                 ft.TextButton("取消", on_click=cancel),
                 ft.TextButton("确认恢复", on_click=confirm),
@@ -278,12 +307,7 @@ def create_maint_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]
         content=ft.Column(
             [
                 theme.section_title("维修分类配置"),
-                ft.Text(
-                    "管理维修记录的故障分类规则。支持从 Excel 导入自定义配置，"
-                    "或使用系统默认的 14 大类分类体系。",
-                    size=13,
-                    color=theme.TEXT_SECONDARY,
-                ),
+                _build_desc_text(),
                 ft.Container(height=8),
                 # 状态
                 ft.Container(

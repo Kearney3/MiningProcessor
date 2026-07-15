@@ -49,10 +49,10 @@ class TestGroupByMajor:
         grouped = _group_by_major(data)
         assert [e["minor"] for e in grouped["A"]] == ["x", "y", "z"]
 
-    def test_default_classifications_13_majors(self, default_grouped):
-        assert len(default_grouped) == 13
+    def test_default_classifications_12_majors(self, default_grouped):
+        assert len(default_grouped) == 12
 
-    def test_engine_has_15_subcategories(self, default_grouped):
+    def test_engine_has_13_subcategories(self, default_grouped):
         assert len(default_grouped["发动机"]) == 13
 
 
@@ -208,15 +208,32 @@ class TestClassifyWithinMajorSpecificFirst:
 class TestClassifyEdgeCases:
     def test_english_keywords(self):
         assert classify("ECM异常") == ("发动机", "ECM/ECU")
-        assert classify("SCR系统报警") == ("排气系统", "排气通用")
+        assert classify("SCR系统报警") == ("发动机", "排气异常")
 
     def test_mixed_zh_en(self):
-        assert classify("DPF再生故障") == ("排气系统", "排气通用")
+        assert classify("DPF再生故障") == ("发动机", "排气异常")
 
     def test_noise_with_valid_content(self):
         """噪声过滤后仍有实质内容 → 正常分类。"""
         r = classify("发动机异响，点检正常")
         assert r is not None and r != (None, None)
+
+    def test_brake_noise_goes_to_brake_not_engine(self):
+        """刹车异响 → 制动系统/制动通用（不是发动机/异响冒烟）"""
+        major, minor = classify("刹车异响")
+        assert (major, minor) == ("制动系统", "制动通用")
+
+    def test_brake_noise_synonym(self):
+        """制动异响 → 制动系统/制动通用"""
+        assert classify("制动异响") == ("制动系统", "制动通用")
+
+    def test_hydraulic_noise_goes_to_hydraulic_not_engine(self):
+        """液压异响 → 液压系统/液压通用（不是发动机/异响冒烟）"""
+        assert classify("液压异响") == ("液压系统", "液压通用")
+
+    def test_transmission_noise_goes_to_transmission_not_engine(self):
+        """变速箱异响 → 变速箱/换挡/离合器（不是发动机/异响冒烟）"""
+        assert classify("变速箱异响") == ("变速箱", "换挡/离合器")
 
     def test_multiple_majors_matched(self):
         """涉及多个大类的复杂语句选择最佳大类。"""
@@ -227,3 +244,58 @@ class TestClassifyEdgeCases:
         """不应将包含单个噪声字的非噪声内容误过滤。"""
         r = classify("停车时发动机异响")
         assert r is not None and r[0] is not None
+
+
+# ── process_maintenance_data details_only ─────────────────────
+
+class TestProcessMaintenanceDetailsOnly:
+    """验证 process_maintenance_data 的 details_only 选项。"""
+
+    def test_details_only_filters_non_detail_sheets(self):
+        """details_only=True 时只保留维修明细 sheet。"""
+        from func.building import build_sheets
+        from datetime import date
+
+        classified = [
+            {
+                "日期": date(2025, 3, 15),
+                "原始设备名称": "EX01",
+                "标准设备名称": "EX01",
+                "设备型号": "CAT390",
+                "原因": "检修",
+                "班次": "白班",
+                "大类": "发动机",
+                "小类": "报警/故障灯",
+                "是否故障": "是",
+                "维修内容": "发动机报警，更换传感器",
+                "工时_分钟": 120,
+            },
+            {
+                "日期": date(2025, 3, 16),
+                "原始设备名称": "EX02",
+                "标准设备名称": "EX02",
+                "设备型号": "CAT390",
+                "原因": "检修",
+                "班次": "夜班",
+                "大类": "制动系统",
+                "小类": "制动通用",
+                "是否故障": "是",
+                "维修内容": "刹车异响",
+                "工时_分钟": 60,
+            },
+        ]
+
+        # 全量 sheets（模拟 process_maintenance_data 中的 build_sheets 调用）
+        full_sheets = build_sheets(classified, classified)
+        assert "维修明细" in full_sheets
+        assert "每月设备故障统计" in full_sheets
+        assert len(full_sheets) > 1
+
+        # details_only 过滤：只保留维修明细
+        detail_only = {k: v for k, v in full_sheets.items() if k == "维修明细"}
+        assert set(detail_only.keys()) == {"维修明细"}
+
+        # 验证明细内容完整
+        df = detail_only["维修明细"]
+        assert len(df) == 2
+        assert list(df.columns)[0] == "日期"

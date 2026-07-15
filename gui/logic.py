@@ -223,6 +223,7 @@ def _dispatch_module(module_type: str, path: str, **kwargs) -> object | None:
             skip_hidden_rows=skip_hidden_rows,
             skip_hidden_cols=skip_hidden_cols,
             split_by_year=kwargs.get("split_by_year", False),
+            details_only=kwargs.get("details_only", False),
         )
     # batch 模块由 _execute_batch_task 单独处理
     return None
@@ -417,10 +418,11 @@ async def on_maint_process(page: ft.Page, maint_refs: dict, log, equipment_ledge
         _log_message(log, "请先选择出勤统计表文件或文件夹", level=logging.WARNING)
         return
     split_by_year = bool(maint_refs.get("split_year") and maint_refs["split_year"].value)
+    details_only = bool(maint_refs.get("details_only") and maint_refs["details_only"].value)
     await _safe_run_task(page, btn, "处理", path, log, "maint",
                          equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
-                         split_by_year=split_by_year)
+                         split_by_year=split_by_year, details_only=details_only)
 
 
 def _set_controls_visible(controls: list, visible: bool):
