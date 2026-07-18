@@ -835,7 +835,7 @@ class TestSyncWithProcessors:
         mock_fuel_proc.return_value = [
             {"date": "2025-06-01", "shiftType": "Day", "equipmentName": "CAT785D-01", "fuelName": "0#柴油", "consumption": 150.5},
         ]
-        mock_sync_api.return_value = {"success": 1, "skipped": 0, "failed": 0}
+        mock_sync_api.return_value = {"success": 1, "skipped": 0, "failed": 0, "warnings": []}
 
         with patch("func.sync_to_minebase.MineBaseAPIClient") as mock_api_cls, \
              patch("func.sync_to_minebase.get_minebase_api_config", return_value={"url": "http://test", "username": "u", "password": "p"}):
@@ -860,7 +860,7 @@ class TestSyncWithProcessors:
         mock_elec_proc.return_value = [
             {"date": "2025-06-01", "shiftType": "Night", "equipmentName": "EX-001", "consumption": 500.0},
         ]
-        mock_sync_api.return_value = {"success": 1, "skipped": 0, "failed": 0}
+        mock_sync_api.return_value = {"success": 1, "skipped": 0, "failed": 0, "warnings": []}
 
         with patch("func.sync_to_minebase.MineBaseAPIClient") as mock_api_cls, \
              patch("func.sync_to_minebase.get_minebase_api_config", return_value={"url": "http://test", "username": "u", "password": "p"}):
@@ -868,7 +868,7 @@ class TestSyncWithProcessors:
             results = sync(tmp_path, mode="api", data_types=["fuel", "electrical"], dry_run=True)
 
         # fuel fails and gets empty result, electrical still syncs
-        assert results["fuel"] == {"success": 0, "skipped": 0, "failed": 0}
+        assert results["fuel"] == {"success": 0, "skipped": 0, "failed": 0, "warnings": []}
         assert results["electrical"]["success"] == 1
 
 
@@ -954,7 +954,7 @@ class TestLedgerToggleSplit:
         """use_equipment_ledger=True 应只加载设备台账，油品台账为 None。"""
         mock_discover.return_value = {"fuel": [tmp_path / "Fuel.xlsx"]}
         mock_fuel.return_value = [{"date": "2025-06-01", "equipmentName": "CAT785D-01"}]
-        mock_api.return_value = {"success": 1, "skipped": 0, "failed": 0}
+        mock_api.return_value = {"success": 1, "skipped": 0, "failed": 0, "warnings": []}
         mock_eq_cache.return_value = [{"标准名称": "CAT785D", "别名": ["卡特785"]}]
         mock_oil_cache.return_value = None
 
@@ -978,7 +978,7 @@ class TestLedgerToggleSplit:
         """use_oil_ledger=True 应只加载油品台账，设备台账为 None。"""
         mock_discover.return_value = {"fuel": [tmp_path / "Fuel.xlsx"]}
         mock_fuel.return_value = [{"date": "2025-06-01", "fuelName": "0#柴油"}]
-        mock_api.return_value = {"success": 1, "skipped": 0, "failed": 0}
+        mock_api.return_value = {"success": 1, "skipped": 0, "failed": 0, "warnings": []}
         mock_eq_cache.return_value = None
         mock_oil_cache.return_value = [{"标准名称": "0号柴油", "编码": "OIL-001"}]
 
@@ -1002,7 +1002,7 @@ class TestLedgerToggleSplit:
         """use_ledger=True 应同时启用设备和油品台账（向后兼容）。"""
         mock_discover.return_value = {"fuel": [tmp_path / "Fuel.xlsx"]}
         mock_fuel.return_value = [{"date": "2025-06-01"}]
-        mock_api.return_value = {"success": 1, "skipped": 0, "failed": 0}
+        mock_api.return_value = {"success": 1, "skipped": 0, "failed": 0, "warnings": []}
         mock_eq_cache.return_value = [{"标准名称": "CAT785D"}]
         mock_oil_cache.return_value = [{"标准名称": "0号柴油"}]
 

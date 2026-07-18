@@ -28,17 +28,23 @@ def sync_via_api(
     column_mapping: dict[str, str],
     api_client: Any,
     dry_run: bool = False,
-) -> dict[str, int]:
+    row_warnings: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """通过 API 模式同步数据。
 
+    Args:
+        row_warnings: 可选警告收集列表（来自台账匹配阶段），
+                      合并服务端返回的 warnings/errors 后一并返回。
+
     Returns:
-        {"success": N, "skipped": N, "failed": N}
+        {"success": N, "skipped": N, "failed": N, "warnings": [...]}
     """
     table = DATA_TYPE_REGISTRY[data_type]["table"]
+    collected_warnings: list[dict[str, Any]] = list(row_warnings) if row_warnings else []
 
     if not rows:
         logger.info("[%s] 无数据可同步", data_type)
-        return {"success": 0, "skipped": 0, "failed": 0}
+        return {"success": 0, "skipped": 0, "failed": 0, "warnings": collected_warnings}
 
     if dry_run:
         logger.info("[DRY-RUN] %s: 将同步 %d 行到 %s", data_type, len(rows), table)
@@ -46,10 +52,14 @@ def sync_via_api(
             logger.info("  示例: %s", row)
         if len(rows) > 3:
             logger.info("  ... 共 %d 行", len(rows))
-        return {"success": 0, "skipped": 0, "failed": 0}
+        return {"success": 0, "skipped": 0, "failed": 0, "warnings": collected_warnings}
 
     field_mappings = _build_field_mappings(column_mapping, table)
     session_id = api_client.create_session(table)
+
+    # 剥离内部元数据字段，不发送到 API
+    _META_KEYS = {"_row_num"}
+    rows = [{k: v for k, v in row.items() if k not in _META_KEYS} for row in rows]
 
     total_success = 0
     total_skipped = 0
@@ -70,11 +80,25 @@ def sync_via_api(
             total_failed += f
 
             if data.get("warnings"):
-                for w in data["warnings"][:5]:
-                    logger.warning("  [%s] 行%d: %s", data_type, w.get("row", "?"), w.get("message", ""))
+                for w in data["warnings"]:
+                    warning_item = {
+                        "row": w.get("row", "?"),
+                        "field": w.get("field", ""),
+                        "value": w.get("value", ""),
+                        "message": w.get("message", ""),
+                    }
+                    collected_warnings.append(warning_item)
+                    logger.warning("  [%s] 行%s: %s", data_type, warning_item["row"], warning_item["message"])
             if data.get("errors"):
-                for e in data["errors"][:5]:
-                    logger.error("  [%s] 行%d: %s", data_type, e.get("row", "?"), e.get("message", ""))
+                for e in data["errors"]:
+                    error_item = {
+                        "row": e.get("row", "?"),
+                        "field": e.get("field", ""),
+                        "value": e.get("value", ""),
+                        "message": e.get("message", ""),
+                    }
+                    collected_warnings.append(error_item)
+                    logger.error("  [%s] 行%s: %s", data_type, error_item["row"], error_item["message"])
 
         # 确认导入（batchIndex=0 处理所有 staging 数据）
         confirm_resp = api_client.confirm_batch(table, session_id, batch_index=0)
@@ -101,7 +125,7 @@ def sync_via_api(
             logger.warning("[%s] 取消导入会话失败: %s", data_type, cancel_err)
         total_failed += len(rows) - total_success - total_skipped
 
-    return {"success": total_success, "skipped": total_skipped, "failed": total_failed}
+    return {"success": total_success, "skipped": total_skipped, "failed": total_failed, "warnings": collected_warnings}
 
 
 # ---------------------------------------------------------------------------
@@ -153,17 +177,23 @@ def sync_via_db(
     column_mapping: dict[str, str],
     db_client: Any,
     dry_run: bool = False,
-) -> dict[str, int]:
+    row_warnings: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     """通过直连数据库模式同步数据。
 
+    Args:
+        row_warnings: 可选警告收集列表（来自台账匹配阶段），
+                      合并 FK 解析阶段的警告后一并返回。
+
     Returns:
-        {"success": N, "skipped": N, "failed": N}
+        {"success": N, "skipped": N, "failed": N, "warnings": [...]}
     """
     table = DATA_TYPE_REGISTRY[data_type]["table"]
+    collected_warnings: list[dict[str, Any]] = list(row_warnings) if row_warnings else []
 
     if not rows:
         logger.info("[%s] 无数据可同步", data_type)
-        return {"success": 0, "skipped": 0, "failed": 0}
+        return {"success": 0, "skipped": 0, "failed": 0, "warnings": collected_warnings}
 
     if dry_run:
         logger.info("[DRY-RUN] %s: 将同步 %d 行到 %s", data_type, len(rows), table)
@@ -171,7 +201,7 @@ def sync_via_db(
             logger.info("  示例: %s", row)
         if len(rows) > 3:
             logger.info("  ... 共 %d 行", len(rows))
-        return {"success": 0, "skipped": 0, "failed": 0}
+        return {"success": 0, "skipped": 0, "failed": 0, "warnings": collected_warnings}
 
     total_success = 0
     total_skipped = 0
@@ -181,7 +211,7 @@ def sync_via_db(
         for row in rows:
             try:
                 # FK 解析
-                resolved_row = _resolve_fks_for_db(data_type, row, db_client)
+                resolved_row = _resolve_fks_for_db(data_type, row, db_client, warnings=collected_warnings)
                 if resolved_row is None:
                     total_skipped += 1
                     continue
@@ -219,4 +249,4 @@ def sync_via_db(
         db_client.rollback()
         total_failed += len(rows) - total_success - total_skipped
 
-    return {"success": total_success, "skipped": total_skipped, "failed": total_failed}
+    return {"success": total_success, "skipped": total_skipped, "failed": total_failed, "warnings": collected_warnings}

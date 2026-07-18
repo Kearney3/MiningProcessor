@@ -53,9 +53,17 @@ export interface ScanResult {
   missing: string[];
 }
 
+/** 同步警告条目 */
+export interface SyncWarning {
+  row: number | string;
+  field: string;
+  value: string;
+  message: string;
+}
+
 /** 同步结果 */
 export interface SyncResult {
-  results: Record<string, { success: number; skipped: number; failed: number }>;
+  results: Record<string, { success: number; skipped: number; failed: number; warnings?: SyncWarning[] }>;
 }
 
 /** 台账数据 */

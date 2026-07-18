@@ -73,6 +73,7 @@ def _apply_ledger_matching(
     rows: list[dict[str, Any]],
     data_type: str,
     ledger: Any,
+    warnings: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """使用设备台账标准化行数据中的设备名称。
 
@@ -80,6 +81,7 @@ def _apply_ledger_matching(
         rows: 已映射的行数据列表。
         data_type: 数据类型键。
         ledger: EquipmentLedger 实例。
+        warnings: 可选警告收集列表，未匹配的设备名会追加到此列表。
 
     Returns:
         设备名称标准化后的新列表。
@@ -105,6 +107,13 @@ def _apply_ledger_matching(
             if match and match["标准名称"] != raw_name:
                 new_row[field] = match["标准名称"]
                 matched_count += 1
+            elif not match and warnings is not None:
+                warnings.append({
+                    "row": row.get("_row_num", "?"),
+                    "field": field,
+                    "value": str(raw_name),
+                    "message": f"设备名 '{raw_name}' 未匹配到台账",
+                })
         result.append(new_row)
 
     if matched_count:
@@ -116,6 +125,7 @@ def _apply_oil_ledger_matching(
     rows: list[dict[str, Any]],
     data_type: str,
     ledger: Any,
+    warnings: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """使用油品台账标准化行数据中的油品名称。
 
@@ -123,6 +133,7 @@ def _apply_oil_ledger_matching(
         rows: 已映射的行数据列表。
         data_type: 数据类型键。
         ledger: OilLedger 实例。
+        warnings: 可选警告收集列表，未匹配的油品名会追加到此列表。
 
     Returns:
         油品名称标准化后的新列表。
@@ -148,6 +159,13 @@ def _apply_oil_ledger_matching(
             if match and match["标准名称"] != raw_name:
                 new_row[field] = match["标准名称"]
                 matched_count += 1
+            elif not match and warnings is not None:
+                warnings.append({
+                    "row": row.get("_row_num", "?"),
+                    "field": field,
+                    "value": str(raw_name),
+                    "message": f"油品名 '{raw_name}' 未匹配到台账",
+                })
         result.append(new_row)
 
     if matched_count:
@@ -160,7 +178,10 @@ def _apply_oil_ledger_matching(
 # ---------------------------------------------------------------------------
 
 
-def _resolve_fks_for_db(data_type: str, row: dict, db_client: Any) -> dict | None:
+def _resolve_fks_for_db(
+    data_type: str, row: dict, db_client: Any,
+    warnings: list[dict[str, Any]] | None = None,
+) -> dict | None:
     """为直连模式解析 FK 字段。返回解析后的行，FK 未找到时返回 None。"""
     resolved = dict(row)
 
@@ -170,11 +191,27 @@ def _resolve_fks_for_db(data_type: str, row: dict, db_client: Any) -> dict | Non
         if truck_name:
             truck_id = db_client.resolve_equipment_id(truck_name)
             if not truck_id:
-                logger.warning("矿卡 '%s' 未找到，跳过该行", truck_name)
+                msg = f"矿卡 '{truck_name}' 未找到，跳过该行"
+                logger.warning(msg)
+                if warnings is not None:
+                    warnings.append({
+                        "row": row.get("_row_num", "?"),
+                        "field": "truckName",
+                        "value": str(truck_name),
+                        "message": msg,
+                    })
                 return None
             resolved["truckId"] = truck_id
         else:
-            logger.warning("缺少矿卡名称，跳过该行")
+            msg = "缺少矿卡名称，跳过该行"
+            logger.warning(msg)
+            if warnings is not None:
+                warnings.append({
+                    "row": row.get("_row_num", "?"),
+                    "field": "truckName",
+                    "value": "",
+                    "message": msg,
+                })
             return None
 
         # 挖机
@@ -182,11 +219,27 @@ def _resolve_fks_for_db(data_type: str, row: dict, db_client: Any) -> dict | Non
         if excavator_name:
             excavator_id = db_client.resolve_equipment_id(excavator_name)
             if not excavator_id:
-                logger.warning("挖机 '%s' 未找到，跳过该行", excavator_name)
+                msg = f"挖机 '{excavator_name}' 未找到，跳过该行"
+                logger.warning(msg)
+                if warnings is not None:
+                    warnings.append({
+                        "row": row.get("_row_num", "?"),
+                        "field": "excavatorName",
+                        "value": str(excavator_name),
+                        "message": msg,
+                    })
                 return None
             resolved["excavatorId"] = excavator_id
         else:
-            logger.warning("缺少挖机名称，跳过该行")
+            msg = "缺少挖机名称，跳过该行"
+            logger.warning(msg)
+            if warnings is not None:
+                warnings.append({
+                    "row": row.get("_row_num", "?"),
+                    "field": "excavatorName",
+                    "value": "",
+                    "message": msg,
+                })
             return None
 
         # 物料类型
@@ -203,11 +256,27 @@ def _resolve_fks_for_db(data_type: str, row: dict, db_client: Any) -> dict | Non
         if equip_name:
             equip_id = db_client.resolve_equipment_id(equip_name)
             if not equip_id:
-                logger.warning("设备 '%s' 未找到，跳过该行", equip_name)
+                msg = f"设备 '{equip_name}' 未找到，跳过该行"
+                logger.warning(msg)
+                if warnings is not None:
+                    warnings.append({
+                        "row": row.get("_row_num", "?"),
+                        "field": "equipmentName",
+                        "value": str(equip_name),
+                        "message": msg,
+                    })
                 return None
             resolved["equipmentId"] = equip_id
         else:
-            logger.warning("缺少设备名称，跳过该行")
+            msg = "缺少设备名称，跳过该行"
+            logger.warning(msg)
+            if warnings is not None:
+                warnings.append({
+                    "row": row.get("_row_num", "?"),
+                    "field": "equipmentName",
+                    "value": "",
+                    "message": msg,
+                })
             return None
 
     return resolved

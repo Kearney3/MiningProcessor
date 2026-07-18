@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { BridgeProp, SyncResult } from "../../lib/types";
+import type { BridgeProp, SyncResult, SyncWarning } from "../../lib/types";
 import { useToast } from "../Toast";
 import { FolderIcon } from "../../lib/icons";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
@@ -93,6 +93,14 @@ const XCircleIcon = () => (
     <circle cx="12" cy="12" r="10" />
     <line x1="15" y1="9" x2="9" y2="15" />
     <line x1="9" y1="9" x2="15" y2="15" />
+  </svg>
+);
+
+const AlertTriangleIcon = () => (
+  <svg className="w-4 h-4 shrink-0 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
   </svg>
 );
 
@@ -589,6 +597,52 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
           </table>
         </div>
       )}
+
+      {/* Warnings table */}
+      {result && (() => {
+        const allWarnings: { type: string; label: string; w: SyncWarning }[] = [];
+        for (const [type, stats] of Object.entries(result.results)) {
+          for (const w of stats.warnings ?? []) {
+            allWarnings.push({ type, label: TYPE_LABEL_MAP[type] ?? type, w });
+          }
+        }
+        if (allWarnings.length === 0) return null;
+        return (
+          <div className="bg-white rounded-lg border border-amber-200 overflow-hidden">
+            <div className="px-4 py-3 border-b border-amber-100 bg-amber-50">
+              <h3 className="text-sm font-medium text-amber-700 flex items-center gap-2">
+                <AlertTriangleIcon />
+                异常行
+                <span className="text-xs text-amber-500">共 {allWarnings.length} 条</span>
+              </h3>
+            </div>
+            <div className="max-h-64 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0">
+                  <tr className="bg-amber-50 text-left">
+                    <th className="px-4 py-2 text-xs font-medium text-amber-600 uppercase tracking-wider">数据类型</th>
+                    <th className="py-2 text-xs font-medium text-amber-600 uppercase tracking-wider">行号</th>
+                    <th className="py-2 text-xs font-medium text-amber-600 uppercase tracking-wider">字段</th>
+                    <th className="py-2 text-xs font-medium text-amber-600 uppercase tracking-wider">原始值</th>
+                    <th className="py-2 pr-4 text-xs font-medium text-amber-600 uppercase tracking-wider">问题</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allWarnings.map((item, idx) => (
+                    <tr key={idx} className={`h-9 border-b border-slate-100 hover:bg-amber-50/50 ${idx % 2 === 0 ? "bg-white" : "bg-slate-50"}`}>
+                      <td className="px-4 py-2 text-sm text-slate-700">{item.label}</td>
+                      <td className="py-2 text-sm text-slate-500">{item.w.row}</td>
+                      <td className="py-2 text-sm text-slate-700">{item.w.field}</td>
+                      <td className="py-2 text-sm text-red-600 font-mono">{item.w.value}</td>
+                      <td className="py-2 pr-4 text-sm text-slate-500">{item.w.message}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
 
       {error && (
         <div className="flex items-start gap-2 text-xs text-red-700 bg-red-50 rounded-md px-2.5 py-1.5">
