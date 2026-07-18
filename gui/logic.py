@@ -871,6 +871,11 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log) -> None:
             result_text.color = "#F59E0B"
             result_text.visible = True
             result_text.update()
+            # 无结果时隐藏异常表格
+            wc = sync_refs.get("warnings_container")
+            if wc:
+                wc.visible = False
+                wc.update()
             return
 
         total = {"success": 0, "skipped": 0, "failed": 0}
@@ -897,6 +902,44 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log) -> None:
         result_text.visible = True
         result_text.update()
 
+        # 收集并展示异常行
+        from gui.components.sync_minebase import DATA_TYPES as _DT_NAMES
+
+        _dt_label_map = dict(_DT_NAMES)
+        all_warnings: list[tuple[str, dict]] = []
+        for dt, r in results.items():
+            for w in r.get("warnings", []):
+                all_warnings.append((dt, w))
+
+        warnings_container = sync_refs.get("warnings_container")
+        warnings_list = sync_refs.get("warnings_list")
+        warnings_count_text = sync_refs.get("warnings_count_text")
+
+        if warnings_container and warnings_list:
+            if all_warnings:
+                warnings_list.controls.clear()
+                for dt_key, w in all_warnings:
+                    dt_label = _dt_label_map.get(dt_key, dt_key)
+                    warnings_list.controls.append(
+                        ft.Row(
+                            [
+                                ft.Text(dt_label, size=11, color="#64748B", width=70),
+                                ft.Text(f"行{w.get('row', '?')}", size=11, color="#64748B", width=50),
+                                ft.Text(w.get("field", ""), size=11, width=100),
+                                ft.Text(w.get("value", ""), size=11, color="#EF4444", width=80),
+                                ft.Text(w.get("message", ""), size=11, color="#64748B", expand=True),
+                            ],
+                            spacing=8,
+                        ),
+                    )
+                if warnings_count_text:
+                    warnings_count_text.value = f"共 {len(all_warnings)} 条"
+                warnings_container.visible = True
+                _log_message(log, f"[数据同步] 发现 {len(all_warnings)} 条异常记录", level=logging.WARNING)
+            else:
+                warnings_container.visible = False
+            warnings_container.update()
+
     except Exception as ex:
         _log_message(log, f"[数据同步] 同步失败: {ex}", level=logging.ERROR)
         _show_snackbar(page, "同步失败", is_error=True)
@@ -904,6 +947,10 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log) -> None:
         result_text.color = "#EF4444"
         result_text.visible = True
         result_text.update()
+        wc = sync_refs.get("warnings_container")
+        if wc:
+            wc.visible = False
+            wc.update()
     finally:
         set_btn_state(btn, True, "同步到 MineBase")
 

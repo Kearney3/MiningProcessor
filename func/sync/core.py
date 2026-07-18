@@ -263,18 +263,25 @@ def sync(
                     logger.error("[%s] 处理文件失败: %s — %s", data_type, file_path, e)
 
             if not all_rows:
-                results[data_type] = {"success": 0, "skipped": 0, "failed": 0}
+                results[data_type] = {"success": 0, "skipped": 0, "failed": 0, "warnings": []}
                 continue
 
+            # 为每行标注序号（用于警告展示）
+            for idx, row in enumerate(all_rows, start=2):
+                row.setdefault("_row_num", idx)
+
+            # 本类型警告收集
+            data_warnings: list[dict[str, Any]] = []
+
             all_rows = _apply_defaults(all_rows, data_type)
-            all_rows = _apply_ledger_matching(all_rows, data_type, ledger)
-            all_rows = _apply_oil_ledger_matching(all_rows, data_type, oil_ledger)
+            all_rows = _apply_ledger_matching(all_rows, data_type, ledger, warnings=data_warnings)
+            all_rows = _apply_oil_ledger_matching(all_rows, data_type, oil_ledger, warnings=data_warnings)
             all_rows = _filter_by_date_range(all_rows, date_start, date_end)
 
             if sync_mode == "api":
-                results[data_type] = _sync_via_api(data_type, all_rows, mapping, api_client, dry_run)
+                results[data_type] = _sync_via_api(data_type, all_rows, mapping, api_client, dry_run, row_warnings=data_warnings)
             else:
-                results[data_type] = _sync_via_db(data_type, all_rows, mapping, db_client, dry_run)
+                results[data_type] = _sync_via_db(data_type, all_rows, mapping, db_client, dry_run, row_warnings=data_warnings)
 
     finally:
         if db_client:
@@ -284,11 +291,16 @@ def sync(
     logger.info("=" * 50)
     logger.info("同步汇总:")
     total = {"success": 0, "skipped": 0, "failed": 0}
+    total_warnings = 0
     for dt, r in results.items():
-        logger.info("  %s: 成功=%d, 跳过=%d, 失败=%d", dt, r["success"], r["skipped"], r["failed"])
+        dt_warnings = r.get("warnings", [])
+        total_warnings += len(dt_warnings)
+        logger.info("  %s: 成功=%d, 跳过=%d, 失败=%d, 异常=%d", dt, r["success"], r["skipped"], r["failed"], len(dt_warnings))
         for k in total:
             total[k] += r[k]
-    logger.info("  合计: 成功=%d, 跳过=%d, 失败=%d", total["success"], total["skipped"], total["failed"])
+    logger.info("  合计: 成功=%d, 跳过=%d, 失败=%d, 异常=%d", total["success"], total["skipped"], total["failed"], total_warnings)
+    if total_warnings:
+        logger.warning("  ⚠️  共 %d 条异常记录，请在 GUI 或前端中查看详情", total_warnings)
 
     return results
 

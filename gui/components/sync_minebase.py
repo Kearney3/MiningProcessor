@@ -298,6 +298,31 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         visible=False,
     )
 
+    # --- 异常行表格 ---
+    warnings_count_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
+    warnings_list = ft.Column([], spacing=2, scroll=ft.ScrollMode.AUTO, height=200)
+    warnings_container = ft.Container(
+        visible=False,
+        content=ft.Column(
+            [
+                ft.Row(
+                    [
+                        ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED, color=theme.WARNING, size=16),
+                        ft.Text("异常行", size=13, weight=ft.FontWeight.W_500, color=theme.WARNING),
+                        warnings_count_text,
+                    ],
+                    spacing=6,
+                ),
+                warnings_list,
+            ],
+            spacing=6,
+        ),
+        bgcolor=theme.SURFACE,
+        border=ft.Border.all(1, theme.WARNING),
+        border_radius=theme.RADIUS_SM,
+        padding=theme.SPACING_SM,
+    )
+
     # --- 布局 ---
     type_row = ft.ResponsiveRow(
         [ft.Container(select_all, col={"xs": 12, "md": 6})]
@@ -346,6 +371,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
                                 vertical_alignment=ft.CrossAxisAlignment.CENTER,
                                 spacing=12,
                             ),
+                            warnings_container,
                         ],
                         spacing=8,
                     ),
@@ -379,6 +405,9 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "skip_hidden": skip_hidden_rows_check,
         "skip_hidden_rows": skip_hidden_rows_check,
         "skip_hidden_cols": skip_hidden_cols_check,
+        "warnings_container": warnings_container,
+        "warnings_list": warnings_list,
+        "warnings_count_text": warnings_count_text,
     }
 
     return container, refs
