@@ -68,6 +68,7 @@ def sync(
     skip_hidden: bool = False,
     skip_hidden_rows: bool = False,
     skip_hidden_cols: bool = False,
+    anomaly_config=None,
 ) -> dict[str, dict[str, int]]:
     """执行同步的主入口。
 
@@ -234,18 +235,21 @@ def sync(
                     if data_type == "fuel":
                         rows = _process_fuel(file_path, year,
                                              skip_hidden_rows=skip_hidden_rows,
-                                             skip_hidden_cols=skip_hidden_cols)
+                                             skip_hidden_cols=skip_hidden_cols,
+                                             anomaly_config=anomaly_config)
                     elif data_type == "electrical":
                         rows = _process_electrical(file_path, year,
                                                    skip_hidden_rows=skip_hidden_rows,
-                                                   skip_hidden_cols=skip_hidden_cols)
+                                                   skip_hidden_cols=skip_hidden_cols,
+                                                   anomaly_config=anomaly_config)
                     elif data_type in ("production", "operation"):
                         # 缓存生产文件处理结果，避免同一文件处理两次
                         cache_key = str(file_path)
                         if _production_cache is None or cache_key not in _production_cache:
                             result = _process_production(file_path,
                                                          skip_hidden_rows=skip_hidden_rows,
-                                                         skip_hidden_cols=skip_hidden_cols)
+                                                         skip_hidden_cols=skip_hidden_cols,
+                                                         anomaly_config=anomaly_config)
                             if _production_cache is None:
                                 _production_cache = {}
                             _production_cache[cache_key] = result
@@ -255,6 +259,7 @@ def sync(
                             file_path, year, month, apply_header_mapping,
                             skip_hidden_rows=skip_hidden_rows,
                             skip_hidden_cols=skip_hidden_cols,
+                            anomaly_config=anomaly_config,
                         )
                     else:
                         rows = _read_and_map(file_path, DATA_TYPE_REGISTRY[data_type]["sheet"], mapping)

@@ -5,6 +5,7 @@ import { useToast } from "../Toast";
 import { ChevronDownIcon, PlayIcon, FolderIcon, FileIcon, PlusIcon, TrashIcon, CheckCircleIcon, XCircleIcon, AlertTriangleIcon, FuelIcon, ProductionIcon, ElectricalIcon, WorktimeIcon, MergeIcon, MaintenanceIcon } from "../../lib/icons";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { useLastDirectory } from "../../hooks/useLastDirectory";
+import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG } from "../AnomalyPanel";
 
 const currentYear = new Date().getFullYear();
 const yearOptions = Array.from({ length: 61 }, (_, i) => currentYear - 30 + i);
@@ -315,6 +316,7 @@ function FuelCard({
   useOilLedger,
   skipHiddenRows,
   skipHiddenCols,
+  anomaly,
   defaultPath,
   onFileSelected,
 }: {
@@ -323,6 +325,7 @@ function FuelCard({
   useOilLedger: boolean;
   skipHiddenRows: boolean;
   skipHiddenCols: boolean;
+  anomaly: AnomalyConfig;
   defaultPath?: string;
   onFileSelected?: (path: string) => void;
 }) {
@@ -344,6 +347,9 @@ function FuelCard({
         use_oil_ledger: useOilLedger,
         skip_hidden_rows: skipHiddenRows,
         skip_hidden_cols: skipHiddenCols,
+        anomaly_enabled: anomaly.enabled,
+        anomaly_report: anomaly.report,
+        anomaly_mode: anomaly.mode,
       };
       if (year) params.year = parseInt(year);
       const res = await bridge.call<{ output_file?: string }>(
@@ -389,6 +395,7 @@ function ProductionCard({
   useOilLedger,
   skipHiddenRows,
   skipHiddenCols,
+  anomaly,
   defaultPath,
   onFileSelected,
 }: {
@@ -397,15 +404,22 @@ function ProductionCard({
   useOilLedger: boolean;
   skipHiddenRows: boolean;
   skipHiddenCols: boolean;
+  anomaly: AnomalyConfig;
   defaultPath?: string;
   onFileSelected?: (path: string) => void;
 }) {
   const { notify } = useToast();
   const [path, setPath] = useState("");
-  const [rawStart, setRawStart] = useState("-1");
+  const [autoDetect, setAutoDetect] = useState(true);
+  const [rawStart, setRawStart] = useState("6");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const handleAutoDetectChange = (v: boolean) => {
+    setAutoDetect(v);
+    if (v) setRawStart("6");
+  };
 
   const handleProcess = async () => {
     setLoading(true);
@@ -414,11 +428,14 @@ function ProductionCard({
     try {
       await bridge.call("process_production", {
         path,
-        raw_start: parseInt(rawStart),
+        raw_start: autoDetect ? -1 : parseInt(rawStart),
         use_equipment_ledger: useEquipmentLedger,
         use_oil_ledger: useOilLedger,
         skip_hidden_rows: skipHiddenRows,
         skip_hidden_cols: skipHiddenCols,
+        anomaly_enabled: anomaly.enabled,
+        anomaly_report: anomaly.report,
+        anomaly_mode: anomaly.mode,
       });
       setResult("处理完成");
       notify("生产数据处理完成", "success");
@@ -441,14 +458,25 @@ function ProductionCard({
       />
       {path === "" && <PathWarning />}
       <div className="mt-2">
-        <input
-          type="number"
-          value={rawStart}
-          onChange={(e) => setRawStart(e.target.value)}
-          placeholder="表头起始行（-1=自动检测）"
-          className={inputClass}
+        <StyledToggle
+          checked={autoDetect}
+          onChange={handleAutoDetectChange}
+          label="自动识别表头"
         />
       </div>
+      {!autoDetect && (
+        <div className="mt-2 space-y-1">
+          <label className="text-xs text-slate-500">表头起始行</label>
+          <input
+            type="number"
+            value={rawStart}
+            onChange={(e) => setRawStart(e.target.value)}
+            placeholder="复合表头所在行号"
+            className={inputClass}
+          />
+          <p className="text-xs text-slate-400">复合表头（矿车+矿石类型）所在的行号，默认6</p>
+        </div>
+      )}
       <ProcessButton
         loading={loading}
         onClick={handleProcess}
@@ -469,6 +497,7 @@ function ElectricalCard({
   useOilLedger,
   skipHiddenRows,
   skipHiddenCols,
+  anomaly,
   defaultPath,
   onFileSelected,
 }: {
@@ -477,6 +506,7 @@ function ElectricalCard({
   useOilLedger: boolean;
   skipHiddenRows: boolean;
   skipHiddenCols: boolean;
+  anomaly: AnomalyConfig;
   defaultPath?: string;
   onFileSelected?: (path: string) => void;
 }) {
@@ -502,6 +532,9 @@ function ElectricalCard({
         use_oil_ledger: useOilLedger,
         skip_hidden_rows: skipHiddenRows,
         skip_hidden_cols: skipHiddenCols,
+        anomaly_enabled: anomaly.enabled,
+        anomaly_report: anomaly.report,
+        anomaly_mode: anomaly.mode,
       };
       if (year) params.year = parseInt(year);
       await bridge.call("process_electrical", params);
@@ -571,6 +604,7 @@ function WorktimeCard({
   useOilLedger,
   skipHiddenRows,
   skipHiddenCols,
+  anomaly,
   defaultPath,
   onFileSelected,
 }: {
@@ -579,6 +613,7 @@ function WorktimeCard({
   useOilLedger: boolean;
   skipHiddenRows: boolean;
   skipHiddenCols: boolean;
+  anomaly: AnomalyConfig;
   defaultPath?: string;
   onFileSelected?: (path: string) => void;
 }) {
@@ -607,6 +642,9 @@ function WorktimeCard({
         use_oil_ledger: useOilLedger,
         skip_hidden_rows: skipHiddenRows,
         skip_hidden_cols: skipHiddenCols,
+        anomaly_enabled: anomaly.enabled,
+        anomaly_report: anomaly.report,
+        anomaly_mode: anomaly.mode,
       };
       if (useHeaderMapping) {
         params.header_mode = headerMode;
@@ -926,6 +964,7 @@ export function DataProcessingPage({ bridge }: { bridge: BridgeProp }) {
   const [useOilLedger, setUseOilLedger] = useState(false);
   const [skipHiddenRows, setSkipHiddenRows] = useState(false);
   const [skipHiddenCols, setSkipHiddenCols] = useState(false);
+  const [anomaly, setAnomaly] = useState<AnomalyConfig>(DEFAULT_ANOMALY_CONFIG);
   const { initialDir, saveDir } = useLastDirectory(bridge);
 
   return (
@@ -959,11 +998,13 @@ export function DataProcessingPage({ bridge }: { bridge: BridgeProp }) {
         </div>
       </div>
 
+      <AnomalyPanel config={anomaly} onChange={setAnomaly} />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <FuelCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
-        <ProductionCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
-        <ElectricalCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
-        <WorktimeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
+        <FuelCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomaly} defaultPath={initialDir} onFileSelected={saveDir} />
+        <ProductionCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomaly} defaultPath={initialDir} onFileSelected={saveDir} />
+        <ElectricalCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomaly} defaultPath={initialDir} onFileSelected={saveDir} />
+        <WorktimeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomaly} defaultPath={initialDir} onFileSelected={saveDir} />
         <MergeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
         <MaintenanceCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
       </div>

@@ -52,10 +52,25 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     prod_raw_start = ft.TextField(
         label="表头起始行",
         width=100,
-        value="-1",
-        hint_text="-1",
+        value="6",
+        hint_text="6",
         color=theme.TEXT_PRIMARY,
+        disabled=True,
     )
+    prod_auto_detect = ft.Switch(
+        label="自动识别表头",
+        value=True,
+        active_color=theme.PRIMARY,
+    )
+
+    def _on_prod_auto_detect_change(e):
+        is_auto = prod_auto_detect.value
+        prod_raw_start.disabled = is_auto
+        if is_auto:
+            prod_raw_start.value = "6"
+        prod_raw_start.update()
+
+    prod_auto_detect.on_change = _on_prod_auto_detect_change
     prod_btn = theme.primary_btn("处理", icon=ft.Icons.PLAY_ARROW, disabled=False)
 
     # --- Electrical ---
@@ -358,6 +373,106 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         tooltip="勾选后，Excel 中被隐藏的列将不会被读取",
     )
 
+    # --- 异常值检测开关 ---
+    _anomaly_mode = "flag"  # 内部状态：flag | filter | handle
+
+    anomaly_enabled = ft.Checkbox(
+        label="启用异常值检测",
+        value=False,
+        tooltip="开启后对处理的数据进行异常值检测",
+    )
+    anomaly_report = ft.Checkbox(
+        label="输出异常报告",
+        value=False,
+        tooltip="生成异常报告 Excel 文件",
+    )
+    anomaly_flag = ft.Checkbox(
+        label="标记异常值",
+        value=True,
+        tooltip="在数据中标记异常值（不删除）",
+    )
+    anomaly_filter = ft.Checkbox(
+        label="过滤异常值",
+        value=False,
+        tooltip="移除异常行（与标记互斥）",
+    )
+    anomaly_handle = ft.Checkbox(
+        label="处理异常值",
+        value=False,
+        tooltip="按用户配置替换异常值（与标记互斥）",
+    )
+
+    def _set_anomaly_mode(mode: str):
+        """设置异常值处理模式，确保三选一互斥。"""
+        nonlocal _anomaly_mode
+        _anomaly_mode = mode
+        anomaly_flag.value = (mode == "flag")
+        anomaly_filter.value = (mode == "filter")
+        anomaly_handle.value = (mode == "handle")
+        safe_update(anomaly_flag)
+        safe_update(anomaly_filter)
+        safe_update(anomaly_handle)
+
+    def _on_anomaly_enabled_change(e):
+        enabled = anomaly_enabled.value
+        anomaly_report.disabled = not enabled
+        anomaly_flag.disabled = not enabled
+        anomaly_filter.disabled = not enabled
+        anomaly_handle.disabled = not enabled
+        safe_update(anomaly_report)
+        safe_update(anomaly_flag)
+        safe_update(anomaly_filter)
+        safe_update(anomaly_handle)
+
+    def _on_anomaly_flag_change(e):
+        if anomaly_flag.value:
+            _set_anomaly_mode("flag")
+        elif _anomaly_mode == "flag":
+            anomaly_flag.value = True
+            safe_update(anomaly_flag)
+
+    def _on_anomaly_filter_change(e):
+        if anomaly_filter.value:
+            _set_anomaly_mode("filter")
+        elif _anomaly_mode == "filter":
+            anomaly_filter.value = True
+            safe_update(anomaly_filter)
+
+    def _on_anomaly_handle_change(e):
+        if anomaly_handle.value:
+            _set_anomaly_mode("handle")
+        elif _anomaly_mode == "handle":
+            anomaly_handle.value = True
+            safe_update(anomaly_handle)
+
+    anomaly_enabled.on_change = _on_anomaly_enabled_change
+    anomaly_flag.on_change = _on_anomaly_flag_change
+    anomaly_filter.on_change = _on_anomaly_filter_change
+    anomaly_handle.on_change = _on_anomaly_handle_change
+
+    # 初始状态：子开关跟随总开关
+    anomaly_report.disabled = not anomaly_enabled.value
+    anomaly_flag.disabled = not anomaly_enabled.value
+    anomaly_filter.disabled = not anomaly_enabled.value
+    anomaly_handle.disabled = not anomaly_enabled.value
+
+    anomaly_panel = ft.Container(
+        content=ft.Column([
+            ft.Row([anomaly_enabled], spacing=8),
+            ft.Container(
+                content=ft.Column([
+                    ft.Row([anomaly_report], spacing=8),
+                    ft.Row([anomaly_flag, anomaly_filter, anomaly_handle], spacing=16),
+                ], spacing=4),
+                padding=ft.Padding.only(left=24),
+            ),
+        ], spacing=4),
+        padding=ft.Padding.symmetric(horizontal=8, vertical=6),
+        border=ft.Border.all(1, theme.BORDER),
+        border_radius=theme.RADIUS_SM,
+        bgcolor=theme.SURFACE_HIGH,
+    )
+
     header_hint = ft.Row(
         [
             ft.Icon(ft.Icons.INFO_OUTLINE, size=14, color=theme.TEXT_SECONDARY),
@@ -388,7 +503,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                 ]),
                 theme.module_card([
                     ft.Row([prod_path, prod_btn], spacing=8),
-                    ft.Row([prod_file_btn, prod_folder_btn, prod_raw_start], spacing=8),
+                    ft.Row([prod_file_btn, prod_folder_btn, prod_auto_detect, prod_raw_start], spacing=8),
                 ]),
                 theme.module_card([
                     ft.Row([elec_path, elec_year, elec_add_shift, elec_default_shift, elec_btn], spacing=8),
@@ -413,6 +528,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                     ft.Row([maint_path, maint_btn], spacing=8),
                     ft.Row([maint_file_btn, maint_folder_btn, maint_split_year, maint_details_only], spacing=8),
                 ]),
+                anomaly_panel,
                 ft.Row([match_eq_toggle, match_oil_toggle, skip_hidden_rows_toggle, skip_hidden_cols_toggle], spacing=8),
             ],
             spacing=8,
@@ -430,8 +546,14 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         "_match_oil_toggle": match_oil_toggle,
         "_skip_hidden_rows_toggle": skip_hidden_rows_toggle,
         "_skip_hidden_cols_toggle": skip_hidden_cols_toggle,
+        "_anomaly_enabled": anomaly_enabled,
+        "_anomaly_report": anomaly_report,
+        "_anomaly_flag": anomaly_flag,
+        "_anomaly_filter": anomaly_filter,
+        "_anomaly_handle": anomaly_handle,
+        "_anomaly_mode": lambda: _anomaly_mode,
         "fuel": {"path": fuel_path, "year": fuel_year, "btn": fuel_btn},
-        "prod": {"path": prod_path, "raw_start": prod_raw_start, "btn": prod_btn},
+        "prod": {"path": prod_path, "raw_start": prod_raw_start, "btn": prod_btn, "auto_detect": prod_auto_detect},
         "elec": {"path": elec_path, "year": elec_year, "btn": elec_btn, "add_shift": elec_add_shift, "default_shift": elec_default_shift},
         "work": {"path": work_path, "year": work_year, "month": work_month, "header_toggle": _work_hmc.toggle, "header_mode": _work_hmc.mode, "header_fuzzy": _work_hmc.fuzzy, "btn": work_btn},
         "merge": {

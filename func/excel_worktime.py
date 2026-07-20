@@ -6,13 +6,16 @@ import argparse
 from func.logger import get_logger
 from func.string_utils import clean_string
 from func.excel_utils import apply_header_mapping, split_day_night_shifts, clean_split_dataframe, strip_date_column, sort_by_date_shift, dedup_dataframe, get_hidden_indices, filter_hidden_from_df, adjust_index_for_hidden, open_workbook
+from func.anomaly import detect_and_filter
+from func.anomaly.rules import AnomalyConfig
+from func import config_loader
 
 logger = get_logger(__name__)
 
 
 def process_excel_data(file_path, year, month, output_file=None, return_sheets=False,
                        header_mapping=None, skip_hidden=False,
-                       skip_hidden_rows=False, skip_hidden_cols=False):
+                       skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None):
     """
     解析非标准结构的Excel文件并合并数据
 
@@ -123,6 +126,14 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
 
     # 去重
     final_df = dedup_dataframe(final_df, "工时数据")
+
+    # 异常值检测
+    output_dir = os.path.dirname(file_path) or "."
+    if anomaly_config is None:
+        anomaly_config = AnomalyConfig.from_config(config_loader.get_anomaly_detection_config())
+    if anomaly_config.enabled:
+        final_df, _ = detect_and_filter(
+            final_df, "worktime", anomaly_config, output_dir=output_dir)
 
     # 7. 输出到Excel（跳过写入当 return_sheets=True）
     if return_sheets:

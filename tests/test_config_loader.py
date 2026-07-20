@@ -393,3 +393,72 @@ class TestSaveMinebaseConfig:
         config_loader._invalidate_config_cache()
         result = secret_store.load_secret(("minebase", "database", "password"))
         assert result == "s3cret"
+
+
+# ---------------------------------------------------------------------------
+# 异常值检测配置
+# ---------------------------------------------------------------------------
+
+class TestAnomalyDetectionConfig:
+    """异常值检测配置的 get / update / save 测试。"""
+
+    def test_get_anomaly_detection_config_defaults(self):
+        """无用户覆盖时应返回 DEFAULT_ANOMALY_DETECTION。"""
+        cfg = config_loader.get_anomaly_detection_config()
+        assert cfg["enabled"] is False
+        assert cfg["sigma_n"] == 3.0
+        assert cfg["percentile_low"] == 1.0
+        assert cfg["percentile_high"] == 99.0
+        assert "fuel" in cfg["thresholds"]
+        assert "production" in cfg["thresholds"]
+        assert "electrical" in cfg["thresholds"]
+        assert "worktime" in cfg["thresholds"]
+
+    def test_get_anomaly_thresholds_all(self):
+        """不指定 data_type 时返回全部阈值。"""
+        thresholds = config_loader.get_anomaly_thresholds()
+        assert "fuel" in thresholds
+        assert "油品消耗" in thresholds["fuel"]
+
+    def test_get_anomaly_thresholds_specific(self):
+        """指定 data_type 时返回对应阈值。"""
+        thresholds = config_loader.get_anomaly_thresholds("fuel")
+        assert "油品消耗" in thresholds
+        assert thresholds["油品消耗"]["max"] == 10000
+
+    def test_get_anomaly_thresholds_unknown_type(self):
+        """未知类型返回空 dict。"""
+        thresholds = config_loader.get_anomaly_thresholds("unknown")
+        assert thresholds == {}
+
+    def test_get_anomaly_handling_rules_default(self):
+        """默认处理规则为空。"""
+        rules = config_loader.get_anomaly_handling_rules()
+        assert rules == {}
+
+    def test_update_anomaly_detection_config(self, temp_config):
+        """更新应写入 config.user.json 并正确合并。"""
+        _, config_file = temp_config
+        updates = {"enabled": True, "sigma_n": 2.5}
+        config_loader._invalidate_config_cache()
+        result = config_loader.update_anomaly_detection_config(updates)
+        assert result["enabled"] is True
+        assert result["sigma_n"] == 2.5
+
+        # 读取应合并默认值
+        cfg = config_loader.get_anomaly_detection_config()
+        assert cfg["enabled"] is True
+        assert cfg["sigma_n"] == 2.5
+        assert cfg["percentile_high"] == 99.0  # 默认值保留
+
+    def test_save_anomaly_detection_config(self, temp_config):
+        """整体保存应替换 user_config 中的 anomaly_detection 段。"""
+        _, config_file = temp_config
+        new_cfg = {"enabled": True, "generate_report": True}
+        config_loader._invalidate_config_cache()
+        config_loader.save_anomaly_detection_config(new_cfg)
+
+        cfg = config_loader.get_anomaly_detection_config()
+        assert cfg["enabled"] is True
+        assert cfg["generate_report"] is True
+

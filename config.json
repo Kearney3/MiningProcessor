@@ -879,5 +879,40 @@
         "点检": "check_content",
         "保养": "non_fault",
         "待机": "skip"
+    },
+    "anomaly_detection": {
+        "enabled": false,
+        "generate_report": false,
+        "flag_anomalies": true,
+        "filter_anomalies": false,
+        "handle_anomalies": false,
+        "sigma_n": 3.0,
+        "percentile_low": 1.0,
+        "percentile_high": 99.0,
+        "thresholds": {
+            "fuel": {
+                "油品消耗": {"min": 0, "max": 10000}
+            },
+            "fuel_engine": {
+                "发动机小时数开始": {"min": 0},
+                "发动机小时数结束": {"min": 0},
+                "运行小时数": {"min": 0, "max": 14}
+            },
+            "production_running": {
+                "运行里程": {"min": 0, "max": 500},
+                "运行小时数": {"min": 0, "max": 14}
+            },
+            "production": {
+                "趟数": {"min": 0, "max": 30},
+                "产量": {"min": 0}
+            },
+            "electrical": {
+                "电力消耗": {"min": 0, "max": 5000}
+            },
+            "worktime": {
+                "__all_numeric__": {"min": 0, "max": 720}
+            }
+        },
+        "handling_rules": {}
     }
 }

@@ -468,6 +468,147 @@ def create_column_mapping_dialog(
     )
 
 
+def create_anomaly_controls() -> dict:
+    """创建异常值检测控件集，返回 refs dict。
+
+    返回的 dict 包含:
+    - "container": ft.Container（可嵌入布局）
+    - "_anomaly_enabled": ft.Checkbox
+    - "_anomaly_report": ft.Checkbox
+    - "_anomaly_mode": callable → "flag" | "filter" | "handle"
+    """
+    try:
+        from . import theme
+    except ImportError:
+        import gui.theme as theme
+
+    _mode = ["flag"]
+
+    anomaly_enabled = ft.Checkbox(
+        label="启用异常值检测",
+        value=False,
+        tooltip="开启后对处理的数据进行异常值检测",
+    )
+    anomaly_report = ft.Checkbox(
+        label="输出异常报告",
+        value=False,
+        tooltip="生成异常报告 Excel 文件",
+    )
+    anomaly_flag = ft.Checkbox(label="标记异常值", value=True, tooltip="标记但不删除")
+    anomaly_filter = ft.Checkbox(label="过滤异常值", value=False, tooltip="移除异常行（与标记互斥）")
+    anomaly_handle = ft.Checkbox(label="处理异常值", value=False, tooltip="按配置替换默认值（与标记互斥）")
+
+    def _set_mode(mode: str):
+        _mode[0] = mode
+        anomaly_flag.value = (mode == "flag")
+        anomaly_filter.value = (mode == "filter")
+        anomaly_handle.value = (mode == "handle")
+        for c in (anomaly_flag, anomaly_filter, anomaly_handle):
+            try:
+                c.update()
+            except (RuntimeError, AttributeError):
+                pass
+
+    def _on_enabled_change(e):
+        enabled = anomaly_enabled.value
+        for c in (anomaly_report, anomaly_flag, anomaly_filter, anomaly_handle):
+            c.disabled = not enabled
+            try:
+                c.update()
+            except (RuntimeError, AttributeError):
+                pass
+
+    def _on_flag_change(e):
+        if anomaly_flag.value:
+            _set_mode("flag")
+        elif _mode[0] == "flag":
+            anomaly_flag.value = True
+            try:
+                anomaly_flag.update()
+            except (RuntimeError, AttributeError):
+                pass
+
+    def _on_filter_change(e):
+        if anomaly_filter.value:
+            _set_mode("filter")
+        elif _mode[0] == "filter":
+            anomaly_filter.value = True
+            try:
+                anomaly_filter.update()
+            except (RuntimeError, AttributeError):
+                pass
+
+    def _on_handle_change(e):
+        if anomaly_handle.value:
+            _set_mode("handle")
+        elif _mode[0] == "handle":
+            anomaly_handle.value = True
+            try:
+                anomaly_handle.update()
+            except (RuntimeError, AttributeError):
+                pass
+
+    anomaly_enabled.on_change = _on_enabled_change
+    anomaly_flag.on_change = _on_flag_change
+    anomaly_filter.on_change = _on_filter_change
+    anomaly_handle.on_change = _on_handle_change
+
+    for c in (anomaly_report, anomaly_flag, anomaly_filter, anomaly_handle):
+        c.disabled = not anomaly_enabled.value
+
+    container = ft.Container(
+        content=ft.Column([
+            ft.Row([anomaly_enabled], spacing=8),
+            ft.Container(
+                content=ft.Column([
+                    ft.Row([anomaly_report], spacing=8),
+                    ft.Row([anomaly_flag, anomaly_filter, anomaly_handle], spacing=16),
+                ], spacing=4),
+                padding=ft.Padding.only(left=24),
+            ),
+        ], spacing=4),
+        padding=ft.Padding.symmetric(horizontal=8, vertical=6),
+        border=ft.Border.all(1, theme.BORDER),
+        border_radius=theme.RADIUS_SM,
+        bgcolor=theme.SURFACE_HIGH,
+    )
+
+    return {
+        "container": container,
+        "_anomaly_enabled": anomaly_enabled,
+        "_anomaly_report": anomaly_report,
+        "_anomaly_mode": lambda: _mode[0],
+    }
+
+
+def build_anomaly_config_from_refs(refs: dict):
+    """从 refs dict 构建 AnomalyConfig 实例（与 logic._build_anomaly_config 相同逻辑）。"""
+    from func.anomaly.rules import AnomalyConfig
+    from func import config_loader
+
+    enabled_ref = refs.get("_anomaly_enabled")
+    if not enabled_ref or not enabled_ref.value:
+        return AnomalyConfig(enabled=False)
+
+    report_ref = refs.get("_anomaly_report")
+    mode_fn = refs.get("_anomaly_mode")
+    mode = mode_fn() if callable(mode_fn) else "flag"
+
+    ad_config = config_loader.get_anomaly_detection_config()
+    return AnomalyConfig(
+        enabled=True,
+        generate_report=report_ref.value if report_ref else False,
+        flag_anomalies=(mode == "flag"),
+        filter_anomalies=(mode == "filter"),
+        handle_anomalies=(mode == "handle"),
+        sigma_n=ad_config.get("sigma_n", 3.0),
+        percentile_low=ad_config.get("percentile_low", 1.0),
+        percentile_high=ad_config.get("percentile_high", 99.0),
+        thresholds=ad_config.get("thresholds", {}),
+        handling_rules=ad_config.get("handling_rules", {}),
+    )
+
+
 def create_sheet_selection_dialog(
     page: ft.Page,
     sheet_names: list[str],

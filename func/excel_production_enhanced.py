@@ -13,6 +13,8 @@ from func import config_loader
 from func.string_utils import clean_string
 from func.logger import get_logger
 from func.excel_utils import dedup_dataframe, get_hidden_indices, filter_hidden_from_df, adjust_index_for_hidden, letters_to_col_indices
+from func.anomaly import detect_and_filter
+from func.anomaly.rules import AnomalyConfig
 
 logger = get_logger(__name__)
 
@@ -20,7 +22,7 @@ logger = get_logger(__name__)
 class MiningDataProcessor:
     def __init__(self, version: str = "new", raw_start: int = -1, device_load_map: dict[str, int] | None = None,
                  target_text: str = "Мото цагийн заалт", skip_hidden: bool = False,
-                 skip_hidden_rows: bool = False, skip_hidden_cols: bool = False):
+                 skip_hidden_rows: bool = False, skip_hidden_cols: bool = False, anomaly_config=None):
         """
         初始化数据处理器
         :param version: 版本，"new"或"old"
@@ -30,6 +32,7 @@ class MiningDataProcessor:
         :param skip_hidden: 若为 True，跳过 Excel 中的隐藏行和隐藏列（向后兼容）
         :param skip_hidden_rows: 若为 True，跳过 Excel 中的隐藏行
         :param skip_hidden_cols: 若为 True，跳过 Excel 中的隐藏列
+        :param anomaly_config: 异常值检测配置，为 None 时从 config_loader 加载
         """
         self.version = version
         self.raw_start = raw_start
@@ -47,6 +50,7 @@ class MiningDataProcessor:
         else:
             self.auto_detect = False
         self.target_text = target_text
+        self.anomaly_config = anomaly_config
         if device_load_map is not None:
             self.load_map: dict[str, int] = dict(device_load_map)
             return
@@ -236,9 +240,14 @@ class MiningDataProcessor:
         excavator_exclude = ["Мото", "Эхэлсэн", "Компани", "км", "Дууссан"]
 
         # HIGH-08 fix: Pre-classify production columns outside the row loop
-        production_col_info = []  # list of (col_name, excavator_name, ore_type)
-        for col in data.columns:
+        # Use column positional index to avoid counting duplicates caused by
+        # ffill on merged-cell headers (e.g. one excavator spanning many cols).
+        production_col_info = []  # list of (col_index, excavator_name, ore_type)
+        seen_col_indices: set[int] = set()
+        for col_idx, col in enumerate(data.columns):
             if col == "矿卡名称":
+                continue
+            if col_idx in seen_col_indices:
                 continue
             col_str = self.safe_str(col)
             if any(k in col_str for k in exclude_keywords):
@@ -252,7 +261,8 @@ class MiningDataProcessor:
             ore_type = self.safe_str(parts[1])
             if not excavator_name and not ore_type:
                 continue
-            production_col_info.append((col, excavator_name, ore_type))
+            seen_col_indices.add(col_idx)
+            production_col_info.append((col_idx, excavator_name, ore_type))
 
         # HIGH-08 fix: Use .at[] access instead of iterrows unpacking
         has_hour_start = hour_start_col in data.columns
@@ -261,7 +271,11 @@ class MiningDataProcessor:
         has_km_end = km_end_col in data.columns
         has_company = company_col in data.columns
 
+        # .iat[] requires positional indices; compute the offset from label index
+        _row_pos_base = data.index[0]
+
         for row_idx in data.index:
+            _row_pos = row_idx - _row_pos_base
             truck_name = self.safe_str(data.at[row_idx, "矿卡名称"])
 
             # 过滤空值和合计行
@@ -280,8 +294,8 @@ class MiningDataProcessor:
             total_trips = 0
             capacity = self.get_load_capacity(truck_name)
 
-            for col, excavator_name, ore_type in production_col_info:
-                trips = self.safe_number(data.at[row_idx, col], default=0)
+            for col_idx, excavator_name, ore_type in production_col_info:
+                trips = self.safe_number(data.iat[_row_pos, col_idx], default=0)
 
                 if trips > 0 and ore_type != "" and "共" not in ore_type and trips % 1 == 0:
                     production = trips * capacity
@@ -367,30 +381,89 @@ class MiningDataProcessor:
         return result_df
 
     # ---------------------------
+    # Sheet 角色识别
+    # ---------------------------
+    _PRODUCTION_KEYWORDS = ("矿车", "Дамп", "总趟数", "Нийт рейс")
+
+    @classmethod
+    def _detect_sheet_roles(cls, xls: pd.ExcelFile) -> tuple[int, int]:
+        """识别生产数据 sheet 和运行数据 sheet 的索引。
+
+        返回 (production_idx, running_idx)。
+        无法识别时回退到默认顺序 (0, 1)。
+        """
+        sheet_count = len(xls.sheet_names)
+        if sheet_count < 2:
+            return (0, 0)
+
+        scores: list[dict] = []
+        for i in range(sheet_count):
+            # 只读前 10 行，避免加载整个 sheet
+            preview = pd.read_excel(xls, sheet_name=i, header=None, nrows=10)
+            col_count = preview.shape[1]
+
+            # 扫描前 10 行的所有单元格
+            flat_text = " ".join(
+                str(v) for v in preview.values.flatten() if pd.notna(v)
+            )
+            has_keyword = any(kw in flat_text for kw in cls._PRODUCTION_KEYWORDS)
+
+            scores.append({
+                "idx": i,
+                "col_count": col_count,
+                "has_keyword": has_keyword,
+            })
+
+        # 规则 1：含关键字且列数最多 → 生产数据 sheet
+        keyword_hits = [s for s in scores if s["has_keyword"]]
+        if len(keyword_hits) == 1:
+            prod_idx = keyword_hits[0]["idx"]
+            run_idx = 1 - prod_idx  # 另一个 sheet
+            logger.info("Sheet 角色识别：sheet %d = 生产数据（关键字匹配）, sheet %d = 运行数据", prod_idx, run_idx)
+            return (prod_idx, run_idx)
+
+        # 规则 2：列数最多的 sheet → 生产数据（生产表有大量挖机×矿石列）
+        widest = max(scores, key=lambda s: s["col_count"])
+        narrowest = min(scores, key=lambda s: s["col_count"])
+        if widest["col_count"] > 50 and narrowest["col_count"] < 30:
+            prod_idx = widest["idx"]
+            run_idx = narrowest["idx"]
+            logger.info("Sheet 角色识别：sheet %d = 生产数据（%d列）, sheet %d = 运行数据（%d列）",
+                        prod_idx, widest["col_count"], run_idx, narrowest["col_count"])
+            return (prod_idx, run_idx)
+
+        # 回退：默认顺序
+        logger.info("Sheet 角色识别：无法确定，使用默认顺序 sheet 0 = 生产数据, sheet 1 = 运行数据")
+        return (0, 1)
+
+    # ---------------------------
     # 单文件处理
     # ---------------------------
     def process_single_file(self, file_path, output_file=None):
         filename = os.path.basename(file_path)
         date_val, shift_val = self.parse_filename(filename)
 
-        # Pre-compute hidden row/col info once for the whole file
-        _h_rows_s1: set[int] = set()
-        _h_cols_s1: set[str] = set()
-        if self.need_hidden:
-            _h_rows_s1, _h_cols_s1 = get_hidden_indices(file_path, 0)
-
         # 只打开一次 Excel 文件
         with pd.ExcelFile(file_path) as xls:
-            if len(xls.sheet_names) < 2:
-                logger.warning(f"文件 {file_path} 中少于2个sheet，尝试将第一个sheet作为生产数据处理。")
-                # raise ValueError("文件中少于2个sheet，请检查Excel结构。")
+            sheet_count = len(xls.sheet_names)
 
-            # 用同一个 xls 解析，避免重复打开文件
-            df_sheet1 = pd.read_excel(xls, sheet_name=0, header=None)
+            if sheet_count < 2:
+                logger.warning(f"文件 {file_path} 中少于2个sheet，尝试将第一个sheet作为生产数据处理。")
+
+            # 识别 sheet 角色
+            prod_sheet_idx, run_sheet_idx = self._detect_sheet_roles(xls)
+
+            # 读取生产数据 sheet
+            _h_rows_s1: set[int] = set()
+            _h_cols_s1: set[str] = set()
+            if self.need_hidden:
+                _h_rows_s1, _h_cols_s1 = get_hidden_indices(file_path, prod_sheet_idx)
+
+            df_prod_sheet = pd.read_excel(xls, sheet_name=prod_sheet_idx, header=None)
             if self.need_hidden:
                 _h_rows_filtered = _h_rows_s1 if self.skip_hidden_rows else set()
                 _h_cols_filtered = _h_cols_s1 if self.skip_hidden_cols else set()
-                df_sheet1 = filter_hidden_from_df(df_sheet1, _h_rows_filtered, _h_cols_filtered)
+                df_prod_sheet = filter_hidden_from_df(df_prod_sheet, _h_rows_filtered, _h_cols_filtered)
 
             # Adjust raw_start for non-auto-detect when hidden rows are present
             if not self.auto_detect and _h_rows_s1:
@@ -399,25 +472,27 @@ class MiningDataProcessor:
                     self.raw_start - 1, _h_rows_s1, one_based=True,
                 ) + 1
                 logger.info(f"raw_start 从 {self.raw_start} 调整为 {adjusted_raw_start}（跳过隐藏行）")
-                # Temporarily override raw_start for this file
                 orig_raw_start = self.raw_start
                 self.raw_start = adjusted_raw_start
-                running_df_1, production_df = self.process_sheet1(df_sheet1, date_val, shift_val)
+                running_df_1, production_df = self.process_sheet1(df_prod_sheet, date_val, shift_val)
                 self.raw_start = orig_raw_start
             else:
-                running_df_1, production_df = self.process_sheet1(df_sheet1, date_val, shift_val)
+                running_df_1, production_df = self.process_sheet1(df_prod_sheet, date_val, shift_val)
 
-            if len(xls.sheet_names) > 1:
-                df_sheet2 = pd.read_excel(xls, sheet_name=1, header=None)
+            # 读取运行数据 sheet（与生产数据 sheet 不同时才读取）
+            if sheet_count > 1 and run_sheet_idx != prod_sheet_idx:
                 if self.need_hidden:
-                    self._hidden_rows, self._hidden_cols = get_hidden_indices(file_path, 1)
+                    self._hidden_rows, self._hidden_cols = get_hidden_indices(file_path, run_sheet_idx)
                     _h_rows_filtered = self._hidden_rows if self.skip_hidden_rows else set()
                     _h_cols_filtered = self._hidden_cols if self.skip_hidden_cols else set()
-                    df_sheet2 = filter_hidden_from_df(df_sheet2, _h_rows_filtered, _h_cols_filtered)
                 else:
                     self._hidden_rows = set()
                     self._hidden_cols = set()
-                running_df_2 = self.process_sheet2(df_sheet2, date_val, shift_val)
+
+                df_run_sheet = pd.read_excel(xls, sheet_name=run_sheet_idx, header=None)
+                if self.need_hidden:
+                    df_run_sheet = filter_hidden_from_df(df_run_sheet, _h_rows_filtered, _h_cols_filtered)
+                running_df_2 = self.process_sheet2(df_run_sheet, date_val, shift_val)
             else:
                 running_df_2 = pd.DataFrame()
 
@@ -427,6 +502,17 @@ class MiningDataProcessor:
         # 去重
         running_df = dedup_dataframe(running_df, "运行数据")
         production_df = dedup_dataframe(production_df, "生产数据")
+
+        # 异常值检测
+        anomaly_cfg = self.anomaly_config
+        if anomaly_cfg is None:
+            anomaly_cfg = AnomalyConfig.from_config(config_loader.get_anomaly_detection_config())
+        if anomaly_cfg.enabled:
+            output_dir = os.path.dirname(file_path) if file_path else "."
+            running_df, _ = detect_and_filter(
+                running_df, "production_running", anomaly_cfg, output_dir=output_dir)
+            production_df, _ = detect_and_filter(
+                production_df, "production", anomaly_cfg, output_dir=output_dir)
 
         # 输出单文件结果
         if output_file:
@@ -525,6 +611,17 @@ class MiningDataProcessor:
         # 去重
         final_running = dedup_dataframe(final_running, "合并运行数据")
         final_production = dedup_dataframe(final_production, "合并生产数据")
+
+        # 异常值检测
+        anomaly_cfg = self.anomaly_config
+        if anomaly_cfg is None:
+            anomaly_cfg = AnomalyConfig.from_config(config_loader.get_anomaly_detection_config())
+        if anomaly_cfg.enabled:
+            output_dir = os.path.dirname(output_file) if output_file else folder_path
+            final_running, _ = detect_and_filter(
+                final_running, "production_running", anomaly_cfg, output_dir=output_dir)
+            final_production, _ = detect_and_filter(
+                final_production, "production", anomaly_cfg, output_dir=output_dir)
 
         if return_sheets:
             sheets = {}

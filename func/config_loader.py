@@ -145,6 +145,42 @@ DEFAULT_WORKTIME_HEADER_MAPPING: dict = {
     ],
 }
 
+DEFAULT_ANOMALY_DETECTION: dict[str, Any] = {
+    "enabled": False,
+    "generate_report": False,
+    "flag_anomalies": True,
+    "filter_anomalies": False,
+    "handle_anomalies": False,
+    "sigma_n": 3.0,
+    "percentile_low": 1.0,
+    "percentile_high": 99.0,
+    "thresholds": {
+        "fuel": {
+            "油品消耗": {"min": 0, "max": 10000},
+        },
+        "fuel_engine": {
+            "发动机小时数开始": {"min": 0},
+            "发动机小时数结束": {"min": 0},
+            "运行小时数": {"min": 0, "max": 14},
+        },
+        "production_running": {
+            "运行里程": {"min": 0, "max": 500},
+            "运行小时数": {"min": 0, "max": 14},
+        },
+        "production": {
+            "趟数": {"min": 0, "max": 30},
+            "产量": {"min": 0},
+        },
+        "electrical": {
+            "电力消耗": {"min": 0, "max": 5000},
+        },
+        "worktime": {
+            "__all_numeric__": {"min": 0, "max": 720},
+        },
+    },
+    "handling_rules": {},
+}
+
 # M3: 线程安全锁，保护 _runtime_config 的读写
 _runtime_lock = threading.Lock()
 _runtime_config: dict[str, Any] | None = None
@@ -589,6 +625,81 @@ def save_worktime_header_mapping(mapping: dict) -> None:
     """持久化工作效率表头映射配置。"""
     update_user_config({"worktime_header_mapping": mapping})
 
+
+# ---------------------------------------------------------------------------
+# 异常值检测配置
+# ---------------------------------------------------------------------------
+
+def get_anomaly_detection_config() -> dict[str, Any]:
+    """获取异常值检测配置。
+
+    合并 DEFAULT_ANOMALY_DETECTION 和用户配置。
+    用户可在 config.user.json 的 anomaly_detection 段覆盖任何默认值。
+
+    Returns:
+        异常检测配置 dict，结构同 DEFAULT_ANOMALY_DETECTION。
+    """
+    config = load_config()
+    ad = config.get("anomaly_detection", {})
+    return _deep_merge(DEFAULT_ANOMALY_DETECTION, ad) if ad else dict(DEFAULT_ANOMALY_DETECTION)
+
+
+def get_anomaly_thresholds(data_type: str | None = None) -> dict[str, Any]:
+    """获取异常检测阈值配置。
+
+    Parameters
+    ----------
+    data_type : str, optional
+        数据类型（如 "fuel", "production"）。为 None 时返回全部。
+
+    Returns
+    -------
+    dict
+        指定数据类型的阈值 dict，或全部阈值 dict。
+    """
+    ad = get_anomaly_detection_config()
+    thresholds = ad.get("thresholds", {})
+    if data_type is not None:
+        return dict(thresholds.get(data_type, {}))
+    return dict(thresholds)
+
+
+def get_anomaly_handling_rules() -> dict[str, Any]:
+    """获取异常值处理策略配置。"""
+    ad = get_anomaly_detection_config()
+    return dict(ad.get("handling_rules", {}))
+
+
+def update_anomaly_detection_config(updates: dict[str, Any]) -> dict[str, Any]:
+    """更新异常值检测配置（写入 config.user.json 顶层 anomaly_detection 段）。
+
+    Parameters
+    ----------
+    updates : dict
+        要更新的字段，会与现有 anomaly_detection 配置合并。
+
+    Returns
+    -------
+    dict
+        更新后的完整 anomaly_detection 配置。
+    """
+    user_file = _load_json(_USER_CONFIG_FILE)
+    current = user_file.get("anomaly_detection", {})
+    if not isinstance(current, dict):
+        current = {}
+    merged = _deep_merge(current, updates)
+    user_file["anomaly_detection"] = merged
+    _save_json(_USER_CONFIG_FILE, user_file)
+    _invalidate_config_cache()
+    return merged
+
+
+def save_anomaly_detection_config(config_data: dict[str, Any]) -> None:
+    """整体替换异常值检测配置（写入 config.user.json 顶层 anomaly_detection 段）。"""
+    user_file = _load_json(_USER_CONFIG_FILE)
+    user_file["anomaly_detection"] = dict(config_data)
+    _save_json(_USER_CONFIG_FILE, user_file)
+    _invalidate_config_cache()
 
 
 # ---------------------------------------------------------------------------
