@@ -186,12 +186,12 @@ class MiningDataProcessor:
             else:
                 raise ValueError(f"未找到目标文本{self.target_text},请检查数据是否正确")
 
-        # 2. 找最后一列：第6行匹配"总趟数"，前一列为最后一列
+        # 2. 找最后一列：第6行匹配"总趟次"，前一列为最后一列
         row6 = df_raw.iloc[raw_start - 1, :]
         total_col_idx = None
         for idx, val in row6.items():
-            if any(k in self.safe_str(val) for k in ["总趟数", "Нийт рейс"]):
-                # logger.info(f"找到总趟数列：{idx},{self.safe_str(val)}")
+            if any(k in self.safe_str(val) for k in ["总趟次", "Нийт рейс"]):
+                # logger.info(f"找到总趟次列：{idx},{self.safe_str(val)}")
                 total_col_idx = idx
                 break
 
@@ -236,7 +236,7 @@ class MiningDataProcessor:
         production_rows = []
 
         # 哪些列属于"生产列"
-        exclude_keywords = ["小时数", "公里数", "总趟数", "备注", "开始", "结束", "公司"]
+        exclude_keywords = ["小时数", "公里数", "总趟次", "备注", "开始", "结束", "公司"]
         excavator_exclude = ["Мото", "Эхэлсэн", "Компани", "км", "Дууссан"]
 
         # HIGH-08 fix: Pre-classify production columns outside the row loop
@@ -321,7 +321,7 @@ class MiningDataProcessor:
                 "公里数仪表开始": k_start,
                 "公里数仪表结束": k_end,
                 "运行里程": k_end - k_start,
-                "趟数": total_trips
+                "趟次": total_trips
             })
 
         running_df = pd.DataFrame(running_rows)
@@ -372,7 +372,7 @@ class MiningDataProcessor:
             "公里数仪表开始": 0,
             "公里数仪表结束": 0,
             "运行里程": 0,
-            "趟数": 0,
+            "趟次": 0,
             "备注": subset.iloc[:, col_notes].apply(self.safe_str).values if subset.shape[1] > col_notes else "",
         })
 
@@ -383,7 +383,7 @@ class MiningDataProcessor:
     # ---------------------------
     # Sheet 角色识别
     # ---------------------------
-    _PRODUCTION_KEYWORDS = ("矿车", "Дамп", "总趟数", "Нийт рейс")
+    _PRODUCTION_KEYWORDS = ("矿车", "Дамп", "总趟次", "Нийт рейс")
 
     @classmethod
     def _detect_sheet_roles(cls, xls: pd.ExcelFile) -> tuple[int, int]:

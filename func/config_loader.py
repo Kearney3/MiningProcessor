@@ -151,12 +151,15 @@ DEFAULT_ANOMALY_DETECTION: dict[str, Any] = {
     "flag_anomalies": True,
     "filter_anomalies": False,
     "handle_anomalies": False,
+    "use_threshold": True,
+    "use_sigma": True,
+    "use_percentile": True,
     "sigma_n": 3.0,
     "percentile_low": 1.0,
     "percentile_high": 99.0,
     "thresholds": {
         "fuel": {
-            "油品消耗": {"min": 0, "max": 10000},
+            "油品消耗": {"min": 0, "max": 50000},
         },
         "fuel_engine": {
             "发动机小时数开始": {"min": 0},
@@ -166,19 +169,34 @@ DEFAULT_ANOMALY_DETECTION: dict[str, Any] = {
         "production_running": {
             "运行里程": {"min": 0, "max": 500},
             "运行小时数": {"min": 0, "max": 14},
+            "趟次": {"min": 0, "max": 50},
         },
         "production": {
-            "趟数": {"min": 0, "max": 30},
-            "产量": {"min": 0},
+            "趟次": {"min": 0, "max": 50},
+            "产量": {"min": 0, "max": 50000},
         },
         "electrical": {
-            "电力消耗": {"min": 0, "max": 5000},
+            "电力消耗": {"min": 0, "max": 50000},
         },
         "worktime": {
             "__all_numeric__": {"min": 0, "max": 720},
         },
     },
-    "handling_rules": {},
+    "handling_rules": {
+        "production_running": {
+            "趟次": {"strategy": "default_value", "default": 0},
+        },
+        "production": {
+            "趟次": {"strategy": "default_value", "default": 0},
+            "产量": {"strategy": "default_value", "default": 0},
+        },
+        "electrical": {
+            "电力消耗": {"strategy": "default_value", "default": 0},
+        },
+        "worktime": {
+            "__all_numeric__": {"strategy": "default_value", "default": 0},
+        },
+    },
 }
 
 # M3: 线程安全锁，保护 _runtime_config 的读写

@@ -4,7 +4,7 @@ GUI 业务逻辑层
 """
 import asyncio
 import logging
-import traceback
+import sys
 from datetime import datetime
 import flet as ft
 import os
@@ -241,11 +241,19 @@ def _execute_task(module_type: str, path: str, **kwargs) -> str | None:
         worktime_sheets = _dispatch_module(module_type, path, **kwargs)
     except Exception:
         logger.exception("Task execution failed: module=%s path=%s", module_type, path)
-        return traceback.format_exc()
+        return str(sys.exc_info()[1]).strip() or sys.exc_info()[0].__name__
 
     # dispatch 完成后才 pop，确保维护模块等内部需要台账的模块能正常读取
     equipment_ledger = kwargs.pop("equipment_ledger", None)
     oil_ledger = kwargs.pop("oil_ledger", None)
+
+    # 工时模块 return_sheets=True 时只返回 DataFrame，需要先落盘
+    if worktime_sheets and module_type == "worktime":
+        output_file = _get_output_file(module_type, path, **kwargs)
+        if output_file:
+            from func.excel_formatter import write_formatted_excel
+            write_formatted_excel(output_file, worktime_sheets)
+            logger.info("工时数据已写入: %s", output_file)
 
     if not (equipment_ledger or oil_ledger):
         return None
@@ -790,6 +798,9 @@ def _build_anomaly_config(module_refs: dict):
         flag_anomalies=(mode == "flag"),
         filter_anomalies=(mode == "filter"),
         handle_anomalies=(mode == "handle"),
+        use_threshold=ad_config.get("use_threshold", True),
+        use_sigma=ad_config.get("use_sigma", True),
+        use_percentile=ad_config.get("use_percentile", True),
         sigma_n=ad_config.get("sigma_n", 3.0),
         percentile_low=ad_config.get("percentile_low", 1.0),
         percentile_high=ad_config.get("percentile_high", 99.0),

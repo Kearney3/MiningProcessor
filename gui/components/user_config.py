@@ -877,6 +877,20 @@ def _create_anomaly_config_section(page: ft.Page, log):
         hint_text="默认 99.0",
     )
 
+    # 检测方法开关
+    use_threshold_toggle = ft.Checkbox(
+        label="绝对阈值检测", value=True,
+        tooltip="基于用户配置的 min/max 范围检测",
+    )
+    use_sigma_toggle = ft.Checkbox(
+        label="σ 异常检测", value=True,
+        tooltip="基于标准差的统计离群检测",
+    )
+    use_percentile_toggle = ft.Checkbox(
+        label="百分位检测", value=True,
+        tooltip="基于百分位数的极端值检测",
+    )
+
     type_dropdown = ft.Dropdown(
         label="数据类型",
         width=150,
@@ -1009,11 +1023,19 @@ def _create_anomaly_config_section(page: ft.Page, log):
         pct_low_field.value = str(ad.get("percentile_low", 1.0))
         pct_high_field.value = str(ad.get("percentile_high", 99.0))
 
+        # 加载检测方法开关
+        use_threshold_toggle.value = ad.get("use_threshold", True)
+        use_sigma_toggle.value = ad.get("use_sigma", True)
+        use_percentile_toggle.value = ad.get("use_percentile", True)
+
         status_text.value = ""
         _build_rows()
         safe_update(sigma_field)
         safe_update(pct_low_field)
         safe_update(pct_high_field)
+        safe_update(use_threshold_toggle)
+        safe_update(use_sigma_toggle)
+        safe_update(use_percentile_toggle)
 
     def _collect_and_save(_e=None):
         """收集 UI 值并保存。"""
@@ -1072,6 +1094,9 @@ def _create_anomaly_config_section(page: ft.Page, log):
             "sigma_n": sigma_n,
             "percentile_low": pct_low,
             "percentile_high": pct_high,
+            "use_threshold": use_threshold_toggle.value,
+            "use_sigma": use_sigma_toggle.value,
+            "use_percentile": use_percentile_toggle.value,
         }
         config_loader.update_anomaly_detection_config(updates)
         status_text.value = "异常值检测配置已保存"
@@ -1101,13 +1126,18 @@ def _create_anomaly_config_section(page: ft.Page, log):
         initially_expanded=False,
         content_controls=[
             ft.Text(
+                "检测方法：选择启用的检测策略，关闭的策略不会应用。\n"
                 "阈值规则对指定列名设置 min/max 范围；"
                 f"使用 {ALL_NUMERIC_SENTINEL} 可对所有数值列统一检测。"
-                "统计参数（σ、百分位）对所有数据类型全局生效。\n"
-                "默认值列：仅在启用「处理异常值」模式时生效，异常值将被替换为该值。",
+                "默认值列仅在启用「处理异常值」模式时生效。",
                 size=12, color=theme.TEXT_SECONDARY,
             ),
+            ft.Row([use_threshold_toggle, use_sigma_toggle, use_percentile_toggle], spacing=16),
+            ft.Divider(height=1, color=theme.BORDER),
+            ft.Text("统计参数", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
             ft.Row([sigma_field, pct_low_field, pct_high_field], spacing=12),
+            ft.Divider(height=1, color=theme.BORDER),
+            ft.Text("阈值配置", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
             type_dropdown,
             rows_column,
             ft.Row(action_buttons, spacing=8, wrap=True, alignment=ft.MainAxisAlignment.START),

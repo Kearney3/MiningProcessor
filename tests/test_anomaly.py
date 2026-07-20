@@ -81,7 +81,7 @@ class TestBuildRules:
         cfg = AnomalyConfig(enabled=True)
         rules = build_rules_for_type("production", {}, cfg)
         columns = {r.column for r in rules}
-        assert "趟数" in columns
+        assert "趟次" in columns
         assert "产量" in columns
 
     def test_empty_type(self):
@@ -340,7 +340,7 @@ class TestDetectAndFilter:
         assert anomalies is None
 
     def test_flag_mode(self):
-        df = pd.DataFrame({"油品消耗": [100, 200, 15000]})
+        df = pd.DataFrame({"油品消耗": [100, 200, 60000]})
         cfg = AnomalyConfig(enabled=True, flag_anomalies=True)
         result_df, anomalies = detect_and_filter(df, "fuel", config=cfg)
         assert ANOMALY_FLAG_COLUMN in result_df.columns
@@ -349,14 +349,14 @@ class TestDetectAndFilter:
         assert anomalies is not None
 
     def test_filter_mode(self):
-        df = pd.DataFrame({"油品消耗": [100, 200, 15000]})
+        df = pd.DataFrame({"油品消耗": [100, 200, 60000]})
         cfg = AnomalyConfig(enabled=True, flag_anomalies=False, filter_anomalies=True)
         result_df, anomalies = detect_and_filter(df, "fuel", config=cfg)
         assert len(result_df) < 3
         assert anomalies is not None
 
     def test_handle_mode(self):
-        df = pd.DataFrame({"油品消耗": [100, 200, 15000]})
+        df = pd.DataFrame({"油品消耗": [100, 200, 60000]})
         handling = {"油品消耗": {"strategy": "default_value", "default": 0}}
         cfg = AnomalyConfig(enabled=True, flag_anomalies=False, handle_anomalies=True,
                             handling_rules=handling)
@@ -943,7 +943,7 @@ class TestCoverageGaps:
 
     def test_no_mode_selected_returns_original(self):
         """无处理模式选中时应返回原 df（__init__.py:134）。"""
-        df = pd.DataFrame({"油品消耗": [100, 200, 15000]})
+        df = pd.DataFrame({"油品消耗": [100, 200, 60000]})
         cfg = AnomalyConfig(
             enabled=True,
             flag_anomalies=False,
@@ -972,7 +972,7 @@ class TestCoverageGaps:
 
     def test_report_generation_via_detect_and_filter(self, tmp_path):
         """detect_and_filter 应在 generate_report=True 时生成报告（__init__.py:138-139）。"""
-        df = pd.DataFrame({"油品消耗": [100, 200, 15000]})
+        df = pd.DataFrame({"油品消耗": [100, 200, 60000]})
         cfg = AnomalyConfig(enabled=True, flag_anomalies=True, generate_report=True)
         result_df, anomalies = detect_and_filter(
             df, "fuel", config=cfg, output_dir=str(tmp_path))
@@ -985,7 +985,7 @@ class TestCoverageGaps:
 
     def test_handle_mode_with_default_value(self):
         """处理异常值模式应替换为默认值并记录日志。"""
-        df = pd.DataFrame({"油品消耗": [100, 200, 15000]})
+        df = pd.DataFrame({"油品消耗": [100, 200, 60000]})
         handling = {"油品消耗": {"strategy": "default_value", "default": 0}}
         cfg = AnomalyConfig(enabled=True, handle_anomalies=True, handling_rules=handling)
         result_df, anomalies = detect_and_filter(
@@ -995,7 +995,7 @@ class TestCoverageGaps:
 
     def test_filter_mode_removes_rows(self):
         """过滤模式应移除异常行并记录日志。"""
-        df = pd.DataFrame({"油品消耗": [100, 200, 15000]})
+        df = pd.DataFrame({"油品消耗": [100, 200, 60000]})
         cfg = AnomalyConfig(enabled=True, flag_anomalies=False, filter_anomalies=True)
         result_df, anomalies = detect_and_filter(df, "fuel", config=cfg)
         assert len(result_df) == 2

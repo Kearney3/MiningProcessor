@@ -121,8 +121,12 @@ def detect_and_filter(
     anomalies_df = _build_anomalies_df(df, hits)
 
     # 处理
-    if config.handle_anomalies and handling_rules:
-        result_df = AnomalyFilterer.handle(df, hits, handling_rules)
+    effective_rules = handling_rules or config.handling_rules
+    # config.handling_rules 按数据类型嵌套，需提取当前类型的规则
+    if effective_rules and data_type in effective_rules:
+        effective_rules = effective_rules[data_type]
+    if config.handle_anomalies and effective_rules:
+        result_df = AnomalyFilterer.handle(df, hits, effective_rules)
         _logger.info("[%s] 异常值已设置为默认值", label)
     elif config.filter_anomalies:
         result_df = AnomalyFilterer.remove(df, hits)

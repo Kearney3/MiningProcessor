@@ -531,3 +531,103 @@ class TestLedgerMatchPreview:
             })
         assert "标准设备名称" in result["rows"][0]
         assert "标准设备名称_矿卡" not in result["rows"][0]
+
+
+# ---------------------------------------------------------------------------
+# get_anomaly_config / save_anomaly_config RPC
+# ---------------------------------------------------------------------------
+
+
+class TestAnomalyConfigRPC:
+    """get_anomaly_config / save_anomaly_config handler 测试。"""
+
+    def test_get_returns_merged_config(self):
+        """应返回包含所有必需字段的合并配置。"""
+        result = tauri_bridge._get_anomaly_config({})
+        assert isinstance(result, dict)
+        assert "use_threshold" in result
+        assert "use_sigma" in result
+        assert "use_percentile" in result
+        assert "sigma_n" in result
+        assert "percentile_low" in result
+        assert "percentile_high" in result
+        assert "thresholds" in result
+        assert "handling_rules" in result
+
+    def test_get_default_sigma_n(self):
+        """默认 σ 倍数应为 3.0。"""
+        result = tauri_bridge._get_anomaly_config({})
+        assert result["sigma_n"] == 3.0
+
+    def test_get_default_thresholds_include_fuel(self):
+        """默认阈值应包含 fuel 数据类型。"""
+        result = tauri_bridge._get_anomaly_config({})
+        assert "fuel" in result["thresholds"]
+
+    def test_save_with_updates_merges(self):
+        """updates 模式应增量合并，不覆盖其他字段。"""
+        original = tauri_bridge._get_anomaly_config({})
+        original_sigma = original["sigma_n"]
+
+        try:
+            tauri_bridge._save_anomaly_config({"updates": {"sigma_n": 5.0}})
+            result = tauri_bridge._get_anomaly_config({})
+            assert result["sigma_n"] == 5.0
+            # 其他字段应保持不变
+            assert result["use_threshold"] == original["use_threshold"]
+        finally:
+            # 恢复
+            tauri_bridge._save_anomaly_config({"updates": {"sigma_n": original_sigma}})
+
+    def test_save_with_config_replaces(self):
+        """config 模式应整体替换 anomaly_detection 段。"""
+        original = tauri_bridge._get_anomaly_config({})
+        try:
+            tauri_bridge._save_anomaly_config({"config": {"sigma_n": 10.0}})
+            result = tauri_bridge._get_anomaly_config({})
+            # sigma_n 被替换为 10.0，但默认值仍通过 DEFAULT_ANOMALY_DETECTION 合并回来
+            assert result["sigma_n"] == 10.0
+        finally:
+            # 恢复：用 updates 恢复 sigma_n
+            tauri_bridge._save_anomaly_config({"updates": {"sigma_n": original["sigma_n"]}})
+
+    def test_save_with_empty_config_resets(self):
+        """空 config 应清除用户覆盖，回到默认值。"""
+        try:
+            tauri_bridge._save_anomaly_config({"config": {}})
+            result = tauri_bridge._get_anomaly_config({})
+            assert result["sigma_n"] == 3.0
+            assert result["use_threshold"] is True
+        finally:
+            pass  # 已恢复默认
+
+    def test_save_updates_returns_ok(self):
+        """save_anomaly_config 应返回 ok: True。"""
+        result = tauri_bridge._save_anomaly_config({"updates": {"sigma_n": 3.0}})
+        assert result == {"ok": True}
+
+    def test_save_no_params_returns_ok(self):
+        """无 updates 也无 config 时仍返回 ok（不修改）。"""
+        result = tauri_bridge._save_anomaly_config({})
+        assert result == {"ok": True}
+
+    def test_save_handling_rules(self):
+        """应能保存处理规则。"""
+        original = tauri_bridge._get_anomaly_config({})
+        try:
+            tauri_bridge._save_anomaly_config({
+                "updates": {
+                    "handling_rules": {
+                        "test_type": {
+                            "test_col": {"strategy": "default_value", "default": 42},
+                        },
+                    },
+                },
+            })
+            result = tauri_bridge._get_anomaly_config({})
+            assert "test_type" in result["handling_rules"]
+            assert result["handling_rules"]["test_type"]["test_col"]["default"] == 42
+        finally:
+            tauri_bridge._save_anomaly_config({
+                "updates": {"handling_rules": original.get("handling_rules", {})},
+            })

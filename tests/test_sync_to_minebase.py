@@ -55,7 +55,7 @@ def sample_mapping(tmp_path):
             "班次": "shiftType",
             "设备名称": "equipmentName",
             "运行小时数": "runningHours",
-            "趟数": "tripCount",
+            "趟次": "tripCount",
         },
         "production_record": {
             "日期": "date",
@@ -124,7 +124,7 @@ def sample_production_excel(tmp_path_factory):
         "公里数仪表开始": [1000.0],
         "公里数仪表结束": [1050.0],
         "运行里程": [50.0],
-        "趟数": [10],
+        "趟次": [10],
     })
     production = pd.DataFrame({
         "日期": [date(2025, 6, 1)],

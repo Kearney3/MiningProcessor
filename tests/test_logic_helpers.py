@@ -11,7 +11,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from func.ledger_postprocess import _find_col, match_sheets
-from gui.logic import _get_output_file, _log_message, _apply_ledger_matching
+from gui.logic import _get_output_file, _log_message, _apply_ledger_matching, _execute_task
 
 
 # ---------------------------------------------------------------------------
@@ -517,3 +517,55 @@ class TestMatchSheets:
         sheets = {"数据": df}
         result = match_sheets(sheets, equipment_ledger=self._StubEquipmentLedger())
         assert result["数据"]["标准设备编号"].iloc[0] == "ID_HT#1"
+
+
+# ---------------------------------------------------------------------------
+# _execute_task worktime 落盘
+# ---------------------------------------------------------------------------
+from unittest.mock import patch
+
+
+class TestExecuteTaskWorktimeWrite:
+    """_execute_task 工时模块落盘逻辑测试。"""
+
+    def test_worktime_sheets_writes_file(self, tmp_path):
+        """worktime 返回 sheets 时应写入文件。"""
+        input_file = str(tmp_path / "worktime.xlsx")
+        # 创建一个假的输入文件让 _get_output_file 能算出目录
+        pd.DataFrame().to_excel(input_file, index=False)
+
+        sheets = {"工时数据": pd.DataFrame({"日期": ["2025-01-01"], "班次": ["Day"], "设备": ["TR100"]})}
+
+        with patch("gui.logic._dispatch_module", return_value=sheets):
+            result = _execute_task("worktime", input_file, year=2025, month=1)
+
+        assert result is None
+        expected = str(tmp_path / "202501_工作效率表.xlsx")
+        assert os.path.exists(expected)
+        written = pd.read_excel(expected)
+        assert "设备" in written.columns
+
+    def test_worktime_no_sheets_skips_write(self, tmp_path):
+        """worktime 返回 None 时不写入文件。"""
+        input_file = str(tmp_path / "worktime.xlsx")
+        pd.DataFrame().to_excel(input_file, index=False)
+
+        with patch("gui.logic._dispatch_module", return_value=None):
+            result = _execute_task("worktime", input_file, year=2025, month=1)
+
+        assert result is None
+        expected = str(tmp_path / "202501_工作效率表.xlsx")
+        assert not os.path.exists(expected)
+
+    def test_non_worktime_module_skips_sheet_write(self, tmp_path):
+        """非 worktime 模块即使返回值也不触发 sheet 落盘。"""
+        input_file = str(tmp_path / "raw_data.xlsx")
+        pd.DataFrame().to_excel(input_file, index=False)
+
+        with patch("gui.logic._dispatch_module", return_value={"some": "data"}):
+            result = _execute_task("fuel", input_file, year=2025)
+
+        assert result is None
+        # fuel 输出文件不应被 sheet-write 逻辑创建
+        expected = str(tmp_path / "Fuel.xlsx")
+        assert not os.path.exists(expected)
