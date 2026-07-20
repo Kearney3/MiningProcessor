@@ -5,6 +5,7 @@ import { useToast } from "../Toast";
 import { FolderIcon } from "../../lib/icons";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { useLastDirectory } from "../../hooks/useLastDirectory";
+import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG } from "../AnomalyPanel";
 
 // ═══════════════════════════════════════
 // Types
@@ -422,6 +423,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
   const [useOilLedger, setUseOilLedger] = useState(false);
   const [skipHiddenRows, setSkipHiddenRows] = useState(false);
   const [skipHiddenCols, setSkipHiddenCols] = useState(false);
+  const [anomaly, setAnomaly] = useState<AnomalyConfig>(DEFAULT_ANOMALY_CONFIG);
 
   // -- Date filter --
   const [dateFilterEnabled, setDateFilterEnabled] = useState(false);
@@ -481,6 +483,9 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
         use_oil_ledger: useOilLedger,
         skip_hidden_rows: skipHiddenRows,
         skip_hidden_cols: skipHiddenCols,
+        anomaly_enabled: anomaly.enabled,
+        anomaly_report: anomaly.report,
+        anomaly_mode: anomaly.mode,
       };
 
       if (tableMergeMode === "merge") {
@@ -686,6 +691,9 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
             />
           </div>
         </div>
+
+        <SectionDivider label="异常值检测" />
+        <AnomalyPanel config={anomaly} onChange={setAnomaly} />
 
         <SectionDivider label="输出方式" />
 

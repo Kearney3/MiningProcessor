@@ -217,6 +217,29 @@ def _load_equipment_ledger_from_cache():
     return load_equipment_ledger_from_cache()
 
 
+def _build_anomaly_config(params: dict):
+    """从 RPC 参数构建 AnomalyConfig，未传入时返回 None（使用默认）。"""
+    if not params.get("anomaly_enabled"):
+        return None
+    from func.anomaly.rules import AnomalyConfig
+    from func.config_loader import get_anomaly_detection_config
+
+    ad_config = get_anomaly_detection_config()
+    mode = params.get("anomaly_mode", "flag")
+    return AnomalyConfig(
+        enabled=True,
+        generate_report=params.get("anomaly_report", False),
+        flag_anomalies=(mode == "flag"),
+        filter_anomalies=(mode == "filter"),
+        handle_anomalies=(mode == "handle"),
+        sigma_n=ad_config.get("sigma_n", 3.0),
+        percentile_low=ad_config.get("percentile_low", 1.0),
+        percentile_high=ad_config.get("percentile_high", 99.0),
+        thresholds=ad_config.get("thresholds", {}),
+        handling_rules=ad_config.get("handling_rules", {}),
+    )
+
+
 def _load_oil_ledger_from_cache():
     """从缓存加载油品台账实例，失败返回 None。"""
     from func.orchestration import load_oil_ledger_from_cache
@@ -252,6 +275,7 @@ def _process_fuel(params: dict) -> dict:
         skip_hidden=params.get("skip_hidden", False),
         skip_hidden_rows=params.get("skip_hidden_rows", False),
         skip_hidden_cols=params.get("skip_hidden_cols", False),
+        anomaly_config=_build_anomaly_config(params),
     )
     output_file = str(result) if result else None
     if output_file:
@@ -274,6 +298,7 @@ def _process_production(params: dict) -> dict:
         skip_hidden=params.get("skip_hidden", False),
         skip_hidden_rows=params.get("skip_hidden_rows", False),
         skip_hidden_cols=params.get("skip_hidden_cols", False),
+        anomaly_config=_build_anomaly_config(params),
     )
     path = str(_sanitize_path(params["path"], must_exist=True))
     p = Path(path)
@@ -305,6 +330,7 @@ def _process_electrical(params: dict) -> dict:
         skip_hidden=params.get("skip_hidden", False),
         skip_hidden_rows=params.get("skip_hidden_rows", False),
         skip_hidden_cols=params.get("skip_hidden_cols", False),
+        anomaly_config=_build_anomaly_config(params),
     )
     output_file = str(Path(safe_path).parent / "电力消耗统计.xlsx")
     _post_process_ledger(
@@ -341,6 +367,7 @@ def _process_worktime(params: dict) -> dict:
             skip_hidden=params.get("skip_hidden", False),
             skip_hidden_rows=params.get("skip_hidden_rows", False),
             skip_hidden_cols=params.get("skip_hidden_cols", False),
+            anomaly_config=_build_anomaly_config(params),
         )
     else:
         output_file = str(Path(safe_path).parent / f"{year}{month:02d}_工作效率表.xlsx")
@@ -354,6 +381,7 @@ def _process_worktime(params: dict) -> dict:
             skip_hidden=params.get("skip_hidden", False),
             skip_hidden_rows=params.get("skip_hidden_rows", False),
             skip_hidden_cols=params.get("skip_hidden_cols", False),
+            anomaly_config=_build_anomaly_config(params),
         )
     _post_process_ledger(
         output_file,
@@ -499,6 +527,7 @@ def _batch_process(params: dict) -> dict:
         skip_hidden=params.get("skip_hidden", False),
         skip_hidden_rows=params.get("skip_hidden_rows", False),
         skip_hidden_cols=params.get("skip_hidden_cols", False),
+        anomaly_config=_build_anomaly_config(params),
     )
     return {"cancelled": _cancel_event.is_set()}
 
@@ -531,6 +560,7 @@ def _sync_minebase(params: dict) -> dict:
         skip_hidden=params.get("skip_hidden", False),
         skip_hidden_rows=params.get("skip_hidden_rows", False),
         skip_hidden_cols=params.get("skip_hidden_cols", False),
+        anomaly_config=_build_anomaly_config(params),
     )
     return {"results": results}
 

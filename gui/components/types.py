@@ -55,6 +55,12 @@ class MaintRefs(TypedDict):
 class ModuleRefs(TypedDict):
     _match_eq_toggle: ft.Checkbox
     _match_oil_toggle: ft.Checkbox
+    _anomaly_enabled: ft.Checkbox
+    _anomaly_report: ft.Checkbox
+    _anomaly_flag: ft.Checkbox
+    _anomaly_filter: ft.Checkbox
+    _anomaly_handle: ft.Checkbox
+    _anomaly_mode: Callable[[], str]
     fuel: FuelRefs
     prod: ProdRefs
     elec: ElecRefs

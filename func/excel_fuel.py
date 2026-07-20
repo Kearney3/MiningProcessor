@@ -7,12 +7,15 @@ import numpy as np
 from func.logger import get_logger
 from func.string_utils import clean_string
 from func.excel_utils import dedup_dataframe, resolve_shift, detect_shift, get_hidden_indices, filter_hidden_from_df, open_workbook
+from func.anomaly import detect_and_filter
+from func.anomaly.rules import AnomalyConfig
+from func import config_loader
 
 logger = get_logger(__name__)
 
 
 def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_hidden=False,
-                        skip_hidden_rows=False, skip_hidden_cols=False):
+                        skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None):
     """处理设备柴油消耗报表，提取发动机与油耗数据。
 
     Args:
@@ -252,6 +255,16 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
     # 去重
     df_engine = dedup_dataframe(df_engine, "设备信息")
     df_fuel = dedup_dataframe(df_fuel, "油耗信息")
+
+    # 异常值检测
+    output_dir = os.path.dirname(file_path)
+    if anomaly_config is None:
+        anomaly_config = AnomalyConfig.from_config(config_loader.get_anomaly_detection_config())
+    if anomaly_config.enabled:
+        df_engine, _ = detect_and_filter(
+            df_engine, "fuel_engine", anomaly_config, output_dir=output_dir)
+        df_fuel, _ = detect_and_filter(
+            df_fuel, "fuel", anomaly_config, output_dir=output_dir)
 
     if return_sheets:
         sheets = {}

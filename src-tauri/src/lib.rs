@@ -205,41 +205,76 @@ fn spawn_stderr_logger(bridge: &PythonBridge, handle: &tauri::AppHandle) {
     }
 }
 
-/// 初始化 PythonBridge，优先 sidecar 模式，回退 dev 模式。
-/// 在 setup 中调用，直接写入 AppState。
+/// 初始化 PythonBridge。
+/// - debug 构建（cargo tauri dev）：优先 dev 模式，直接运行源码，方便调试。
+/// - release 构建（cargo tauri build）：优先 sidecar 模式，使用打包后的二进制。
 fn init_bridge(app: &tauri::App) -> Result<(), String> {
-    // 优先尝试 sidecar 模式（打包后）
-    if let Some(bridge) = try_start_sidecar(app) {
-        let pid = bridge.pid();
-        spawn_stderr_logger(&bridge, app.handle());
-        let _ = app.handle().emit("python-log", &serde_json::json!({
-            "event": "connection",
-            "data": { "status": "connected", "mode": "sidecar", "pid": pid }
-        }));
-        app.manage(AppState {
-            bridge,
-            mode: "sidecar".into(),
-            command: "tauri-bridge (sidecar)".into(),
-        });
-        println!("Python bridge started (sidecar mode)");
-        return Ok(());
-    }
-
-    // 回退到 dev 模式（直接调 Python）
-    if let Some((bridge, info)) = try_start_dev() {
-        let pid = bridge.pid();
-        spawn_stderr_logger(&bridge, app.handle());
-        let _ = app.handle().emit("python-log", &serde_json::json!({
-            "event": "connection",
-            "data": { "status": "connected", "mode": "dev", "pid": pid, "command": info }
-        }));
-        app.manage(AppState {
-            bridge,
-            mode: "dev".into(),
-            command: info,
-        });
-        println!("Python bridge started (dev mode)");
-        return Ok(());
+    // debug 构建优先 dev 模式（源码）
+    if cfg!(debug_assertions) {
+        if let Some((bridge, info)) = try_start_dev() {
+            let pid = bridge.pid();
+            spawn_stderr_logger(&bridge, app.handle());
+            let _ = app.handle().emit("python-log", &serde_json::json!({
+                "event": "connection",
+                "data": { "status": "connected", "mode": "dev", "pid": pid, "command": info }
+            }));
+            app.manage(AppState {
+                bridge,
+                mode: "dev".into(),
+                command: info,
+            });
+            println!("Python bridge started (dev mode)");
+            return Ok(());
+        }
+        // dev 失败时回退到 sidecar
+        if let Some(bridge) = try_start_sidecar(app) {
+            let pid = bridge.pid();
+            spawn_stderr_logger(&bridge, app.handle());
+            let _ = app.handle().emit("python-log", &serde_json::json!({
+                "event": "connection",
+                "data": { "status": "connected", "mode": "sidecar", "pid": pid }
+            }));
+            app.manage(AppState {
+                bridge,
+                mode: "sidecar".into(),
+                command: "tauri-bridge (sidecar fallback)".into(),
+            });
+            println!("Python bridge started (sidecar fallback)");
+            return Ok(());
+        }
+    } else {
+        // release 构建优先 sidecar（打包二进制）
+        if let Some(bridge) = try_start_sidecar(app) {
+            let pid = bridge.pid();
+            spawn_stderr_logger(&bridge, app.handle());
+            let _ = app.handle().emit("python-log", &serde_json::json!({
+                "event": "connection",
+                "data": { "status": "connected", "mode": "sidecar", "pid": pid }
+            }));
+            app.manage(AppState {
+                bridge,
+                mode: "sidecar".into(),
+                command: "tauri-bridge (sidecar)".into(),
+            });
+            println!("Python bridge started (sidecar mode)");
+            return Ok(());
+        }
+        // sidecar 失败时回退到 dev
+        if let Some((bridge, info)) = try_start_dev() {
+            let pid = bridge.pid();
+            spawn_stderr_logger(&bridge, app.handle());
+            let _ = app.handle().emit("python-log", &serde_json::json!({
+                "event": "connection",
+                "data": { "status": "connected", "mode": "dev", "pid": pid, "command": info }
+            }));
+            app.manage(AppState {
+                bridge,
+                mode: "dev".into(),
+                command: info,
+            });
+            println!("Python bridge started (dev fallback)");
+            return Ok(());
+        }
     }
 
     // 两种模式都失败，向前端发送错误事件

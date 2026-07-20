@@ -148,6 +148,7 @@ def _process_fuel_file(
     skip_hidden: bool = False,
     skip_hidden_rows: bool = False,
     skip_hidden_cols: bool = False,
+    anomaly_config=None,
 ) -> list[dict[str, Any]]:
     """通过柴油处理器解析文件，返回同步行列表。"""
     from func.excel_fuel import process_diesel_data
@@ -181,6 +182,7 @@ def _process_fuel_file(
         skip_hidden=skip_hidden,
         skip_hidden_rows=skip_hidden_rows,
         skip_hidden_cols=skip_hidden_cols,
+        anomaly_config=anomaly_config,
     )
 
 
@@ -190,6 +192,7 @@ def _process_electrical_file(
     skip_hidden: bool = False,
     skip_hidden_rows: bool = False,
     skip_hidden_cols: bool = False,
+    anomaly_config=None,
 ) -> list[dict[str, Any]]:
     """通过电力处理器解析文件，返回同步行列表。"""
     from func.excel_electrical import parse_excel_data
@@ -223,6 +226,7 @@ def _process_electrical_file(
         skip_hidden=skip_hidden,
         skip_hidden_rows=skip_hidden_rows,
         skip_hidden_cols=skip_hidden_cols,
+        anomaly_config=anomaly_config,
     )
 
 
@@ -231,6 +235,7 @@ def _process_production_file(
     skip_hidden: bool = False,
     skip_hidden_rows: bool = False,
     skip_hidden_cols: bool = False,
+    anomaly_config=None,
 ) -> dict[str, list[dict[str, Any]]]:
     """通过产量处理器解析文件，返回 {"production": [...], "operation": [...]}。"""
     from func.excel_production_enhanced import MiningDataProcessor
@@ -263,7 +268,8 @@ def _process_production_file(
     def _processor(path: str, **_kw: Any) -> tuple:
         processor = MiningDataProcessor(skip_hidden=skip_hidden,
                                         skip_hidden_rows=skip_hidden_rows,
-                                        skip_hidden_cols=skip_hidden_cols)
+                                        skip_hidden_cols=skip_hidden_cols,
+                                        anomaly_config=anomaly_config)
         return processor.process_single_file(path)
 
     def _extract(pair: tuple | None) -> tuple | None:
@@ -299,6 +305,7 @@ def _process_work_efficiency_file(
     skip_hidden: bool = False,
     skip_hidden_rows: bool = False,
     skip_hidden_cols: bool = False,
+    anomaly_config=None,
 ) -> list[dict[str, Any]]:
     """通过工时处理器解析文件，返回同步行列表。
 
@@ -365,6 +372,7 @@ def _process_work_efficiency_file(
             skip_hidden=skip_hidden,
             skip_hidden_rows=skip_hidden_rows,
             skip_hidden_cols=skip_hidden_cols,
+            anomaly_config=anomaly_config,
         )
         if result:
             return result

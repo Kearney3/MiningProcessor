@@ -64,6 +64,7 @@ def test_execute_task_passes_current_device_load_map_to_production_processor(mon
         "device_load_map": {"TR100": 77, "XDE120": 44},
         "skip_hidden_rows": False,
         "skip_hidden_cols": False,
+        "anomaly_config": None,
     }
     assert processor.single_calls == [
         (str(input_file), str(tmp_path / "合并产量.xlsx"))

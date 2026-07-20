@@ -31,6 +31,9 @@ from func.excel_utils import (
     split_day_night_shifts,
     strip_date_column,
 )
+from func.anomaly import detect_and_filter
+from func.anomaly.rules import AnomalyConfig
+from func import config_loader
 
 logger = get_logger(__name__)
 
@@ -48,6 +51,7 @@ def process_directory(
     skip_hidden: bool = False,
     skip_hidden_rows: bool = False,
     skip_hidden_cols: bool = False,
+    anomaly_config=None,
 ) -> dict | None:
     """遍历按日期分文件夹的工时报表目录，合并为单一 DataFrame。
 
@@ -150,6 +154,7 @@ def process_directory(
         all_data, success_count, processed_days,
         base_dir, year, month,
         header_mapping, output_file, return_sheets,
+        anomaly_config,
     )
 
 
@@ -213,6 +218,7 @@ def _finalize(
     header_mapping: dict | None,
     output_file: str | None,
     return_sheets: bool,
+    anomaly_config=None,
 ) -> dict | None:
     """合并、排序、映射、去重、输出。"""
     if not all_data:
@@ -243,6 +249,14 @@ def _finalize(
 
     # 去重
     final_df = dedup_dataframe(final_df, "多文件工时合并")
+
+    # 异常值检测
+    if anomaly_config is None:
+        anomaly_config = AnomalyConfig.from_config(config_loader.get_anomaly_detection_config())
+    if anomaly_config.enabled:
+        output_dir = output_file and os.path.dirname(output_file) or base_dir
+        final_df, _ = detect_and_filter(
+            final_df, "worktime", anomaly_config, output_dir=output_dir)
 
     if return_sheets:
         return {"工时数据": final_df}

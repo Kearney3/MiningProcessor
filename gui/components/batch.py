@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 
 import flet as ft
 
-from .common import _last_directory, _update_last_directory, _log_message, _get_initial_directory, _show_path_confirm, ChipToggle, year_options, month_options, make_browse_handler, HeaderModeConfig, to_local_dt
+from .common import _last_directory, _update_last_directory, _log_message, _get_initial_directory, _show_path_confirm, ChipToggle, year_options, month_options, make_browse_handler, HeaderModeConfig, to_local_dt, create_anomaly_controls
 
 try:
     from . import theme
@@ -95,6 +95,9 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         value=False,
         tooltip="勾选后，Excel 中被隐藏的列将不会被读取",
     )
+
+    # --- 异常值检测 ---
+    _anomaly = create_anomaly_controls()
 
     # --- 表内合并 ---
     batch_table_merge = ft.Checkbox(
@@ -272,18 +275,24 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
     date_filter_toggle.on_change = _on_date_filter_toggle
 
     # --- 布局 ---
-    # 处理选项（可折叠，2 列布局）
     options_grid = ft.ResponsiveRow(
         [
             ft.Container(ft.Row([batch_auto_detect, batch_raw_start], spacing=4), col={"xs": 12, "md": 6}),
             ft.Container(_batch_hmc.toggle, col={"xs": 12, "md": 6}),
-            ft.Container(ft.Row([batch_match_eq, batch_match_oil, batch_skip_hidden_rows, batch_skip_hidden_cols], spacing=4), col={"xs": 12, "md": 6}),
-            ft.Container(batch_merge, col={"xs": 12, "md": 6}),
-            ft.Container(batch_table_merge, col={"xs": 12, "md": 6}),
             ft.Container(
                 ft.Row([_batch_hmc.mode.row, _batch_hmc.fuzzy], spacing=4, wrap=True),
                 col={"xs": 12, "md": 6},
             ),
+        ],
+        run_spacing=4,
+        spacing=8,
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+    )
+
+    output_grid = ft.ResponsiveRow(
+        [
+            ft.Container(batch_merge, col={"xs": 12, "md": 6}),
+            ft.Container(batch_table_merge, col={"xs": 12, "md": 6}),
             ft.Container(batch_base_table.row, col={"xs": 12, "md": 6}),
         ],
         run_spacing=4,
@@ -298,14 +307,6 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         visible=False,
     )
 
-    options_collapsible = theme.make_collapsible(
-        title="处理选项",
-        subtitle="数据检测、台账匹配、合并输出等处理参数",
-        icon=ft.Icons.TUNE,
-        initially_expanded=False,
-        content_controls=[options_grid],
-    )
-
     container = ft.Container(
         content=ft.Column(
             [
@@ -316,28 +317,45 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
                     color=theme.TEXT_SECONDARY,
                 ),
 
-                # ── 文件夹选择 ──
+                # ── 文件夹 + 日期 ──
                 theme.module_card([
                     ft.Row([batch_path], spacing=8),
-                ], label="目标文件夹"),
-
-                # ── 日期参数 ──
-                theme.module_card([
                     ft.Row(
                         [batch_year, batch_month, date_filter_toggle],
                         spacing=6,
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
                     date_nav_row,
-                ], label="日期参数"),
+                ], label="目标文件夹"),
 
-                # ── 处理选项（折叠） ──
-                options_collapsible,
+                # ── 处理参数 ──
+                theme.module_card([
+                    options_grid,
+                    ft.Divider(height=1, color=theme.BORDER),
+                    ft.Text("数据选项", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                    ft.ResponsiveRow(
+                        [
+                            ft.Container(batch_match_eq, col={"xs": 6}),
+                            ft.Container(batch_match_oil, col={"xs": 6}),
+                            ft.Container(batch_skip_hidden_rows, col={"xs": 6}),
+                            ft.Container(batch_skip_hidden_cols, col={"xs": 6}),
+                        ],
+                        run_spacing=4,
+                    ),
+                ], label="处理参数"),
 
-                # ── 进度区 ──
+                # ── 输出方式 ──
+                theme.module_card([
+                    output_grid,
+                ], label="输出方式"),
+
+                # ── 异常值检测 ──
+                theme.module_card([
+                    _anomaly["container"],
+                ], label="异常值检测"),
+
+                # ── 进度 + 操作 ──
                 progress_row,
-
-                # ── 操作按钮 ──
                 ft.Row(
                     [batch_btn],
                     alignment=ft.MainAxisAlignment.END,
@@ -366,6 +384,9 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "match_oil_toggle": batch_match_oil,
         "_skip_hidden_rows_toggle": batch_skip_hidden_rows,
         "_skip_hidden_cols_toggle": batch_skip_hidden_cols,
+        "_anomaly_enabled": _anomaly["_anomaly_enabled"],
+        "_anomaly_report": _anomaly["_anomaly_report"],
+        "_anomaly_mode": _anomaly["_anomaly_mode"],
         "header_toggle": _batch_hmc.toggle,
         "header_mode": _batch_hmc.mode,
         "header_fuzzy": _batch_hmc.fuzzy,

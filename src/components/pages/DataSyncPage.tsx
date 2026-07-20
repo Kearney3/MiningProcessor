@@ -5,6 +5,7 @@ import { useToast } from "../Toast";
 import { FolderIcon } from "../../lib/icons";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { DatePicker } from "../DatePicker";
+import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG } from "../AnomalyPanel";
 
 // ═══════════════════════════════════════
 // Date helpers
@@ -176,6 +177,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const [useOilLedger, setUseOilLedger] = useState(true);
   const [skipHiddenRows, setSkipHiddenRows] = useState(true);
   const [skipHiddenCols, setSkipHiddenCols] = useState(false);
+  const [anomaly, setAnomaly] = useState<AnomalyConfig>(DEFAULT_ANOMALY_CONFIG);
 
   // 启动时从配置加载上次目录，不存在则清空
   useEffect(() => {
@@ -225,6 +227,9 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
         use_oil_ledger: useOilLedger,
         skip_hidden_rows: skipHiddenRows,
         skip_hidden_cols: skipHiddenCols,
+        anomaly_enabled: anomaly.enabled,
+        anomaly_report: anomaly.report,
+        anomaly_mode: anomaly.mode,
       });
       setResult(res);
       const total = Object.values(res.results).reduce(
@@ -536,6 +541,9 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
           </div>
         </div>
       </div>
+
+      {/* Anomaly detection */}
+      <AnomalyPanel config={anomaly} onChange={setAnomaly} />
 
       <button
         onClick={handleSync}

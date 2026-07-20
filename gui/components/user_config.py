@@ -13,7 +13,7 @@ except ImportError:
 
 from func import config_loader
 from func.config_loader import DEFAULT_FILE_KEYWORDS, get_minebase_column_mapping, save_minebase_column_mapping, reset_minebase_column_mapping, get_minebase_config_default
-from .common import _log_message
+from .common import _log_message, safe_update
 
 
 def _sync_port_state(port_field: ft.TextField, is_valid: bool, message: str = ""):
@@ -836,6 +836,289 @@ def _create_column_mapping_section(page: ft.Page, log):
 
 
 # ---------------------------------------------------------------------------
+# 5. 异常值检测配置
+# ---------------------------------------------------------------------------
+
+def _create_anomaly_config_section(page: ft.Page, log):
+    """创建异常值检测配置卡片，返回 (card, refs_dict)。"""
+
+    from func.anomaly.rules import ALL_NUMERIC_SENTINEL, DEFAULT_THRESHOLDS
+
+    # 数据类型选项
+    _DATA_TYPE_OPTIONS = [
+        ("fuel", "油耗"),
+        ("fuel_engine", "发动机"),
+        ("production_running", "运行数据"),
+        ("production", "生产数据"),
+        ("electrical", "电力消耗"),
+        ("worktime", "工时数据"),
+    ]
+
+    # 当前选中的数据类型
+    _current_type = ["fuel"]
+
+    # 每个数据类型的阈值行：{data_type: [[col, min, max, default], ...]}
+    _threshold_rows: dict[str, list[list[str]]] = {}
+
+    # 全局统计参数
+    sigma_field = ft.TextField(
+        label="σ 倍数", value="3.0", width=120,
+        text_size=13, color=theme.TEXT_PRIMARY,
+        hint_text="默认 3.0",
+    )
+    pct_low_field = ft.TextField(
+        label="百分位下限", value="1.0", width=120,
+        text_size=13, color=theme.TEXT_PRIMARY,
+        hint_text="默认 1.0",
+    )
+    pct_high_field = ft.TextField(
+        label="百分位上限", value="99.0", width=120,
+        text_size=13, color=theme.TEXT_PRIMARY,
+        hint_text="默认 99.0",
+    )
+
+    type_dropdown = ft.Dropdown(
+        label="数据类型",
+        width=150,
+        options=[ft.dropdown.Option(key=k, text=v) for k, v in _DATA_TYPE_OPTIONS],
+        value="fuel",
+    )
+    rows_column = ft.Column(spacing=4, expand=True)
+    status_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
+
+    def _build_rows():
+        """根据当前数据类型构建阈值编辑行。"""
+        controls = []
+        dt = _current_type[0]
+        rows = _threshold_rows.get(dt, [])
+
+        # 表头
+        controls.append(ft.Row(
+            [
+                ft.Text("列名 / 标记", expand=True, size=12,
+                        weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                ft.Text("最小值", width=100, size=12,
+                        weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                ft.Text("最大值", width=100, size=12,
+                        weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                ft.Text("默认值", width=100, size=12,
+                        weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY,
+                        tooltip="处理异常值时的替换值"),
+                ft.Text("", width=40),
+            ],
+            spacing=4,
+        ))
+
+        for i in range(len(rows)):
+            idx = i
+
+            col_field = ft.TextField(
+                value=rows[idx][0], expand=True, text_size=13, dense=True,
+                color=theme.TEXT_PRIMARY, border_color=theme.BORDER,
+                hint_text="列名或 __all_numeric__",
+            )
+            min_field = ft.TextField(
+                value=rows[idx][1], width=100, text_size=13, dense=True,
+                color=theme.TEXT_PRIMARY, border_color=theme.BORDER,
+                hint_text="无下限",
+            )
+            max_field = ft.TextField(
+                value=rows[idx][2], width=100, text_size=13, dense=True,
+                color=theme.TEXT_PRIMARY, border_color=theme.BORDER,
+                hint_text="无上限",
+            )
+            default_field = ft.TextField(
+                value=rows[idx][3] if len(rows[idx]) > 3 else "",
+                width=100, text_size=13, dense=True,
+                color=theme.TEXT_PRIMARY, border_color=theme.BORDER,
+                hint_text="0",
+                tooltip="选择「处理异常值」时替换为此值",
+            )
+
+            def _on_col_change(e, _idx=idx):
+                rows[_idx][0] = e.control.value.strip()
+
+            def _on_min_change(e, _idx=idx):
+                rows[_idx][1] = e.control.value.strip()
+
+            def _on_max_change(e, _idx=idx):
+                rows[_idx][2] = e.control.value.strip()
+
+            def _on_default_change(e, _idx=idx):
+                rows[_idx][3] = e.control.value.strip()
+
+            def _on_remove(e, _idx=idx):
+                rows.pop(_idx)
+                _build_rows()
+
+            col_field.on_change = _on_col_change
+            min_field.on_change = _on_min_change
+            max_field.on_change = _on_max_change
+            default_field.on_change = _on_default_change
+            remove_btn = ft.IconButton(
+                icon=ft.Icons.DELETE_OUTLINE, tooltip="删除",
+                icon_size=18, icon_color=theme.ERROR, on_click=_on_remove,
+            )
+
+            controls.append(ft.Row(
+                [col_field, min_field, max_field, default_field, remove_btn],
+                spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            ))
+
+        rows_column.controls = controls
+        safe_update(rows_column)
+
+    def _on_type_change(e):
+        _current_type[0] = type_dropdown.value
+        _build_rows()
+
+    type_dropdown.on_select = _on_type_change
+
+    def _add_row(e=None):
+        dt = _current_type[0]
+        if dt not in _threshold_rows:
+            _threshold_rows[dt] = []
+        _threshold_rows[dt].append(["", "", "", ""])
+        _build_rows()
+
+    def _reload():
+        """从配置文件加载。"""
+        ad = config_loader.get_anomaly_detection_config()
+
+        # 加载阈值 + 处理规则
+        _threshold_rows.clear()
+        thresholds = ad.get("thresholds", {})
+        handling = ad.get("handling_rules", {})
+        for dt, _ in _DATA_TYPE_OPTIONS:
+            dt_thresholds = thresholds.get(dt, {})
+            dt_handling = handling.get(dt, {})
+            rows = []
+            for col, bounds in dt_thresholds.items():
+                rule = dt_handling.get(col, {})
+                default_val = str(rule.get("default", "")) if rule.get("strategy") == "default_value" else ""
+                rows.append([
+                    col,
+                    str(bounds.get("min", "")) if "min" in bounds else "",
+                    str(bounds.get("max", "")) if "max" in bounds else "",
+                    default_val,
+                ])
+            _threshold_rows[dt] = rows
+
+        # 加载统计参数
+        sigma_field.value = str(ad.get("sigma_n", 3.0))
+        pct_low_field.value = str(ad.get("percentile_low", 1.0))
+        pct_high_field.value = str(ad.get("percentile_high", 99.0))
+
+        status_text.value = ""
+        _build_rows()
+        safe_update(sigma_field)
+        safe_update(pct_low_field)
+        safe_update(pct_high_field)
+
+    def _collect_and_save(_e=None):
+        """收集 UI 值并保存。"""
+        # 收集阈值 + 处理规则
+        thresholds = {}
+        handling_rules = {}
+        for dt, rows in _threshold_rows.items():
+            dt_thresholds = {}
+            dt_handling = {}
+            for r in rows:
+                col = r[0].strip()
+                if not col:
+                    continue
+                # 阈值
+                bounds = {}
+                if r[1].strip():
+                    try:
+                        bounds["min"] = float(r[1])
+                    except ValueError:
+                        pass
+                if r[2].strip():
+                    try:
+                        bounds["max"] = float(r[2])
+                    except ValueError:
+                        pass
+                if bounds:
+                    dt_thresholds[col] = bounds
+                # 默认值（处理异常值时替换用）
+                if len(r) > 3 and r[3].strip():
+                    try:
+                        dt_handling[col] = {"strategy": "default_value", "default": float(r[3])}
+                    except ValueError:
+                        dt_handling[col] = {"strategy": "default_value", "default": 0}
+            if dt_thresholds:
+                thresholds[dt] = dt_thresholds
+            if dt_handling:
+                handling_rules[dt] = dt_handling
+
+        # 收集统计参数
+        try:
+            sigma_n = float(sigma_field.value or "3.0")
+        except ValueError:
+            sigma_n = 3.0
+        try:
+            pct_low = float(pct_low_field.value or "1.0")
+        except ValueError:
+            pct_low = 1.0
+        try:
+            pct_high = float(pct_high_field.value or "99.0")
+        except ValueError:
+            pct_high = 99.0
+
+        updates = {
+            "thresholds": thresholds,
+            "handling_rules": handling_rules,
+            "sigma_n": sigma_n,
+            "percentile_low": pct_low,
+            "percentile_high": pct_high,
+        }
+        config_loader.update_anomaly_detection_config(updates)
+        status_text.value = "异常值检测配置已保存"
+        _log_message(log, "已保存异常值检测配置")
+        safe_update(status_text)
+
+    def _reset(_e=None):
+        """恢复默认值。"""
+        from func.config_loader import DEFAULT_ANOMALY_DETECTION
+        config_loader.save_anomaly_detection_config(dict(DEFAULT_ANOMALY_DETECTION))
+        _reload()
+        status_text.value = "已恢复默认配置"
+        _log_message(log, "已恢复异常值检测默认配置")
+        safe_update(status_text)
+
+    action_buttons = [
+        theme.primary_btn("保存配置", icon=ft.Icons.SAVE, on_click=_collect_and_save),
+        theme.secondary_btn("重新加载", icon=ft.Icons.REFRESH, on_click=lambda _: _reload()),
+        theme.secondary_btn("恢复默认", icon=ft.Icons.RESTART_ALT, on_click=_reset),
+        theme.accent_btn("添加阈值", icon=ft.Icons.ADD, on_click=_add_row),
+    ]
+
+    card = theme.make_collapsible(
+        title="异常值检测配置",
+        subtitle="配置各数据类型的检测阈值、σ 倍数和百分位范围",
+        icon=ft.Icons.TUNE,
+        initially_expanded=False,
+        content_controls=[
+            ft.Text(
+                "阈值规则对指定列名设置 min/max 范围；"
+                f"使用 {ALL_NUMERIC_SENTINEL} 可对所有数值列统一检测。"
+                "统计参数（σ、百分位）对所有数据类型全局生效。\n"
+                "默认值列：仅在启用「处理异常值」模式时生效，异常值将被替换为该值。",
+                size=12, color=theme.TEXT_SECONDARY,
+            ),
+            ft.Row([sigma_field, pct_low_field, pct_high_field], spacing=12),
+            type_dropdown,
+            rows_column,
+            ft.Row(action_buttons, spacing=8, wrap=True, alignment=ft.MainAxisAlignment.START),
+            status_text,
+        ],
+    )
+
+    return card, {"reload": _reload}
+
+
+# ---------------------------------------------------------------------------
 # 主组装函数
 # ---------------------------------------------------------------------------
 
@@ -852,6 +1135,7 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
     header_mapping_card, hm_refs = _create_header_mapping_section(page, log)
     minebase_card, mb_refs = _create_minebase_section(page, log)
     mapping_card, map_refs = _create_column_mapping_section(page, log)
+    anomaly_card, anomaly_refs = _create_anomaly_config_section(page, log)
 
     container = ft.Container(
         content=ft.Column(
@@ -862,6 +1146,7 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
                 keywords_card,
                 header_mapping_card,
                 mapping_card,
+                anomaly_card,
             ],
             spacing=8,
             expand=True,
@@ -901,4 +1186,5 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
     mb_refs["reload"]()
     map_refs["reload"]()
     map_refs["build"]()
+    anomaly_refs["reload"]()
     return container, refs

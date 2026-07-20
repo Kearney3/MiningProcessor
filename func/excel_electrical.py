@@ -11,12 +11,15 @@ import argparse
 from func.logger import get_logger
 from func.excel_utils import dedup_dataframe, detect_shift, get_hidden_indices, filter_hidden_from_df, open_workbook
 from func.string_utils import clean_string
+from func.anomaly import detect_and_filter
+from func.anomaly.rules import AnomalyConfig
+from func import config_loader
 
 logger = get_logger(__name__)
 
 
 def parse_excel_data(file_path, target_year=None, return_sheets=False, add_shift_column=False, default_shift="Day", skip_hidden=False,
-                     skip_hidden_rows=False, skip_hidden_cols=False):
+                     skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None):
     """
     解析复杂的Excel电力消耗报表
     :param file_path: 输入文件路径
@@ -163,6 +166,14 @@ def parse_excel_data(file_path, target_year=None, return_sheets=False, add_shift
 
     # 去重
     result_df = dedup_dataframe(result_df, "电力消耗")
+
+    # 异常值检测
+    output_dir = os.path.dirname(file_path)
+    if anomaly_config is None:
+        anomaly_config = AnomalyConfig.from_config(config_loader.get_anomaly_detection_config())
+    if anomaly_config.enabled:
+        result_df, _ = detect_and_filter(
+            result_df, "electrical", anomaly_config, output_dir=output_dir)
 
     if return_sheets:
         return {"电力消耗": result_df}

@@ -171,14 +171,17 @@ def _dispatch_module(module_type: str, path: str, **kwargs) -> object | None:
     """Dispatch to the appropriate processor. Returns worktime_sheets or None."""
     skip_hidden_rows = kwargs.get("skip_hidden_rows", False)
     skip_hidden_cols = kwargs.get("skip_hidden_cols", False)
+    anomaly_config = kwargs.get("anomaly_config")
     if module_type == "fuel":
         process_fuel_data(path, kwargs.get("year"),
-                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols)
+                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
+                          anomaly_config=anomaly_config)
     elif module_type == "production":
         raw_start = kwargs.get("raw_start", -1)
         device_load_map = config_loader.get_device_load_map()
         processor = ProdProcessor(raw_start=raw_start, device_load_map=device_load_map,
-                                  skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols)
+                                  skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
+                                  anomaly_config=anomaly_config)
         logging.info(f"装载量参数：{device_load_map}")
         if os.path.isdir(path):
             output_file = os.path.join(path, "合并产量.xlsx")
@@ -190,7 +193,8 @@ def _dispatch_module(module_type: str, path: str, **kwargs) -> object | None:
         process_electrical_data(path, kwargs.get("year"),
                          add_shift_column=kwargs.get("add_shift_column", False),
                          default_shift=kwargs.get("default_shift", "Day"),
-                         skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols)
+                         skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
+                         anomaly_config=anomaly_config)
     elif module_type == "worktime":
         year = kwargs.get("year", datetime.now().year)
         month = kwargs.get("month", 1)
@@ -200,13 +204,15 @@ def _dispatch_module(module_type: str, path: str, **kwargs) -> object | None:
             output_file = os.path.join(path, f"{year}{month:02d}_多文件合并_工作效率表.xlsx")
             return process_directory(path, year, month, output_file,
                                     return_sheets=True, header_mapping=header_mapping,
-                                    skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols)
+                                    skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
+                                    anomaly_config=anomaly_config)
         else:
             file_dir = os.path.dirname(path) or "."
             output_file = os.path.join(file_dir, f"{year}{month:02d}_工作效率表.xlsx")
             return process_worktime_data(path, year, month, output_file,
                                       return_sheets=True, header_mapping=header_mapping,
-                                      skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols)
+                                      skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
+                                      anomaly_config=anomaly_config)
     elif module_type == "merge":
         keyword = kwargs.get("keyword", "")
         strip_time = kwargs.get("strip_time", False)
@@ -291,7 +297,7 @@ async def _safe_run_task(
 # ---------------------------------------------------------------------------
 # 各模块按钮回调
 # ---------------------------------------------------------------------------
-async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False) -> None:
+async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None) -> None:
     """燃油处理按钮回调"""
     btn = fuel_refs["btn"]
     path = fuel_refs["path"].value
@@ -305,10 +311,11 @@ async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=
         return
     await _safe_run_task(page, btn, "处理", path, log, "fuel",
                          year=year, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
-                         skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols)
+                         skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
+                         anomaly_config=anomaly_config)
 
 
-async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False) -> None:
+async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None) -> None:
     """生产处理按钮回调"""
     btn = prod_refs["btn"]
     path = prod_refs["path"].value
@@ -316,21 +323,26 @@ async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=
         _log_message(log, "请先选择 Excel 文件或文件夹", level=logging.WARNING)
         return
 
-    raw_start_text = (prod_refs["raw_start"].value or "-1").strip()
-    try:
-        raw_start = int(raw_start_text)
-        if raw_start != -1 and raw_start < 1:
-            raise ValueError
-    except ValueError:
-        _log_message(log, "请输入有效的 raw_start（正整数或-1【自动检测行】）", level=logging.WARNING)
-        return
+    auto_detect_ref = prod_refs.get("auto_detect")
+    if auto_detect_ref and auto_detect_ref.value:
+        raw_start = -1
+    else:
+        raw_start_text = (prod_refs["raw_start"].value or "6").strip()
+        try:
+            raw_start = int(raw_start_text)
+            if raw_start < 1:
+                raise ValueError
+        except ValueError:
+            _log_message(log, "请输入有效的表头起始行（正整数）", level=logging.WARNING)
+            return
 
     await _safe_run_task(page, btn, "处理", path, log, "production",
                          raw_start=raw_start, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
-                         skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols)
+                         skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
+                         anomaly_config=anomaly_config)
 
 
-async def on_elec_process(page: ft.Page, elec_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False) -> None:
+async def on_elec_process(page: ft.Page, elec_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None) -> None:
     """电力处理按钮回调"""
     btn = elec_refs["btn"]
     path = elec_refs["path"].value
@@ -352,10 +364,11 @@ async def on_elec_process(page: ft.Page, elec_refs: dict, log, equipment_ledger=
                          add_shift_column=add_shift.value if add_shift else False,
                          default_shift=default_shift_ref.value if default_shift_ref else "Day",
                          equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
-                         skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols)
+                         skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
+                         anomaly_config=anomaly_config)
 
 
-async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False) -> None:
+async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None) -> None:
     """工时处理按钮回调"""
     btn = work_refs["btn"]
     path = work_refs["path"].value
@@ -383,7 +396,8 @@ async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=
                          year=year, month=month,
                          equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
                          header_mapping=header_mapping,
-                         skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols)
+                         skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
+                         anomaly_config=anomaly_config)
 
 
 async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False) -> None:
@@ -496,7 +510,7 @@ async def _poll_batch_progress_queue(progress_queue, progress_bar, progress_text
     _drain_batch_progress_queue_once(progress_queue, progress_bar, progress_text)
 
 
-async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledger=None, oil_ledger=None) -> None:
+async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledger=None, oil_ledger=None, anomaly_config=None) -> None:
     """批量处理按钮回调（带文件扫描 + 缺失确认弹窗）"""
     import queue
     import threading
@@ -660,6 +674,7 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
                         cancel_event=cancel_event,
                         skip_hidden_rows=skip_hidden_rows,
                         skip_hidden_cols=skip_hidden_cols,
+                        anomaly_config=anomaly_config,
                     )
                 except Exception as ex:
                     thread_result["error"] = ex
@@ -742,11 +757,45 @@ def _make_module_handler(
             skip_hidden_rows = _sh_rows.value
         if _sh_cols:
             skip_hidden_cols = _sh_cols.value
+
+        # 构建异常检测配置
+        anomaly_config = _build_anomaly_config(module_refs)
+
         await callback(page, module_refs[module_key], log,
                        equipment_ledger=eq, oil_ledger=oil,
-                       skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols)
+                       skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
+                       anomaly_config=anomaly_config)
 
     return handler
+
+
+def _build_anomaly_config(module_refs: dict):
+    """从 module_refs 构建 AnomalyConfig 实例（加载用户配置的阈值和处理规则）。"""
+    from func.anomaly.rules import AnomalyConfig
+
+    enabled_ref = module_refs.get("_anomaly_enabled")
+    if not enabled_ref or not enabled_ref.value:
+        return AnomalyConfig(enabled=False)
+
+    report_ref = module_refs.get("_anomaly_report")
+    mode_fn = module_refs.get("_anomaly_mode")
+    mode = mode_fn() if callable(mode_fn) else "flag"
+
+    # 从配置文件加载阈值和处理规则
+    ad_config = config_loader.get_anomaly_detection_config()
+
+    return AnomalyConfig(
+        enabled=True,
+        generate_report=report_ref.value if report_ref else False,
+        flag_anomalies=(mode == "flag"),
+        filter_anomalies=(mode == "filter"),
+        handle_anomalies=(mode == "handle"),
+        sigma_n=ad_config.get("sigma_n", 3.0),
+        percentile_low=ad_config.get("percentile_low", 1.0),
+        percentile_high=ad_config.get("percentile_high", 99.0),
+        thresholds=ad_config.get("thresholds", {}),
+        handling_rules=ad_config.get("handling_rules", {}),
+    )
 
 
 def wire_processing_buttons(
@@ -784,11 +833,13 @@ def wire_processing_buttons(
             oil_toggle = module_refs["batch"].get("match_oil_toggle")
             eq = ledger_refs.get("get_ledger", lambda: None)() if eq_toggle and eq_toggle.value else None
             oil = oil_ledger_refs.get("get_oil", lambda: None)() if oil_toggle and oil_toggle.value else None
-            await on_batch_process(page, module_refs["batch"], log, equipment_ledger=eq, oil_ledger=oil)
+            from .common import build_anomaly_config_from_refs
+            anomaly_config = build_anomaly_config_from_refs(module_refs["batch"])
+            await on_batch_process(page, module_refs["batch"], log, equipment_ledger=eq, oil_ledger=oil, anomaly_config=anomaly_config)
         module_refs["batch"]["btn"].on_click = handle_batch_click
 
 
-async def on_sync_process(page: ft.Page, sync_refs: dict, log) -> None:
+async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=None) -> None:
     """MineBase 同步按钮回调"""
     path = sync_refs["path"].value
     if not path:
@@ -860,6 +911,7 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log) -> None:
                 use_oil_ledger=use_oil_ledger,
                 skip_hidden_rows=skip_hidden_rows,
                 skip_hidden_cols=skip_hidden_cols,
+                anomaly_config=anomaly_config,
             )
 
         results = await asyncio.to_thread(_do_sync)
@@ -955,10 +1007,12 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log) -> None:
         set_btn_state(btn, True, "同步到 MineBase")
 
 
-def wire_sync_button(sync_refs: dict, page: ft.Page, log):
+def wire_sync_button(sync_refs: dict, page: ft.Page, log, module_refs: dict | None = None):
     """绑定 MineBase 同步按钮"""
     async def handle_sync_click(e: ft.ControlEvent):
-        await on_sync_process(page, sync_refs, log)
+        from .common import build_anomaly_config_from_refs
+        anomaly_config = build_anomaly_config_from_refs(sync_refs)
+        await on_sync_process(page, sync_refs, log, anomaly_config=anomaly_config)
     sync_refs["btn"].on_click = handle_sync_click
 
 
