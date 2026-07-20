@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="platform" />
   <img src="https://img.shields.io/badge/Tauri-v2-FFC131?style=flat-square&logo=tauri&logoColor=black" alt="tauri" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="react" />
-  <img src="https://img.shields.io/badge/tests-747%20passed-brightgreen?style=flat-square" alt="tests" />
+  <img src="https://img.shields.io/badge/tests-887%20passed-brightgreen?style=flat-square" alt="tests" />
 </p>
 
 <p>
@@ -30,6 +30,7 @@
 | `excel_production_enhanced.py` | `production` | 增强版生产报表解析（GUI 默认） | 生产报表文件/文件夹 | 生产数据汇总 |
 | `excel_merger.py` | `merge` | 按关键字批量合并同结构 Excel | 文件夹 + 关键字 | 合并后的 Excel |
 | `excel_batch.py` | — | 批量多报表综合处理 | 文件夹 | 综合统计表 |
+| `anomaly/` | — | 异常值检测与处理 | 各类 DataFrame | 标记/过滤/替换 + 异常报告 |
 
 ---
 
@@ -69,6 +70,7 @@ pnpm dev:bridge
 - 用户配置菜单（数据库连接、工作效率表头映射）
 - 实时日志展示
 - 设备台账管理（支持设备名称模糊匹配、编号匹配）
+- 异常值检测（阈值 / σ 异常 / 百分位，支持标记、过滤、替换默认值三种处理模式）
 
 ### 命令行使用
 
@@ -150,6 +152,12 @@ MiningProcessor/
 │   ├── excel_production_enhanced.py # 生产报表（GUI 默认）
 │   ├── excel_merger.py         # 多文件合并
 │   ├── excel_batch.py          # 批量综合处理
+│   ├── anomaly/                # 异常值检测与处理
+│   │   ├── __init__.py         # detect_and_filter() 门面函数
+│   │   ├── rules.py            # 规则定义（阈值/σ/百分位）+ AnomalyConfig
+│   │   ├── detector.py         # 检测引擎
+│   │   ├── filters.py          # 过滤器（标记/移除/替换）
+│   │   └── report.py           # Excel 异常报告生成
 │   ├── sync_to_minebase.py     # MineBase 同步 CLI 入口
 │   └── sync/                   # MineBase 同步子模块
 │       ├── core.py             # 同步核心
@@ -213,6 +221,7 @@ MiningProcessor/
 | `user_config.database` | 数据库连接参数（`db_type/host/port/name/user/password`） |
 | `user_config.worktime_header_mapping` | 工作效率表自定义表头映射（支持位置模式和模糊匹配） |
 | `user_config.file_keywords` | 各报表文件识别关键字 |
+| `anomaly_detection` | 异常值检测配置（阈值、σ/百分位参数、处理规则） |
 | `minebase.mode` | MineBase 同步模式：`api` 或 `database` |
 | `minebase.api` | API 模式连接参数（`url/username/password`） |
 | `minebase.database` | 数据库直连参数（`host/port/database/user/password`） |
@@ -258,6 +267,24 @@ MiningProcessor/
 - `func/equipment_ledger.py` 支持标准名称、别名、前缀、`rapidfuzz` 相似度匹配，用于跨报表设备名称归一化。生产数据处理时，若同时存在"矿卡名称"和"挖机名称"列，匹配结果会自动添加后缀区分。
 - `func/oil_ledger.py` 管理油品编码与名称映射。
 
+### 异常值检测
+
+`func/anomaly/` 提供统一的异常值检测与处理框架，在各处理器去重后自动调用：
+
+**检测方式：**
+- **绝对阈值**：用户配置的 min/max 范围（如油耗 > 10000）
+- **σ 异常**：基于当批数据的统计离群检测（默认 3σ）
+- **百分位异常**：基于当批数据的极端值检测（默认 P1/P99）
+- **`__all_numeric__` 模式**：工时数据专用，自动对所有数值列统一检测（默认 0-720）
+
+**处理模式（四选一）：**
+- 输出报告：生成 `异常报告_{数据类型}.xlsx`（含汇总 + 明细）
+- 标记异常值：新增「异常值」(bool) +「异常值原因」列
+- 过滤异常值：移除异常行
+- 处理异常值：按用户配置的默认值替换
+
+数据处理、批量处理、数据同步三个入口均支持异常检测开关。用户可在配置界面按数据类型编辑阈值和默认值。
+
 ### MineBase 同步
 
 `func/sync_to_minebase.py` 提供 MineBase 同步 CLI 入口，子模块位于 `func/sync/`：
@@ -271,7 +298,7 @@ MiningProcessor/
 ## 🧪 测试
 
 ```bash
-# 运行全部测试（747 个用例）
+# 运行全部测试（887 个用例）
 uv run pytest
 
 # 运行指定测试文件
@@ -314,6 +341,7 @@ uv run pytest -v
 | `test_sync_to_minebase.py` / `test_sync_file_processors.py` | MineBase 同步 |
 | `test_header_mapping_unified.py` | 表头映射统一逻辑 |
 | `test_hidden_rows.py` | 隐藏行/列检测、过滤与索引映射 |
+| `test_anomaly.py` | 异常值检测（阈值/σ/百分位/过滤/标记/报告，88 个用例） |
 
 前端测试在 `src/test/` 下，使用 Vitest + Testing Library，覆盖 `LogPanel`、`Sidebar`、`Toast`、`useLastDirectory`、`usePythonBridge`。
 
@@ -350,6 +378,18 @@ uv run flet build windows # Windows
 ---
 
 ## 📋 更新日志
+
+### v1.3.0 · 2026-07-19
+
+- 🆕 异常值检测与处理模块（`func/anomaly/`）：支持绝对阈值、σ 异常、百分位三种检测方式
+- 四种处理模式：输出报告、标记异常值（新增「异常值」+「异常值原因」列）、过滤异常值、处理异常值（按默认值替换）
+- 工时数据 `__all_numeric__` 模式：自动对所有数值列统一检测（默认 0-720 范围）
+- 数据处理、批量处理、数据同步三个入口均集成异常检测开关
+- 用户配置界面：按数据类型编辑阈值和默认值，支持 σ 倍数和百分位范围全局设置
+- Flet GUI 和 Tauri 前端均提供异常检测控件（开关 + 报告 + 三选一模式）
+- 处理日志显示来源表和处理方式（如 `[油耗信息] 检测到 3 个异常值 → 异常值已标记`）
+- GUI 布局优化：批量处理按功能分组为 module_card，数据同步移除多余分割线改为 2 列布局
+- 新增 88 个异常检测单元测试 + 7 个配置测试，总计 887 个测试用例
 
 ### v1.2.0 · 2026-07-11
 
