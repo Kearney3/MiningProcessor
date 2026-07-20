@@ -260,7 +260,7 @@ def _process_production_file(
         "公里数仪表开始": "milemeterStart",
         "公里数仪表结束": "milemeterEnd",
         "运行里程": "mileage",
-        "趟数": "tripCount",
+        "趟次": "tripCount",
         "备注": "remark",
     }
     _map = _get_df_to_mapped_rows()

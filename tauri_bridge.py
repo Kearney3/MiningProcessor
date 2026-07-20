@@ -166,6 +166,10 @@ class _StderrLogHandler(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         try:
             msg = self.format(record)
+            # ERROR 级别且含 traceback 时，只保留第一行（用户友好的异常消息）
+            # log record 本身不变，完整 traceback 仍可通过 logger.exception 访问
+            if record.levelno >= logging.ERROR and "\nTraceback " in msg:
+                msg = msg.split("\n", 1)[0].rstrip()
             obj = json.dumps(
                 {"event": "log", "data": {"level": record.levelname, "message": msg}},
                 ensure_ascii=False,
@@ -232,6 +236,9 @@ def _build_anomaly_config(params: dict):
         flag_anomalies=(mode == "flag"),
         filter_anomalies=(mode == "filter"),
         handle_anomalies=(mode == "handle"),
+        use_threshold=ad_config.get("use_threshold", True),
+        use_sigma=ad_config.get("use_sigma", True),
+        use_percentile=ad_config.get("use_percentile", True),
         sigma_n=ad_config.get("sigma_n", 3.0),
         percentile_low=ad_config.get("percentile_low", 1.0),
         percentile_high=ad_config.get("percentile_high", 99.0),
@@ -602,6 +609,27 @@ def _save_minebase_config(params: dict) -> dict:
     from func.config_loader import save_minebase_config
 
     save_minebase_config(params["config"])
+    return {"ok": True}
+
+
+@_register("get_anomaly_config")
+def _get_anomaly_config(params: dict) -> dict:
+    from func.config_loader import get_anomaly_detection_config
+
+    return get_anomaly_detection_config()
+
+
+@_register("save_anomaly_config")
+def _save_anomaly_config(params: dict) -> dict:
+    from func.config_loader import update_anomaly_detection_config, save_anomaly_detection_config
+
+    updates = params.get("updates")
+    if updates is not None:
+        update_anomaly_detection_config(updates)
+    else:
+        full = params.get("config")
+        if full is not None:
+            save_anomaly_detection_config(full)
     return {"ok": True}
 
 
@@ -1078,7 +1106,11 @@ def _handle_request(req: dict) -> None:
     except Exception:
         ref_id = secrets.token_hex(4)
         logger.error("RPC error ref=%s method=%s", ref_id, method, exc_info=True)
-        _send({"id": req_id, "error": f"处理失败 (ref: {ref_id})，请查看日志获取详情"})
+        # 提取根因，构造用户友好的错误消息
+        root_msg = str(sys.exc_info()[1]).strip()
+        if not root_msg:
+            root_msg = sys.exc_info()[0].__name__
+        _send({"id": req_id, "error": root_msg})
 
 
 def main() -> None:

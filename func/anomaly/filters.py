@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from func.anomaly.rules import AnomalyHit
+from func.anomaly.rules import ALL_NUMERIC_SENTINEL, AnomalyHit
 
 logger = logging.getLogger(__name__)
 
@@ -87,8 +87,10 @@ class AnomalyFilterer:
         result = df.copy()
 
         # 按 (行索引, 列名) 分组
+        # 优先匹配列名规则，回退到 __all_numeric__ 通配规则
+        fallback_rule = rules.get(ALL_NUMERIC_SENTINEL)
         for hit in hits:
-            col_rule = rules.get(hit.column)
+            col_rule = rules.get(hit.column, fallback_rule)
             if col_rule is None:
                 continue
 

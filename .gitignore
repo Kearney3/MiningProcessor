@@ -78,4 +78,4 @@ build/*.toc
 assets/fonts/
 
 # Vite
-dist/
+dist/.coverage

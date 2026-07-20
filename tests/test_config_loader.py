@@ -424,7 +424,7 @@ class TestAnomalyDetectionConfig:
         """指定 data_type 时返回对应阈值。"""
         thresholds = config_loader.get_anomaly_thresholds("fuel")
         assert "油品消耗" in thresholds
-        assert thresholds["油品消耗"]["max"] == 10000
+        assert thresholds["油品消耗"]["max"] == 50000
 
     def test_get_anomaly_thresholds_unknown_type(self):
         """未知类型返回空 dict。"""
@@ -432,9 +432,13 @@ class TestAnomalyDetectionConfig:
         assert thresholds == {}
 
     def test_get_anomaly_handling_rules_default(self):
-        """默认处理规则为空。"""
+        """默认处理规则应包含预配置的默认值策略。"""
         rules = config_loader.get_anomaly_handling_rules()
-        assert rules == {}
+        assert "production" in rules
+        assert "electrical" in rules
+        assert "worktime" in rules
+        assert rules["production"]["产量"]["strategy"] == "default_value"
+        assert rules["production"]["产量"]["default"] == 0
 
     def test_update_anomaly_detection_config(self, temp_config):
         """更新应写入 config.user.json 并正确合并。"""

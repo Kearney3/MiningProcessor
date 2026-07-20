@@ -375,9 +375,40 @@ uv run flet build windows # Windows
 
 在 GitHub Actions 页面选择 `Build Tauri App` 或 `Build Flet App` workflow，点击 `Run workflow`。
 
+### 版本号管理
+
+项目版本号统一由 `scripts/bump_version.py` 管理，以 `pyproject.toml` 为唯一真相源，自动同步到：
+
+- `package.json`（Node.js / Flet 前端）
+- `src-tauri/tauri.conf.json`（Tauri 应用配置）
+- `src-tauri/Cargo.toml`（Rust crate）
+
+```bash
+# 查看当前版本，同步所有文件
+uv run scripts/bump_version.py
+
+# 升级版本号（自动同步四份文件）
+uv run scripts/bump_version.py --bump patch   # 1.2.0 → 1.2.1
+uv run scripts/bump_version.py --bump minor   # 1.2.0 → 1.3.0
+uv run scripts/bump_version.py --bump major   # 1.2.0 → 2.0.0
+
+# 指定版本号
+uv run scripts/bump_version.py 1.3.1
+
+# 预览变更，不实际写入
+uv run scripts/bump_version.py --bump minor --dry-run
+```
+
 ---
 
 ## 📋 更新日志
+
+### v1.3.1 · 2026-07-20
+
+- 🐛 GUI 错误日志简化：ERROR 级别日志不再显示完整 Python traceback，只展示根因异常消息（如 `Path does not exist: xxx.xlsx`）
+- Tauri 前端 RPC 错误消息同步优化：去掉 traceback 和文件位置，只返回根因文字
+- 完整 traceback 仍通过 `logger.exception()` 保留在后端日志，不影响调试排查
+- 🆕 统一版本号管理：`scripts/bump_version.py` 以 `pyproject.toml` 为唯一真相源，一次修改同步 `package.json`、`tauri.conf.json`、`Cargo.toml`
 
 ### v1.3.0 · 2026-07-19
 

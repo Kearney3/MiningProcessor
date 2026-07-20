@@ -168,13 +168,19 @@ class LogSystem:
             logging.getLogger(__name__).debug("page.run_thread 失败（页面可能已关闭）")
 
     def _append_log_record(self, log_item: dict[str, object]):
+        raw_msg = str(log_item["message"])
+        # ERROR 级别且含 traceback 时，只保留第一行（用户友好的异常消息）
+        # 后端日志已通过 logger.exception 记录完整 traceback，此处仅影响 GUI 显示
+        levelno = int(log_item["levelno"])
+        if levelno >= logging.ERROR and "\nTraceback " in raw_msg:
+            raw_msg = raw_msg.split("\n", 1)[0].rstrip()
         record = {
             "timestamp": str(log_item.get("timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
             "created": float(log_item.get("created", 0)),
             "seq": int(log_item.get("seq", 0)),
-            "levelno": int(log_item["levelno"]),
+            "levelno": levelno,
             "levelname": str(log_item["levelname"]),
-            "message": str(log_item["message"]),
+            "message": raw_msg,
         }
         with self._log_records_lock:
             if not self._log_records or record["seq"] >= self._log_records[-1]["seq"]:
