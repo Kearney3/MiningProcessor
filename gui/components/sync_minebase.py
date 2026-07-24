@@ -52,7 +52,9 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     )
 
     _browse_picker = ft.FilePicker()
+    _save_warnings_picker = ft.FilePicker()
     page.services.append(_browse_picker)
+    page.services.append(_save_warnings_picker)
 
     async def on_browse(e):
         result = await _browse_picker.get_directory_path(dialog_title="选择输出目录")
@@ -304,6 +306,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     # --- 异常行表格 ---
     warnings_count_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
+    export_warnings_btn = theme.secondary_btn("导出 Excel", icon=ft.Icons.DOWNLOAD, height=28)
     warnings_list = ft.Column([], spacing=2, scroll=ft.ScrollMode.AUTO, height=200)
     warnings_container = ft.Container(
         visible=False,
@@ -314,8 +317,12 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
                         ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED, color=theme.WARNING, size=16),
                         ft.Text("异常行", size=13, weight=ft.FontWeight.W_500, color=theme.WARNING),
                         warnings_count_text,
+                        ft.Container(expand=True),
+                        export_warnings_btn,
                     ],
                     spacing=6,
+                    alignment=ft.MainAxisAlignment.START,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
                 warnings_list,
             ],
@@ -423,6 +430,8 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "warnings_container": warnings_container,
         "warnings_list": warnings_list,
         "warnings_count_text": warnings_count_text,
+        "export_warnings_btn": export_warnings_btn,
+        "save_warnings_picker": _save_warnings_picker,
     }
 
     return container, refs

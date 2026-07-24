@@ -844,7 +844,10 @@ def wire_processing_buttons(
             oil_toggle = module_refs["batch"].get("match_oil_toggle")
             eq = ledger_refs.get("get_ledger", lambda: None)() if eq_toggle and eq_toggle.value else None
             oil = oil_ledger_refs.get("get_oil", lambda: None)() if oil_toggle and oil_toggle.value else None
-            from .common import build_anomaly_config_from_refs
+            try:
+                from .components.common import build_anomaly_config_from_refs
+            except ImportError:
+                from gui.components.common import build_anomaly_config_from_refs
             anomaly_config = build_anomaly_config_from_refs(module_refs["batch"])
             await on_batch_process(page, module_refs["batch"], log, equipment_ledger=eq, oil_ledger=oil, anomaly_config=anomaly_config)
         module_refs["batch"]["btn"].on_click = handle_batch_click
@@ -983,13 +986,15 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
                 warnings_list.controls.clear()
                 for dt_key, w in all_warnings:
                     dt_label = _dt_label_map.get(dt_key, dt_key)
+                    val = w.get("value")
+                    val_str = str(val) if val is not None and str(val).strip() != "" else "（空）"
                     warnings_list.controls.append(
                         ft.Row(
                             [
                                 ft.Text(dt_label, size=11, color="#64748B", width=70),
                                 ft.Text(f"行{w.get('row', '?')}", size=11, color="#64748B", width=50),
                                 ft.Text(w.get("field", ""), size=11, width=100),
-                                ft.Text(w.get("value", ""), size=11, color="#EF4444", width=80),
+                                ft.Text(val_str, size=11, color="#EF4444", width=80),
                                 ft.Text(w.get("message", ""), size=11, color="#64748B", expand=True),
                             ],
                             spacing=8,
@@ -997,6 +1002,29 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
                     )
                 if warnings_count_text:
                     warnings_count_text.value = f"共 {len(all_warnings)} 条"
+
+                export_btn = sync_refs.get("export_warnings_btn")
+                save_picker = sync_refs.get("save_warnings_picker")
+                if export_btn:
+                    async def _on_export_click(e):
+                        from datetime import datetime
+                        from func.sync.export import export_warnings_to_excel
+                        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        target_path = None
+                        if save_picker:
+                            res = await save_picker.save_file(
+                                dialog_title="选择导出异常行保存位置",
+                                file_name=f"异常行明细_{ts}.xlsx",
+                                allowed_extensions=["xlsx"],
+                            )
+                            if not res:
+                                return
+                            target_path = res
+                        out_path = export_warnings_to_excel(all_warnings, output_path=target_path, input_dir=path)
+                        _log_message(log, f"[数据同步] 异常行已导出至: {out_path}")
+                        _show_snackbar(page, f"异常行已导出至: {out_path}")
+                    export_btn.on_click = _on_export_click
+
                 warnings_container.visible = True
                 _log_message(log, f"[数据同步] 发现 {len(all_warnings)} 条异常记录", level=logging.WARNING)
             else:
@@ -1021,7 +1049,10 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
 def wire_sync_button(sync_refs: dict, page: ft.Page, log, module_refs: dict | None = None):
     """绑定 MineBase 同步按钮"""
     async def handle_sync_click(e: ft.ControlEvent):
-        from .common import build_anomaly_config_from_refs
+        try:
+            from .components.common import build_anomaly_config_from_refs
+        except ImportError:
+            from gui.components.common import build_anomaly_config_from_refs
         anomaly_config = build_anomaly_config_from_refs(sync_refs)
         await on_sync_process(page, sync_refs, log, anomaly_config=anomaly_config)
     sync_refs["btn"].on_click = handle_sync_click

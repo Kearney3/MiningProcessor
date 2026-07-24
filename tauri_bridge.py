@@ -572,6 +572,18 @@ def _sync_minebase(params: dict) -> dict:
     return {"results": results}
 
 
+@_register("export_sync_warnings")
+def _export_sync_warnings(params: dict) -> dict:
+    from func.sync.export import export_warnings_to_excel
+
+    warnings = params.get("warnings", [])
+    output_path = params.get("output_path")
+    input_dir = params.get("input_dir")
+
+    out_file = export_warnings_to_excel(warnings, output_path=output_path, input_dir=input_dir)
+    return {"output_file": out_file}
+
+
 @_register("get_config")
 def _get_config(params: dict) -> dict:
     from func.config_loader import (

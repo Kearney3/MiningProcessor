@@ -25,6 +25,7 @@ from func.sync_to_minebase import (
     load_column_mapping,
     read_and_map_excel,
     sync,
+    sync_via_api,
 )
 
 
@@ -939,6 +940,59 @@ class TestResolveFksForDb:
         result = _resolve_fks_for_db("production", row, mock_db)
         assert result is None
 
+    def test_production_missing_truck_warning_value_shows_empty_placeholder(self):
+        """production row missing truckName should emit warning with '（空）' as value."""
+        mock_db = MagicMock()
+        warnings = []
+        row = {
+            "_row_num": 5,
+            "date": "2025-06-15",
+            "shiftType": "夜班",
+            "excavatorName": "EX-001",
+        }
+
+        _resolve_fks_for_db("production", row, mock_db, warnings=warnings)
+
+        assert len(warnings) == 1
+        assert warnings[0]["field"] == "truckName"
+        assert warnings[0]["value"] == "（空）"
+        assert warnings[0]["row"] == 5
+
+    def test_production_missing_excavator_warning_value_shows_empty_placeholder(self):
+        """production row missing excavatorName should emit warning with '（空）'."""
+        mock_db = MagicMock()
+        mock_db.resolve_equipment_id.return_value = "truck-uuid"
+        warnings = []
+        row = {
+            "_row_num": 8,
+            "date": "2025-06-15",
+            "shiftType": "夜班",
+            "truckName": "CAT785D-01",
+        }
+
+        _resolve_fks_for_db("production", row, mock_db, warnings=warnings)
+
+        assert len(warnings) == 1
+        assert warnings[0]["field"] == "excavatorName"
+        assert warnings[0]["value"] == "（空）"
+
+    def test_generic_missing_equipment_warning_value_shows_empty_placeholder(self):
+        """generic row missing equipmentName should emit warning with '（空）'."""
+        mock_db = MagicMock()
+        warnings = []
+        row = {
+            "_row_num": 12,
+            "date": "2025-06-15",
+            "shiftType": "Day",
+        }
+
+        _resolve_fks_for_db("fuel", row, mock_db, warnings=warnings)
+
+        assert len(warnings) == 1
+        assert warnings[0]["field"] == "equipmentName"
+        assert warnings[0]["value"] == "（空）"
+        assert warnings[0]["row"] == 12
+
 
 class TestLedgerToggleSplit:
     """sync() 应支持 use_equipment_ledger 和 use_oil_ledger 独立控制。"""
@@ -1020,3 +1074,79 @@ class TestLedgerToggleSplit:
         sig = inspect.signature(sync)
         assert sig.parameters["use_equipment_ledger"].default is False
         assert sig.parameters["use_oil_ledger"].default is True
+
+
+# ---------------------------------------------------------------------------
+# sync_via_api 值解析与空值兜底
+# ---------------------------------------------------------------------------
+
+
+class TestSyncApiValueFallback:
+    """sync_via_api 应正确解析 API 返回中的 value 字段，空值显示为 '（空）'。"""
+
+    def _make_api_client(self, warnings=None, errors=None):
+        """创建 mock API 客户端，模拟 send_batch 返回 warnings/errors。"""
+        client = MagicMock()
+        client.create_session.return_value = "session-1"
+        resp_data = {"success": 1, "skipped": 0, "failed": 0}
+        if warnings:
+            resp_data["warnings"] = warnings
+        if errors:
+            resp_data["errors"] = errors
+        client.send_batch.return_value = {"data": resp_data}
+        client.confirm_batch.return_value = {"data": {"inserted": 1, "updated": 0, "skipped": 0}}
+        return client
+
+    def test_api_warning_value_from_standard_key(self):
+        """API 返回的 warning.value 有值时正常传递。"""
+        client = self._make_api_client(warnings=[
+            {"row": 3, "field": "equipmentName", "value": "旧设备", "message": "未匹配"},
+        ])
+        result = sync_via_api("fuel", [{"date": "2025-01-01"}], {"日期": "date"}, client)
+        assert len(result["warnings"]) == 1
+        assert result["warnings"][0]["value"] == "旧设备"
+
+    def test_api_warning_value_from_rawvalue_fallback(self):
+        """API 返回 warning 时，若 value 为空但有 rawValue，应取 rawValue。"""
+        client = self._make_api_client(warnings=[
+            {"row": 3, "field": "fuelName", "value": "", "rawValue": "柴油-10", "message": "未匹配"},
+        ])
+        result = sync_via_api("fuel", [{"date": "2025-01-01"}], {"日期": "date"}, client)
+        assert len(result["warnings"]) == 1
+        assert result["warnings"][0]["value"] == "柴油-10"
+
+    def test_api_warning_value_from_raw_value_fallback(self):
+        """API 返回 warning 时，若 value 为空但有 raw_value，应取 raw_value。"""
+        client = self._make_api_client(warnings=[
+            {"row": 3, "field": "fuelName", "value": "", "raw_value": "柴油-10", "message": "未匹配"},
+        ])
+        result = sync_via_api("fuel", [{"date": "2025-01-01"}], {"日期": "date"}, client)
+        assert len(result["warnings"]) == 1
+        assert result["warnings"][0]["value"] == "柴油-10"
+
+    def test_api_warning_value_all_empty_shows_placeholder(self):
+        """API 返回 warning 的 value 与 rawValue 均为空时，显示 '（空）'。"""
+        client = self._make_api_client(warnings=[
+            {"row": 3, "field": "equipmentName", "value": "", "rawValue": "", "message": "缺少设备"},
+        ])
+        result = sync_via_api("fuel", [{"date": "2025-01-01"}], {"日期": "date"}, client)
+        assert len(result["warnings"]) == 1
+        assert result["warnings"][0]["value"] == "（空）"
+
+    def test_api_error_value_none_shows_placeholder(self):
+        """API 返回 error 的 value 为 None 时，显示 '（空）'。"""
+        client = self._make_api_client(errors=[
+            {"row": 1, "field": "truckName", "value": None, "message": "缺少矿卡"},
+        ])
+        result = sync_via_api("production", [{"date": "2025-01-01"}], {"日期": "date"}, client)
+        assert len(result["warnings"]) == 1
+        assert result["warnings"][0]["value"] == "（空）"
+
+    def test_api_error_value_from_originalvalue_fallback(self):
+        """API 返回 error 时，若 value 为空但有 originalValue，应取 originalValue。"""
+        client = self._make_api_client(errors=[
+            {"row": 2, "field": "consumption", "value": "", "originalValue": "99999", "message": "超出范围"},
+        ])
+        result = sync_via_api("electrical", [{"date": "2025-01-01"}], {"日期": "date"}, client)
+        assert len(result["warnings"]) == 1
+        assert result["warnings"][0]["value"] == "99999"
