@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import type { BridgeProp, SyncResult, SyncWarning } from "../../lib/types";
 import { useToast } from "../Toast";
 import { FolderIcon } from "../../lib/icons";
@@ -102,6 +102,14 @@ const AlertTriangleIcon = () => (
     <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
     <line x1="12" y1="9" x2="12" y2="13" />
     <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+);
+
+const DownloadIcon = () => (
+  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
   </svg>
 );
 
@@ -615,14 +623,50 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
           }
         }
         if (allWarnings.length === 0) return null;
+
+        const handleExportWarnings = async () => {
+          try {
+            const today = new Date().toISOString().slice(0, 10);
+            const savePath = await save({
+              defaultPath: `异常行明细_${today}.xlsx`,
+              filters: [{ name: "Excel", extensions: ["xlsx"] }],
+            });
+            if (!savePath) return;
+
+            const rawWarnings = allWarnings.map((item) => ({
+              data_type: item.type,
+              row: item.w.row,
+              field: item.w.field,
+              value: item.w.value,
+              message: item.w.message,
+            }));
+            const res = await bridge.call<{ output_file: string }>("export_sync_warnings", {
+              warnings: rawWarnings,
+              output_path: savePath,
+            });
+            notify(`异常行已导出至: ${res.output_file}`, "success");
+          } catch (e) {
+            notify(`导出失败: ${e}`, "error");
+          }
+        };
+
         return (
           <div className="bg-white rounded-lg border border-amber-200 overflow-hidden">
-            <div className="px-4 py-3 border-b border-amber-100 bg-amber-50">
+            <div className="px-4 py-3 border-b border-amber-100 bg-amber-50 flex items-center justify-between">
               <h3 className="text-sm font-medium text-amber-700 flex items-center gap-2">
                 <AlertTriangleIcon />
                 异常行
                 <span className="text-xs text-amber-500">共 {allWarnings.length} 条</span>
               </h3>
+              <button
+                type="button"
+                onClick={handleExportWarnings}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-md transition-colors"
+                title="导出异常行为 Excel 文件"
+              >
+                <DownloadIcon />
+                导出 Excel
+              </button>
             </div>
             <div className="max-h-64 overflow-y-auto">
               <table className="w-full text-sm">
@@ -641,7 +685,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
                       <td className="px-4 py-2 text-sm text-slate-700">{item.label}</td>
                       <td className="py-2 text-sm text-slate-500">{item.w.row}</td>
                       <td className="py-2 text-sm text-slate-700">{item.w.field}</td>
-                      <td className="py-2 text-sm text-red-600 font-mono">{item.w.value}</td>
+                      <td className="py-2 text-sm text-red-600 font-mono">{item.w.value || "（空）"}</td>
                       <td className="py-2 pr-4 text-sm text-slate-500">{item.w.message}</td>
                     </tr>
                   ))}

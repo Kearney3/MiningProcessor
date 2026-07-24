@@ -75,4 +75,53 @@ describe("LogPanel", () => {
     fireEvent.click(screen.getByTitle("复制全部"));
     expect(writeText).toHaveBeenCalledWith("[INFO] copy-test");
   });
+
+  it("disables text selection during drag resize", () => {
+    render(<LogPanel logs={[]} onClear={onClear} />);
+
+    // 找到拖拽手柄（cursor-row-resize 的 div）
+    const handle = document.querySelector(".cursor-row-resize");
+    expect(handle).toBeTruthy();
+
+    // 模拟 mousedown 触发拖拽
+    fireEvent.mouseDown(handle!);
+
+    // 拖拽期间 document.body.userSelect 应为 "none"
+    expect(document.body.style.userSelect).toBe("none");
+    expect(document.body.style.cursor).toBe("row-resize");
+
+    // 模拟 mouseup 结束拖拽
+    fireEvent.mouseUp(window);
+
+    // 拖拽结束后恢复
+    expect(document.body.style.userSelect).toBe("");
+    expect(document.body.style.cursor).toBe("");
+  });
+
+  it("drag handle has select-none class to prevent text selection", () => {
+    render(<LogPanel logs={[]} onClear={onClear} />);
+    const handle = document.querySelector(".cursor-row-resize");
+    expect(handle).toBeTruthy();
+    expect(handle!.className).toContain("select-none");
+  });
+
+  it("container adds select-none class during resize", () => {
+    const { container } = render(<LogPanel logs={[]} onClear={onClear} />);
+    const panel = container.firstElementChild as HTMLElement;
+    expect(panel).toBeTruthy();
+
+    // 初始状态不应有 select-none
+    expect(panel.className).not.toContain("select-none");
+
+    // 模拟 mousedown 触发拖拽
+    const handle = document.querySelector(".cursor-row-resize")!;
+    fireEvent.mouseDown(handle);
+
+    // 拖拽期间应有 select-none
+    expect(panel.className).toContain("select-none");
+
+    // 模拟 mouseup 结束
+    fireEvent.mouseUp(window);
+    expect(panel.className).not.toContain("select-none");
+  });
 });

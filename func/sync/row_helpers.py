@@ -209,7 +209,7 @@ def _resolve_fks_for_db(
                 warnings.append({
                     "row": row.get("_row_num", "?"),
                     "field": "truckName",
-                    "value": "",
+                    "value": "（空）",
                     "message": msg,
                 })
             return None
@@ -237,7 +237,7 @@ def _resolve_fks_for_db(
                 warnings.append({
                     "row": row.get("_row_num", "?"),
                     "field": "excavatorName",
-                    "value": "",
+                    "value": "（空）",
                     "message": msg,
                 })
             return None
@@ -274,7 +274,7 @@ def _resolve_fks_for_db(
                 warnings.append({
                     "row": row.get("_row_num", "?"),
                     "field": "equipmentName",
-                    "value": "",
+                    "value": "（空）",
                     "message": msg,
                 })
             return None

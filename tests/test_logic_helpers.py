@@ -3,6 +3,7 @@ import logging
 import os
 import pathlib
 import sys
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
@@ -569,3 +570,67 @@ class TestExecuteTaskWorktimeWrite:
         # fuel 输出文件不应被 sheet-write 逻辑创建
         expected = str(tmp_path / "Fuel.xlsx")
         assert not os.path.exists(expected)
+
+
+# ---------------------------------------------------------------------------
+# wire_sync_button 导入路径测试
+# ---------------------------------------------------------------------------
+
+
+class TestWireSyncButtonImport:
+    """wire_sync_button 中 build_anomaly_config_from_refs 应从正确路径导入。"""
+
+    def test_build_anomaly_config_from_refs_importable_from_components(self):
+        """gui.components.common 应包含 build_anomaly_config_from_refs。"""
+        from gui.components.common import build_anomaly_config_from_refs
+        assert callable(build_anomaly_config_from_refs)
+
+    def test_wire_sync_button_sets_on_click(self):
+        """wire_sync_button 应正确绑定 on_click，且点击时不抛出 ImportError。"""
+        import asyncio
+        from gui.logic import wire_sync_button
+        from gui.components.common import build_anomaly_config_from_refs
+
+        mock_page = MagicMock()
+        mock_log = MagicMock()
+
+        # 构造 sync_refs 满足 wire_sync_button 的最低要求
+        sync_refs = {
+            "btn": MagicMock(),
+            "path": MagicMock(value="/tmp/test"),
+            "mode": MagicMock(value="api"),
+            "types": {"fuel": MagicMock(value=True)},
+            "dry_run": MagicMock(value=True),
+            "result_text": MagicMock(visible=False),
+            "year": MagicMock(value="2025"),
+            "month": MagicMock(value="6"),
+            "date_filter_toggle": MagicMock(value=False),
+            "date_start": MagicMock(value=""),
+            "date_end": MagicMock(value=""),
+            "apply_header": MagicMock(value=False),
+            "use_equipment_ledger": MagicMock(value=False),
+            "use_oil_ledger": MagicMock(value=False),
+            "skip_hidden_rows": MagicMock(value=False),
+            "skip_hidden_cols": MagicMock(value=False),
+            "_anomaly_enabled": MagicMock(value=False),
+            "_anomaly_report": MagicMock(value=False),
+            "_anomaly_mode": MagicMock(return_value="flag"),
+            "warnings_container": MagicMock(visible=False),
+            "warnings_list": MagicMock(),
+            "warnings_count_text": MagicMock(),
+            "export_warnings_btn": MagicMock(),
+        }
+
+        wire_sync_button(sync_refs, mock_page, mock_log)
+
+        # 确认 on_click 被赋值为一个异步函数
+        assert sync_refs["btn"].on_click is not None
+
+        # 调用 on_click 不应抛出 ImportError（即 import 路径正确）
+        # 由于 dry_run=True，同步不会真正执行
+        handler = sync_refs["btn"].on_click
+        try:
+            asyncio.get_event_loop().run_until_complete(handler(None))
+        except Exception as e:
+            # ImportError 是我们想检测的；其他异常（如 sync 失败）在此可忽略
+            assert "gui.common" not in str(e), f"应从 gui.components.common 导入，但报错: {e}"

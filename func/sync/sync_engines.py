@@ -81,20 +81,28 @@ def sync_via_api(
 
             if data.get("warnings"):
                 for w in data["warnings"]:
+                    val = w.get("value")
+                    if not val and val != 0:
+                        val = w.get("rawValue") or w.get("raw_value") or w.get("originalValue") or w.get("original_value")
+                    val_str = str(val) if val is not None and str(val).strip() != "" else "（空）"
                     warning_item = {
                         "row": w.get("row", "?"),
                         "field": w.get("field", ""),
-                        "value": w.get("value", ""),
+                        "value": val_str,
                         "message": w.get("message", ""),
                     }
                     collected_warnings.append(warning_item)
                     logger.warning("  [%s] 行%s: %s", data_type, warning_item["row"], warning_item["message"])
             if data.get("errors"):
                 for e in data["errors"]:
+                    val = e.get("value")
+                    if not val and val != 0:
+                        val = e.get("rawValue") or e.get("raw_value") or e.get("originalValue") or e.get("original_value")
+                    val_str = str(val) if val is not None and str(val).strip() != "" else "（空）"
                     error_item = {
                         "row": e.get("row", "?"),
                         "field": e.get("field", ""),
-                        "value": e.get("value", ""),
+                        "value": val_str,
                         "message": e.get("message", ""),
                     }
                     collected_warnings.append(error_item)

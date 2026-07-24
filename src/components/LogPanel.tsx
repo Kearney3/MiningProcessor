@@ -74,14 +74,31 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
   // Drag to resize height
   useEffect(() => {
     if (!isResizing) return;
+
+    // 拖动调整高度时防止选中背景文本并禁用默认选择
+    const prevUserSelect = document.body.style.userSelect;
+    const prevCursor = document.body.style.cursor;
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "row-resize";
+
+    // 清除当前的文本选中范围
+    window.getSelection()?.removeAllRanges();
+
     const onMove = (e: MouseEvent) => {
+      e.preventDefault();
+      window.getSelection()?.removeAllRanges();
       const newHeight = window.innerHeight - e.clientY;
       setHeight(Math.max(80, Math.min(500, newHeight)));
     };
+
     const onUp = () => setIsResizing(false);
+
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
+
     return () => {
+      document.body.style.userSelect = prevUserSelect;
+      document.body.style.cursor = prevCursor;
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
@@ -127,13 +144,19 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
 
   return (
     <div
-      className="bg-white border-t border-slate-200 shrink-0 flex flex-col transition-[height] duration-150 ease-out"
+      className={`bg-white border-t border-slate-200 shrink-0 flex flex-col ${
+        isResizing ? "transition-none select-none" : "transition-[height] duration-150 ease-out"
+      }`}
       style={{ height }}
     >
       {/* Drag handle */}
       <div
-        className="h-1 cursor-row-resize flex items-center justify-center hover:bg-slate-100 group"
-        onMouseDown={() => setIsResizing(true)}
+        className="h-1.5 cursor-row-resize flex items-center justify-center hover:bg-slate-100 group select-none"
+        onMouseDown={(e) => {
+          e.preventDefault();
+          window.getSelection()?.removeAllRanges();
+          setIsResizing(true);
+        }}
       >
         <div className="flex items-center gap-1">
           <span className="w-[3px] h-[3px] rounded-full bg-slate-300 group-hover:bg-slate-400 transition-colors" />
