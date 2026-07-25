@@ -80,7 +80,7 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
 
                 # 2. 分割 Day/Night 班次
                 # Adjust hardcoded row indices for hidden rows that were removed
-                if h_rows:
+                if h_rows and skip_hidden_rows:
                     adj_header = adjust_index_for_hidden(1, h_rows, one_based=True)
                     adj_data = adjust_index_for_hidden(2, h_rows, one_based=True)
                     combined_day_df = split_day_night_shifts(

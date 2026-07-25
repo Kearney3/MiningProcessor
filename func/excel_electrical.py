@@ -56,6 +56,9 @@ def parse_excel_data(file_path, target_year=None, return_sheets=False, add_shift
                         h_cols if skip_hidden_cols else set(),
                     )
 
+                # 重置 index，使 label == position（后续 .iloc 全部基于位置访问）
+                df = df.reset_index(drop=True)
+
                 if df.empty or df.shape[1] == 0:
                     logger.warning(f"跳过 Sheet {sheet_name}: 空表")
                     continue
