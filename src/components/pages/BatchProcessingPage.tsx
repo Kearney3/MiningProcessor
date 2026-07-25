@@ -1,11 +1,11 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { BridgeProp, BatchProgress, ScanResult } from "../../lib/types";
 import { useToast } from "../Toast";
 import { FolderIcon } from "../../lib/icons";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { useLastDirectory } from "../../hooks/useLastDirectory";
-import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG } from "../AnomalyPanel";
+import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG, type ColumnToggles, buildDefaultColumnToggles } from "../AnomalyPanel";
 
 // ═══════════════════════════════════════
 // Types
@@ -424,6 +424,19 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
   const [skipHiddenRows, setSkipHiddenRows] = useState(false);
   const [skipHiddenCols, setSkipHiddenCols] = useState(false);
   const [anomaly, setAnomaly] = useState<AnomalyConfig>(DEFAULT_ANOMALY_CONFIG);
+  const [columnToggles, setColumnToggles] = useState<ColumnToggles>(buildDefaultColumnToggles());
+  const [savedThresholds, setSavedThresholds] = useState<Record<string, Record<string, { enabled?: boolean }>>>();
+  const [savedStatCols, setSavedStatCols] = useState<Record<string, Record<string, { enabled?: boolean }>>>();
+
+  useEffect(() => {
+    bridge
+      .call<Record<string, unknown>>("get_anomaly_config")
+      .then((cfg) => {
+        setSavedThresholds(cfg.thresholds as Record<string, Record<string, { enabled?: boolean }>> | undefined);
+        setSavedStatCols(cfg.statistical_columns as Record<string, Record<string, { enabled?: boolean }>> | undefined);
+      })
+      .catch(() => {});
+  }, [bridge]);
 
   // -- Date filter --
   const [dateFilterEnabled, setDateFilterEnabled] = useState(false);
@@ -486,6 +499,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
         anomaly_enabled: anomaly.enabled,
         anomaly_report: anomaly.report,
         anomaly_mode: anomaly.mode,
+        column_toggles: anomaly.enabled ? columnToggles : undefined,
       };
 
       if (tableMergeMode === "merge") {
@@ -693,7 +707,14 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
         </div>
 
         <SectionDivider label="异常值检测" />
-        <AnomalyPanel config={anomaly} onChange={setAnomaly} />
+        <AnomalyPanel
+          config={anomaly}
+          onChange={setAnomaly}
+          columnToggles={columnToggles}
+          onColumnTogglesChange={setColumnToggles}
+          savedThresholds={savedThresholds}
+          savedStatisticalColumns={savedStatCols}
+        />
 
         <SectionDivider label="输出方式" />
 

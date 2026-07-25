@@ -423,6 +423,12 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         safe_update(anomaly_flag)
         safe_update(anomaly_filter)
         safe_update(anomaly_handle)
+        for _k, _cb in _column_toggles.items():
+            if _k == "_section":
+                _cb.visible = enabled
+            else:
+                _cb.disabled = not enabled
+            safe_update(_cb)
 
     def _on_anomaly_flag_change(e):
         if anomaly_flag.value:
@@ -456,6 +462,71 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     anomaly_filter.disabled = not anomaly_enabled.value
     anomaly_handle.disabled = not anomaly_enabled.value
 
+    # --- 逐列检测开关 ---
+    _TYPE_COLUMN_LABELS: dict[str, str] = {
+        "fuel": "油耗", "fuel_engine": "发动机",
+        "production_running": "运行", "production": "生产",
+        "electrical": "电力", "worktime": "工时",
+    }
+    _TYPE_COLUMNS: dict[str, dict[str, list[str]]] = {
+        "fuel": {"threshold": ["油品消耗"], "statistical": ["油品消耗"]},
+        "fuel_engine": {"threshold": ["发动机小时数开始", "发动机小时数结束", "运行小时数"], "statistical": ["运行小时数"]},
+        "production_running": {"threshold": ["运行里程", "运行小时数", "趟次"], "statistical": ["运行里程", "运行小时数", "趟次"]},
+        "production": {"threshold": ["趟次", "产量"], "statistical": ["趟次", "产量"]},
+        "electrical": {"threshold": ["电力消耗"], "statistical": ["电力消耗"]},
+        "worktime": {"threshold": ["__all_numeric__"], "statistical": []},
+    }
+
+    from func import config_loader as _cl
+    _ad_cfg = _cl.get_anomaly_detection_config()
+
+    def _get_col_enabled(dtype: str, col: str) -> bool:
+        t_cfg = (_ad_cfg.get("thresholds") or {}).get(dtype, {})
+        s_cfg = (_ad_cfg.get("statistical_columns") or {}).get(dtype, {})
+        t_val = t_cfg.get(col, {}).get("enabled", True) if isinstance(t_cfg.get(col), dict) else True
+        s_val = s_cfg.get(col, {}).get("enabled", True) if isinstance(s_cfg.get(col), dict) else True
+        return t_val and s_val
+
+    _column_toggles: dict[str, ft.Checkbox] = {}
+    _col_rows = []
+    for _dtype, _type_label in _TYPE_COLUMN_LABELS.items():
+        _cols_cfg = _TYPE_COLUMNS.get(_dtype, {})
+        _all_cols = sorted(set(_cols_cfg.get("threshold", []) + _cols_cfg.get("statistical", [])))
+        if not _all_cols:
+            continue
+        _cbs: list[ft.Control] = []
+        for _col in _all_cols:
+            _key = f"{_dtype}:{_col}"
+            _label = "全部数值列" if _col == "__all_numeric__" else _col
+            _cb = ft.Checkbox(
+                label=_label,
+                value=_get_col_enabled(_dtype, _col),
+                visual_density=ft.VisualDensity.COMPACT,
+            )
+            _column_toggles[_key] = _cb
+            _cbs.append(_cb)
+        _col_rows.append(
+            ft.Column([
+                ft.Text(f"{_type_label}:", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                ft.Container(
+                    content=ft.Row(_cbs, wrap=True, spacing=4, run_spacing=0),
+                    padding=ft.Padding.only(left=8),
+                ),
+            ], spacing=2, tight=True)
+        )
+
+    _column_toggle_section = ft.Container(
+        content=ft.Column(_col_rows, spacing=4),
+        padding=ft.Padding.only(left=24),
+        visible=anomaly_enabled.value,
+    )
+    _column_toggles["_section"] = _column_toggle_section
+
+    for _k, _cb in _column_toggles.items():
+        if _k == "_section":
+            continue
+        _cb.disabled = not anomaly_enabled.value
+
     anomaly_panel = ft.Container(
         content=ft.Column([
             ft.Row([anomaly_enabled], spacing=8),
@@ -466,6 +537,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                 ], spacing=4),
                 padding=ft.Padding.only(left=24),
             ),
+            _column_toggle_section,
         ], spacing=4),
         padding=ft.Padding.symmetric(horizontal=8, vertical=6),
         border=ft.Border.all(1, theme.BORDER),
@@ -552,6 +624,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         "_anomaly_filter": anomaly_filter,
         "_anomaly_handle": anomaly_handle,
         "_anomaly_mode": lambda: _anomaly_mode,
+        "_anomaly_column_toggles": _column_toggles,
         "fuel": {"path": fuel_path, "year": fuel_year, "btn": fuel_btn},
         "prod": {"path": prod_path, "raw_start": prod_raw_start, "btn": prod_btn, "auto_detect": prod_auto_detect},
         "elec": {"path": elec_path, "year": elec_year, "btn": elec_btn, "add_shift": elec_add_shift, "default_shift": elec_default_shift},

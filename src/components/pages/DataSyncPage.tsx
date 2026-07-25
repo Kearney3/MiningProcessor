@@ -5,7 +5,7 @@ import { useToast } from "../Toast";
 import { FolderIcon } from "../../lib/icons";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { DatePicker } from "../DatePicker";
-import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG } from "../AnomalyPanel";
+import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG, type ColumnToggles, buildDefaultColumnToggles } from "../AnomalyPanel";
 
 // ═══════════════════════════════════════
 // Date helpers
@@ -186,6 +186,20 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const [skipHiddenRows, setSkipHiddenRows] = useState(true);
   const [skipHiddenCols, setSkipHiddenCols] = useState(false);
   const [anomaly, setAnomaly] = useState<AnomalyConfig>(DEFAULT_ANOMALY_CONFIG);
+  const [columnToggles, setColumnToggles] = useState<ColumnToggles>(buildDefaultColumnToggles());
+  const [savedThresholds, setSavedThresholds] = useState<Record<string, Record<string, { enabled?: boolean }>>>();
+  const [savedStatCols, setSavedStatCols] = useState<Record<string, Record<string, { enabled?: boolean }>>>();
+
+  // 启动时加载异常检测配置（用于初始化逐列开关默认值）
+  useEffect(() => {
+    bridge
+      .call<Record<string, unknown>>("get_anomaly_config")
+      .then((cfg) => {
+        setSavedThresholds(cfg.thresholds as Record<string, Record<string, { enabled?: boolean }>> | undefined);
+        setSavedStatCols(cfg.statistical_columns as Record<string, Record<string, { enabled?: boolean }>> | undefined);
+      })
+      .catch(() => {});
+  }, [bridge]);
 
   // 启动时从配置加载上次目录，不存在则清空
   useEffect(() => {
@@ -238,6 +252,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
         anomaly_enabled: anomaly.enabled,
         anomaly_report: anomaly.report,
         anomaly_mode: anomaly.mode,
+        column_toggles: anomaly.enabled ? columnToggles : undefined,
       });
       setResult(res);
       const total = Object.values(res.results).reduce(
@@ -551,7 +566,14 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
       </div>
 
       {/* Anomaly detection */}
-      <AnomalyPanel config={anomaly} onChange={setAnomaly} />
+      <AnomalyPanel
+        config={anomaly}
+        onChange={setAnomaly}
+        columnToggles={columnToggles}
+        onColumnTogglesChange={setColumnToggles}
+        savedThresholds={savedThresholds}
+        savedStatisticalColumns={savedStatCols}
+      />
 
       <button
         onClick={handleSync}

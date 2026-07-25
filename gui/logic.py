@@ -780,34 +780,15 @@ def _make_module_handler(
 
 def _build_anomaly_config(module_refs: dict):
     """从 module_refs 构建 AnomalyConfig 实例（加载用户配置的阈值和处理规则）。"""
-    from func.anomaly.rules import AnomalyConfig
-
     enabled_ref = module_refs.get("_anomaly_enabled")
     if not enabled_ref or not enabled_ref.value:
         return AnomalyConfig(enabled=False)
 
-    report_ref = module_refs.get("_anomaly_report")
-    mode_fn = module_refs.get("_anomaly_mode")
-    mode = mode_fn() if callable(mode_fn) else "flag"
-
-    # 从配置文件加载阈值和处理规则
-    ad_config = config_loader.get_anomaly_detection_config()
-
-    return AnomalyConfig(
-        enabled=True,
-        generate_report=report_ref.value if report_ref else False,
-        flag_anomalies=(mode == "flag"),
-        filter_anomalies=(mode == "filter"),
-        handle_anomalies=(mode == "handle"),
-        use_threshold=ad_config.get("use_threshold", True),
-        use_sigma=ad_config.get("use_sigma", True),
-        use_percentile=ad_config.get("use_percentile", True),
-        sigma_n=ad_config.get("sigma_n", 3.0),
-        percentile_low=ad_config.get("percentile_low", 1.0),
-        percentile_high=ad_config.get("percentile_high", 99.0),
-        thresholds=ad_config.get("thresholds", {}),
-        handling_rules=ad_config.get("handling_rules", {}),
-    )
+    try:
+        from .components.common import build_anomaly_config_from_refs
+    except ImportError:
+        from gui.components.common import build_anomaly_config_from_refs
+    return build_anomaly_config_from_refs(module_refs)
 
 
 def wire_processing_buttons(

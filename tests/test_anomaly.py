@@ -400,10 +400,117 @@ class TestBuildRulesEdgeCases:
         assert threshold_rules[0].params["min"] == 0  # default preserved
 
     def test_statistical_columns_for_all_types(self):
-        cfg = AnomalyConfig(enabled=True)
+        cfg = AnomalyConfig(enabled=True, statistical_columns={})
         for dtype in ("fuel", "fuel_engine", "production_running", "production", "electrical", "worktime"):
             rules = build_rules_for_type(dtype, {}, cfg)
             assert len(rules) > 0, f"No rules for {dtype}"
+
+
+# ---------------------------------------------------------------------------
+# build_rules_for_type — per-column enabled 开关
+# ---------------------------------------------------------------------------
+
+class TestBuildRulesColumnEnabled:
+    """每项列名/标记的 enabled 开关测试。"""
+
+    def test_threshold_disabled_column_skipped(self):
+        """阈值规则中 enabled=false 的列应被跳过。"""
+        cfg = AnomalyConfig(enabled=True)
+        user = {"油品消耗": {"min": 0, "max": 100, "enabled": False}}
+        rules = build_rules_for_type("fuel", user, cfg)
+        threshold_rules = [r for r in rules if r.method == "threshold"]
+        col_names = {r.column for r in threshold_rules}
+        assert "油品消耗" not in col_names
+
+    def test_threshold_enabled_true_column_included(self):
+        """阈值规则中 enabled=true 的列应正常包含。"""
+        cfg = AnomalyConfig(enabled=True)
+        user = {"油品消耗": {"min": 0, "max": 100, "enabled": True}}
+        rules = build_rules_for_type("fuel", user, cfg)
+        threshold_rules = [r for r in rules if r.method == "threshold" and r.column == "油品消耗"]
+        assert len(threshold_rules) == 1
+        assert threshold_rules[0].params == {"min": 0, "max": 100}
+
+    def test_threshold_enabled_key_stripped_from_params(self):
+        """enabled 键不应出现在规则的 params 中。"""
+        cfg = AnomalyConfig(enabled=True)
+        user = {"油品消耗": {"min": 0, "max": 100, "enabled": True}}
+        rules = build_rules_for_type("fuel", user, cfg)
+        threshold_rules = [r for r in rules if r.column == "油品消耗"]
+        assert "enabled" not in threshold_rules[0].params
+
+    def test_threshold_missing_enabled_defaults_to_true(self):
+        """未指定 enabled 的列默认启用（向后兼容）。"""
+        cfg = AnomalyConfig(enabled=True)
+        user = {"油品消耗": {"min": 0, "max": 100}}
+        rules = build_rules_for_type("fuel", user, cfg)
+        threshold_rules = [r for r in rules if r.method == "threshold" and r.column == "油品消耗"]
+        assert len(threshold_rules) == 1
+
+    def test_statistical_column_disabled_skipped(self):
+        """统计列中 enabled=false 的列应被跳过。"""
+        cfg = AnomalyConfig(
+            enabled=True,
+            statistical_columns={"fuel": {"油品消耗": {"enabled": False}}},
+        )
+        rules = build_rules_for_type("fuel", {}, cfg)
+        stat_rules = [r for r in rules if r.method in ("sigma", "percentile")]
+        assert len(stat_rules) == 0
+
+    def test_statistical_column_enabled_included(self):
+        """统计列中 enabled=true 的列应正常包含。"""
+        cfg = AnomalyConfig(
+            enabled=True,
+            statistical_columns={"fuel": {"油品消耗": {"enabled": True}}},
+        )
+        rules = build_rules_for_type("fuel", {}, cfg)
+        stat_rules = [r for r in rules if r.method in ("sigma", "percentile")]
+        assert len(stat_rules) == 2  # sigma + percentile
+
+    def test_statistical_columns_fallback_to_default(self):
+        """config 无 statistical_columns 时应回退到默认统计列。"""
+        cfg = AnomalyConfig(enabled=True, statistical_columns={})
+        rules = build_rules_for_type("fuel", {}, cfg)
+        stat_rules = [r for r in rules if r.method in ("sigma", "percentile")]
+        assert len(stat_rules) == 2  # 油品消耗 sigma + percentile
+
+    def test_statistical_column_missing_enabled_defaults_true(self):
+        """统计列未指定 enabled 时默认启用。"""
+        cfg = AnomalyConfig(
+            enabled=True,
+            statistical_columns={"fuel": {"油品消耗": {}}},  # 无 enabled 键
+        )
+        rules = build_rules_for_type("fuel", {}, cfg)
+        stat_rules = [r for r in rules if r.method in ("sigma", "percentile")]
+        assert len(stat_rules) == 2
+
+    def test_mixed_enabled_and_disabled(self):
+        """同一类型下部分列启用、部分列禁用。"""
+        cfg = AnomalyConfig(enabled=True)
+        user = {
+            "油品消耗": {"min": 0, "max": 50000, "enabled": True},
+            "自定义列": {"min": 0, "max": 100, "enabled": False},
+        }
+        rules = build_rules_for_type("fuel", user, cfg)
+        threshold_rules = [r for r in rules if r.method == "threshold"]
+        col_names = {r.column for r in threshold_rules}
+        assert "油品消耗" in col_names
+        assert "自定义列" not in col_names
+
+    def test_worktime_all_numeric_disabled(self):
+        """工时 __all_numeric__ 标记可通过 enabled=false 关闭。"""
+        cfg = AnomalyConfig(enabled=True)
+        user = {"__all_numeric__": {"min": 0, "max": 720, "enabled": False}}
+        rules = build_rules_for_type("worktime", user, cfg)
+        threshold_rules = [r for r in rules if r.method == "threshold"]
+        assert len(threshold_rules) == 0
+
+    def test_all_thresholds_disabled(self):
+        """所有列都禁用时应只产生统计规则（或无规则）。"""
+        cfg = AnomalyConfig(enabled=True, statistical_columns={"fuel": {"油品消耗": {"enabled": False}}})
+        user = {"油品消耗": {"min": 0, "max": 50000, "enabled": False}}
+        rules = build_rules_for_type("fuel", user, cfg)
+        assert rules == []
 
 
 # ---------------------------------------------------------------------------
