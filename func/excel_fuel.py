@@ -63,8 +63,9 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
                     )
 
                 try:
-                    start_row_idx = df_raw[df_raw.iloc[:, 0] == 1].index[0]
-                    start_row = start_row_idx + 1
+                    # 转为 0-based 位置（隐藏行过滤后 index 非连续，label ≠ position）
+                    start_row_pos = df_raw.index.get_loc(df_raw[df_raw.iloc[:, 0] == 1].index[0])
+                    start_row = start_row_pos + 1
                 except IndexError:
                     logger.warning(f"Sheet {sheet} 格式异常")
                     continue

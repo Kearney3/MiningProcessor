@@ -164,7 +164,8 @@ class MiningDataProcessor:
         if len(non_empty_a) == 0:
             return pd.DataFrame(), pd.DataFrame()
 
-        last_row_idx = non_empty_a.index[-1]
+        # 转为 0-based 位置索引（隐藏行过滤后 index 非连续，label ≠ position）
+        last_row_pos = df_raw.index.get_loc(non_empty_a.index[-1])
 
         # 通过目标文本self.target_text找到复合表头的行号
         # positions = np.where(df_raw == self.target_text)
@@ -173,15 +174,15 @@ class MiningDataProcessor:
         #     logger.info(f"在第 {row} 行，第 {col} 列找到文本")
 
         # 使用局部变量避免多线程竞态条件（process_folder 并发调用时共享同一实例）
-        raw_start = self.raw_start
+        raw_start = self.raw_start  # 1-based 位置
         if self.auto_detect == True:
             # HIGH-11 fix: limit search to first 20 rows to avoid full DataFrame scan
             search_area = df_raw.iloc[:20]
             mask = search_area.apply(
                 lambda row: row.astype(str).str.contains(self.target_text, na=False).any(), axis=1)
-            row_indices = search_area[mask].index.tolist()
-            if len(row_indices) > 0:
-                raw_start = row_indices[0] + 1
+            row_positions = [df_raw.index.get_loc(lbl) for lbl in search_area[mask].index]
+            if len(row_positions) > 0:
+                raw_start = row_positions[0] + 1  # 转回 1-based
                 logger.info(f"开启自动检测，找到目标文本{self.target_text}，行号为: {raw_start}")
             else:
                 raise ValueError(f"未找到目标文本{self.target_text},请检查数据是否正确")
@@ -211,7 +212,7 @@ class MiningDataProcessor:
             combined_headers.append(f"{h6_str}｜{h7_str}")
 
         # 4. 数据区：第raw_start+1行开始
-        data = df_raw.iloc[raw_start + 1: last_row_idx + 1, :last_col_idx + 1].copy()
+        data = df_raw.iloc[raw_start + 1: last_row_pos + 1, :last_col_idx + 1].copy()
         if data.empty:
             return pd.DataFrame(), pd.DataFrame()
 
@@ -272,10 +273,7 @@ class MiningDataProcessor:
         has_company = company_col in data.columns
 
         # .iat[] requires positional indices; compute the offset from label index
-        _row_pos_base = data.index[0]
-
-        for row_idx in data.index:
-            _row_pos = row_idx - _row_pos_base
+        for _row_pos, row_idx in enumerate(data.index):
             truck_name = self.safe_str(data.at[row_idx, "矿卡名称"])
 
             # 过滤空值和合计行
@@ -338,9 +336,10 @@ class MiningDataProcessor:
         输出到运行数据表
         """
         # Adjust start_row (0-based) and column indices for hidden rows/cols
-        _h_col_indices = letters_to_col_indices(self._hidden_cols)
-        start_row = adjust_index_for_hidden(3, self._hidden_rows, one_based=True)
-        _adj_col = lambda c: adjust_index_for_hidden(c, _h_col_indices)
+        # 只在确实移除了隐藏行/列时才调整索引，否则保持原始位置
+        _h_col_indices = letters_to_col_indices(self._hidden_cols) if self.skip_hidden_cols else set()
+        start_row = adjust_index_for_hidden(3, self._hidden_rows, one_based=True) if self.skip_hidden_rows else 3
+        _adj_col = lambda c: adjust_index_for_hidden(c, _h_col_indices) if self.skip_hidden_cols else c
 
         if len(df_raw) <= start_row:
             return pd.DataFrame()

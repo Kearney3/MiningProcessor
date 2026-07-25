@@ -138,7 +138,8 @@ def process_directory(
                     )
 
                 df_processed = _extract_one_day(
-                    df_raw, year, month, target_day, h_rows,
+                    df_raw, year, month, target_day,
+                    h_rows if skip_hidden_rows else set(),
                 )
 
                 if df_processed is not None and not df_processed.empty:
