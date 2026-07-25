@@ -159,28 +159,36 @@ DEFAULT_ANOMALY_DETECTION: dict[str, Any] = {
     "percentile_high": 99.0,
     "thresholds": {
         "fuel": {
-            "油品消耗": {"min": 0, "max": 50000},
+            "油品消耗": {"min": 0, "max": 50000, "enabled": True},
         },
         "fuel_engine": {
-            "发动机小时数开始": {"min": 0},
-            "发动机小时数结束": {"min": 0},
-            "运行小时数": {"min": 0, "max": 14},
+            "发动机小时数开始": {"min": 0, "enabled": True},
+            "发动机小时数结束": {"min": 0, "enabled": True},
+            "运行小时数": {"min": 0, "max": 14, "enabled": True},
         },
         "production_running": {
-            "运行里程": {"min": 0, "max": 500},
-            "运行小时数": {"min": 0, "max": 14},
-            "趟次": {"min": 0, "max": 50},
+            "运行里程": {"min": 0, "max": 500, "enabled": True},
+            "运行小时数": {"min": 0, "max": 14, "enabled": True},
+            "趟次": {"min": 0, "max": 50, "enabled": True},
         },
         "production": {
-            "趟次": {"min": 0, "max": 50},
-            "产量": {"min": 0, "max": 50000},
+            "趟次": {"min": 0, "max": 50, "enabled": True},
+            "产量": {"min": 0, "max": 50000, "enabled": True},
         },
         "electrical": {
-            "电力消耗": {"min": 0, "max": 50000},
+            "电力消耗": {"min": 0, "max": 50000, "enabled": True},
         },
         "worktime": {
-            "__all_numeric__": {"min": 0, "max": 720},
+            "__all_numeric__": {"min": 0, "max": 720, "enabled": True},
         },
+    },
+    "statistical_columns": {
+        "fuel": {"油品消耗": {"enabled": True}},
+        "fuel_engine": {"运行小时数": {"enabled": True}},
+        "production_running": {"运行里程": {"enabled": True}, "运行小时数": {"enabled": True}, "趟次": {"enabled": True}},
+        "production": {"趟次": {"enabled": True}, "产量": {"enabled": True}},
+        "electrical": {"电力消耗": {"enabled": True}},
+        "worktime": {},
     },
     "handling_rules": {
         "production_running": {

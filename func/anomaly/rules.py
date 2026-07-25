@@ -23,7 +23,7 @@ class AnomalyConfig:
         "filter_anomalies", "handle_anomalies",
         "use_threshold", "use_sigma", "use_percentile",
         "sigma_n", "percentile_low", "percentile_high",
-        "thresholds", "handling_rules",
+        "thresholds", "statistical_columns", "handling_rules",
         "_anomaly_counts",
     )
 
@@ -42,6 +42,7 @@ class AnomalyConfig:
         percentile_low: float = 1.0,
         percentile_high: float = 99.0,
         thresholds: dict[str, dict[str, float]] | None = None,
+        statistical_columns: dict[str, dict[str, Any]] | None = None,
         handling_rules: dict[str, dict[str, Any]] | None = None,
     ):
         self.enabled = enabled
@@ -56,6 +57,7 @@ class AnomalyConfig:
         self.percentile_low = percentile_low
         self.percentile_high = percentile_high
         self.thresholds = thresholds or {}
+        self.statistical_columns = statistical_columns or {}
         self.handling_rules = handling_rules or {}
         self._anomaly_counts: list[tuple[str, int]] | None = None
 
@@ -76,6 +78,7 @@ class AnomalyConfig:
             percentile_low=ad.get("percentile_low", 1.0),
             percentile_high=ad.get("percentile_high", 99.0),
             thresholds=ad.get("thresholds", {}),
+            statistical_columns=ad.get("statistical_columns", {}),
             handling_rules=ad.get("handling_rules", {}),
         )
 
@@ -163,6 +166,7 @@ def build_rules_for_type(
 
     合并默认阈值和用户自定义阈值，并添加统计检测规则。
     根据 config 中的 use_threshold/use_sigma/use_percentile 开关过滤。
+    每项列名/标记可通过 ``"enabled": false`` 关闭。
     """
     rules: list[AnomalyRule] = []
 
@@ -174,14 +178,33 @@ def build_rules_for_type(
         else:
             merged[col] = bounds
 
-    # 2. 阈值规则（受 use_threshold 开关控制）
+    # 2. 阈值规则（受 use_threshold 开关和 per-column enabled 控制）
     if config.use_threshold:
         for col, bounds in merged.items():
-            if bounds:
-                rules.append(AnomalyRule(column=col, method="threshold", params=dict(bounds)))
+            if not bounds.get("enabled", True):
+                continue
+            # 去掉 enabled 元数据，只保留 min/max 等阈值参数
+            rule_params = {k: v for k, v in bounds.items() if k != "enabled"}
+            if rule_params:
+                rules.append(AnomalyRule(column=col, method="threshold", params=rule_params))
 
-    # 3. 统计规则（σ + 百分位，分别受开关控制）
-    stat_cols = _STATISTICAL_COLUMNS.get(data_type, [])
+    # 3. 统计规则（σ + 百分位，分别受开关和 per-column enabled 控制）
+    #    stat_cols 来自 config.statistical_columns（config_loader 提供），
+    #    若配置中无此字段则回退到模块级 _STATISTICAL_COLUMNS。
+    cfg_stat: dict[str, dict[str, Any]] = getattr(config, "statistical_columns", None) or {}
+    stat_cfg = cfg_stat.get(data_type) or _STATISTICAL_COLUMNS.get(data_type, {})
+    stat_cols: list[str] = []
+    if isinstance(stat_cfg, dict):
+        for col, col_cfg in stat_cfg.items():
+            if isinstance(col_cfg, dict):
+                if col_cfg.get("enabled", True):
+                    stat_cols.append(col)
+            else:
+                stat_cols.append(col)
+    else:
+        # 旧格式 list[str]：全部启用
+        stat_cols = list(stat_cfg)
+
     for col in stat_cols:
         if config.use_sigma:
             rules.append(AnomalyRule(

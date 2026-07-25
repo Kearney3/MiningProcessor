@@ -227,9 +227,27 @@ def _build_anomaly_config(params: dict):
         return None
     from func.anomaly.rules import AnomalyConfig
     from func.config_loader import get_anomaly_detection_config
+    import copy
 
     ad_config = get_anomaly_detection_config()
     mode = params.get("anomaly_mode", "flag")
+
+    # 合并前端逐列开关覆盖
+    column_toggles = params.get("column_toggles")
+    if column_toggles:
+        thresholds = copy.deepcopy(ad_config.get("thresholds", {}))
+        stat_cols = copy.deepcopy(ad_config.get("statistical_columns", {}))
+        for key, val in column_toggles.items():
+            parts = key.split(":", 1)
+            if len(parts) != 2:
+                continue
+            dtype, col = parts
+            if dtype in thresholds and col in thresholds[dtype]:
+                thresholds[dtype][col] = {**thresholds[dtype][col], "enabled": bool(val)}
+            if dtype in stat_cols and col in stat_cols[dtype]:
+                stat_cols[dtype][col] = {**stat_cols[dtype][col], "enabled": bool(val)}
+        ad_config = {**ad_config, "thresholds": thresholds, "statistical_columns": stat_cols}
+
     return AnomalyConfig(
         enabled=True,
         generate_report=params.get("anomaly_report", False),
@@ -243,6 +261,7 @@ def _build_anomaly_config(params: dict):
         percentile_low=ad_config.get("percentile_low", 1.0),
         percentile_high=ad_config.get("percentile_high", 99.0),
         thresholds=ad_config.get("thresholds", {}),
+        statistical_columns=ad_config.get("statistical_columns", {}),
         handling_rules=ad_config.get("handling_rules", {}),
     )
 
