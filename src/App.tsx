@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import { usePythonBridge } from "./hooks/usePythonBridge";
 import type { PageId } from "./lib/types";
 import { Sidebar } from "./components/Sidebar";
@@ -17,7 +18,14 @@ import { UserConfigPage } from "./components/pages/UserConfigPage";
 
 function App() {
   const [currentPage, setCurrentPage] = useState<PageId>("data-processing");
+  const [appVersion, setAppVersion] = useState("v1.4.0");
   const bridge = usePythonBridge();
+
+  useEffect(() => {
+    getVersion()
+      .then((v) => setAppVersion(`v${v}`))
+      .catch(() => {});
+  }, []);
 
   return (
     <ToastProvider>
@@ -58,7 +66,7 @@ function App() {
         />
 
         {/* Version */}
-        <span className="text-xs text-slate-400 ml-auto">v1.2.0</span>
+        <span className="text-xs text-slate-400 ml-auto">{appVersion}</span>
       </header>
 
       {/* Main content area */}

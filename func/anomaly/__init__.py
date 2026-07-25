@@ -115,7 +115,11 @@ def detect_and_filter(
     # 统计受影响的行数（去重）
     affected_rows = len({h.row_index for h in hits})
     label = _DATA_TYPE_LABELS.get(data_type, data_type)
-    _logger.info("[%s] 检测到 %d 个异常值（共 %d 条数据）", label, affected_rows, len(df))
+    _logger.warning("[%s] 检测到 %d 个异常值（共 %d 条数据）", label, affected_rows, len(df))
+
+    # 累积异常计数（供批量处理汇总）
+    if config._anomaly_counts is not None:
+        config._anomaly_counts.append((data_type, affected_rows))
 
     # 构建异常明细 DataFrame
     anomalies_df = _build_anomalies_df(df, hits)
