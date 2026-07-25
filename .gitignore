@@ -6,6 +6,7 @@ dist/
 wheels/
 *.egg-info
 __pypackages__/
+.coverage
 
 # Virtual environments
 .venv/
@@ -23,6 +24,8 @@ __pypackages__/
 .cursor/
 .serena/
 .trellis/
+.agents/
+.serena/
 
 # Test / cache
 .pytest_cache/
