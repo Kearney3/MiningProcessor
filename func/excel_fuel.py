@@ -121,7 +121,7 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
                     h3 = clean_string(header_rows.iloc[1, idx])  # 班组/关键字
                     h4 = clean_string(header_rows.iloc[2, idx])  # 小时数或班次名
                     h5 = clean_string(header_rows.iloc[3, idx])  # 油品
-                    if "按照班子柴油准备" in h3:
+                    if "按照班子柴油准备" in h3 or "Түлш зэхэлт" in h3 or "Нийт" in h4:
                         stop_signal = True
                         continue
 
@@ -148,7 +148,7 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
                     data_type = None
                     if "已使用小时数" in h4 or "АМЦ" in h4:
                         data_type = "work_hours"
-                    elif "小时数" in h4 or "мц" in h4.lower():
+                    elif "小时数" in h4 or "мц" in h4.lower() or "мотоцаг" in h4.lower():
                         data_type = "end_hours"
                     else:  # 燃油列
                         data_type = "fuel"
