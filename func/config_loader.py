@@ -350,28 +350,71 @@ def get_device_load_map(version: str = "new") -> dict[str, int]:
     return config.get(key, {})
 
 
-def apply_device_load_map(device_load_map: dict[str, int]) -> dict[str, int]:
-    """仅在当前运行时应用设备装载量映射，不持久化到文件"""
+# ---------------------------------------------------------------------------
+# 装载量版本偏好
+# ---------------------------------------------------------------------------
+
+def get_load_map_version() -> str:
+    """获取当前装载量版本偏好（"new" 或 "old"）。
+
+    读取 user_config.load_map_version，默认返回 "new"。
+    """
+    return get_user_config("load_map_version", "new")
+
+
+def set_load_map_version(version: str) -> None:
+    """持久化装载量版本偏好（写入 config.user.json）。
+
+    Parameters
+    ----------
+    version : str
+        "new" 或 "old"。
+    """
+    if version not in ("new", "old"):
+        raise ValueError(f"version must be 'new' or 'old', got {version!r}")
+    update_user_config({"load_map_version": version})
+
+
+def apply_device_load_map(device_load_map: dict[str, int], version: str = "new") -> dict[str, int]:
+    """仅在当前运行时应用设备装载量映射，不持久化到文件。
+
+    Parameters
+    ----------
+    device_load_map : dict[str, int]
+        要应用的装载量映射。
+    version : str
+        "new" 或 "old"，决定更新运行时中的哪个 key。
+    """
     global _runtime_config
+    config_key = "device_load_map" if version == "new" else "device_load_map_old"
     with _runtime_lock:  # M3
         config = load_config()
-        config["device_load_map"] = dict(device_load_map)
+        config[config_key] = dict(device_load_map)
         _runtime_config = config
-        return _runtime_config["device_load_map"]
+        return _runtime_config[config_key]
 
 
-def update_device_load_map(updates: dict[str, int]) -> dict[str, int]:
-    """更新设备装载量映射（写入 config.json）"""
+def update_device_load_map(updates: dict[str, int], version: str = "new") -> dict[str, int]:
+    """更新设备装载量映射（写入 config.json）。
+
+    Parameters
+    ----------
+    updates : dict[str, int]
+        要更新的 key-value 对。
+    version : str
+        "new" 或 "old"，决定写入 config.json 中的哪个 key。
+    """
     global _runtime_config
+    config_key = "device_load_map" if version == "new" else "device_load_map_old"
     config = _load_json(_CONFIG_FILE)
-    if "device_load_map" not in config:
-        config["device_load_map"] = {}
-    config["device_load_map"].update(updates)
+    if config_key not in config:
+        config[config_key] = {}
+    config[config_key].update(updates)
     _save_json(_CONFIG_FILE, config)
     _invalidate_config_cache()
     with _runtime_lock:  # M2: 清除运行时缓存，确保下次读取使用最新值
         _runtime_config = None
-    return config["device_load_map"]
+    return config[config_key]
 
 
 # ---------------------------------------------------------------------------

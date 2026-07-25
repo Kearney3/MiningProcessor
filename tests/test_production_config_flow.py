@@ -47,7 +47,8 @@ def test_mining_data_processor_loads_runtime_config_when_not_explicit(monkeypatc
 
 def test_execute_task_passes_current_device_load_map_to_production_processor(monkeypatch, tmp_path):
     ProcessorSpy.instances.clear()
-    monkeypatch.setattr(logic.config_loader, "get_device_load_map", lambda: {"TR100": 77, "XDE120": 44})
+    monkeypatch.setattr(logic.config_loader, "get_load_map_version", lambda: "new")
+    monkeypatch.setattr(logic.config_loader, "get_device_load_map", lambda version="new": {"TR100": 77, "XDE120": 44})
     monkeypatch.setattr(logic, "ProdProcessor", ProcessorSpy)
     monkeypatch.setattr(logic.os.path, "isdir", lambda path: False)
 
