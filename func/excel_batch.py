@@ -237,6 +237,10 @@ def process_files(
         skip_hidden_rows = True
         skip_hidden_cols = True
 
+    # 启用异常计数累积（供后续汇总）
+    if anomaly_config is not None and anomaly_config.enabled:
+        anomaly_config._anomaly_counts = []
+
     _emit_progress(progress_cb, {"stage": "preparing", "percent": 0.0, "current": 0, "total": 0, "detail": "开始处理"})
     if _check_cancel(cancel_event):
         _emit_progress(progress_cb, {"stage": "cancelled", "percent": 0.0, "current": 0, "total": 0, "detail": "用户取消，已完成部分输出"})
@@ -275,6 +279,13 @@ def process_files(
     all_types = ["fuel", "electrical", "production", "worktime"]
     failed_labels = [MODULE_LABELS.get(k, k) for k in all_types if k not in all_results]
     logger.info(f"处理完成 — 成功: {', '.join(success_labels) or '无'}; 失败: {', '.join(failed_labels) or '无'}")
+
+    # 异常值汇总
+    if anomaly_config is not None and getattr(anomaly_config, "_anomaly_counts", None):
+        total_anomalies = sum(count for _, count in anomaly_config._anomaly_counts)
+        if total_anomalies > 0:
+            logger.warning(f"共检测到 {total_anomalies} 个异常值")
+        anomaly_config._anomaly_counts = None
 
     if not all_results:
         logger.error("所有模块均无数据")

@@ -43,6 +43,11 @@ _TARGETS: list[tuple[Path, str, str]] = [
         r'(?m)^(version\s*=\s*")([^"]+)(")',
         r'\g<1>{version}\3',
     ),
+    (
+        Path("src/App.tsx"),
+        r'useState\("v[^"]+"\)',
+        r'useState("v{version}")',
+    ),
 ]
 
 
