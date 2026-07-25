@@ -124,6 +124,31 @@ class TestGetDeviceLoadMap:
         assert result == {"RUNTIME_ONLY": 42}
 
 
+class TestLoadMapVersion:
+    def test_default_version_is_new(self, temp_config):
+        assert config_loader.get_load_map_version() == "new"
+
+    def test_set_and_get_version(self, temp_config):
+        config_loader.set_load_map_version("old")
+        assert config_loader.get_load_map_version() == "old"
+
+    def test_set_version_persists_to_user_config(self, temp_config):
+        _, _ = temp_config
+        config_loader.set_load_map_version("old")
+        user_cfg = json.loads(config_loader._USER_CONFIG_FILE.read_text(encoding="utf-8"))
+        assert user_cfg.get("user_config", {}).get("load_map_version") == "old"
+
+    def test_invalid_version_raises(self, temp_config):
+        import pytest
+        with pytest.raises(ValueError, match="must be 'new' or 'old'"):
+            config_loader.set_load_map_version("invalid")
+
+    def test_user_config_takes_priority(self, temp_config):
+        """set 后 get 应返回最新值"""
+        config_loader.set_load_map_version("old")
+        assert config_loader.get_load_map_version() == "old"
+
+
 class TestApplyDeviceLoadMap:
     def test_apply_updates_runtime_not_file(self, temp_config):
         _, config_file = temp_config

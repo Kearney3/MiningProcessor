@@ -466,6 +466,20 @@ class TestLoadMapRPC:
         result = tauri_bridge._get_default_load_map({})
         assert isinstance(result, dict)
 
+    def test_get_load_map_version(self):
+        result = tauri_bridge._get_load_map_version({})
+        assert "version" in result
+        assert result["version"] in ("new", "old")
+
+    def test_set_load_map_version(self):
+        result = tauri_bridge._set_load_map_version({"version": "old"})
+        assert result["ok"] is True
+        # Verify it was persisted
+        from func.config_loader import get_load_map_version
+        assert get_load_map_version() == "old"
+        # Reset to new
+        tauri_bridge._set_load_map_version({"version": "new"})
+
 
 # ---------------------------------------------------------------------------
 # ledger_match_preview — result_suffix / id_column

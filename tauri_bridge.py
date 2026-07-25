@@ -297,9 +297,10 @@ def _process_fuel(params: dict) -> dict:
 @_register("process_production")
 def _process_production(params: dict) -> dict:
     from func.excel_production_enhanced import MiningDataProcessor
-    from func.config_loader import get_device_load_map
+    from func.config_loader import get_device_load_map, get_load_map_version
 
-    load_map = get_device_load_map()
+    load_map_ver = get_load_map_version()
+    load_map = get_device_load_map(load_map_ver)
     processor = MiningDataProcessor(
         raw_start=params.get("raw_start", -1), device_load_map=load_map,
         skip_hidden=params.get("skip_hidden", False),
@@ -649,14 +650,14 @@ def _save_anomaly_config(params: dict) -> dict:
 def _get_device_load_map(params: dict) -> dict:
     from func.config_loader import get_device_load_map
 
-    return get_device_load_map()
+    return get_device_load_map(params.get("version", "new"))
 
 
 @_register("update_device_load_map")
 def _update_device_load_map(params: dict) -> dict:
     from func.config_loader import update_device_load_map
 
-    update_device_load_map(params["map_data"])
+    update_device_load_map(params["map_data"], params.get("version", "new"))
     return {"ok": True}
 
 
@@ -664,7 +665,7 @@ def _update_device_load_map(params: dict) -> dict:
 def _apply_device_load_map(params: dict) -> dict:
     from func.config_loader import apply_device_load_map
 
-    apply_device_load_map(params["map_data"])
+    apply_device_load_map(params["map_data"], params.get("version", "new"))
     return {"ok": True}
 
 
@@ -673,6 +674,21 @@ def _get_default_load_map(params: dict) -> dict:
     from func.config_loader import get_default_load_map
 
     return get_default_load_map(params.get("version", "new"))
+
+
+@_register("get_load_map_version")
+def _get_load_map_version(params: dict) -> dict:
+    from func.config_loader import get_load_map_version
+
+    return {"version": get_load_map_version()}
+
+
+@_register("set_load_map_version")
+def _set_load_map_version(params: dict) -> dict:
+    from func.config_loader import set_load_map_version
+
+    set_load_map_version(params["version"])
+    return {"ok": True}
 
 
 # ─── 维修分类配置 ───

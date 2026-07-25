@@ -191,7 +191,7 @@ class ApplyConfigSpy:
     def __init__(self):
         self.calls = []
 
-    def __call__(self, config):
+    def __call__(self, config, version="new"):
         self.calls.append(config)
 
 
@@ -199,7 +199,7 @@ class UpdateDeviceLoadMapSpy:
     def __init__(self):
         self.calls = []
 
-    def __call__(self, updates):
+    def __call__(self, updates, version="new"):
         self.calls.append(updates)
         return updates
 
@@ -726,7 +726,7 @@ def test_apply_button_uses_current_ui_config_without_saving(monkeypatch):
 
     assert apply_spy.calls == [{"TR100": 35, "EH4000": 85}]
     assert update_spy.calls == []
-    assert logs[-1] == "当前配置已应用"
+    assert logs[-1] == "当前新版配置已应用"
 
 
 # ---- DataTable column invariant tests ----

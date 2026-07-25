@@ -161,9 +161,44 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
     config_prev_btn.on_click = _config_prev
     config_next_btn.on_click = _config_next
 
-    def load_config():
+    # ── 装载量版本切换 ──
+    _current_version = [config_loader.get_load_map_version()]
+
+    def _on_version_change(e: ft.ControlEvent):
+        selected_set: set = e.control.selected
+        if not selected_set:
+            return
+        new_ver = next(iter(selected_set))
+        if new_ver == _current_version[0]:
+            return
+        _current_version[0] = new_ver
+        config_loader.set_load_map_version(new_ver)
+        # 重新加载对应版本的配置
         try:
-            device_map = config_loader.get_device_load_map()
+            device_map = config_loader.get_device_load_map(new_ver)
+        except Exception:
+            logging.getLogger(__name__).warning("加载配置失败", exc_info=True)
+            device_map = {}
+        set_config_state(_device_map_to_rows(device_map))
+        _log_message(log, f"已切换到{'旧版' if new_ver == 'old' else '新版'}装载量配置")
+
+    version_toggle = ft.SegmentedButton(
+        selected={"new"} if _current_version[0] == "new" else {"old"},
+        segments=[
+            ft.Segment(value="new", label=ft.Text("新版配置")),
+            ft.Segment(value="old", label=ft.Text("旧版配置")),
+        ],
+        on_change=_on_version_change,
+        allow_empty_selection=False,
+        style=ft.ButtonStyle(
+            padding=ft.Padding.symmetric(horizontal=12, vertical=6),
+        ),
+    )
+
+    def load_config():
+        ver = _current_version[0]
+        try:
+            device_map = config_loader.get_device_load_map(ver)
         except Exception:
             logging.getLogger(__name__).warning("加载配置失败，使用空配置", exc_info=True)
             device_map = {}
@@ -253,8 +288,8 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
 
     def apply_current_config(e: ft.ControlEvent):
         try:
-            config_loader.apply_device_load_map(build_device_load_map())
-            _log_message(log, "当前配置已应用")
+            config_loader.apply_device_load_map(build_device_load_map(), _current_version[0])
+            _log_message(log, f"当前{'旧版' if _current_version[0] == 'old' else '新版'}配置已应用")
         except Exception as ex:
             _log_message(log, f"应用当前配置失败: {ex}", level=logging.ERROR)
 
@@ -325,6 +360,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
         content=ft.Column(
             [
                 theme.section_title("设备装载量配置"),
+                ft.Row([version_toggle], alignment=ft.MainAxisAlignment.START),
                 *action_button_rows,
                 ft.Container(
                     content=ft.Stack(

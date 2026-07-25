@@ -178,7 +178,8 @@ def _dispatch_module(module_type: str, path: str, **kwargs) -> object | None:
                           anomaly_config=anomaly_config)
     elif module_type == "production":
         raw_start = kwargs.get("raw_start", -1)
-        device_load_map = config_loader.get_device_load_map()
+        load_map_ver = config_loader.get_load_map_version()
+        device_load_map = config_loader.get_device_load_map(load_map_ver)
         processor = ProdProcessor(raw_start=raw_start, device_load_map=device_load_map,
                                   skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
                                   anomaly_config=anomaly_config)

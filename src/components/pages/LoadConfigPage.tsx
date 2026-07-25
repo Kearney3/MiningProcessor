@@ -194,6 +194,9 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
   const [newNameError, setNewNameError] = useState<string | null>(null);
   const [newValueError, setNewValueError] = useState<string | null>(null);
 
+  // version selection ("new" | "old")
+  const [mapVersion, setMapVersion] = useState<"new" | "old">("new");
+
   // selection
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -227,11 +230,12 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
 
   /* ---- data loading ---------------------------------------------- */
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (version?: "new" | "old") => {
     setLoading(true);
     setError(null);
     try {
-      const res = await bridge.call<LoadMap>("get_device_load_map");
+      const ver = version ?? mapVersion;
+      const res = await bridge.call<LoadMap>("get_device_load_map", { version: ver });
       const map = res || {};
       setLoadMap(map);
       setPersistedMap(map);
@@ -240,11 +244,37 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
     } finally {
       setLoading(false);
     }
-  }, [bridge]);
+  }, [bridge, mapVersion]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    // Load persisted version preference, then load data with that version
+    (async () => {
+      try {
+        const res = await bridge.call<{ version: string }>("get_load_map_version");
+        const ver = res?.version === "old" ? "old" : "new";
+        setMapVersion(ver);
+        loadData(ver);
+      } catch {
+        // fallback: use default "new" and load data
+        loadData("new");
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bridge]);
+
+  /* ---- version switch ------------------------------------------- */
+
+  const handleVersionSwitch = async (ver: "new" | "old") => {
+    if (ver === mapVersion) return;
+    setMapVersion(ver);
+    try {
+      await bridge.call("set_load_map_version", { version: ver });
+    } catch {
+      // non-critical, continue
+    }
+    loadData(ver);
+    notify(`已切换到${ver === "old" ? "旧版" : "新版"}装载量配置`, "info");
+  };
 
   /* ---- sorted & paginated entries -------------------------------- */
 
@@ -352,7 +382,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
     setApplying(true);
     setError(null);
     try {
-      await bridge.call("apply_device_load_map", { map_data: loadMap });
+      await bridge.call("apply_device_load_map", { map_data: loadMap, version: mapVersion });
       notify("已应用（未保存）", "info");
     } catch (e) {
       setError(String(e));
@@ -366,7 +396,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
     setSaving(true);
     setError(null);
     try {
-      await bridge.call("update_device_load_map", { map_data: loadMap });
+      await bridge.call("update_device_load_map", { map_data: loadMap, version: mapVersion });
       setPersistedMap({ ...loadMap });
       notify("已保存", "success");
     } catch (e) {
@@ -473,6 +503,30 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
         <div className="flex items-center gap-2">
           <IconSettings />
           <h2 className="text-base font-semibold text-slate-800">装载量配置</h2>
+
+          {/* version toggle */}
+          <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden ml-3">
+            <button
+              onClick={() => handleVersionSwitch("new")}
+              className={`text-xs px-3 py-1.5 transition-colors ${
+                mapVersion === "new"
+                  ? "bg-blue-50 text-blue-700 font-medium"
+                  : "text-slate-500 hover:bg-slate-50"
+              }`}
+            >
+              新版
+            </button>
+            <button
+              onClick={() => handleVersionSwitch("old")}
+              className={`text-xs px-3 py-1.5 border-l border-slate-200 transition-colors ${
+                mapVersion === "old"
+                  ? "bg-blue-50 text-blue-700 font-medium"
+                  : "text-slate-500 hover:bg-slate-50"
+              }`}
+            >
+              旧版
+            </button>
+          </div>
         </div>
 
         {/* status badges */}
@@ -520,7 +574,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
 
         <div className="flex-1" />
 
-        <button onClick={loadData} className="btn-secondary">
+        <button onClick={() => loadData()} className="btn-secondary">
           <IconRefresh />
           重载
         </button>
