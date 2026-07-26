@@ -110,6 +110,12 @@ def detect_and_filter(
     hits = detector.detect(df)
 
     if not hits:
+        # 即使无异常，flag 模式下仍添加标记列（默认值），保持表头一致
+        if config.flag_anomalies:
+            result = df.copy()
+            result[ANOMALY_FLAG_COLUMN] = False
+            result[ANOMALY_REASON_COLUMN] = ""
+            return result, None
         return df, None
 
     # 统计受影响的行数（去重）

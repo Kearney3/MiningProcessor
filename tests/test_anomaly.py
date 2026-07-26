@@ -1069,10 +1069,23 @@ class TestCoverageGaps:
         assert result_df is df
         assert anomalies is None
 
-    def test_no_hits_returns_original(self):
-        """无命中时应返回原 df（__init__.py:113）。"""
+    def test_no_hits_flag_adds_columns(self):
+        """无命中且 flag 模式时应添加标记列（默认值）。"""
         df = pd.DataFrame({"油品消耗": [100, 200, 300]})
         cfg = AnomalyConfig(enabled=True, flag_anomalies=True)
+        result_df, anomalies = detect_and_filter(df, "fuel", config=cfg)
+        assert result_df is not df
+        assert ANOMALY_FLAG_COLUMN in result_df.columns
+        assert ANOMALY_REASON_COLUMN in result_df.columns
+        assert (result_df[ANOMALY_FLAG_COLUMN] == False).all()
+        assert (result_df[ANOMALY_REASON_COLUMN] == "").all()
+        assert len(result_df) == 3
+        assert anomalies is None
+
+    def test_no_hits_non_flag_returns_original(self):
+        """无命中且非 flag 模式时应返回原 df。"""
+        df = pd.DataFrame({"油品消耗": [100, 200, 300]})
+        cfg = AnomalyConfig(enabled=True, flag_anomalies=False, filter_anomalies=True)
         result_df, anomalies = detect_and_filter(df, "fuel", config=cfg)
         assert result_df is df
         assert anomalies is None
