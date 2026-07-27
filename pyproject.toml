@@ -1,6 +1,6 @@
 [project]
 name = "MiningProcessor"
-version = "1.4.4"
+version = "1.4.5"
 description = "矿山运营 Excel 报表批量处理工具 — 支持 CLI 与 Flet 桌面 GUI"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -12,6 +12,7 @@ dependencies = [
     "xlsxwriter>=3.0.0",
     "cryptography>=41.0.0",
     "psycopg2-binary>=2.9,<3.0",
+    "xlrd>=2.0.1",
 ]
 
 [project.scripts]

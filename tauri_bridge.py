@@ -918,6 +918,37 @@ def _clear_oil_ledger(params: dict) -> dict:
     return {"ok": True}
 
 
+@_register("export_ledger_data")
+def _export_ledger_data(params: dict) -> dict:
+    """将当前台账数据导出为 Excel。
+
+    params:
+        data_type: "oil" 或 "equipment"
+        output_path: 输出文件路径
+    """
+    from func.config_loader import load_oil_ledger_cache, load_equipment_ledger_cache
+
+    data_type = params.get("data_type", "oil")
+    safe_path = str(_sanitize_path(params["output_path"], allow_dir=False))
+
+    if data_type == "oil":
+        records = load_oil_ledger_cache()
+        sheet_name = "油品台账"
+    else:
+        records = load_equipment_ledger_cache()
+        sheet_name = "设备台账"
+
+    if not records:
+        return {"error": f"无{sheet_name}数据可导出"}
+
+    import pandas as pd
+    from func.excel_formatter import write_formatted_excel
+
+    df = pd.DataFrame(records)
+    write_formatted_excel(safe_path, {sheet_name: df})
+    return {"output_file": safe_path}
+
+
 @_register("list_directory")
 def _list_directory(params: dict) -> dict:
     """列出目录内容，返回文件和子目录。"""

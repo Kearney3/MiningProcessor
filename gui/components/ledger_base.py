@@ -317,6 +317,29 @@ def create_ledger_section_factory(
         except Exception as ex:
             _log_message(log, f"导出模板失败: {ex}", level=logging.ERROR)
 
+    async def on_export_data(e):
+        """导出当前台账数据"""
+        if not records:
+            return
+        try:
+            picker = ft.FilePicker()
+            save_path = await picker.save_file(
+                dialog_title=f"导出{cfg.section_title}",
+                file_name=f"{cfg.section_title}.xlsx",
+                initial_directory=_last_directory[0] if _last_directory[0] else None,
+                allowed_extensions=["xlsx"],
+            )
+            if not save_path:
+                return
+
+            from func.excel_formatter import write_formatted_excel
+            df = pd.DataFrame(records)
+            write_formatted_excel(save_path, {cfg.section_title: df})
+            _update_last_directory(save_path)
+            _log_message(log, f"已导出{cfg.section_title}: {save_path}，共 {len(records)} 条")
+        except Exception as ex:
+            _log_message(log, f"导出{cfg.section_title}失败: {ex}", level=logging.ERROR)
+
     def _do_clear(e):
         """执行清空"""
         page.pop_dialog()
@@ -404,6 +427,7 @@ def create_ledger_section_factory(
     import_btn = theme.secondary_btn(f"导入{cfg.label_prefix}", icon=ft.Icons.UPLOAD, on_click=on_import)
     clear_btn = theme.secondary_btn(f"清空{cfg.label_prefix}", icon=ft.Icons.DELETE_SWEEP, on_click=on_clear, disabled=True)
     export_template_btn = theme.secondary_btn("导出模板", icon=ft.Icons.DOWNLOAD, on_click=on_export_template)
+    export_data_btn = theme.secondary_btn("导出台账", icon=ft.Icons.DOWNLOAD, on_click=on_export_data, disabled=True)
     save_default_btn = theme.primary_btn("保存为默认", icon=ft.Icons.BOOKMARK, on_click=on_save_default, disabled=True)
     cancel_default_btn = theme.secondary_btn("取消默认", icon=ft.Icons.BOOKMARK_REMOVE, on_click=on_cancel_default, disabled=not (cfg.has_cache() if cfg.has_cache else False))
 
@@ -412,10 +436,12 @@ def create_ledger_section_factory(
         has_cached = cfg.has_cache() if cfg.has_cache else False
         clear_btn.disabled = not has_records
         save_default_btn.disabled = not has_records
+        export_data_btn.disabled = not has_records
         cancel_default_btn.disabled = not has_cached
         try:
             clear_btn.update()
             save_default_btn.update()
+            export_data_btn.update()
             cancel_default_btn.update()
         except (RuntimeError, AttributeError):
             pass
@@ -428,7 +454,7 @@ def create_ledger_section_factory(
                 ft.Column(
                     [
                         ft.Row(
-                            [import_btn, clear_btn, export_template_btn],
+                            [import_btn, clear_btn, export_template_btn, export_data_btn],
                             spacing=8,
                         ),
                         ft.Row(

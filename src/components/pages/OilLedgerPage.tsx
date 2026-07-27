@@ -21,6 +21,8 @@ const config: LedgerPageConfig = {
   loadFileColumnsMethod: "load_oil_ledger_file_columns",
   listSheetsMethod: "list_excel_sheets",
   exportTemplateMethod: "export_oil_ledger_template",
+  exportDataMethod: "export_ledger_data",
+  exportDataType: "oil",
   setDefaultMethod: "set_default_oil_ledger",
   cancelDefaultMethod: "cancel_default_oil_ledger",
   clearMethod: "clear_oil_ledger",

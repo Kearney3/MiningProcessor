@@ -21,6 +21,10 @@ export interface LedgerPageConfig {
   importMethod: string;
   /** Bridge method to export a blank template */
   exportTemplateMethod: string;
+  /** Bridge method to export current data as Excel */
+  exportDataMethod?: string;
+  /** Data type parameter for export (e.g. "oil", "equipment") */
+  exportDataType?: string;
   /** Bridge method to set as default */
   setDefaultMethod: string;
   /** Bridge method to cancel default */
@@ -558,6 +562,25 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
     }
   };
 
+  const handleExportData = async () => {
+    if (!config.exportDataMethod || rows.length === 0) return;
+    try {
+      const filePath = await save({
+        filters: [{ name: "Excel", extensions: ["xlsx"] }],
+        defaultPath: `${config.title}.xlsx`,
+      });
+      if (!filePath) return;
+      await bridge.call(config.exportDataMethod, {
+        data_type: config.exportDataType,
+        output_path: filePath,
+      });
+      notify("台账导出成功", "success");
+    } catch (e) {
+      setError(String(e));
+      notify(`台账导出失败: ${e}`, "error");
+    }
+  };
+
   const handleSetDefault = async () => {
     setShowSetDefaultDialog(false);
     try {
@@ -670,6 +693,18 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
             <IconExport />
             <span className="hidden sm:inline">导出模板</span>
           </button>
+
+          {/* Export data */}
+          {config.exportDataMethod && rows.length > 0 && (
+            <button
+              onClick={handleExportData}
+              className="btn-secondary"
+              title="导出台账"
+            >
+              <IconExport />
+              <span className="hidden sm:inline">导出台账</span>
+            </button>
+          )}
 
           <div className="w-px h-5 bg-slate-200 mx-0.5" />
 
