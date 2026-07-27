@@ -8,43 +8,31 @@ try:
 except ImportError:
     import gui.theme as theme
 
-# 滚动到底部的判定阈值（像素）
-_SCROLL_BOTTOM_THRESHOLD = 50
-
 
 def create_log_view(height: int = 300) -> tuple[ft.Container, "LogViewRefs"]:
     """创建适合实时追加的日志视图组件
 
-    auto_scroll 由调用方在每次 flush 时根据 _is_at_bottom 动态设置，
-    从而实现"视图在底部时自动跟随，手动上翻后不被打扰"的效果。
+    使用 ListView（逐行 Text 控件）+ auto_scroll=True：
+    - 原生 scroll_to() 实现自动滚动到底部
+    - 不绑定 on_scroll 事件（彻底避免 Flet 控制树 diff 竞态 IndexError）
     """
-    # 用 list 包装以便 on_scroll 回调和 flush 函数共享可变状态
-    _is_at_bottom: list[bool] = [True]
-
-    def _on_scroll(e: ft.OnScrollEvent):
-        _is_at_bottom[0] = e.extent_after < _SCROLL_BOTTOM_THRESHOLD
-
-    log_list = ft.Column(
+    log_list = ft.ListView(
         controls=[],
         spacing=4,
-        scroll=ft.ScrollMode.AUTO,
-        auto_scroll=False,
+        auto_scroll=True,
         expand=True,
-        on_scroll=_on_scroll,
     )
     level_filter = ft.Dropdown(
         label="级别",
         width=130,
         dense=True,
         content_padding=ft.Padding.symmetric(horizontal=8, vertical=6),
-        value="ALL",
+        value="INFO",
         options=[
-            ft.dropdown.Option(key="ALL", text="全部"),
             ft.dropdown.Option(key="DEBUG", text="DEBUG"),
             ft.dropdown.Option(key="INFO", text="INFO"),
             ft.dropdown.Option(key="WARNING", text="WARNING"),
             ft.dropdown.Option(key="ERROR", text="ERROR"),
-            ft.dropdown.Option(key="CRITICAL", text="CRITICAL"),
         ],
     )
     export_button = ft.IconButton(
@@ -113,6 +101,5 @@ def create_log_view(height: int = 300) -> tuple[ft.Container, "LogViewRefs"]:
         "resize_handle": resize_handle,
         "list_container": list_container,
         "log_list": log_list,
-        "_is_at_bottom": _is_at_bottom,
     }
     return root, refs

@@ -105,7 +105,6 @@ class LogViewRefs(TypedDict):
     resize_handle: ft.GestureDetector
     list_container: ft.Container
     log_list: ft.ListView
-    _is_at_bottom: list[bool]
 
 
 class SyncRefs(TypedDict):
