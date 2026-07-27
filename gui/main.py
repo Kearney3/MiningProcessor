@@ -17,6 +17,7 @@ from . import components as cmp
 from . import logic as logic
 from .log_system import LogSystem
 from .log_system import MIN_LOG_HEIGHT  # re-exported for test access
+from .log_broker import install_gui_log_handler
 
 try:
     from . import theme
@@ -33,6 +34,7 @@ INITIAL_WINDOW_HEIGHT = 900
 
 def main(page: ft.Page):
     setup_logging()
+    install_gui_log_handler()
     page.title = "矿山数据处理工具"
     assets_dir = Path(__file__).resolve().parent.parent / "assets"
     page.assets_dir = str(assets_dir)

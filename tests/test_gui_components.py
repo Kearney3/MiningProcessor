@@ -167,7 +167,13 @@ class StubLogView:
         self.level_filter = types.SimpleNamespace(value="INFO", on_select=None)
         self.export_button = types.SimpleNamespace(on_click=None)
         self.clear_button = types.SimpleNamespace(on_click=None)
-        self.scroll_bottom_button = types.SimpleNamespace(on_click=None)
+        self.scroll_bottom_button = types.SimpleNamespace(
+            on_click=None,
+            tooltip="滚动到底部",
+            icon_color=None,
+            update=lambda: None,
+        )
+        self.follow_status = types.SimpleNamespace(visible=False, update=lambda: None)
         self.resize_handle = types.SimpleNamespace(on_vertical_drag_update=None)
         self.list_container = types.SimpleNamespace(height=200, update=lambda: None)
         self.content = types.SimpleNamespace(
@@ -189,6 +195,7 @@ def make_stub_log_view():
         "export_button": view.export_button,
         "clear_button": view.clear_button,
         "scroll_bottom_button": view.scroll_bottom_button,
+        "follow_status": view.follow_status,
         "resize_handle": view.resize_handle,
         "list_container": view.list_container,
         "log_list": view.log_list,
@@ -600,10 +607,11 @@ def test_gui_main_stops_log_consumer_on_disconnect(monkeypatch):
     log_view, refs = real_create_log_view()
 
     assert isinstance(log_view, components.ft.Container)
-    assert refs["log_list"].auto_scroll is True
+    assert refs["log_list"].auto_scroll is False
     assert refs["log_list"].spacing == 4
     assert refs["list_container"].height == 300
     assert getattr(refs["export_button"], "tooltip", None) == "导出日志"
+    assert refs["follow_status"].visible is False
 
 
 

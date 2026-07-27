@@ -1,55 +1,53 @@
+"""Flet 页面级日志控制器。
+
+页面只订阅进程级 LogBroker。日志、筛选和清空请求会合并到同一个异步
+flush 中，因此只有一个入口会修改 Flet 日志控件。
 """
-日志系统模块
-封装日志队列、消费者线程、UI 刷新逻辑，从 main.py 中独立出来 (M5)。
-"""
-import bisect
+from __future__ import annotations
+
+import asyncio
+import concurrent.futures
 import inspect
-import flet as ft
 import logging
-import queue
-import threading
-import time
 from datetime import datetime
 from pathlib import Path
+import sys
+import threading
 
+import flet as ft
+
+from . import theme
 from .components.common import _last_directory, _update_last_directory
+from .log_broker import LogEntry, LogSubscription, get_log_broker
 
-from func.logger import QueueHandler, DEFAULT_FORMAT
 
 MAX_LOG_RECORDS = 5000
+MAX_RENDERED_RECORDS = 1000
 MIN_LOG_HEIGHT = 140
 MAX_LOG_HEIGHT = 520
-
-# 第三方库 DEBUG 日志噪音，通过 root logger filter 从源头拦截
-_NOISY_LOGGERS = frozenset({
-    "flet", "flet_controls", "flet_object_patch",
-    "flet_transport", "flet_components",
-    "watchfiles", "uvicorn",
-})
+FLUSH_INTERVAL = 0.08
+SCROLL_BOTTOM_THRESHOLD = 48
 
 
-def _suppress_noisy_loggers():
-    """将第三方库的 logger 级别设为 INFO，从源头阻止 DEBUG 记录产生。"""
-    for name in _NOISY_LOGGERS:
-        logging.getLogger(name).setLevel(logging.INFO)
+def _diagnose(message: str, ex: BaseException | None = None) -> None:
+    """日志基础设施的故障直接写 stderr，避免重新进入 GUI 日志管道。"""
 
-
-class _SuppressNoisyFilter(logging.Filter):
-    """挂在 root logger 上，拦截第三方库的 DEBUG 日志，项目自身日志正常放行。"""
-
-    def filter(self, record: logging.LogRecord) -> bool:
-        if record.levelno < logging.INFO:
-            name = record.name or ""
-            if name in _NOISY_LOGGERS:
-                return False
-            for prefix in _NOISY_LOGGERS:
-                if name.startswith(prefix + "."):
-                    return False
-        return True
+    suffix = f": {ex}" if ex is not None else ""
+    try:
+        print(f"[GUI日志系统] {message}{suffix}", file=sys.__stderr__)
+    except Exception:
+        pass
 
 
 class LogSystem:
-    """封装日志队列、消费者线程、UI 刷新逻辑。"""
+    """管理一个 Flet 页面的日志状态和渲染。"""
+
+    _LEVEL_THRESHOLD = {
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARNING": logging.WARNING,
+        "ERROR": logging.ERROR,
+    }
 
     def __init__(self, page: ft.Page, log_refs: dict):
         self._page = page
@@ -60,218 +58,260 @@ class LogSystem:
         self._resize_handle = log_refs["resize_handle"]
         self._clear_button = log_refs["clear_button"]
         self._scroll_bottom_button = log_refs["scroll_bottom_button"]
+        self._follow_status = log_refs["follow_status"]
 
-        # 日志队列与 Handler
-        self._log_queue: queue.Queue = queue.Queue()
-        self._queue_handler = QueueHandler(self._log_queue)
-        self._queue_handler.setFormatter(logging.Formatter(DEFAULT_FORMAT, datefmt="%Y-%m-%d %H:%M:%S"))
-        self._root_logger = logging.getLogger()
+        self._broker = get_log_broker()
+        self._subscription: LogSubscription | None = None
+        self._log_records: list[LogEntry] = []
+        self._selected_level = self._read_selected_level()
+        self._clear_before_sequence = 0
+        self._applied_clear_sequence = 0
+        self._full_render_requested = False
+        self._follow_tail = True
 
-        for h in list(self._root_logger.handlers):
-            if isinstance(h, QueueHandler):
-                self._root_logger.removeHandler(h)
-        self._root_logger.addHandler(self._queue_handler)
-        # root logger 始终 DEBUG，确保所有级别日志都能被采集到；
-        # 前端/控制台的级别筛选只控制显示，不控制采集。
-        self._root_logger.setLevel(logging.DEBUG)
-        # 全局 filter 挂 root logger，拦截第三方库噪音（任何 handler 都受控）
-        _suppress_noisy_loggers()
-        if not any(isinstance(f, _SuppressNoisyFilter) for f in self._root_logger.filters):
-            self._root_logger.addFilter(_SuppressNoisyFilter())
-
-        # 状态
-        self._log_records: list[dict[str, object]] = []
-        self._log_records_lock = threading.Lock()
         self._log_view_height = int(self._log_height_container.height or 400)
         self._shutdown_event = threading.Event()
-        self._pending_records: list[dict[str, object]] = []
-        self._pending_lock = threading.Lock()
-        self._flush_timer: threading.Timer | None = None
-        self._last_flush_time: float = time.monotonic()
-        self.FLUSH_INTERVAL = 0.15
-        self.FALLBACK_FLUSH_TIMEOUT = 1.0
+        self._schedule_lock = threading.Lock()
+        self._flush_scheduled = False
+        self._flush_future: concurrent.futures.Future | None = None
 
-        self._consumer_thread: threading.Thread | None = None
         self._log_export_picker = ft.FilePicker()
         page.services.append(self._log_export_picker)
 
-    # ── 公开接口 ──
+    def start(self) -> None:
+        """绑定控件并订阅日志。重复调用不会创建重复订阅。"""
 
-    def start(self):
-        """启动消费者线程并绑定 UI 控件。"""
+        if self._subscription is not None:
+            return
         self._bind_controls()
-        self._consumer_thread = threading.Thread(target=self._consume_logs, daemon=True)
-        self._consumer_thread.start()
+        self._subscription = self._broker.subscribe(self._request_flush)
 
-    def shutdown(self):
-        """优雅关闭消费者线程。"""
+    def shutdown(self) -> None:
+        """停止当前页面的日志投递，不影响其他页面。"""
+
         if self._shutdown_event.is_set():
             return
         self._shutdown_event.set()
-        self._root_logger.removeHandler(self._queue_handler)
-        with self._pending_lock:
-            if self._flush_timer is not None:
-                self._flush_timer.cancel()
-                self._flush_timer = None
-        try:
-            while True:
-                self._log_queue.get_nowait()
-        except queue.Empty:
-            pass
-        try:
-            self._log_queue.put_nowait(None)
-        except queue.Full:
-            pass
+        if self._subscription is not None:
+            self._broker.unsubscribe(self._subscription)
+            self._subscription = None
+        with self._schedule_lock:
+            future = self._flush_future
+            self._flush_future = None
+            self._flush_scheduled = False
+        if future is not None and not future.done():
+            future.cancel()
 
-    # ── 内部方法 ──
-
-    def _bind_controls(self):
+    def _bind_controls(self) -> None:
         self._clear_button.on_click = self._clear_logs
         self._scroll_bottom_button.on_click = self._scroll_to_bottom
+        self._log_list.on_scroll = self._on_log_scroll
         self._level_filter.on_select = self._apply_filters
         self._export_button.on_click = self._export_logs
         self._resize_handle.on_vertical_drag_start = lambda e: None
         self._resize_handle.on_vertical_drag_update = self._on_vertical_drag_update
         self._page.window.on_resize = self._on_page_resize
-        self._page.on_disconnect = lambda e: self.shutdown()
-        self._page.on_close = lambda e: self.shutdown()
 
-    def _level_color(self, levelno: int):
-        # 保留接口以兼容导出等功能，但 TextField 不支持逐行着色
-        if levelno >= logging.ERROR:
-            return ft.Colors.RED
-        if levelno >= logging.WARNING:
-            return ft.Colors.ORANGE
-        return None
+    def _read_selected_level(self) -> str:
+        value = str(getattr(self._level_filter, "value", "INFO") or "INFO").strip()
+        return value if value in self._LEVEL_THRESHOLD else "INFO"
 
-    _LEVEL_THRESHOLD = {
-        "DEBUG": logging.DEBUG,
-        "INFO": logging.INFO,
-        "WARNING": logging.WARNING,
-        "ERROR": logging.ERROR,
-    }
+    def _passes_filter(self, entry: LogEntry) -> bool:
+        return entry.levelno >= self._LEVEL_THRESHOLD[self._selected_level]
 
-    def _get_selected_level(self) -> str:
-        raw_value = getattr(self._level_filter, "value", "INFO")
-        if raw_value is None:
-            return "INFO"
-        return str(raw_value).strip() or "INFO"
+    @staticmethod
+    def _display_message(entry: LogEntry) -> str:
+        message = entry.message
+        if entry.levelno >= logging.ERROR and "\nTraceback " in message:
+            return message.split("\n", 1)[0].rstrip()
+        return message
 
-    def _pass_level_filter(self, record: dict[str, object]) -> bool:
-        """判断记录是否通过当前级别筛选（选中级别及以上）。"""
-        selected = self._get_selected_level()
-        threshold = self._LEVEL_THRESHOLD.get(selected, logging.INFO)
-        return int(record.get("levelno", 0)) >= threshold
+    def _request_flush(self) -> None:
+        """线程安全地合并 flush 请求。"""
 
-    def _get_filtered_log_records(self) -> list[dict[str, object]]:
-        with self._log_records_lock:
-            return [r for r in self._log_records if self._pass_level_filter(r)]
-
-    async def _flush_pending_to_ui(self):
-        """将待显示记录追加到 ListView。
-
-        必须在事件循环线程上运行（通过 run_task 调度），
-        避免与 Flet 的 ObjectPatch.from_diff 并发修改 controls。
-        run_thread 会在线程池中执行，与事件循环线程并发导致 IndexError。
-        """
-        with self._pending_lock:
-            batch = self._pending_records[:]
-            self._pending_records.clear()
-        if not batch or self._shutdown_event.is_set():
+        if self._shutdown_event.is_set():
             return
-        batch.sort(key=lambda r: r.get("seq", 0))
-        new_controls = list(self._log_list.controls)
-        for record in batch:
-            if not self._pass_level_filter(record):
-                continue
-            new_controls.append(
-                ft.Text(
-                    str(record["message"]),
-                    size=13,
-                    selectable=True,
-                )
-            )
-        if len(new_controls) > MAX_LOG_RECORDS:
-            new_controls = new_controls[-MAX_LOG_RECORDS:]
-        self._log_list.controls = new_controls
+        with self._schedule_lock:
+            if self._flush_scheduled:
+                return
+            self._flush_scheduled = True
         try:
-            self._log_list.update()
+            future = self._page.run_task(self._flush_to_ui)
         except Exception as ex:
-            logging.getLogger(__name__).debug("flush_update 异常: %s", ex)
+            with self._schedule_lock:
+                self._flush_scheduled = False
+                self._flush_future = None
+            _diagnose("无法调度页面日志刷新", ex)
+            return
+        with self._schedule_lock:
+            if self._flush_scheduled:
+                self._flush_future = future
+
+    async def _flush_to_ui(self) -> None:
+        """唯一允许修改日志 ListView 的方法。"""
+
         try:
-            scroll_result = self._log_list.scroll_to(offset=-1)
-            if inspect.isawaitable(scroll_result):
-                await scroll_result
+            await asyncio.sleep(FLUSH_INTERVAL)
+            while not self._shutdown_event.is_set():
+                subscription = self._subscription
+                if subscription is None:
+                    break
+                entries, dropped = subscription.drain()
+                render_all = self._full_render_requested
+                self._full_render_requested = False
+
+                if self._clear_before_sequence > self._applied_clear_sequence:
+                    cutoff = self._clear_before_sequence
+                    self._log_records = [entry for entry in self._log_records if entry.sequence > cutoff]
+                    self._applied_clear_sequence = cutoff
+                    render_all = True
+
+                visible_new: list[LogEntry] = []
+                for entry in entries:
+                    if entry.sequence <= self._clear_before_sequence:
+                        continue
+                    self._log_records.append(entry)
+                    if self._passes_filter(entry):
+                        visible_new.append(entry)
+                if len(self._log_records) > MAX_LOG_RECORDS:
+                    self._log_records = self._log_records[-MAX_LOG_RECORDS:]
+                    render_all = True
+
+                if dropped:
+                    synthetic = LogEntry(
+                        sequence=self._broker.latest_sequence,
+                        created=0,
+                        levelno=logging.WARNING,
+                        levelname="WARNING",
+                        logger_name=__name__,
+                        message=f"[WARNING]日志流量过高，已省略 {dropped} 条较早记录",
+                    )
+                    self._log_records.append(synthetic)
+                    if self._passes_filter(synthetic):
+                        visible_new.append(synthetic)
+
+                changed = render_all or bool(visible_new)
+                if render_all:
+                    visible = [entry for entry in self._log_records if self._passes_filter(entry)]
+                    visible = visible[-MAX_RENDERED_RECORDS:]
+                    self._log_list.controls = [self._make_text(entry) for entry in visible]
+                elif visible_new:
+                    controls = [*self._log_list.controls, *(self._make_text(entry) for entry in visible_new)]
+                    self._log_list.controls = controls[-MAX_RENDERED_RECORDS:]
+
+                if changed:
+                    self._log_list.update()
+                    if self._follow_tail:
+                        scroll_result = self._log_list.scroll_to(offset=-1)
+                        if inspect.isawaitable(scroll_result):
+                            await scroll_result
+
+                with self._schedule_lock:
+                    pending_command = self._full_render_requested or (
+                        self._clear_before_sequence > self._applied_clear_sequence
+                    )
+                    if subscription.has_pending() or pending_command:
+                        continue
+                    self._flush_scheduled = False
+                    self._flush_future = None
+                    break
+        except asyncio.CancelledError:
+            raise
+        except Exception as ex:
+            _diagnose("页面日志刷新失败", ex)
+        finally:
+            should_reschedule = False
+            with self._schedule_lock:
+                if self._flush_scheduled:
+                    self._flush_scheduled = False
+                    self._flush_future = None
+                    subscription = self._subscription
+                    should_reschedule = (
+                        not self._shutdown_event.is_set()
+                        and subscription is not None
+                        and (
+                            subscription.has_pending()
+                            or self._full_render_requested
+                            or self._clear_before_sequence > self._applied_clear_sequence
+                        )
+                    )
+            if should_reschedule:
+                self._request_flush()
+
+    def _make_text(self, entry: LogEntry) -> ft.Text:
+        return ft.Text(self._display_message(entry), size=13, selectable=True)
+
+    async def _apply_filters(self, _e=None) -> None:
+        self._selected_level = self._read_selected_level()
+        self._full_render_requested = True
+        self._request_flush()
+        await asyncio.sleep(FLUSH_INTERVAL * 2)
+
+    async def _clear_logs(self, _e=None) -> None:
+        self._clear_before_sequence = self._broker.latest_sequence
+        self._full_render_requested = True
+        self._request_flush()
+        await asyncio.sleep(FLUSH_INTERVAL * 2)
+
+    async def _scroll_to_bottom(self, _e=None) -> None:
+        self._set_follow_tail(True)
+        try:
+            result = self._log_list.scroll_to(offset=-1)
+            if inspect.isawaitable(result):
+                await result
         except (RuntimeError, AttributeError):
             pass
-        self._last_flush_time = time.monotonic()
 
-    def _schedule_flush(self):
-        with self._pending_lock:
-            if self._flush_timer is None:
-                self._flush_timer = threading.Timer(self.FLUSH_INTERVAL, self._run_flush_on_page)
-                self._flush_timer.daemon = True
-                self._flush_timer.start()
+    def _on_log_scroll(self, event: ft.OnScrollEvent) -> None:
+        """用户离开底部时暂停自动跟随；回到底部后自动恢复。"""
 
-    def _run_flush_on_page(self):
-        with self._pending_lock:
-            self._flush_timer = None
+        pixels = float(getattr(event, "pixels", 0) or 0)
+        max_extent = float(getattr(event, "max_scroll_extent", 0) or 0)
+        self._set_follow_tail(max_extent - pixels <= SCROLL_BOTTOM_THRESHOLD)
+
+    def _set_follow_tail(self, enabled: bool) -> None:
+        if self._follow_tail == enabled:
+            return
+        self._follow_tail = enabled
+        self._follow_status.visible = not enabled
+        self._scroll_bottom_button.tooltip = (
+            "滚动到底部" if enabled else "滚动到底部并恢复自动跟随"
+        )
+        self._scroll_bottom_button.icon_color = (
+            theme.TEXT_SECONDARY if enabled else theme.PRIMARY
+        )
         try:
-            self._page.run_task(self._flush_pending_to_ui)
-        except Exception:
-            logging.getLogger(__name__).debug("page.run_task 失败（页面可能已关闭）")
-
-    def _append_log_record(self, log_item: dict[str, object]):
-        raw_msg = str(log_item["message"])
-        # ERROR 级别且含 traceback 时，只保留第一行（用户友好的异常消息）
-        # 后端日志已通过 logger.exception 记录完整 traceback，此处仅影响 GUI 显示
-        levelno = int(log_item["levelno"])
-        if levelno >= logging.ERROR and "\nTraceback " in raw_msg:
-            raw_msg = raw_msg.split("\n", 1)[0].rstrip()
-        record = {
-            "timestamp": str(log_item.get("timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-            "created": float(log_item.get("created", 0)),
-            "seq": int(log_item.get("seq", 0)),
-            "levelno": levelno,
-            "levelname": str(log_item["levelname"]),
-            "message": raw_msg,
-        }
-        with self._log_records_lock:
-            if not self._log_records or record["seq"] >= self._log_records[-1]["seq"]:
-                self._log_records.append(record)
-            else:
-                keys = [r["seq"] for r in self._log_records]
-                idx = bisect.bisect_right(keys, record["seq"])
-                self._log_records.insert(idx, record)
-            if len(self._log_records) > MAX_LOG_RECORDS:
-                del self._log_records[:-MAX_LOG_RECORDS]
-        with self._pending_lock:
-            self._pending_records.append(record)
-
-    async def _apply_filters(self, _e=None):
-        try:
-            with self._log_records_lock:
-                records = list(self._log_records)
-            filtered = [r for r in records if self._pass_level_filter(r)]
-            self._log_list.controls = [
-                ft.Text(str(r["message"]), size=13, selectable=True)
-                for r in filtered
-            ]
-            self._log_list.update()
-        except (RuntimeError, AttributeError, Exception) as ex:
-            logging.getLogger(__name__).debug("apply_filters 异常: %s", ex)
-        try:
-            scroll_result = self._log_list.scroll_to(offset=-1)
-            if inspect.isawaitable(scroll_result):
-                await scroll_result
+            self._follow_status.update()
+            self._scroll_bottom_button.update()
         except (RuntimeError, AttributeError):
             pass
-        self._last_flush_time = time.monotonic()
+
+    async def _export_logs(self, _e: ft.ControlEvent) -> None:
+        path = await self._log_export_picker.save_file(
+            dialog_title="导出日志",
+            file_name=f"logs-{datetime.now().strftime('%Y-%m-%d')}.txt",
+            allowed_extensions=["txt", "log"],
+            initial_directory=_last_directory[0] or None,
+        )
+        if not path:
+            return
+        _update_last_directory(path)
+        threshold = self._LEVEL_THRESHOLD[self._selected_level]
+        snapshot = [entry for entry in self._log_records if entry.levelno >= threshold]
+        try:
+            Path(path).write_text(
+                "\n".join(entry.message for entry in snapshot),
+                encoding="utf-8",
+            )
+        except OSError as ex:
+            logging.getLogger(__name__).error("日志导出失败: %s", ex)
+            return
+        logging.getLogger(__name__).info("日志已导出: %s", path)
 
     def _clamp_log_height(self, next_height: int) -> int:
         return max(MIN_LOG_HEIGHT, min(MAX_LOG_HEIGHT, next_height))
 
-    def _on_vertical_drag_update(self, e: ft.DragUpdateEvent):
+    def _on_vertical_drag_update(self, e: ft.DragUpdateEvent) -> None:
         if self._shutdown_event.is_set():
             return
         self._log_view_height = self._clamp_log_height(self._log_view_height - int(e.primary_delta))
@@ -281,98 +321,10 @@ class LogSystem:
         except RuntimeError:
             pass
 
-    def _on_page_resize(self, e):
+    def _on_page_resize(self, _e) -> None:
         self._log_view_height = self._clamp_log_height(self._log_view_height)
         self._log_height_container.height = self._log_view_height
         try:
             self._log_height_container.update()
         except RuntimeError:
             pass
-
-    async def _export_logs(self, _e: ft.ControlEvent):
-        path = await self._log_export_picker.save_file(
-            dialog_title="导出日志",
-            file_name=f"logs-{datetime.now().strftime('%Y-%m-%d')}.txt",
-            allowed_extensions=["txt", "log"],
-            initial_directory=_last_directory[0] or None,
-        )
-        if path:
-            _update_last_directory(path)
-            export_path = Path(path)
-            export_path.write_text(
-                "\n".join(str(r["message"]) for r in self._get_filtered_log_records()),
-                encoding="utf-8",
-            )
-            logging.getLogger(__name__).info(f"日志已导出: {export_path}")
-
-    async def _clear_logs(self, e=None):
-        try:
-            self._log_list.controls = []
-            with self._log_records_lock:
-                self._log_records.clear()
-            self._log_list.update()
-        except (RuntimeError, AttributeError, Exception) as ex:
-            logging.getLogger(__name__).debug("clear_logs 异常: %s", ex)
-
-    async def _scroll_to_bottom(self, e=None):
-        try:
-            scroll_result = self._log_list.scroll_to(offset=-1)
-            if inspect.isawaitable(scroll_result):
-                await scroll_result
-        except (RuntimeError, AttributeError):
-            pass
-
-    def _consume_logs(self):
-        while True:
-            try:
-                log_item = self._log_queue.get(timeout=max(self.FLUSH_INTERVAL * 4, 0.5))
-            except queue.Empty:
-                with self._pending_lock:
-                    pending_count = len(self._pending_records)
-                if pending_count > 0:
-                    elapsed = time.monotonic() - self._last_flush_time
-                    if elapsed > self.FALLBACK_FLUSH_TIMEOUT:
-                        try:
-                            self._page.run_task(self._flush_pending_to_ui)
-                        except Exception:
-                            pass
-                continue
-            except Exception:
-                continue
-            if log_item is None:
-                break
-            if self._shutdown_event.is_set():
-                continue
-            try:
-                self._append_log_record(log_item)
-                for _ in range(100):
-                    try:
-                        log_item = self._log_queue.get_nowait()
-                    except queue.Empty:
-                        break
-                    if log_item is None:
-                        return
-                    if not self._shutdown_event.is_set():
-                        self._append_log_record(log_item)
-                if not self._shutdown_event.is_set():
-                    self._schedule_flush()
-                with self._pending_lock:
-                    pending_count = len(self._pending_records)
-                if pending_count > 0:
-                    elapsed = time.monotonic() - self._last_flush_time
-                    if elapsed > self.FALLBACK_FLUSH_TIMEOUT:
-                        logging.getLogger(__name__).debug(
-                            "fallback flush: %d pending records stuck for %.1fs", pending_count, elapsed
-                        )
-                        try:
-                            self._page.run_task(self._flush_pending_to_ui)
-                        except Exception:
-                            pass
-            except Exception as ex:
-                import sys
-                if hasattr(sys.stderr, 'reconfigure'):
-                    try:
-                        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
-                    except Exception:
-                        pass
-                print(f"[日志消费线程异常] {ex}", file=sys.stderr)

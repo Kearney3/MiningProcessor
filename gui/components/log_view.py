@@ -12,14 +12,14 @@ except ImportError:
 def create_log_view(height: int = 300) -> tuple[ft.Container, "LogViewRefs"]:
     """创建适合实时追加的日志视图组件
 
-    使用 ListView（逐行 Text 控件）+ auto_scroll=True：
-    - 原生 scroll_to() 实现自动滚动到底部
-    - 不绑定 on_scroll 事件（彻底避免 Flet 控制树 diff 竞态 IndexError）
+    使用 ListView（逐行 Text 控件）：
+    - 日志控制器批量追加并按需滚动到底部
+    - 用户上翻后暂停自动跟随，避免阅读位置被新日志打断
     """
     log_list = ft.ListView(
         controls=[],
         spacing=4,
-        auto_scroll=True,
+        auto_scroll=False,
         expand=True,
     )
     level_filter = ft.Dropdown(
@@ -49,6 +49,13 @@ def create_log_view(height: int = 300) -> tuple[ft.Container, "LogViewRefs"]:
         icon=ft.Icons.VERTICAL_ALIGN_BOTTOM,
         tooltip="滚动到底部",
         icon_size=18,
+        icon_color=theme.TEXT_SECONDARY,
+    )
+    follow_status = ft.Text(
+        "已暂停跟随",
+        size=12,
+        color=theme.WARNING,
+        visible=False,
     )
     resize_handle = ft.GestureDetector(
         content=ft.Container(
@@ -71,7 +78,7 @@ def create_log_view(height: int = 300) -> tuple[ft.Container, "LogViewRefs"]:
         mouse_cursor=ft.MouseCursor.RESIZE_UP_DOWN,
     )
     toolbar = ft.Row(
-        [level_filter, export_button, clear_button, scroll_bottom_button],
+        [level_filter, export_button, clear_button, scroll_bottom_button, follow_status],
         spacing=4,
         wrap=False,
         alignment=ft.MainAxisAlignment.START,
@@ -94,6 +101,7 @@ def create_log_view(height: int = 300) -> tuple[ft.Container, "LogViewRefs"]:
     )
     refs = {
         "toolbar": toolbar,
+        "follow_status": follow_status,
         "level_filter": level_filter,
         "export_button": export_button,
         "clear_button": clear_button,
