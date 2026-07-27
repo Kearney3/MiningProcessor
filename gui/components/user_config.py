@@ -111,6 +111,7 @@ def _create_keywords_section(page: ft.Page, log):
         title="文件关键字配置",
         subtitle="用于批量处理时自动识别文件夹中的数据文件",
         icon=ft.Icons.KEY,
+        initially_expanded=False,
         content_controls=[
             ft.Text(
                 "所有类型均按文件名关键字匹配，Sheet 级别识别由各处理器内部完成。多个关键字用英文逗号分隔。",
@@ -891,6 +892,55 @@ def _create_anomaly_config_section(page: ft.Page, log):
         tooltip="基于百分位数的极端值检测",
     )
 
+    # --- 逐列检测开关（持久化到用户配置） ---
+    _COLUMN_LABELS: dict[str, str] = {
+        "fuel": "油耗", "fuel_engine": "发动机",
+        "production_running": "运行", "production": "生产",
+        "electrical": "电力", "worktime": "工时",
+    }
+    _COLUMN_DEFS: dict[str, dict[str, list[str]]] = {
+        "fuel": {"threshold": ["油品消耗"], "statistical": ["油品消耗"]},
+        "fuel_engine": {"threshold": ["发动机小时数开始", "发动机小时数结束", "运行小时数"], "statistical": ["运行小时数"]},
+        "production_running": {"threshold": ["运行里程", "运行小时数", "趟次"], "statistical": ["运行里程", "运行小时数", "趟次"]},
+        "production": {"threshold": ["趟次", "产量"], "statistical": ["趟次", "产量"]},
+        "electrical": {"threshold": ["电力消耗"], "statistical": ["电力消耗"]},
+        "worktime": {"threshold": ["__all_numeric__"], "statistical": []},
+    }
+    column_toggles: dict[str, ft.Checkbox] = {}  # key: "dtype:col"
+
+    def _build_column_toggles():
+        """构建逐列开关 UI。"""
+        col_rows = []
+        for dtype, type_label in _COLUMN_LABELS.items():
+            cols_cfg = _COLUMN_DEFS.get(dtype, {})
+            all_cols = sorted(set(cols_cfg.get("threshold", []) + cols_cfg.get("statistical", [])))
+            if not all_cols:
+                continue
+            cbs: list[ft.Control] = []
+            for col in all_cols:
+                key = f"{dtype}:{col}"
+                label = "全部数值列" if col == "__all_numeric__" else col
+                cb = ft.Checkbox(
+                    label=label,
+                    value=True,
+                    visual_density=ft.VisualDensity.COMPACT,
+                )
+                column_toggles[key] = cb
+                cbs.append(cb)
+            col_rows.append(
+                ft.Column([
+                    ft.Text(f"{type_label}:", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                    ft.Container(
+                        content=ft.Row(cbs, wrap=True, spacing=4, run_spacing=0),
+                        padding=ft.Padding.only(left=8),
+                    ),
+                ], spacing=2, tight=True)
+            )
+        column_toggle_area.controls = col_rows
+
+    column_toggle_area = ft.Column(spacing=4)
+    _build_column_toggles()
+
     type_dropdown = ft.Dropdown(
         label="数据类型",
         width=150,
@@ -1028,6 +1078,17 @@ def _create_anomaly_config_section(page: ft.Page, log):
         use_sigma_toggle.value = ad.get("use_sigma", True)
         use_percentile_toggle.value = ad.get("use_percentile", True)
 
+        # 加载逐列检测开关
+        thresholds_data = ad.get("thresholds", {})
+        stat_data = ad.get("statistical_columns", {})
+        for key, cb in column_toggles.items():
+            dtype, col = key.split(":", 1)
+            t_cfg = thresholds_data.get(dtype, {}).get(col, {})
+            s_cfg = stat_data.get(dtype, {}).get(col, {})
+            t_enabled = t_cfg.get("enabled", True) if isinstance(t_cfg, dict) else True
+            s_enabled = s_cfg.get("enabled", True) if isinstance(s_cfg, dict) else True
+            cb.value = t_enabled and s_enabled
+
         status_text.value = ""
         _build_rows()
         safe_update(sigma_field)
@@ -1036,6 +1097,8 @@ def _create_anomaly_config_section(page: ft.Page, log):
         safe_update(use_threshold_toggle)
         safe_update(use_sigma_toggle)
         safe_update(use_percentile_toggle)
+        for cb in column_toggles.values():
+            safe_update(cb)
 
     def _collect_and_save(_e=None):
         """收集 UI 值并保存。"""
@@ -1098,6 +1161,23 @@ def _create_anomaly_config_section(page: ft.Page, log):
             "use_sigma": use_sigma_toggle.value,
             "use_percentile": use_percentile_toggle.value,
         }
+
+        # 合并逐列检测开关到 thresholds 和 statistical_columns
+        thresholds_out = updates["thresholds"]
+        stat_cols_out: dict[str, dict] = {}
+        for key, cb in column_toggles.items():
+            dtype, col = key.split(":", 1)
+            val = cb.value
+            # thresholds 中标记 enabled
+            if dtype in thresholds_out and col in thresholds_out[dtype]:
+                thresholds_out[dtype][col] = {**thresholds_out[dtype][col], "enabled": val}
+            elif val is False:
+                # 列不在阈值表但被关闭，需记录
+                thresholds_out.setdefault(dtype, {})[col] = {"enabled": False}
+            # statistical_columns 中标记 enabled
+            stat_cols_out.setdefault(dtype, {})[col] = {"enabled": val}
+        updates["thresholds"] = thresholds_out
+        updates["statistical_columns"] = stat_cols_out
         config_loader.update_anomaly_detection_config(updates)
         status_text.value = "异常值检测配置已保存"
         _log_message(log, "已保存异常值检测配置")
@@ -1136,6 +1216,13 @@ def _create_anomaly_config_section(page: ft.Page, log):
             ft.Divider(height=1, color=theme.BORDER),
             ft.Text("统计参数", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
             ft.Row([sigma_field, pct_low_field, pct_high_field], spacing=12),
+            ft.Divider(height=1, color=theme.BORDER),
+            ft.Text("逐列检测开关", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+            ft.Text(
+                "关闭某列的开关后，该列将不参与任何异常检测（阈值、σ、百分位均跳过）。",
+                size=11, color=theme.TEXT_SECONDARY,
+            ),
+            column_toggle_area,
             ft.Divider(height=1, color=theme.BORDER),
             ft.Text("阈值配置", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
             type_dropdown,

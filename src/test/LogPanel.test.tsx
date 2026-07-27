@@ -44,7 +44,7 @@ describe("LogPanel", () => {
     render(<LogPanel logs={logs} onClear={onClear} />);
 
     // Filter to ERROR only
-    fireEvent.change(screen.getByDisplayValue("全部"), { target: { value: "ERROR" } });
+    fireEvent.change(screen.getByDisplayValue("INFO"), { target: { value: "ERROR" } });
     expect(screen.getByText("error-msg")).toBeInTheDocument();
     expect(screen.queryByText("info-msg")).not.toBeInTheDocument();
     expect(screen.queryByText("warn-msg")).not.toBeInTheDocument();
@@ -59,22 +59,24 @@ describe("LogPanel", () => {
     ];
     render(<LogPanel logs={logs} onClear={onClear} />);
 
-    fireEvent.change(screen.getByDisplayValue("全部"), { target: { value: "WARNING" } });
+    fireEvent.change(screen.getByDisplayValue("INFO"), { target: { value: "WARNING" } });
     expect(screen.getByText("warn-msg")).toBeInTheDocument();
     expect(screen.getByText("error-msg")).toBeInTheDocument();
     expect(screen.queryByText("info-msg")).not.toBeInTheDocument();
     expect(screen.getByText("2")).toBeInTheDocument();
   });
 
-  it("filters logs by level and above (INFO shows INFO + WARNING + ERROR)", () => {
+  it("default INFO filter hides DEBUG logs", () => {
     const logs = [
-      makeLog("INFO", "info-msg", 1),
-      makeLog("WARNING", "warn-msg", 2),
-      makeLog("ERROR", "error-msg", 3),
+      makeLog("DEBUG", "debug-msg", 1),
+      makeLog("INFO", "info-msg", 2),
+      makeLog("WARNING", "warn-msg", 3),
+      makeLog("ERROR", "error-msg", 4),
     ];
     render(<LogPanel logs={logs} onClear={onClear} />);
 
-    fireEvent.change(screen.getByDisplayValue("全部"), { target: { value: "INFO" } });
+    // Default is INFO: shows INFO + WARNING + ERROR, hides DEBUG
+    expect(screen.queryByText("debug-msg")).not.toBeInTheDocument();
     expect(screen.getByText("info-msg")).toBeInTheDocument();
     expect(screen.getByText("warn-msg")).toBeInTheDocument();
     expect(screen.getByText("error-msg")).toBeInTheDocument();

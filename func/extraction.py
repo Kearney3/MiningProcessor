@@ -1,6 +1,7 @@
 """维修记录提取逻辑
 
 从设备出勤统计表的单元格批注中提取维修记录，支持隐藏行/列过滤和公式解析。
+支持 .xlsx（openpyxl）和 .xls（xlrd）两种格式。
 """
 import ast as _ast
 import glob
@@ -10,6 +11,7 @@ import re
 from datetime import date
 
 import openpyxl
+import xlrd
 
 from func.logger import get_logger
 from func.maintenance_utils import (
@@ -67,6 +69,72 @@ def _safe_eval_formula(value) -> int | None:
         return int(float(result))
     except (ZeroDivisionError, SyntaxError, ValueError, TypeError):
         return None
+
+
+# ── xlrd 适配器 ────────────────────────────────────────────────
+
+class _XlrdCell:
+    """将 xlrd 单元格适配为 openpyxl 风格的 cell 对象（最小接口）。"""
+
+    __slots__ = ("value", "comment")
+
+    def __init__(self, value):
+        self.value = value
+        self.comment = None  # .xls 不支持批注
+
+
+class _XlrdRow:
+    """将 xlrd 一行适配为 openpyxl 可迭代行。"""
+
+    def __init__(self, sheet, row_idx):
+        self._sheet = sheet
+        self._row_idx = row_idx
+
+    def __iter__(self):
+        for col_idx in range(self._sheet.ncols):
+            yield _XlrdCell(self._sheet.cell_value(self._row_idx, col_idx))
+
+    def __getitem__(self, col_idx):
+        return _XlrdCell(self._sheet.cell_value(self._row_idx, col_idx))
+
+
+class _XlrdSheetWrapper:
+    """将 xlrd.sheet.Sheet 适配为 openpyxl Worksheet 最小接口。
+
+    仅实现 ``extract_sheet_records`` 和 ``detect_header_layout`` 使用的属性。
+    """
+
+    def __init__(self, sheet: xlrd.sheet.Sheet):
+        self._sheet = sheet
+
+    @property
+    def max_row(self) -> int:
+        return self._sheet.nrows
+
+    @property
+    def row_dimensions(self):
+        return {
+            i: type("Dim", (), {"hidden": self._sheet.rowinfo_map.get(i, xlrd.sheet.Rowinfo()).hidden})()
+            for i in range(self._sheet.nrows)
+        }
+
+    @property
+    def column_dimensions(self):
+        from openpyxl.utils import get_column_letter
+        return {
+            get_column_letter(i + 1): type("Dim", (), {"hidden": self._sheet.colinfo_map.get(i, xlrd.sheet.Colinfo()).hidden})()
+            for i in range(self._sheet.ncols)
+        }
+
+    def cell(self, row: int, column: int):
+        return _XlrdCell(self._sheet.cell_value(row - 1, column - 1))
+
+    def __getitem__(self, row_idx):
+        return _XlrdRow(self._sheet, row_idx - 1)
+
+
+def _is_xls(filepath: str) -> bool:
+    return filepath.lower().endswith(".xls")
 
 
 # ── 记录提取 ──────────────────────────────────────────────────
@@ -206,7 +274,8 @@ def discover_files(file_path: str, file_keywords: list[str]) -> list[str]:
         return [file_path]
 
     files = []
-    for f in sorted(glob.glob(os.path.join(file_path, "*.xlsx"))):
+    for f in sorted(glob.glob(os.path.join(file_path, "*.xlsx"))
+                     + glob.glob(os.path.join(file_path, "*.xls"))):
         basename = os.path.basename(f)
         if basename.startswith("~$"):
             continue
@@ -246,50 +315,89 @@ def extract_all_records(
         file_year, file_month = parse_year_month_from_filename(filename)
         logger.info("处理: %s (年=%s, 月=%s)", filename, file_year, file_month)
 
-        try:
-            wb = openpyxl.load_workbook(filepath)
-        except Exception as e:
-            logger.error("无法打开文件 %s: %s", filepath, e)
-            continue
+        use_xlrd = _is_xls(filepath)
 
-        # 第二个 workbook 用于读取公式单元格的计算结果
-        try:
-            wb_values = openpyxl.load_workbook(filepath, data_only=True)
-        except Exception:
-            wb_values = None
+        if use_xlrd:
+            try:
+                xlrd_book = xlrd.open_workbook(filepath, formatting_info=True)
+            except Exception as e:
+                logger.error("无法打开文件 %s: %s", filepath, e)
+                continue
 
-        try:
-            multi_sheet = len(wb.sheetnames) > 1
+            try:
+                multi_sheet = xlrd_book.nsheets > 1
 
-            for sheetname in wb.sheetnames:
-                sheet_month = parse_month_from_sheetname(sheetname)
-                year = file_year
-                month = sheet_month if (multi_sheet and sheet_month) else (file_month or sheet_month)
+                for sheet_idx in range(xlrd_book.nsheets):
+                    sheetname = xlrd_book.sheet_names()[sheet_idx]
+                    sheet_month = parse_month_from_sheetname(sheetname)
+                    year = file_year
+                    month = sheet_month if (multi_sheet and sheet_month) else (file_month or sheet_month)
 
-                if not year or not month:
-                    logger.debug("跳过 sheet '%s': 无法确定年月", sheetname)
-                    continue
+                    if not year or not month:
+                        logger.debug("跳过 sheet '%s': 无法确定年月", sheetname)
+                        continue
 
-                key = (year, month)
-                if key in processed_months:
-                    logger.debug("跳过 sheet '%s' -> %d年%d月 (已处理)", sheetname, year, month)
-                    continue
+                    key = (year, month)
+                    if key in processed_months:
+                        logger.debug("跳过 sheet '%s' -> %d年%d月 (已处理)", sheetname, year, month)
+                        continue
 
-                ws = wb[sheetname]
-                ws_values = wb_values[sheetname] if wb_values and sheetname in wb_values.sheetnames else None
-                records = extract_sheet_records(
-                    ws, year, month,
-                    skip_hidden_rows=skip_hidden_rows,
-                    skip_hidden_cols=skip_hidden_cols,
-                    ws_values=ws_values,
-                )
-                all_records.extend(records)
-                processed_months.add(key)
-                logger.info("  sheet '%s' -> %d年%d月: %d 条记录", sheetname, year, month, len(records))
-        finally:
-            wb.close()
-            if wb_values:
-                wb_values.close()
+                    ws = _XlrdSheetWrapper(xlrd_book.sheet_by_index(sheet_idx))
+                    records = extract_sheet_records(
+                        ws, year, month,
+                        skip_hidden_rows=skip_hidden_rows,
+                        skip_hidden_cols=skip_hidden_cols,
+                        ws_values=None,
+                    )
+                    all_records.extend(records)
+                    processed_months.add(key)
+                    logger.info("  sheet '%s' -> %d年%d月: %d 条记录", sheetname, year, month, len(records))
+            finally:
+                xlrd_book.release_resources()
+        else:
+            try:
+                wb = openpyxl.load_workbook(filepath)
+            except Exception as e:
+                logger.error("无法打开文件 %s: %s", filepath, e)
+                continue
+
+            try:
+                wb_values = openpyxl.load_workbook(filepath, data_only=True)
+            except Exception:
+                wb_values = None
+
+            try:
+                multi_sheet = len(wb.sheetnames) > 1
+
+                for sheetname in wb.sheetnames:
+                    sheet_month = parse_month_from_sheetname(sheetname)
+                    year = file_year
+                    month = sheet_month if (multi_sheet and sheet_month) else (file_month or sheet_month)
+
+                    if not year or not month:
+                        logger.debug("跳过 sheet '%s': 无法确定年月", sheetname)
+                        continue
+
+                    key = (year, month)
+                    if key in processed_months:
+                        logger.debug("跳过 sheet '%s' -> %d年%d月 (已处理)", sheetname, year, month)
+                        continue
+
+                    ws = wb[sheetname]
+                    ws_values = wb_values[sheetname] if wb_values and sheetname in wb_values.sheetnames else None
+                    records = extract_sheet_records(
+                        ws, year, month,
+                        skip_hidden_rows=skip_hidden_rows,
+                        skip_hidden_cols=skip_hidden_cols,
+                        ws_values=ws_values,
+                    )
+                    all_records.extend(records)
+                    processed_months.add(key)
+                    logger.info("  sheet '%s' -> %d年%d月: %d 条记录", sheetname, year, month, len(records))
+            finally:
+                wb.close()
+                if wb_values:
+                    wb_values.close()
 
     logger.info("共提取 %d 条维修记录 (%d 个月)", len(all_records), len(processed_months))
     return all_records

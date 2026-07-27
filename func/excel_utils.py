@@ -53,6 +53,11 @@ def sanitize_filename(name: str) -> str:
 # Hidden rows / columns detection
 # ---------------------------------------------------------------------------
 
+def _is_xls(file_path: str) -> bool:
+    """Return ``True`` if *file_path* is an old-format ``.xls`` workbook."""
+    return str(file_path).lower().endswith(".xls")
+
+
 def get_hidden_indices(
     file_path: str,
     sheet_name: str | int = 0,
@@ -71,7 +76,16 @@ def get_hidden_indices(
         ``(hidden_rows, hidden_cols)`` where *hidden_rows* is a set of
         1-based row indices and *hidden_cols* is a set of column letters
         (e.g. ``{'B', 'F'}``).  Both may be empty.
+
+    Note:
+        Old-format ``.xls`` files (BIFF) are opened with ``xlrd`` which
+        does not expose row/column dimension metadata.  For ``.xls``
+        files this function always returns two empty sets — hidden
+        row/column filtering is silently skipped.
     """
+    if _is_xls(file_path):
+        return set(), set()
+
     from openpyxl import load_workbook
 
     should_close = _workbook is None
@@ -94,6 +108,9 @@ def get_hidden_indices(
 def open_workbook(file_path: str):
     """Open an openpyxl workbook for reuse across multiple ``get_hidden_indices`` calls.
 
+    For old-format ``.xls`` files, returns ``None`` — callers should
+    treat a ``None`` return the same as "hidden-row detection unavailable".
+
     Usage::
 
         wb = open_workbook(path)
@@ -101,8 +118,11 @@ def open_workbook(file_path: str):
             h_rows, h_cols = get_hidden_indices(path, "Sheet1", _workbook=wb)
             ...
         finally:
-            wb.close()
+            if wb is not None:
+                wb.close()
     """
+    if _is_xls(file_path):
+        return None
     from openpyxl import load_workbook
     return load_workbook(file_path, read_only=False, data_only=True)
 

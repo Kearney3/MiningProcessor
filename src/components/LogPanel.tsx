@@ -71,7 +71,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
   const [height, setHeight] = useState(180);
   const [isResizing, setIsResizing] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
-  const [filterLevel, setFilterLevel] = useState<string>("ALL");
+  const [filterLevel, setFilterLevel] = useState<string>("INFO");
   const [copied, setCopied] = useState(false);
 
   // Auto-scroll to bottom
@@ -114,10 +114,9 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
     };
   }, [isResizing]);
 
-  const filteredLogs =
-    filterLevel === "ALL"
-      ? logs
-      : logs.filter((l) => (LEVEL_ORDER[l.level] ?? 0) >= (LEVEL_ORDER[filterLevel] ?? 0));
+  const filteredLogs = logs.filter(
+    (l) => (LEVEL_ORDER[l.level] ?? 0) >= (LEVEL_ORDER[filterLevel] ?? 0),
+  );
 
   const handleCopyAll = useCallback(() => {
     const text = filteredLogs
@@ -187,7 +186,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
             onChange={(e) => setFilterLevel(e.target.value)}
             className="text-xs bg-white border border-slate-200 rounded px-2 py-0.5 text-slate-500 cursor-pointer hover:border-slate-300 appearance-none"
           >
-            <option value="ALL">全部</option>
+            <option value="DEBUG">DEBUG</option>
             <option value="INFO">INFO</option>
             <option value="WARNING">WARN</option>
             <option value="ERROR">ERROR</option>

@@ -18,7 +18,7 @@ import { UserConfigPage } from "./components/pages/UserConfigPage";
 
 function App() {
   const [currentPage, setCurrentPage] = useState<PageId>("data-processing");
-  const [appVersion, setAppVersion] = useState("v1.4.5");
+  const [appVersion, setAppVersion] = useState("v1.5.0");
   const bridge = usePythonBridge();
 
   useEffect(() => {

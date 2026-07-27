@@ -76,63 +76,34 @@ def import_excel(
     Returns ``(parsed_sheets, sheet_names)``.  *progress_cb* and
     *cancel_event* are optional hooks so the GUI can show a progress bar and
     honour a cancel button.
-    """
-    from openpyxl import load_workbook
 
+    Supports both ``.xlsx`` (openpyxl) and ``.xls`` (xlrd) files.
+    """
     parsed_sheets: dict[str, pd.DataFrame] = {}
     cancelled = cancel_event or threading.Event()
 
-    wb = load_workbook(file_path, read_only=True, data_only=True)
-    sheet_names = list(wb.sheetnames)
-    total_sheets = len(sheet_names)
+    with pd.ExcelFile(file_path) as xl:
+        sheet_names = list(xl.sheet_names)
+        total_sheets = len(sheet_names)
 
-    if total_sheets == 0:
-        wb.close()
-        return parsed_sheets, sheet_names
+        if total_sheets == 0:
+            return parsed_sheets, sheet_names
 
-    try:
         for sname in sheet_names:
             if cancelled.is_set():
                 break
 
-            ws = wb[sname]
-            total_rows = ws.max_row or 0
-            total_cols = ws.max_column or 0
+            df = xl.parse(sname)
 
-            if total_rows == 0 or total_cols == 0:
+            if df.empty:
                 parsed_sheets[sname] = pd.DataFrame()
                 continue
 
-            headers: list[str] = []
-            for cell in next(ws.iter_rows(min_row=1, max_row=1)):
-                val = cell.value
-                headers.append(str(val).strip() if val is not None else f"Col{cell.column - 1}")
-
-            rows_data: list[list[Any]] = []
-            rows_read = 0
-            for row in ws.iter_rows(min_row=2, values_only=True):
-                if cancelled.is_set():
-                    break
-                rows_data.append(list(row))
-                rows_read += 1
-                if rows_read % 500 == 0 and progress_cb:
-                    progress_cb(rows_read / total_rows if total_rows > 0 else 0,
-                                f"正在导入 {sname}: {rows_read}/{total_rows} 行")
-
-            if rows_data:
-                header_len = len(headers)
-                row_lens = set(len(r) for r in rows_data)
-                if len(row_lens) > 1 or (row_lens and header_len not in row_lens):
-                    logger.debug("Sheet %r: header_len=%d, row_lengths=%s", sname, header_len, row_lens)
-                df = pd.DataFrame(rows_data, columns=headers)
-                df = strip_date_only_times(df)
-            else:
-                df = pd.DataFrame(columns=headers)
-
+            df = strip_date_only_times(df)
             parsed_sheets[sname] = df
+            if progress_cb:
+                progress_cb(1.0, f"已导入 {sname}: {len(df)} 行")
             logger.info("已导入 %s: %d 行, %d 列", sname, len(df), len(df.columns))
-    finally:
-        wb.close()
 
     return parsed_sheets, sheet_names
 

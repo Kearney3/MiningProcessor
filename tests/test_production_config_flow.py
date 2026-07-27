@@ -55,7 +55,7 @@ def test_execute_task_passes_current_device_load_map_to_production_processor(mon
     input_file = tmp_path / "sample.xlsx"
     input_file.write_text("placeholder", encoding="utf-8")
 
-    error = logic._execute_task("production", str(input_file), raw_start=9)
+    error, extra = logic._execute_task("production", str(input_file), raw_start=9)
 
     assert error is None
     assert len(ProcessorSpy.instances) == 1
