@@ -170,7 +170,9 @@ MiningProcessor/
 ├── gui/                        # Flet 桌面 GUI（保留，可独立运行）
 │   ├── main.py                 # 组装页面 + 日志初始化
 │   ├── logic.py                # 按钮事件绑定 + 后台任务调度
-│   ├── theme.py / utils.py / log_system.py
+│   ├── theme.py / utils.py      # 主题与 GUI 辅助函数
+│   ├── log_broker.py            # 进程级日志分发与页面订阅
+│   ├── log_system.py            # Flet 页面日志状态与单写者渲染
 │   └── components/             # 13 个组件模块（batch/common/config/ledger/oil_ledger/sync_minebase/...）
 ├── tauri_bridge.py             # JSON-RPC over stdio 服务端（GUI 入口）
 ├── tauri_bridge.spec           # PyInstaller 打包配置
@@ -260,7 +262,9 @@ MiningProcessor/
 
 ### 统一日志
 
-`func/logger.py` 提供 `logging` + `get_logger()`，CLI 直接输出控制台，GUI 通过 `QueueHandler`（Flet）或 JSON-RPC 事件（Tauri）推送到页面日志列表。新增处理逻辑请使用 `logging` 而非 `print()`。
+`func/logger.py` 提供 `logging` + `get_logger()`，CLI 直接输出控制台。Flet 由进程级 `GuiLogHandler` 将记录广播给各页面订阅，每个页面通过单一异步刷新入口批量更新日志列表；Tauri 通过 JSON-RPC 事件推送。新增处理逻辑请使用 `logging` 而非 `print()`。
+
+Flet 日志面板保留最近 5000 条历史记录、最多渲染 1000 个控件。用户上翻时会暂停自动跟随；队列高峰时优先保留 WARNING/ERROR。界面中的异常只显示根因，导出的日志保留完整 traceback 供诊断。
 
 ### 设备台账与油品台账
 
@@ -413,13 +417,13 @@ uv run scripts/bump_version.py --bump minor --dry-run
 - 🆕 用户配置页面增强（Flet + Tauri）：新增逐列异常检测开关管理界面
 - 🐛 油耗模块班次识别改进：改为扫描所有表头行（不再固定第 3 行），燃油类型增加关键字扫描后备机制
 - 🐛 油耗模块移除无油品类型的空记录，避免无效数据污染输出
-- 🐛 日志面板重构：用 ListView 替代 Column + on_scroll，原生 auto_scroll 彻底避免 Flet 控制树 diff 竞态 IndexError；日志级别筛选默认值改为 INFO
+- 🐛 Flet 日志面板重构：进程级 Broker 隔离多页面订阅，页面使用单一异步刷新入口消除控制树竞态；支持上翻暂停跟随、有界渲染、高峰期优先保留警告/错误，日志级别筛选默认值为 INFO
 - 🐛 生产处理摘要（_processing_summary）：process_folder 返回 warnings 和 errors 列表，调用方可获取未匹配型号等警告
 - 🎨 Tauri AnomalyPanel 简化：移除运行时逐列开关 UI（ColumnToggles），只保留开关和模式选择
 - 🎨 用户配置页面文件关键字区块默认折叠，减少视觉干扰
 - 🎨 ledger_match.py、maintenance_classification.py 代码精简
 - 🔧 全量版本号更新到 v1.5.0（pyproject.toml / package.json / tauri.conf.json / Cargo.toml）
-- 🧪 测试用例从 887 个增加到 935 个
+- 🧪 测试用例从 887 个增加到 937 个
 
 ### v1.3.1 · 2026-07-20
 

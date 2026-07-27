@@ -98,6 +98,7 @@ class OilLedgerRefs(TypedDict):
 
 class LogViewRefs(TypedDict):
     toolbar: ft.Row
+    follow_status: ft.Text
     level_filter: ft.Dropdown
     export_button: ft.IconButton
     clear_button: ft.IconButton
