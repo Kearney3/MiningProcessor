@@ -109,18 +109,31 @@ class LogSystem:
             return ft.Colors.ORANGE
         return None
 
+    _LEVEL_THRESHOLD = {
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARNING": logging.WARNING,
+        "ERROR": logging.ERROR,
+        "CRITICAL": logging.CRITICAL,
+    }
+
     def _get_selected_level(self) -> str:
         raw_value = getattr(self._level_filter, "value", "ALL")
         if raw_value is None:
             return "ALL"
         return str(raw_value).strip() or "ALL"
 
+    def _pass_level_filter(self, record: dict[str, object]) -> bool:
+        """判断记录是否通过当前级别筛选（选中级别及以上）。"""
+        selected = self._get_selected_level()
+        if selected == "ALL":
+            return True
+        threshold = self._LEVEL_THRESHOLD.get(selected, logging.DEBUG)
+        return int(record.get("levelno", 0)) >= threshold
+
     def _get_filtered_log_records(self) -> list[dict[str, object]]:
-        selected_level = self._get_selected_level()
         with self._log_records_lock:
-            if selected_level == "ALL":
-                return list(self._log_records)
-            return [r for r in self._log_records if str(r.get("levelname", "")) == selected_level]
+            return [r for r in self._log_records if self._pass_level_filter(r)]
 
     def _flush_pending_to_ui(self):
         """将待显示记录追加到 ListView。"""
@@ -130,9 +143,8 @@ class LogSystem:
         if not batch or self._shutdown_event.is_set():
             return
         batch.sort(key=lambda r: r.get("seq", 0))
-        selected_level = self._get_selected_level()
         for record in batch:
-            if selected_level != "ALL" and record.get("levelname") != selected_level:
+            if not self._pass_level_filter(record):
                 continue
             self._log_list.controls.append(
                 ft.Text(
@@ -197,11 +209,7 @@ class LogSystem:
     def _apply_filters(self, _e=None):
         with self._log_records_lock:
             records = list(self._log_records)
-        selected_level = self._get_selected_level()
-        filtered = [
-            r for r in records
-            if selected_level == "ALL" or r.get("levelname") == selected_level
-        ]
+        filtered = [r for r in records if self._pass_level_filter(r)]
         self._log_list.controls = [
             ft.Text(
                 str(r["message"]),

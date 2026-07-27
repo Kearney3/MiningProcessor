@@ -644,6 +644,69 @@ def test_gui_main_filters_logs_by_level(monkeypatch):
 
 
 
+def test_gui_main_filters_logs_by_level_and_above(monkeypatch):
+    monkeypatch.setattr(gui_main.cmp, "create_ledger_section", lambda page, log: (object(), {}))
+    monkeypatch.setattr(gui_main.cmp, "create_config_section", lambda page, log: (object(), {}))
+    monkeypatch.setattr(gui_main.cmp, "create_modules_section", lambda page: (object(), {}))
+
+    log_view, refs = make_stub_log_view()
+    monkeypatch.setattr(gui_main.cmp, "create_log_view", lambda: (log_view, refs))
+    monkeypatch.setattr(gui_main.logic, "wire_processing_buttons", lambda module_refs, page, log, *a, **kw: None)
+    monkeypatch.setattr(gui_main.logic, "init", lambda config_refs: None)
+
+    captured = {}
+
+    def capture_ledger_section(page, log):
+        captured["log"] = log
+        return object(), {}
+
+    monkeypatch.setattr(gui_main.cmp, "create_ledger_section", capture_ledger_section)
+
+    page = PageSpy()
+    gui_main.main(page)
+    time.sleep(0.1)
+
+    # 清空已有日志，确保只看到下面发出的测试日志
+    refs["log_list"].controls.clear()
+
+    # setup_logging 默认 INFO，临时降到 DEBUG 以发出 DEBUG 消息
+    prev_level = logging.root.level
+    logging.root.setLevel(logging.DEBUG)
+    try:
+        captured["log"]("debug消息", level=logging.DEBUG)
+        captured["log"]("info消息", level=logging.INFO)
+        captured["log"]("warning消息", level=logging.WARNING)
+        captured["log"]("error消息", level=logging.ERROR)
+    finally:
+        logging.root.setLevel(prev_level)
+    time.sleep(0.3)
+
+    # WARNING 及以上：应包含 WARNING + ERROR，不含 INFO / DEBUG
+    refs["level_filter"].value = "WARNING"
+    refs["level_filter"].on_select(DummyControlEvent(refs["level_filter"]))
+    values = [c.value for c in refs["log_list"].controls]
+    assert any("warning消息" in v for v in values)
+    assert any("error消息" in v for v in values)
+    assert not any("info消息" in v for v in values)
+    assert not any("debug消息" in v for v in values)
+
+    # INFO 及以上：应包含 INFO + WARNING + ERROR，不含 DEBUG
+    refs["level_filter"].value = "INFO"
+    refs["level_filter"].on_select(DummyControlEvent(refs["level_filter"]))
+    values = [c.value for c in refs["log_list"].controls]
+    assert any("info消息" in v for v in values)
+    assert any("warning消息" in v for v in values)
+    assert any("error消息" in v for v in values)
+    assert not any("debug消息" in v for v in values)
+
+    # DEBUG 及以上：应包含全部 4 条测试日志
+    refs["level_filter"].value = "DEBUG"
+    refs["level_filter"].on_select(DummyControlEvent(refs["level_filter"]))
+    values = [c.value for c in refs["log_list"].controls]
+    assert sum(1 for v in values if "消息" in v) == 4
+
+
+
 def test_gui_main_exports_filtered_logs(monkeypatch, tmp_path):
     monkeypatch.setattr(gui_main.cmp, "create_ledger_section", lambda page, log: (object(), {}))
     monkeypatch.setattr(gui_main.cmp, "create_config_section", lambda page, log: (object(), {}))

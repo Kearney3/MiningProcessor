@@ -8,6 +8,7 @@ from typing import Any
 import pandas as pd
 import os
 import re
+import threading
 
 from func import config_loader
 from func.string_utils import clean_string
@@ -45,6 +46,8 @@ class MiningDataProcessor:
         self.need_hidden = skip_hidden_rows or skip_hidden_cols
         self._hidden_rows: set[int] = set()
         self._hidden_cols: set[str] = set()
+        self._unmatched_trucks: dict[str, int] = {}
+        self._unmatched_lock = threading.Lock()
         if raw_start == -1:
             self.auto_detect = True
         else:
@@ -144,6 +147,23 @@ class MiningDataProcessor:
                     return col
         return None
 
+    def _log_unmatched_trucks(self, reset: bool = True) -> None:
+        """记录未匹配装载量的矿卡及受影响记录数，然后清空跟踪器。"""
+        with self._unmatched_lock:
+            if not self._unmatched_trucks:
+                return
+            total = sum(self._unmatched_trucks.values())
+            details = ", ".join(
+                f"{name}({count}条)" for name, count in
+                sorted(self._unmatched_trucks.items(), key=lambda x: x[1], reverse=True)
+            )
+            logger.warning(
+                "以下矿卡型号未匹配到装载量配置，产量将为 0（共 %d 条记录受影响）: %s",
+                total, details,
+            )
+            if reset:
+                self._unmatched_trucks.clear()
+
     # ---------------------------
     # 处理第一个sheet
     # ---------------------------
@@ -183,7 +203,7 @@ class MiningDataProcessor:
             row_positions = [df_raw.index.get_loc(lbl) for lbl in search_area[mask].index]
             if len(row_positions) > 0:
                 raw_start = row_positions[0] + 1  # 转回 1-based
-                logger.info(f"开启自动检测，找到目标文本{self.target_text}，行号为: {raw_start}")
+                logger.debug(f"开启自动检测，找到目标文本{self.target_text}，行号为: {raw_start}")
             else:
                 raise ValueError(f"未找到目标文本{self.target_text},请检查数据是否正确")
 
@@ -291,6 +311,7 @@ class MiningDataProcessor:
 
             total_trips = 0
             capacity = self.get_load_capacity(truck_name)
+            affected_rows = 0
 
             for col_idx, excavator_name, ore_type in production_col_info:
                 trips = self.safe_number(data.iat[_row_pos, col_idx], default=0)
@@ -307,6 +328,14 @@ class MiningDataProcessor:
                         "产量": production
                     })
                     total_trips += trips
+                    if capacity == 0:
+                        affected_rows += 1
+
+            if affected_rows > 0:
+                with self._unmatched_lock:
+                    self._unmatched_trucks[truck_name] = (
+                        self._unmatched_trucks.get(truck_name, 0) + affected_rows
+                    )
 
             running_rows.append({
                 "日期": date_val,
@@ -418,7 +447,7 @@ class MiningDataProcessor:
         if len(keyword_hits) == 1:
             prod_idx = keyword_hits[0]["idx"]
             run_idx = 1 - prod_idx  # 另一个 sheet
-            logger.info("Sheet 角色识别：sheet %d = 生产数据（关键字匹配）, sheet %d = 运行数据", prod_idx, run_idx)
+            logger.debug("Sheet 角色识别：sheet %d = 生产数据（关键字匹配）, sheet %d = 运行数据", prod_idx, run_idx)
             return (prod_idx, run_idx)
 
         # 规则 2：列数最多的 sheet → 生产数据（生产表有大量挖机×矿石列）
@@ -427,12 +456,12 @@ class MiningDataProcessor:
         if widest["col_count"] > 50 and narrowest["col_count"] < 30:
             prod_idx = widest["idx"]
             run_idx = narrowest["idx"]
-            logger.info("Sheet 角色识别：sheet %d = 生产数据（%d列）, sheet %d = 运行数据（%d列）",
+            logger.debug("Sheet 角色识别：sheet %d = 生产数据（%d列）, sheet %d = 运行数据（%d列）",
                         prod_idx, widest["col_count"], run_idx, narrowest["col_count"])
             return (prod_idx, run_idx)
 
         # 回退：默认顺序
-        logger.info("Sheet 角色识别：无法确定，使用默认顺序 sheet 0 = 生产数据, sheet 1 = 运行数据")
+        logger.debug("Sheet 角色识别：无法确定，使用默认顺序 sheet 0 = 生产数据, sheet 1 = 运行数据")
         return (0, 1)
 
     # ---------------------------
@@ -470,7 +499,7 @@ class MiningDataProcessor:
                 adjusted_raw_start = adjust_index_for_hidden(
                     self.raw_start - 1, _h_rows_s1, one_based=True,
                 ) + 1
-                logger.info(f"raw_start 从 {self.raw_start} 调整为 {adjusted_raw_start}（跳过隐藏行）")
+                logger.debug(f"raw_start 从 {self.raw_start} 调整为 {adjusted_raw_start}（跳过隐藏行）")
                 orig_raw_start = self.raw_start
                 self.raw_start = adjusted_raw_start
                 running_df_1, production_df = self.process_sheet1(df_prod_sheet, date_val, shift_val)
@@ -518,6 +547,7 @@ class MiningDataProcessor:
             from func.excel_formatter import write_formatted_excel
             write_formatted_excel(output_file, {"运行数据": running_df, "生产数据": production_df})
 
+        self._log_unmatched_trucks()
         return running_df, production_df
 
     # ---------------------------
@@ -592,7 +622,7 @@ class MiningDataProcessor:
                         all_running.append(running_df)
                         all_production.append(production_df)
                         success_files += 1
-                        logger.info(f"处理成功: {rel_path}")
+                        logger.debug(f"处理成功: {rel_path}")
                     else:
                         logger.error(f"处理失败: {rel_path} -> {error_msg}")
                 except Exception as e:
@@ -630,6 +660,7 @@ class MiningDataProcessor:
                 sheets["生产数据"] = final_production
             logger.info(
                 f"统计信息：共处理 {total_files} 个文件，成功 {success_files} 个，失败 {total_files - success_files} 个")
+            self._log_unmatched_trucks()
             return sheets if sheets else None
 
         from func.excel_formatter import write_formatted_excel
@@ -638,6 +669,7 @@ class MiningDataProcessor:
         logger.info(f"汇总完成，输出文件：{output_file}")
         logger.info(
             f"统计信息：共处理 {total_files} 个文件，成功 {success_files} 个，失败 {total_files - success_files} 个")
+        self._log_unmatched_trucks()
 
 
 def main():

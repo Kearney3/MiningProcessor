@@ -18,6 +18,16 @@ const LEVEL_DOT: Record<string, string> = {
 
 const DEFAULT_DOT = "bg-slate-400";
 
+/** 数字越大级别越高，用于"选中级别及以上"筛选 */
+const LEVEL_ORDER: Record<string, number> = {
+  DEBUG: 10,
+  INFO: 20,
+  WARNING: 30,
+  ERROR: 40,
+  CRITICAL: 50,
+  STDERR: 40,
+};
+
 // --- Toolbar SVG icons ---
 
 function IconClipboard() {
@@ -107,7 +117,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
   const filteredLogs =
     filterLevel === "ALL"
       ? logs
-      : logs.filter((l) => l.level === filterLevel);
+      : logs.filter((l) => (LEVEL_ORDER[l.level] ?? 0) >= (LEVEL_ORDER[filterLevel] ?? 0));
 
   const handleCopyAll = useCallback(() => {
     const text = filteredLogs

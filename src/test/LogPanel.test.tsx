@@ -51,6 +51,36 @@ describe("LogPanel", () => {
     expect(screen.getByText("1")).toBeInTheDocument(); // count badge
   });
 
+  it("filters logs by level and above (WARNING shows WARNING + ERROR)", () => {
+    const logs = [
+      makeLog("INFO", "info-msg", 1),
+      makeLog("WARNING", "warn-msg", 2),
+      makeLog("ERROR", "error-msg", 3),
+    ];
+    render(<LogPanel logs={logs} onClear={onClear} />);
+
+    fireEvent.change(screen.getByDisplayValue("全部"), { target: { value: "WARNING" } });
+    expect(screen.getByText("warn-msg")).toBeInTheDocument();
+    expect(screen.getByText("error-msg")).toBeInTheDocument();
+    expect(screen.queryByText("info-msg")).not.toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+  });
+
+  it("filters logs by level and above (INFO shows INFO + WARNING + ERROR)", () => {
+    const logs = [
+      makeLog("INFO", "info-msg", 1),
+      makeLog("WARNING", "warn-msg", 2),
+      makeLog("ERROR", "error-msg", 3),
+    ];
+    render(<LogPanel logs={logs} onClear={onClear} />);
+
+    fireEvent.change(screen.getByDisplayValue("全部"), { target: { value: "INFO" } });
+    expect(screen.getByText("info-msg")).toBeInTheDocument();
+    expect(screen.getByText("warn-msg")).toBeInTheDocument();
+    expect(screen.getByText("error-msg")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+  });
+
   it("calls onClear when clear button clicked", () => {
     const logs = [makeLog("INFO", "msg", 1)];
     render(<LogPanel logs={logs} onClear={onClear} />);
