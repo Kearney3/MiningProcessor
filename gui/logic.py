@@ -5,6 +5,7 @@ GUI 业务逻辑层
 import asyncio
 import logging
 import sys
+import threading
 from datetime import datetime
 import flet as ft
 import os
@@ -32,6 +33,36 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # 公共工具
 # ---------------------------------------------------------------------------
+# 全局关闭标记：页面关闭时置位，后台任务定期检查以提前终止
+_shutdown_event = threading.Event()
+
+# 活跃任务的 cancel_event 集合，页面关闭时统一触发
+_active_cancel_events: list[threading.Event] = []
+
+
+def register_cancel_event(event: threading.Event) -> None:
+    """将一个 cancel_event 注册到活跃列表中，关闭时自动触发。"""
+    _active_cancel_events.append(event)
+
+
+def unregister_cancel_event(event: threading.Event) -> None:
+    """从活跃列表中移除已完成的 cancel_event。"""
+    try:
+        _active_cancel_events.remove(event)
+    except ValueError:
+        pass
+
+
+def shutdown_tasks() -> None:
+    """设置全局关闭标记，并触发所有活跃任务的 cancel_event。"""
+    _shutdown_event.set()
+    for ev in _active_cancel_events[:]:
+        ev.set()
+
+
+def is_shutdown() -> bool:
+    """检查全局关闭标记是否已设置。"""
+    return _shutdown_event.is_set()
 # 保存按钮原始样式，以便恢复
 _btn_original_styles: dict[int, ft.ButtonStyle] = {}
 
@@ -167,8 +198,16 @@ def _get_output_file(module_type: str, path: str, **kwargs) -> str | None:
 # ---------------------------------------------------------------------------
 # 任务执行
 # ---------------------------------------------------------------------------
-def _dispatch_module(module_type: str, path: str, **kwargs) -> object | None:
-    """Dispatch to the appropriate processor. Returns worktime_sheets or None."""
+def _dispatch_module(module_type: str, path: str, cancel_event: threading.Event | None = None, **kwargs) -> object | None:
+    """Dispatch to the appropriate processor. Returns worktime_sheets or None.
+
+    Args:
+        cancel_event: 可选的取消事件，用于在长时间处理中检查是否应终止。
+    """
+    # 处理前检查：如果已关闭或已取消则直接返回
+    if _shutdown_event.is_set() or (cancel_event and cancel_event.is_set()):
+        return None
+
     skip_hidden_rows = kwargs.get("skip_hidden_rows", False)
     skip_hidden_cols = kwargs.get("skip_hidden_cols", False)
     anomaly_config = kwargs.get("anomaly_config")
@@ -186,10 +225,20 @@ def _dispatch_module(module_type: str, path: str, **kwargs) -> object | None:
         logging.info(f"装载量参数：{device_load_map}")
         if os.path.isdir(path):
             output_file = os.path.join(path, "合并产量.xlsx")
-            processor.process_folder(path, output_file)
+            processor.process_folder(path, output_file, cancel_event=cancel_event)
         else:
             output_file = os.path.join(os.path.dirname(path) or ".", "合并产量.xlsx")
             processor.process_single_file(path, output_file)
+        # 提取处理摘要供调用方显示
+        summary = getattr(processor, "_processing_summary", None)
+        if summary:
+            for w in summary.get("warnings", []):
+                logger.warning(w)
+            logger.info(
+                "生产统计：共 %d 个文件，成功 %d，失败 %d",
+                summary.get("total_files", 0), summary.get("success_files", 0), summary.get("failed_files", 0),
+            )
+        return summary
     elif module_type == "electrical":
         process_electrical_data(path, kwargs.get("year"),
                          add_shift_column=kwargs.get("add_shift_column", False),
@@ -236,19 +285,33 @@ def _dispatch_module(module_type: str, path: str, **kwargs) -> object | None:
     return None
 
 
-def _execute_task(module_type: str, path: str, **kwargs) -> str | None:
-    """在后台线程中执行处理任务，返回错误信息或 None"""
+def _execute_task(module_type: str, path: str, cancel_event: threading.Event | None = None, **kwargs) -> tuple[str | None, dict | None]:
+    """在后台线程中执行处理任务，返回 (错误信息或None, 额外数据或None)。
+
+    Args:
+        cancel_event: 可选的取消事件，页面关闭或用户取消时置位。
+    """
+    # 页面已关闭则直接跳过
+    if _shutdown_event.is_set():
+        logger.info("页面已关闭，跳过任务: module=%s", module_type)
+        return "页面已关闭", None
+
+    extra = None
     try:
-        worktime_sheets = _dispatch_module(module_type, path, **kwargs)
+        result = _dispatch_module(module_type, path, cancel_event=cancel_event, **kwargs)
+        # production 模块返回 summary dict
+        if module_type == "production" and isinstance(result, dict):
+            extra = result
     except Exception:
         logger.exception("Task execution failed: module=%s path=%s", module_type, path)
-        return str(sys.exc_info()[1]).strip() or sys.exc_info()[0].__name__
+        return str(sys.exc_info()[1]).strip() or sys.exc_info()[0].__name__, None
 
     # dispatch 完成后才 pop，确保维护模块等内部需要台账的模块能正常读取
     equipment_ledger = kwargs.pop("equipment_ledger", None)
     oil_ledger = kwargs.pop("oil_ledger", None)
 
     # 工时模块 return_sheets=True 时只返回 DataFrame，需要先落盘
+    worktime_sheets = result if module_type == "worktime" else None
     if worktime_sheets and module_type == "worktime":
         output_file = _get_output_file(module_type, path, **kwargs)
         if output_file:
@@ -257,30 +320,37 @@ def _execute_task(module_type: str, path: str, **kwargs) -> str | None:
             logger.info("工时数据已写入: %s", output_file)
 
     if not (equipment_ledger or oil_ledger):
-        return None
+        return None, extra
 
     output_file = _get_output_file(module_type, path, **kwargs)
     if not output_file or not os.path.exists(output_file):
-        return None
+        return None, extra
 
     sheets_data = worktime_sheets if module_type == "worktime" else None
     _apply_ledger_matching(output_file, equipment_ledger, oil_ledger,
                            preloaded_sheets=sheets_data)
-    return None
+    return None, extra
 
 
-async def run_task(page: ft.Page, module_type: str, path: str, log, **kwargs) -> None:
-    """异步执行处理任务，按钮状态由调用方自行恢复"""
+async def run_task(page: ft.Page, module_type: str, path: str, log, cancel_event: threading.Event | None = None, **kwargs) -> dict | None:
+    """异步执行处理任务，返回额外数据（如 summary）或 None。按钮状态由调用方自行恢复。
 
+    Args:
+        cancel_event: 可选的取消事件，页面关闭或用户取消时自动置位。
+    """
     label = _MODULE_LABELS.get(module_type, module_type)
     _log_message(log, f"[{label}] 开始处理...")
-    error_message = await asyncio.to_thread(_execute_task, module_type, path, **kwargs)
+    error_message, extra = await asyncio.to_thread(_execute_task, module_type, path, cancel_event, **kwargs)
     if error_message:
-        _log_message(log, f"[{label}] 处理失败: {error_message}", level=logging.ERROR)
-        _show_snackbar(page, f"{label}处理失败", is_error=True)
+        if _shutdown_event.is_set():
+            _log_message(log, f"[{label}] 任务因页面关闭而中止", level=logging.WARNING)
+        else:
+            _log_message(log, f"[{label}] 处理失败: {error_message}", level=logging.ERROR)
+            _show_snackbar(page, f"{label}处理失败", is_error=True)
     else:
         _log_message(log, f"[{label}] 处理成功")
         _show_snackbar(page, f"{label}处理完成")
+    return extra
 
 
 # ---------------------------------------------------------------------------
@@ -294,13 +364,19 @@ async def _safe_run_task(
     log,
     module_type: str,
     **kwargs,
-):
+) -> dict | None:
     """通用处理回调模板：禁用按钮 → 执行任务 → 恢复按钮 (M4)"""
+    if _shutdown_event.is_set():
+        return None
+    cancel_event = threading.Event()
+    register_cancel_event(cancel_event)
     set_btn_state(btn, False, "处理中...")
     try:
-        await run_task(page, module_type, path, log, **kwargs)
+        return await run_task(page, module_type, path, log, cancel_event=cancel_event, **kwargs)
     finally:
-        set_btn_state(btn, True, label)
+        unregister_cancel_event(cancel_event)
+        if not _shutdown_event.is_set():
+            set_btn_state(btn, True, label)
 
 
 # ---------------------------------------------------------------------------
@@ -324,6 +400,45 @@ async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=
                          anomaly_config=anomaly_config)
 
 
+def _update_prod_summary(container: ft.Column, summary: dict | None) -> None:
+    """更新生产模块的汇总显示区域。"""
+    container.controls.clear()
+    if not summary:
+        container.visible = False
+        if hasattr(container, 'update'):
+            container.update()
+        return
+
+    total = summary.get("total_files", 0)
+    success = summary.get("success_files", 0)
+    failed = summary.get("failed_files", 0)
+    warnings = summary.get("warnings", [])
+
+    # 文件统计行
+    stats_text = f"共 {total} 个文件，成功 {success}，失败 {failed}"
+    stats_color = ft.Colors.RED_700 if failed > 0 else ft.Colors.GREEN_700
+    container.controls.append(
+        ft.Text(stats_text, size=12, color=stats_color, weight=ft.FontWeight.W_500)
+    )
+
+    # 警告列表
+    for w in warnings:
+        container.controls.append(
+            ft.Row(
+                [
+                    ft.Icon(ft.Icons.WARNING_AMBER, size=14, color=ft.Colors.AMBER_600),
+                    ft.Text(w, size=11, color=ft.Colors.AMBER_800, expand=True),
+                ],
+                spacing=4,
+                vertical_alignment=ft.CrossAxisAlignment.START,
+            )
+        )
+
+    container.visible = True
+    if hasattr(container, 'update'):
+        container.update()
+
+
 async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None) -> None:
     """生产处理按钮回调"""
     btn = prod_refs["btn"]
@@ -345,10 +460,15 @@ async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=
             _log_message(log, "请输入有效的表头起始行（正整数）", level=logging.WARNING)
             return
 
-    await _safe_run_task(page, btn, "处理", path, log, "production",
+    summary = await _safe_run_task(page, btn, "处理", path, log, "production",
                          raw_start=raw_start, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
                          anomaly_config=anomaly_config)
+
+    # 更新汇总显示
+    summary_container = prod_refs.get("summary_container")
+    if summary_container is not None:
+        _update_prod_summary(summary_container, summary)
 
 
 async def on_elec_process(page: ft.Page, elec_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None) -> None:
@@ -572,6 +692,9 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
     # 每次运行前重置取消状态，避免上次取消影响本次运行
     if cancel_event is not None:
         cancel_event.clear()
+    # 注册到全局关闭机制：页面关闭时自动触发取消
+    if cancel_event is not None:
+        register_cancel_event(cancel_event)
     if cancel_btn is not None:
         cancel_btn.on_click = lambda e: _handle_batch_cancel(cancel_event, cancel_btn)
     _show_batch_progress(progress_row, progress_bar, progress_text, cancel_btn)
@@ -674,7 +797,7 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
             thread_result = {}
             def _batch_target():
                 try:
-                    thread_result["value"] = process_files(
+                    results, summary = process_files(
                         path, matched, year, month, raw_start, merge_output,
                         equipment_ledger, oil_ledger, filter_date,
                         worktime_header_mapping,
@@ -685,6 +808,8 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
                         skip_hidden_cols=skip_hidden_cols,
                         anomaly_config=anomaly_config,
                     )
+                    thread_result["value"] = results
+                    thread_result["summary"] = summary
                 except Exception as ex:
                     thread_result["error"] = ex
 
@@ -698,7 +823,16 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
                 _log_message(log, "用户取消了批量处理", level=logging.WARNING)
                 _show_snackbar(page, "批量处理已取消")
             else:
-                _log_message(log, "批量处理完成")
+                summary = thread_result.get("summary", {})
+                warnings = summary.get("warnings", [])
+                success_mods = summary.get("success_modules", [])
+                failed_mods = summary.get("failed_modules", [])
+                msg = f"批量处理完成 — 成功: {', '.join(success_mods) or '无'}"
+                if failed_mods:
+                    msg += f"; 失败: {', '.join(failed_mods)}"
+                _log_message(log, msg)
+                for w in warnings:
+                    _log_message(log, w, level=logging.WARNING)
                 _show_snackbar(page, "批量处理完成")
         except Exception as ex:
             # Ensure poller is cancelled on error to prevent task leak
@@ -714,8 +848,11 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
 
     finally:
         # 确保所有路径（包括早期返回）都清理进度条和按钮状态
+        if cancel_event is not None:
+            unregister_cancel_event(cancel_event)
         _hide_batch_progress(progress_row, progress_bar, progress_text, cancel_btn)
-        set_btn_state(btn, True, "批量处理")
+        if not _shutdown_event.is_set():
+            set_btn_state(btn, True, "批量处理")
 
 
 # ---------------------------------------------------------------------------
@@ -780,6 +917,8 @@ def _make_module_handler(
 
 def _build_anomaly_config(module_refs: dict):
     """从 module_refs 构建 AnomalyConfig 实例（加载用户配置的阈值和处理规则）。"""
+    from func.anomaly.rules import AnomalyConfig
+
     enabled_ref = module_refs.get("_anomaly_enabled")
     if not enabled_ref or not enabled_ref.value:
         return AnomalyConfig(enabled=False)
@@ -890,6 +1029,9 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
     result_text.update()
 
     try:
+        if _shutdown_event.is_set():
+            return
+
         _log_message(log, f"[数据同步] 开始同步 (模式={mode}, 类型={selected_types}, 预览={dry_run}, 年={year}, 月={month}, 日期={date_start}~{date_end})")
 
         def _do_sync():
@@ -1025,7 +1167,8 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
             wc.visible = False
             wc.update()
     finally:
-        set_btn_state(btn, True, "同步到 MineBase")
+        if not _shutdown_event.is_set():
+            set_btn_state(btn, True, "同步到 MineBase")
 
 
 def wire_sync_button(sync_refs: dict, page: ft.Page, log, module_refs: dict | None = None):
@@ -1093,7 +1236,8 @@ async def on_test_db_connection(page: ft.Page, config_refs: dict, log):
         result.update()
         _show_snackbar(page, "测试异常", is_error=True)
     finally:
-        set_btn_state(btn, True, "测试连接")
+        if not _shutdown_event.is_set():
+            set_btn_state(btn, True, "测试连接")
 
 
 def wire_test_db_button(config_refs: dict, page: ft.Page, log):
@@ -1153,7 +1297,8 @@ async def on_test_api_connection(page: ft.Page, config_refs: dict, log):
         result.update()
         _show_snackbar(page, "测试异常", is_error=True)
     finally:
-        set_btn_state(btn, True, "测试连接")
+        if not _shutdown_event.is_set():
+            set_btn_state(btn, True, "测试连接")
 
 
 def wire_test_api_button(config_refs: dict, page: ft.Page, log):

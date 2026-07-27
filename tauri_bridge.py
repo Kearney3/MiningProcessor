@@ -160,8 +160,30 @@ def _emit(event: str, data: dict) -> None:
 
 
 # ─── 日志拦截 ───
+_NOISY_LOGGERS = frozenset({
+    "watchfiles", "uvicorn", "asyncio",
+})
+
+
+class _SuppressNoisyFilter(logging.Filter):
+    """过滤第三方库的 DEBUG 日志。"""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.levelno < logging.INFO:
+            name = record.name or ""
+            if name in _NOISY_LOGGERS or any(
+                name.startswith(prefix + ".") for prefix in _NOISY_LOGGERS
+            ):
+                return False
+        return True
+
+
 class _StderrLogHandler(logging.Handler):
     """将 logging 记录序列化为 JSON 推送到 stderr。"""
+
+    def __init__(self):
+        super().__init__()
+        self.addFilter(_SuppressNoisyFilter())
 
     def emit(self, record: logging.LogRecord) -> None:
         try:
@@ -186,10 +208,13 @@ def _setup_logging() -> None:
     handler = _StderrLogHandler()
     handler.setFormatter(logging.Formatter("%(message)s"))
     root = logging.getLogger()
-    root.setLevel(logging.INFO)
+    root.setLevel(logging.DEBUG)
     # 清除已有 handler，避免重复
     root.handlers.clear()
     root.addHandler(handler)
+    # 全局 filter 挂 root logger，拦截第三方库噪音
+    if not any(isinstance(f, _SuppressNoisyFilter) for f in root.filters):
+        root.addFilter(_SuppressNoisyFilter())
 
 
 # ─── 取消令牌 ───
@@ -222,31 +247,17 @@ def _load_equipment_ledger_from_cache():
 
 
 def _build_anomaly_config(params: dict):
-    """从 RPC 参数构建 AnomalyConfig，未传入时返回 None（使用默认）。"""
+    """从 RPC 参数构建 AnomalyConfig，未传入时返回 None（使用默认）。
+
+    逐列检测开关从用户配置中读取（持久化设置），无需前端传入。
+    """
     if not params.get("anomaly_enabled"):
         return None
     from func.anomaly.rules import AnomalyConfig
     from func.config_loader import get_anomaly_detection_config
-    import copy
 
     ad_config = get_anomaly_detection_config()
     mode = params.get("anomaly_mode", "flag")
-
-    # 合并前端逐列开关覆盖
-    column_toggles = params.get("column_toggles")
-    if column_toggles:
-        thresholds = copy.deepcopy(ad_config.get("thresholds", {}))
-        stat_cols = copy.deepcopy(ad_config.get("statistical_columns", {}))
-        for key, val in column_toggles.items():
-            parts = key.split(":", 1)
-            if len(parts) != 2:
-                continue
-            dtype, col = parts
-            if dtype in thresholds and col in thresholds[dtype]:
-                thresholds[dtype][col] = {**thresholds[dtype][col], "enabled": bool(val)}
-            if dtype in stat_cols and col in stat_cols[dtype]:
-                stat_cols[dtype][col] = {**stat_cols[dtype][col], "enabled": bool(val)}
-        ad_config = {**ad_config, "thresholds": thresholds, "statistical_columns": stat_cols}
 
     return AnomalyConfig(
         enabled=True,
@@ -330,7 +341,7 @@ def _process_production(params: dict) -> dict:
     path = str(_sanitize_path(params["path"], must_exist=True))
     p = Path(path)
     if p.is_dir():
-        processor.process_folder(path)
+        processor.process_folder(path, cancel_event=_cancel_event)
         output_file = str(p / "合并产量.xlsx")
     else:
         output_file = str(p.parent / "合并产量.xlsx")
@@ -341,7 +352,11 @@ def _process_production(params: dict) -> dict:
             use_equipment_ledger=params.get("use_equipment_ledger", False),
             use_oil_ledger=params.get("use_oil_ledger", False),
         )
-    return {"output_file": output_file}
+    result = {"output_file": output_file}
+    summary = getattr(processor, "_processing_summary", None)
+    if summary:
+        result["summary"] = summary
+    return result
 
 
 @_register("process_electrical")
@@ -537,7 +552,7 @@ def _batch_process(params: dict) -> dict:
         if required not in (matched or {}):
             return {"error": f"表内合并需要 {required} 数据，但未在目录中找到"}
 
-    result = process_files(
+    result, summary = process_files(
         folder_path=safe_folder,
         matched=matched,
         year=params.get("year"),
@@ -556,7 +571,7 @@ def _batch_process(params: dict) -> dict:
         skip_hidden_cols=params.get("skip_hidden_cols", False),
         anomaly_config=_build_anomaly_config(params),
     )
-    return {"cancelled": _cancel_event.is_set()}
+    return {"cancelled": _cancel_event.is_set(), "summary": summary}
 
 
 @_register("cancel")
