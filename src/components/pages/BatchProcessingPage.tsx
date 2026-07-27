@@ -189,11 +189,13 @@ function shiftDate(dateStr: string, days: number): string {
 function Collapsible({
   title,
   icon,
+  summary,
   defaultOpen = false,
   children,
 }: {
   title: string;
   icon?: React.ReactNode;
+  summary?: React.ReactNode;
   defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
@@ -203,10 +205,12 @@ function Collapsible({
       <button
         type="button"
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
         className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
       >
         {icon && <span className="text-slate-400">{icon}</span>}
         <span className="flex-1 text-left">{title}</span>
+        {!open && summary}
         <svg
           className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
           viewBox="0 0 24 24"
@@ -219,12 +223,9 @@ function Collapsible({
           <polyline points="6 9 12 15 18 9" />
         </svg>
       </button>
-      <div
-        className="overflow-hidden transition-all duration-300 ease-in-out"
-        style={{ maxHeight: open ? "500px" : "0px", opacity: open ? 1 : 0 }}
-      >
-        <div className="px-4 pb-4 border-t border-slate-100">{children}</div>
-      </div>
+      {open && (
+        <div className="px-4 border-t border-slate-100">{children}</div>
+      )}
     </div>
   );
 }
@@ -697,12 +698,6 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
           </div>
         </div>
 
-        <SectionDivider label="异常值检测" />
-        <AnomalyPanel
-          config={anomaly}
-          onChange={setAnomaly}
-        />
-
         <SectionDivider label="输出方式" />
 
         {/* ── Table merge mode ── */}
@@ -733,96 +728,130 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
       </div>
 
       {/* ════════════════════════════════════
-          Section 3: Collapsible optional sections
+          Section 3: Consolidated advanced options
           ════════════════════════════════════ */}
-
-      {/* ── Date filter ── */}
-      <Collapsible title="日期过滤" icon={<CalendarIcon />}>
-        <div className="mt-3 space-y-3">
-          <Toggle
-            checked={dateFilterEnabled}
-            onChange={setDateFilterEnabled}
-            label="按日期过滤"
-          />
-
-          {dateFilterEnabled && (
-            <div className="space-y-3 pl-1">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setFilterDate(shiftDate(filterDate, -1))}
-                  className="text-xs px-3 py-1.5 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                  上一天
-                </button>
-                <button
-                  onClick={() => setFilterDate(formatToday())}
-                  className="text-xs px-3 py-1.5 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                  今天
-                </button>
-                <button
-                  onClick={() => {
-                    const el = document.getElementById("batch-filter-date") as HTMLInputElement | null;
-                    el?.showPicker?.();
-                  }}
-                  className="text-xs px-3 py-1.5 rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-1"
-                >
-                  <CalendarIcon />
-                  选择日期
-                </button>
-              </div>
-              <div className="flex items-center gap-3">
-                <label className="text-xs text-slate-500">日期</label>
-                <input
-                  id="batch-filter-date"
-                  type="date"
-                  value={filterDate}
-                  onChange={(e) => setFilterDate(e.target.value)}
-                  className={`${inputClass} w-auto`}
-                />
-                <span className="text-xs text-slate-400 font-mono">{filterDate}</span>
-              </div>
+      <Collapsible
+        title="高级选项"
+        icon={<SettingsIcon />}
+        summary={
+          <span className="mr-1 text-xs font-normal text-slate-500">
+            {dateFilterEnabled || useHeaderMapping || anomaly.enabled
+              ? `${Number(dateFilterEnabled) + Number(useHeaderMapping) + Number(anomaly.enabled)} 项已启用`
+              : "使用默认设置"}
+          </span>
+        }
+      >
+        <div className="grid grid-cols-1 xl:grid-cols-3 xl:divide-x divide-slate-100">
+          {/* ── Date filter ── */}
+          <section className="py-4 xl:pr-5">
+            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
+              <span className="text-slate-500"><CalendarIcon /></span>
+              日期过滤
             </div>
-          )}
-        </div>
-      </Collapsible>
+            <div className="space-y-3">
+              <Toggle
+                checked={dateFilterEnabled}
+                onChange={setDateFilterEnabled}
+                label="按日期过滤"
+              />
 
-      {/* ── Header mapping ── */}
-      <Collapsible title="工时表头映射" icon={<RulerIcon />}>
-        <div className="mt-3 space-y-3">
-          <Toggle
-            checked={useHeaderMapping}
-            onChange={setUseHeaderMapping}
-            label="启用表头映射"
-          />
-
-          {useHeaderMapping && (
-            <div className="space-y-3 pl-1">
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-slate-500">映射模式</span>
-                <ChipToggle
-                  value={headerMode}
-                  onChange={setHeaderMode}
-                  options={[
-                    { label: "位置映射", value: "position" },
-                    { label: "名称映射", value: "name" },
-                  ]}
-                />
-              </div>
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={fuzzyMatch}
-                  onChange={(e) => setFuzzyMatch(e.target.checked)}
-                  className="rounded border-slate-300"
-                />
-                <span className="text-xs text-slate-600">启用模糊匹配</span>
-              </label>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                映射规则可在「用户配置 &rarr; 工作效率表头映射配置」中编辑
-              </p>
+              {dateFilterEnabled && (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => setFilterDate(shiftDate(filterDate, -1))}
+                      className="text-xs px-3 py-1.5 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      上一天
+                    </button>
+                    <button
+                      onClick={() => setFilterDate(formatToday())}
+                      className="text-xs px-3 py-1.5 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      今天
+                    </button>
+                    <button
+                      onClick={() => {
+                        const el = document.getElementById("batch-filter-date") as HTMLInputElement | null;
+                        el?.showPicker?.();
+                      }}
+                      className="text-xs px-3 py-1.5 rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-1"
+                    >
+                      <CalendarIcon />
+                      选择日期
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="text-xs text-slate-500" htmlFor="batch-filter-date">日期</label>
+                    <input
+                      id="batch-filter-date"
+                      type="date"
+                      value={filterDate}
+                      onChange={(e) => setFilterDate(e.target.value)}
+                      className={`${inputClass} w-auto`}
+                    />
+                    <span className="text-xs text-slate-400 font-mono">{filterDate}</span>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+          </section>
+
+          {/* ── Header mapping ── */}
+          <section className="border-t border-slate-100 py-4 xl:border-t-0 xl:pl-5">
+            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
+              <span className="text-slate-500"><RulerIcon /></span>
+              工时表头映射
+            </div>
+            <div className="space-y-3">
+              <Toggle
+                checked={useHeaderMapping}
+                onChange={setUseHeaderMapping}
+                label="启用表头映射"
+              />
+
+              {useHeaderMapping && (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-xs text-slate-500">映射模式</span>
+                    <ChipToggle
+                      value={headerMode}
+                      onChange={setHeaderMode}
+                      options={[
+                        { label: "位置映射", value: "position" },
+                        { label: "名称映射", value: "name" },
+                      ]}
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={fuzzyMatch}
+                      onChange={(e) => setFuzzyMatch(e.target.checked)}
+                      className="rounded border-slate-300"
+                    />
+                    <span className="text-xs text-slate-600">启用模糊匹配</span>
+                  </label>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    映射规则可在「用户配置 &rarr; 工作效率表头映射配置」中编辑
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* ── Anomaly detection ── */}
+          <section className="border-t border-slate-100 py-4 xl:border-t-0 xl:pl-5">
+            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
+              <span className="text-amber-600"><AlertTriangleIcon /></span>
+              异常值检测
+            </div>
+            <AnomalyPanel
+              config={anomaly}
+              onChange={setAnomaly}
+              embedded
+            />
+          </section>
         </div>
       </Collapsible>
 

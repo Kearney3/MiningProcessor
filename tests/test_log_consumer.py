@@ -218,7 +218,10 @@ def test_manual_scroll_pauses_following_until_scroll_bottom_is_clicked():
     assert refs["follow_status"].visible is False
 
 
-def test_export_preserves_traceback_while_ui_only_shows_root_message(tmp_path):
+def test_export_preserves_traceback_while_ui_only_shows_root_message(monkeypatch, tmp_path):
+    from func import config_loader
+    monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", tmp_path / "config.user.json")
+
     class ExportPicker:
         async def save_file(self, **_kwargs):
             return str(tmp_path / "diagnostic.log")
@@ -244,7 +247,10 @@ def test_export_preserves_traceback_while_ui_only_shows_root_message(tmp_path):
     assert "ValueError: diagnostic detail" in exported
 
 
-def test_export_write_failure_is_reported_without_raising(tmp_path):
+def test_export_write_failure_is_reported_without_raising(monkeypatch, tmp_path):
+    from func import config_loader
+    monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", tmp_path / "config.user.json")
+
     class ExportPicker:
         async def save_file(self, **_kwargs):
             return str(tmp_path / "missing-directory" / "diagnostic.log")

@@ -59,20 +59,23 @@ def create_log_view(height: int = 300) -> tuple[ft.Container, "LogViewRefs"]:
     )
     resize_handle = ft.GestureDetector(
         content=ft.Container(
-            height=10,
+            height=12,
             content=ft.Row(
                 [
                     ft.Container(
-                        width=48,
-                        height=4,
+                        width=40,
+                        height=3,
                         border_radius=999,
-                        bgcolor=theme.BORDER,
+                        bgcolor=theme.BORDER_STRONG,
                     )
                 ],
                 alignment=ft.MainAxisAlignment.CENTER,
             ),
-            bgcolor=theme.SURFACE,
-            border=ft.Border.only(top=ft.BorderSide(1, theme.BORDER)),
+            bgcolor=theme.SURFACE_LOW,
+            border=ft.Border.only(
+                top=ft.BorderSide(1, theme.BORDER),
+                bottom=ft.BorderSide(1, theme.BORDER),
+            ),
             tooltip="上下拖拽调整日志区域高度",
         ),
         mouse_cursor=ft.MouseCursor.RESIZE_UP_DOWN,
@@ -87,17 +90,14 @@ def create_log_view(height: int = 300) -> tuple[ft.Container, "LogViewRefs"]:
     list_container = ft.Container(
         content=ft.Column([toolbar, log_list], spacing=4, expand=True, horizontal_alignment=ft.CrossAxisAlignment.STRETCH),
         height=height,
-        border=ft.Border.all(1, theme.BORDER),
-        border_radius=theme.RADIUS_MD,
-        padding=8,
-        bgcolor=theme.SURFACE_HIGH,
+        padding=ft.Padding.only(left=10, right=10, top=8, bottom=10),
+        bgcolor=theme.SURFACE,
     )
     root = ft.Container(
         content=ft.Column(
             [resize_handle, list_container],
-            spacing=6,
+            spacing=0,
         ),
-        padding=ft.Padding.only(top=2),
     )
     refs = {
         "toolbar": toolbar,

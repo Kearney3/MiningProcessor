@@ -1236,11 +1236,6 @@ function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
 
   // 逐列检测开关（持久化到用户配置）
   type ColumnToggles = Record<string, boolean>;
-  const COLUMN_LABELS: Record<string, string> = {
-    fuel: "油耗", fuel_engine: "发动机",
-    production_running: "运行", production: "生产",
-    electrical: "电力", worktime: "工时",
-  };
   const COLUMN_DEFS: Record<string, string[]> = {
     fuel: ["油品消耗"],
     fuel_engine: ["发动机小时数开始", "发动机小时数结束", "运行小时数"],
@@ -1430,6 +1425,7 @@ function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
   };
 
   const currentRows = thresholdRows[activeType] || [];
+  const currentColumns = COLUMN_DEFS[activeType] || [];
 
   return (
     <SectionCard
@@ -1483,44 +1479,20 @@ function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
 
       <div className="border-t border-slate-100 pt-3 mb-3" />
 
-      {/* 逐列检测开关 */}
-      <p className="text-xs font-medium text-slate-500 mb-1">逐列检测开关</p>
-      <p className="text-xs text-slate-400 mb-2">关闭某列的开关后，该列将不参与任何异常检测（阈值、σ、百分位均跳过）。</p>
-      <div className="space-y-1.5 mb-3">
-        {Object.entries(COLUMN_DEFS).map(([dtype, cols]) => (
-          <div key={dtype} className="flex items-start gap-2">
-            <span className="text-xs text-slate-500 w-12 shrink-0 pt-0.5">{COLUMN_LABELS[dtype]}:</span>
-            <div className="flex flex-wrap gap-x-4 gap-y-0.5">
-              {cols.map((col) => {
-                const key = `${dtype}:${col}`;
-                const label = col === ALL_NUMERIC ? "全部数值列" : col;
-                return (
-                  <label key={key} className="flex items-center gap-1 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={columnToggles[key] ?? true}
-                      onChange={(e) => setColumnToggles({ ...columnToggles, [key]: e.target.checked })}
-                      className="w-3.5 h-3.5 rounded border-slate-300"
-                    />
-                    <span className="text-xs text-slate-600">{label}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="border-t border-slate-100 pt-3 mb-3" />
-
       {/* 阈值配置 */}
       <p className="text-xs font-medium text-slate-500 mb-2">阈值配置</p>
 
       {/* 数据类型选项卡 */}
-      <div className="flex gap-1 bg-slate-100 rounded-lg p-0.5 overflow-x-auto mb-3">
+      <div
+        role="tablist"
+        aria-label="异常值数据类型"
+        className="flex gap-1 bg-slate-100 rounded-lg p-0.5 overflow-x-auto mb-3"
+      >
         {DATA_TYPE_OPTIONS.map(({ key, label }) => (
           <button
             key={key}
+            role="tab"
+            aria-selected={activeType === key}
             onClick={() => setActiveType(key)}
             className={`shrink-0 px-3 py-1.5 text-xs rounded-md transition-colors whitespace-nowrap ${
               activeType === key
@@ -1531,6 +1503,31 @@ function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
             {label}
           </button>
         ))}
+      </div>
+
+      {/* 当前数据类型的逐列检测开关 */}
+      <div className="flex flex-wrap items-start gap-x-5 gap-y-2 border-b border-slate-100 pb-3 mb-3 px-0.5">
+        <div className="shrink-0">
+          <p className="text-xs font-medium text-slate-500">逐列检测</p>
+          <p className="text-xs text-slate-400">关闭后跳过该列的全部检测方法</p>
+        </div>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 pt-0.5">
+          {currentColumns.map((col) => {
+            const key = `${activeType}:${col}`;
+            const label = col === ALL_NUMERIC ? "全部数值列" : col;
+            return (
+              <label key={key} className="flex items-center gap-1.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={columnToggles[key] ?? true}
+                  onChange={(e) => setColumnToggles({ ...columnToggles, [key]: e.target.checked })}
+                  className="w-3.5 h-3.5 rounded border-slate-300"
+                />
+                <span className="text-xs text-slate-600">{label}</span>
+              </label>
+            );
+          })}
+        </div>
       </div>
 
       {/* 表头 */}

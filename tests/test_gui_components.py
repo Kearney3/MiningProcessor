@@ -393,6 +393,7 @@ def test_save_config_cancel_keeps_state_and_writes_nothing(tmp_path):
 def test_save_button_uses_selected_path_instead_of_mutating_default_config(monkeypatch, tmp_path):
     logs = []
     update_spy = UpdateDeviceLoadMapSpy()
+    monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", tmp_path / "config.user.json")
     monkeypatch.setattr(components.ft, "FilePicker", SavePicker)
     monkeypatch.setattr(config_loader, "update_device_load_map", update_spy)
 
@@ -420,6 +421,7 @@ def test_save_button_uses_selected_path_instead_of_mutating_default_config(monke
 
 def test_import_config_replaces_existing_ui_state(monkeypatch, tmp_path):
     logs = []
+    monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", tmp_path / "config.user.json")
     monkeypatch.setattr(components.ft, "FilePicker", ImportPicker)
 
     imported_config = tmp_path / "imported-config.json"
@@ -731,6 +733,7 @@ def test_gui_main_filters_logs_by_level_and_above(monkeypatch):
 
 
 def test_gui_main_exports_filtered_logs(monkeypatch, tmp_path):
+    monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", tmp_path / "config.user.json")
     monkeypatch.setattr(gui_main.cmp, "create_ledger_section", lambda page, log: (object(), {}))
     monkeypatch.setattr(gui_main.cmp, "create_config_section", lambda page, log: (object(), {}))
     monkeypatch.setattr(gui_main.cmp, "create_modules_section", lambda page: (object(), {}))

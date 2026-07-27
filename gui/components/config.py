@@ -165,10 +165,10 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
     _current_version = [config_loader.get_load_map_version()]
 
     def _on_version_change(e: ft.ControlEvent):
-        selected_set: set = e.control.selected
-        if not selected_set:
+        selected_values = e.control.selected
+        if not selected_values:
             return
-        new_ver = next(iter(selected_set))
+        new_ver = selected_values[0]
         if new_ver == _current_version[0]:
             return
         _current_version[0] = new_ver
@@ -183,7 +183,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
         _log_message(log, f"已切换到{'旧版' if new_ver == 'old' else '新版'}装载量配置")
 
     version_toggle = ft.SegmentedButton(
-        selected={"new"} if _current_version[0] == "new" else {"old"},
+        selected=["new"] if _current_version[0] == "new" else ["old"],
         segments=[
             ft.Segment(value="new", label=ft.Text("新版配置")),
             ft.Segment(value="old", label=ft.Text("旧版配置")),

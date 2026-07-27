@@ -907,11 +907,11 @@ def _create_anomaly_config_section(page: ft.Page, log):
         "worktime": {"threshold": ["__all_numeric__"], "statistical": []},
     }
     column_toggles: dict[str, ft.Checkbox] = {}  # key: "dtype:col"
+    column_toggle_rows: dict[str, ft.Row] = {}
 
     def _build_column_toggles():
         """构建逐列开关 UI。"""
-        col_rows = []
-        for dtype, type_label in _COLUMN_LABELS.items():
+        for dtype in _COLUMN_LABELS:
             cols_cfg = _COLUMN_DEFS.get(dtype, {})
             all_cols = sorted(set(cols_cfg.get("threshold", []) + cols_cfg.get("statistical", [])))
             if not all_cols:
@@ -926,26 +926,42 @@ def _create_anomaly_config_section(page: ft.Page, log):
                     visual_density=ft.VisualDensity.COMPACT,
                 )
                 column_toggles[key] = cb
-                cbs.append(cb)
-            col_rows.append(
-                ft.Column([
-                    ft.Text(f"{type_label}:", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                cbs.append(
                     ft.Container(
-                        content=ft.Row(cbs, wrap=True, spacing=4, run_spacing=0),
-                        padding=ft.Padding.only(left=8),
-                    ),
-                ], spacing=2, tight=True)
+                        content=cb,
+                        width=190 if len(label) >= 7 else 140,
+                    )
+                )
+            column_toggle_rows[dtype] = ft.Row(
+                cbs,
+                wrap=True,
+                spacing=8,
+                run_spacing=0,
+                vertical_alignment=ft.CrossAxisAlignment.CENTER,
             )
-        column_toggle_area.controls = col_rows
 
     column_toggle_area = ft.Column(spacing=4)
     _build_column_toggles()
 
-    type_dropdown = ft.Dropdown(
-        label="数据类型",
-        width=150,
-        options=[ft.dropdown.Option(key=k, text=v) for k, v in _DATA_TYPE_OPTIONS],
-        value="fuel",
+    def _show_column_toggles(data_type: str):
+        selected_row = column_toggle_rows.get(data_type)
+        column_toggle_area.controls = [selected_row] if selected_row else []
+        safe_update(column_toggle_area)
+
+    _show_column_toggles(_current_type[0])
+
+    type_segment = ft.SegmentedButton(
+        selected=[_current_type[0]],
+        segments=[
+            ft.Segment(value=key, label=ft.Text(_COLUMN_LABELS[key]))
+            for key, _ in _DATA_TYPE_OPTIONS
+        ],
+        allow_empty_selection=False,
+        show_selected_icon=False,
+        style=ft.ButtonStyle(
+            padding=ft.Padding.symmetric(horizontal=14, vertical=8),
+            text_style=ft.TextStyle(size=12, weight=ft.FontWeight.W_500),
+        ),
     )
     rows_column = ft.Column(spacing=4, expand=True)
     status_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
@@ -1033,10 +1049,14 @@ def _create_anomaly_config_section(page: ft.Page, log):
         safe_update(rows_column)
 
     def _on_type_change(e):
-        _current_type[0] = type_dropdown.value
+        selected_values = e.control.selected
+        if not selected_values:
+            return
+        _current_type[0] = selected_values[0]
+        _show_column_toggles(_current_type[0])
         _build_rows()
 
-    type_dropdown.on_select = _on_type_change
+    type_segment.on_change = _on_type_change
 
     def _add_row(e=None):
         dt = _current_type[0]
@@ -1090,6 +1110,8 @@ def _create_anomaly_config_section(page: ft.Page, log):
             cb.value = t_enabled and s_enabled
 
         status_text.value = ""
+        type_segment.selected = [_current_type[0]]
+        _show_column_toggles(_current_type[0])
         _build_rows()
         safe_update(sigma_field)
         safe_update(pct_low_field)
@@ -1097,6 +1119,7 @@ def _create_anomaly_config_section(page: ft.Page, log):
         safe_update(use_threshold_toggle)
         safe_update(use_sigma_toggle)
         safe_update(use_percentile_toggle)
+        safe_update(type_segment)
         for cb in column_toggles.values():
             safe_update(cb)
 
@@ -1217,6 +1240,9 @@ def _create_anomaly_config_section(page: ft.Page, log):
             ft.Text("统计参数", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
             ft.Row([sigma_field, pct_low_field, pct_high_field], spacing=12),
             ft.Divider(height=1, color=theme.BORDER),
+            ft.Text("数据类型", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+            type_segment,
+            ft.Divider(height=1, color=theme.BORDER),
             ft.Text("逐列检测开关", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
             ft.Text(
                 "关闭某列的开关后，该列将不参与任何异常检测（阈值、σ、百分位均跳过）。",
@@ -1225,14 +1251,19 @@ def _create_anomaly_config_section(page: ft.Page, log):
             column_toggle_area,
             ft.Divider(height=1, color=theme.BORDER),
             ft.Text("阈值配置", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
-            type_dropdown,
             rows_column,
             ft.Row(action_buttons, spacing=8, wrap=True, alignment=ft.MainAxisAlignment.START),
             status_text,
         ],
     )
 
-    return card, {"reload": _reload}
+    return card, {
+        "reload": _reload,
+        "type_segment": type_segment,
+        "column_toggle_area": column_toggle_area,
+        "column_toggle_rows": column_toggle_rows,
+        "rows_column": rows_column,
+    }
 
 
 # ---------------------------------------------------------------------------
