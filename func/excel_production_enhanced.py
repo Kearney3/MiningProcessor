@@ -622,7 +622,7 @@ class MiningDataProcessor:
                         all_running.append(running_df)
                         all_production.append(production_df)
                         success_files += 1
-                        logger.debug(f"处理成功: {rel_path}")
+                        logger.info(f"处理成功: {rel_path}")
                     else:
                         logger.error(f"处理失败: {rel_path} -> {error_msg}")
                 except Exception as e:
