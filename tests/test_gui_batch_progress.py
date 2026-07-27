@@ -99,7 +99,7 @@ def test_on_batch_process_updates_progress(tmp_path, monkeypatch):
             progress_cb({"stage": "preparing", "percent": 0.0, "current": 0, "total": 0, "detail": "开始处理"})
             progress_cb({"stage": "finished", "percent": 1.0, "current": 1, "total": 1, "detail": "分开输出完成"})
         captured["cancel_event"] = kwargs.get("cancel_event")
-        return {"fuel": {"油耗信息": None}}
+        return {"fuel": {"油耗信息": None}}, {}
 
     monkeypatch.setattr(logic, "process_files", fake_process_files)
 
@@ -120,7 +120,7 @@ def test_on_batch_process_cancel_disables_button(tmp_path, monkeypatch):
     monkeypatch.setattr(logic, "scan_files", lambda path: ({"fuel": ["dummy.xlsx"]}, []))
 
     def fake_process_files(*args, **kwargs):
-        return {"fuel": {"油耗信息": None}}
+        return {"fuel": {"油耗信息": None}}, {}
 
     monkeypatch.setattr(logic, "process_files", fake_process_files)
 

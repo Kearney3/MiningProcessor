@@ -1,11 +1,11 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { BridgeProp, BatchProgress, ScanResult } from "../../lib/types";
+import type { BridgeProp, BatchProgress, ScanResult, BatchSummary } from "../../lib/types";
 import { useToast } from "../Toast";
 import { FolderIcon } from "../../lib/icons";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { useLastDirectory } from "../../hooks/useLastDirectory";
-import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG, type ColumnToggles, buildDefaultColumnToggles } from "../AnomalyPanel";
+import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG } from "../AnomalyPanel";
 
 // ═══════════════════════════════════════
 // Types
@@ -405,6 +405,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<BatchSummary | null>(null);
 
   // -- Confirmation dialog --
   const [showConfirm, setShowConfirm] = useState(false);
@@ -424,19 +425,6 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
   const [skipHiddenRows, setSkipHiddenRows] = useState(false);
   const [skipHiddenCols, setSkipHiddenCols] = useState(false);
   const [anomaly, setAnomaly] = useState<AnomalyConfig>(DEFAULT_ANOMALY_CONFIG);
-  const [columnToggles, setColumnToggles] = useState<ColumnToggles>(buildDefaultColumnToggles());
-  const [savedThresholds, setSavedThresholds] = useState<Record<string, Record<string, { enabled?: boolean }>>>();
-  const [savedStatCols, setSavedStatCols] = useState<Record<string, Record<string, { enabled?: boolean }>>>();
-
-  useEffect(() => {
-    bridge
-      .call<Record<string, unknown>>("get_anomaly_config")
-      .then((cfg) => {
-        setSavedThresholds(cfg.thresholds as Record<string, Record<string, { enabled?: boolean }>> | undefined);
-        setSavedStatCols(cfg.statistical_columns as Record<string, Record<string, { enabled?: boolean }>> | undefined);
-      })
-      .catch(() => {});
-  }, [bridge]);
 
   // -- Date filter --
   const [dateFilterEnabled, setDateFilterEnabled] = useState(false);
@@ -484,6 +472,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
     setProcessing(true);
     setError(null);
     setResult(null);
+    setSummary(null);
     bridge.setProgress(null);
     try {
       const params: Record<string, unknown> = {
@@ -499,7 +488,6 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
         anomaly_enabled: anomaly.enabled,
         anomaly_report: anomaly.report,
         anomaly_mode: anomaly.mode,
-        column_toggles: anomaly.enabled ? columnToggles : undefined,
       };
 
       if (tableMergeMode === "merge") {
@@ -521,7 +509,10 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
         params.fuzzy_match = fuzzyMatch;
       }
 
-      await bridge.call("batch_process", params);
+      const res = await bridge.call<{ cancelled?: boolean; summary?: BatchSummary }>("batch_process", params);
+      if (res.summary) {
+        setSummary(res.summary);
+      }
       setResult("批量处理完成");
       notify("批量处理完成", "success");
     } catch (e) {
@@ -710,10 +701,6 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
         <AnomalyPanel
           config={anomaly}
           onChange={setAnomaly}
-          columnToggles={columnToggles}
-          onColumnTogglesChange={setColumnToggles}
-          savedThresholds={savedThresholds}
-          savedStatisticalColumns={savedStatCols}
         />
 
         <SectionDivider label="输出方式" />
@@ -884,6 +871,44 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
         <div className="flex items-start gap-2 text-xs text-red-700 bg-red-50 rounded-md px-2.5 py-1.5">
           <XCircleIcon />
           <span>{error}</span>
+        </div>
+      )}
+
+      {/* ── Batch Summary ── */}
+      {summary && (
+        <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-3">
+          <h3 className="text-sm font-medium text-slate-700">处理汇总</h3>
+          <div className="flex items-center gap-4 text-xs">
+            {summary.success_modules.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                <CheckIcon />
+                <span className="text-slate-600">
+                  成功: {summary.success_modules.join("、")}
+                </span>
+              </div>
+            )}
+            {summary.failed_modules.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                <XIcon />
+                <span className="text-slate-600">
+                  失败: {summary.failed_modules.join("、")}
+                </span>
+              </div>
+            )}
+          </div>
+          {summary.warnings.length > 0 && (
+            <div className="space-y-1.5">
+              {summary.warnings.map((w, i) => (
+                <div
+                  key={i}
+                  className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 rounded-md px-2.5 py-1.5"
+                >
+                  <AlertTriangleIcon />
+                  <span>{w}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

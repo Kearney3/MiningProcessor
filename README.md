@@ -3,13 +3,13 @@
 > 矿山运营 Excel 报表批量处理工具
 
 <p>
-  <img src="https://img.shields.io/badge/version-v1.2.0-blue?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-v1.5.0-blue?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/Python-≥3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="python" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square" alt="license" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="platform" />
   <img src="https://img.shields.io/badge/Tauri-v2-FFC131?style=flat-square&logo=tauri&logoColor=black" alt="tauri" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="react" />
-  <img src="https://img.shields.io/badge/tests-887%20passed-brightgreen?style=flat-square" alt="tests" />
+  <img src="https://img.shields.io/badge/tests-935%20passed-brightgreen?style=flat-square" alt="tests" />
 </p>
 
 <p>
@@ -298,7 +298,7 @@ MiningProcessor/
 ## 🧪 测试
 
 ```bash
-# 运行全部测试（887 个用例）
+# 运行全部测试（935 个用例）
 uv run pytest
 
 # 运行指定测试文件
@@ -388,9 +388,9 @@ uv run flet build windows # Windows
 uv run scripts/bump_version.py
 
 # 升级版本号（自动同步四份文件）
-uv run scripts/bump_version.py --bump patch   # 1.2.0 → 1.2.1
-uv run scripts/bump_version.py --bump minor   # 1.2.0 → 1.3.0
-uv run scripts/bump_version.py --bump major   # 1.2.0 → 2.0.0
+uv run scripts/bump_version.py --bump patch   # 1.5.0 → 1.5.1
+uv run scripts/bump_version.py --bump minor   # 1.5.0 → 1.6.0
+uv run scripts/bump_version.py --bump major   # 1.5.0 → 2.0.0
 
 # 指定版本号
 uv run scripts/bump_version.py 1.3.1
@@ -402,6 +402,24 @@ uv run scripts/bump_version.py --bump minor --dry-run
 ---
 
 ## 📋 更新日志
+
+### v1.5.0 · 2026-07-27
+
+- 🆕 油耗模块动态表头检测：自动查找表头锚点（"Д/д" / "Парк дугаар"）、日期行、油品品牌行（НИК / IC IC / Primary），不再依赖固定行号，兼容更多报表结构
+- 🆕 旧格式 `.xls` 文件支持：维修记录提取和文件发现支持 `.xls` 格式（通过 xlrd 适配器模拟 openpyxl 接口），隐藏行列检测对 `.xls` 自动跳过
+- 🆕 页面关闭时终止后台任务：关闭 Flet / Tauri 窗口自动取消正在运行的批量处理任务，生产数据处理支持中途取消（cancel_event 透传到多线程处理循环）
+- 🆕 批量 / 生产处理汇总 UI：Tauri 前端处理完成后展示成功/失败模块列表及警告信息（如未匹配装载量型号），Flet GUI 生产处理后显示文件统计
+- 🆕 逐列异常检测开关持久化：从各页面运行时 UI 移除，统一迁移到用户配置页面集中管理，所有 GUI 入口从 `config_loader` 读取，配置更清晰
+- 🆕 用户配置页面增强（Flet + Tauri）：新增逐列异常检测开关管理界面
+- 🐛 油耗模块班次识别改进：改为扫描所有表头行（不再固定第 3 行），燃油类型增加关键字扫描后备机制
+- 🐛 油耗模块移除无油品类型的空记录，避免无效数据污染输出
+- 🐛 日志面板重构：用 ListView 替代 Column + on_scroll，原生 auto_scroll 彻底避免 Flet 控制树 diff 竞态 IndexError；日志级别筛选默认值改为 INFO
+- 🐛 生产处理摘要（_processing_summary）：process_folder 返回 warnings 和 errors 列表，调用方可获取未匹配型号等警告
+- 🎨 Tauri AnomalyPanel 简化：移除运行时逐列开关 UI（ColumnToggles），只保留开关和模式选择
+- 🎨 用户配置页面文件关键字区块默认折叠，减少视觉干扰
+- 🎨 ledger_match.py、maintenance_classification.py 代码精简
+- 🔧 全量版本号更新到 v1.5.0（pyproject.toml / package.json / tauri.conf.json / Cargo.toml）
+- 🧪 测试用例从 887 个增加到 935 个
 
 ### v1.3.1 · 2026-07-20
 

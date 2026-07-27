@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
 import { ChevronDownIcon, PlayIcon, FolderIcon, FileIcon, PlusIcon, TrashIcon, CheckCircleIcon, XCircleIcon, AlertTriangleIcon, FuelIcon, ProductionIcon, ElectricalIcon, WorktimeIcon, MergeIcon, MaintenanceIcon } from "../../lib/icons";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { useLastDirectory } from "../../hooks/useLastDirectory";
-import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG, type ColumnToggles, buildDefaultColumnToggles } from "../AnomalyPanel";
+import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG } from "../AnomalyPanel";
 
 const currentYear = new Date().getFullYear();
 const yearOptions = Array.from({ length: 61 }, (_, i) => currentYear - 30 + i);
@@ -317,7 +317,6 @@ function FuelCard({
   skipHiddenRows,
   skipHiddenCols,
   anomaly,
-  columnToggles,
   defaultPath,
   onFileSelected,
 }: {
@@ -327,7 +326,6 @@ function FuelCard({
   skipHiddenRows: boolean;
   skipHiddenCols: boolean;
   anomaly: AnomalyConfig;
-  columnToggles: ColumnToggles;
   defaultPath?: string;
   onFileSelected?: (path: string) => void;
 }) {
@@ -352,7 +350,6 @@ function FuelCard({
         anomaly_enabled: anomaly.enabled,
         anomaly_report: anomaly.report,
         anomaly_mode: anomaly.mode,
-        column_toggles: anomaly.enabled ? columnToggles : undefined,
       };
       if (year) params.year = parseInt(year);
       const res = await bridge.call<{ output_file?: string }>(
@@ -399,7 +396,6 @@ function ProductionCard({
   skipHiddenRows,
   skipHiddenCols,
   anomaly,
-  columnToggles,
   defaultPath,
   onFileSelected,
 }: {
@@ -409,7 +405,6 @@ function ProductionCard({
   skipHiddenRows: boolean;
   skipHiddenCols: boolean;
   anomaly: AnomalyConfig;
-  columnToggles: ColumnToggles;
   defaultPath?: string;
   onFileSelected?: (path: string) => void;
 }) {
@@ -420,6 +415,12 @@ function ProductionCard({
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<{
+    total_files: number;
+    success_files: number;
+    failed_files: number;
+    warnings: string[];
+  } | null>(null);
 
   const handleAutoDetectChange = (v: boolean) => {
     setAutoDetect(v);
@@ -430,8 +431,12 @@ function ProductionCard({
     setLoading(true);
     setError(null);
     setResult(null);
+    setSummary(null);
     try {
-      await bridge.call("process_production", {
+      const res = await bridge.call<{
+        output_file?: string;
+        summary?: { total_files: number; success_files: number; failed_files: number; warnings: string[] };
+      }>("process_production", {
         path,
         raw_start: autoDetect ? -1 : parseInt(rawStart),
         use_equipment_ledger: useEquipmentLedger,
@@ -441,8 +446,10 @@ function ProductionCard({
         anomaly_enabled: anomaly.enabled,
         anomaly_report: anomaly.report,
         anomaly_mode: anomaly.mode,
-        column_toggles: anomaly.enabled ? columnToggles : undefined,
       });
+      if (res.summary) {
+        setSummary(res.summary);
+      }
       setResult("处理完成");
       notify("生产数据处理完成", "success");
     } catch (e) {
@@ -490,6 +497,19 @@ function ProductionCard({
       />
       {result && <SuccessBadge message={result} />}
       {error && <ErrorBadge message={error} />}
+      {summary && (
+        <div className="mt-3 space-y-2">
+          <div className="flex items-center gap-3 text-xs text-slate-600">
+            <span>共 {summary.total_files} 个文件，成功 {summary.success_files}，失败 {summary.failed_files}</span>
+          </div>
+          {summary.warnings.length > 0 && summary.warnings.map((w, i) => (
+            <div key={i} className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 rounded-md px-2.5 py-1.5">
+              <AlertTriangleIcon />
+              <span>{w}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </ModuleCard>
   );
 }
@@ -504,7 +524,6 @@ function ElectricalCard({
   skipHiddenRows,
   skipHiddenCols,
   anomaly,
-  columnToggles,
   defaultPath,
   onFileSelected,
 }: {
@@ -514,7 +533,6 @@ function ElectricalCard({
   skipHiddenRows: boolean;
   skipHiddenCols: boolean;
   anomaly: AnomalyConfig;
-  columnToggles: ColumnToggles;
   defaultPath?: string;
   onFileSelected?: (path: string) => void;
 }) {
@@ -543,7 +561,6 @@ function ElectricalCard({
         anomaly_enabled: anomaly.enabled,
         anomaly_report: anomaly.report,
         anomaly_mode: anomaly.mode,
-        column_toggles: anomaly.enabled ? columnToggles : undefined,
       };
       if (year) params.year = parseInt(year);
       await bridge.call("process_electrical", params);
@@ -614,7 +631,6 @@ function WorktimeCard({
   skipHiddenRows,
   skipHiddenCols,
   anomaly,
-  columnToggles,
   defaultPath,
   onFileSelected,
 }: {
@@ -624,7 +640,6 @@ function WorktimeCard({
   skipHiddenRows: boolean;
   skipHiddenCols: boolean;
   anomaly: AnomalyConfig;
-  columnToggles: ColumnToggles;
   defaultPath?: string;
   onFileSelected?: (path: string) => void;
 }) {
@@ -656,7 +671,6 @@ function WorktimeCard({
         anomaly_enabled: anomaly.enabled,
         anomaly_report: anomaly.report,
         anomaly_mode: anomaly.mode,
-        column_toggles: anomaly.enabled ? columnToggles : undefined,
       };
       if (useHeaderMapping) {
         params.header_mode = headerMode;
@@ -977,20 +991,7 @@ export function DataProcessingPage({ bridge }: { bridge: BridgeProp }) {
   const [skipHiddenRows, setSkipHiddenRows] = useState(false);
   const [skipHiddenCols, setSkipHiddenCols] = useState(false);
   const [anomaly, setAnomaly] = useState<AnomalyConfig>(DEFAULT_ANOMALY_CONFIG);
-  const [columnToggles, setColumnToggles] = useState<ColumnToggles>(buildDefaultColumnToggles());
-  const [savedThresholds, setSavedThresholds] = useState<Record<string, Record<string, { enabled?: boolean }>>>();
-  const [savedStatCols, setSavedStatCols] = useState<Record<string, Record<string, { enabled?: boolean }>>>();
   const { initialDir, saveDir } = useLastDirectory(bridge);
-
-  useEffect(() => {
-    bridge
-      .call<Record<string, unknown>>("get_anomaly_config")
-      .then((cfg) => {
-        setSavedThresholds(cfg.thresholds as Record<string, Record<string, { enabled?: boolean }>> | undefined);
-        setSavedStatCols(cfg.statistical_columns as Record<string, Record<string, { enabled?: boolean }>> | undefined);
-      })
-      .catch(() => {});
-  }, [bridge]);
 
   return (
     <div className="space-y-5">
@@ -1026,17 +1027,13 @@ export function DataProcessingPage({ bridge }: { bridge: BridgeProp }) {
       <AnomalyPanel
         config={anomaly}
         onChange={setAnomaly}
-        columnToggles={columnToggles}
-        onColumnTogglesChange={setColumnToggles}
-        savedThresholds={savedThresholds}
-        savedStatisticalColumns={savedStatCols}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <FuelCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomaly} columnToggles={columnToggles} defaultPath={initialDir} onFileSelected={saveDir} />
-        <ProductionCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomaly} columnToggles={columnToggles} defaultPath={initialDir} onFileSelected={saveDir} />
-        <ElectricalCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomaly} columnToggles={columnToggles} defaultPath={initialDir} onFileSelected={saveDir} />
-        <WorktimeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomaly} columnToggles={columnToggles} defaultPath={initialDir} onFileSelected={saveDir} />
+        <FuelCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomaly} defaultPath={initialDir} onFileSelected={saveDir} />
+        <ProductionCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomaly} defaultPath={initialDir} onFileSelected={saveDir} />
+        <ElectricalCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomaly} defaultPath={initialDir} onFileSelected={saveDir} />
+        <WorktimeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomaly} defaultPath={initialDir} onFileSelected={saveDir} />
         <MergeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
         <MaintenanceCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
       </div>

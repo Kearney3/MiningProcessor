@@ -538,9 +538,10 @@ class TestExecuteTaskWorktimeWrite:
         sheets = {"工时数据": pd.DataFrame({"日期": ["2025-01-01"], "班次": ["Day"], "设备": ["TR100"]})}
 
         with patch("gui.logic._dispatch_module", return_value=sheets):
-            result = _execute_task("worktime", input_file, year=2025, month=1)
+            result, extra = _execute_task("worktime", input_file, year=2025, month=1)
 
         assert result is None
+        assert extra is None
         expected = str(tmp_path / "202501_工作效率表.xlsx")
         assert os.path.exists(expected)
         written = pd.read_excel(expected)
@@ -552,9 +553,10 @@ class TestExecuteTaskWorktimeWrite:
         pd.DataFrame().to_excel(input_file, index=False)
 
         with patch("gui.logic._dispatch_module", return_value=None):
-            result = _execute_task("worktime", input_file, year=2025, month=1)
+            result, extra = _execute_task("worktime", input_file, year=2025, month=1)
 
         assert result is None
+        assert extra is None
         expected = str(tmp_path / "202501_工作效率表.xlsx")
         assert not os.path.exists(expected)
 
@@ -564,9 +566,11 @@ class TestExecuteTaskWorktimeWrite:
         pd.DataFrame().to_excel(input_file, index=False)
 
         with patch("gui.logic._dispatch_module", return_value={"some": "data"}):
-            result = _execute_task("fuel", input_file, year=2025)
+            result, extra = _execute_task("fuel", input_file, year=2025)
 
         assert result is None
+        # fuel 模块不返回 summary，extra 为 None
+        assert extra is None
         # fuel 输出文件不应被 sheet-write 逻辑创建
         expected = str(tmp_path / "Fuel.xlsx")
         assert not os.path.exists(expected)

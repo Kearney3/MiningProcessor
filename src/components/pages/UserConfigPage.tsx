@@ -309,7 +309,7 @@ function StatusMessage({ message, kind }: { message: string; kind: "success" | "
 
 function FileKeywordsSection({ bridge }: { bridge: BridgeProp }) {
   const { notify } = useToast();
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ msg: string; kind: "success" | "error" | "info" }>({ msg: "", kind: "info" });
   const [keywords, setKeywords] = useState<FileKeywords>({ ...DEFAULT_FILE_KEYWORDS });
@@ -1192,7 +1192,8 @@ interface AnomalyConfig {
   sigma_n: number;
   percentile_low: number;
   percentile_high: number;
-  thresholds: Record<string, Record<string, { min?: number; max?: number }>>;
+  thresholds: Record<string, Record<string, { min?: number; max?: number; enabled?: boolean }>>;
+  statistical_columns: Record<string, Record<string, { enabled?: boolean }>>;
   handling_rules: Record<string, Record<string, { strategy: string; default?: number }>>;
 }
 
@@ -1233,6 +1234,29 @@ function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
   const [activeType, setActiveType] = useState("fuel");
   const [thresholdRows, setThresholdRows] = useState<Record<string, ThresholdRow[]>>({});
 
+  // 逐列检测开关（持久化到用户配置）
+  type ColumnToggles = Record<string, boolean>;
+  const COLUMN_LABELS: Record<string, string> = {
+    fuel: "油耗", fuel_engine: "发动机",
+    production_running: "运行", production: "生产",
+    electrical: "电力", worktime: "工时",
+  };
+  const COLUMN_DEFS: Record<string, string[]> = {
+    fuel: ["油品消耗"],
+    fuel_engine: ["发动机小时数开始", "发动机小时数结束", "运行小时数"],
+    production_running: ["运行里程", "运行小时数", "趟次"],
+    production: ["趟次", "产量"],
+    electrical: ["电力消耗"],
+    worktime: ["__all_numeric__"],
+  };
+  const [columnToggles, setColumnToggles] = useState<ColumnToggles>(() => {
+    const t: ColumnToggles = {};
+    for (const [dtype, cols] of Object.entries(COLUMN_DEFS)) {
+      for (const col of cols) t[`${dtype}:${col}`] = true;
+    }
+    return t;
+  });
+
   const reload = useCallback(async () => {
     try {
       const raw = await bridge.call<AnomalyConfig>("get_anomaly_config", {});
@@ -1262,6 +1286,23 @@ function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
           if (rows[key].length === 0) rows[key] = [];
         }
         setThresholdRows(rows);
+
+        // 加载逐列检测开关
+        const t: ColumnToggles = {};
+        const thresholdsData = raw.thresholds || {};
+        const statData = raw.statistical_columns || {};
+        for (const dtype of DATA_TYPE_OPTIONS.map((o) => o.key)) {
+          const tCfg = thresholdsData[dtype] || {};
+          const sCfg = statData[dtype] || {};
+          for (const col of COLUMN_DEFS[dtype] || []) {
+            const tVal = tCfg[col]?.enabled ?? true;
+            const sVal = sCfg[col]?.enabled ?? true;
+            t[`${dtype}:${col}`] = tVal && sVal;
+          }
+        }
+        // 只有当值有变化时才更新
+        const changed = Object.keys(t).some((k) => t[k] !== (columnToggles[k] ?? true));
+        if (changed) setColumnToggles(t);
       }
       setStatus({ msg: "", kind: "info" });
     } catch {
@@ -1296,12 +1337,12 @@ function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
     setSaving(true);
     try {
       // 收集阈值 + 处理规则
-      const thresholds: Record<string, Record<string, { min?: number; max?: number }>> = {};
+      const thresholds: Record<string, Record<string, { min?: number; max?: number; enabled?: boolean }>> = {};
       const handling_rules: Record<string, Record<string, { strategy: string; default?: number }>> = {};
 
       for (const { key } of DATA_TYPE_OPTIONS) {
         const rows = thresholdRows[key] || [];
-        const dtThresholds: Record<string, { min?: number; max?: number }> = {};
+        const dtThresholds: Record<string, { min?: number; max?: number; enabled?: boolean }> = {};
         const dtHandling: Record<string, { strategy: string; default?: number }> = {};
 
         for (const row of rows) {
@@ -1333,6 +1374,25 @@ function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
         return isNaN(v) ? fallback : v;
       };
 
+      // 合并逐列检测开关到 thresholds 和 statistical_columns
+      const thresholdsOut = { ...thresholds };
+      const statColsOut: Record<string, Record<string, { enabled: boolean }>> = {};
+      for (const [dtype, cols] of Object.entries(COLUMN_DEFS)) {
+        for (const col of cols) {
+          const val = columnToggles[`${dtype}:${col}`] ?? true;
+          // thresholds 中标记 enabled
+          if (thresholdsOut[dtype]?.[col]) {
+            thresholdsOut[dtype] = { ...thresholdsOut[dtype], [col]: { ...thresholdsOut[dtype][col], enabled: val } };
+          } else if (!val) {
+            if (!thresholdsOut[dtype]) thresholdsOut[dtype] = {};
+            thresholdsOut[dtype][col] = { enabled: val };
+          }
+          // statistical_columns 中标记 enabled
+          if (!statColsOut[dtype]) statColsOut[dtype] = {};
+          statColsOut[dtype][col] = { enabled: val };
+        }
+      }
+
       const updates = {
         use_threshold: useThreshold,
         use_sigma: useSigma,
@@ -1340,7 +1400,8 @@ function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
         sigma_n: parseOr(sigmaN, 3.0),
         percentile_low: parseOr(pctLow, 1.0),
         percentile_high: parseOr(pctHigh, 99.0),
-        thresholds,
+        thresholds: thresholdsOut,
+        statistical_columns: statColsOut,
         handling_rules,
       };
 
@@ -1418,6 +1479,36 @@ function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
           <label className="text-xs text-slate-500 mb-1 block">百分位上限</label>
           <input type="text" value={pctHigh} onChange={(e) => setPctHigh(e.target.value)} placeholder="99.0" className="input w-28" />
         </div>
+      </div>
+
+      <div className="border-t border-slate-100 pt-3 mb-3" />
+
+      {/* 逐列检测开关 */}
+      <p className="text-xs font-medium text-slate-500 mb-1">逐列检测开关</p>
+      <p className="text-xs text-slate-400 mb-2">关闭某列的开关后，该列将不参与任何异常检测（阈值、σ、百分位均跳过）。</p>
+      <div className="space-y-1.5 mb-3">
+        {Object.entries(COLUMN_DEFS).map(([dtype, cols]) => (
+          <div key={dtype} className="flex items-start gap-2">
+            <span className="text-xs text-slate-500 w-12 shrink-0 pt-0.5">{COLUMN_LABELS[dtype]}:</span>
+            <div className="flex flex-wrap gap-x-4 gap-y-0.5">
+              {cols.map((col) => {
+                const key = `${dtype}:${col}`;
+                const label = col === ALL_NUMERIC ? "全部数值列" : col;
+                return (
+                  <label key={key} className="flex items-center gap-1 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={columnToggles[key] ?? true}
+                      onChange={(e) => setColumnToggles({ ...columnToggles, [key]: e.target.checked })}
+                      className="w-3.5 h-3.5 rounded border-slate-300"
+                    />
+                    <span className="text-xs text-slate-600">{label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
       <div className="border-t border-slate-100 pt-3 mb-3" />

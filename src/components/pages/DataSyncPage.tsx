@@ -5,7 +5,7 @@ import { useToast } from "../Toast";
 import { FolderIcon } from "../../lib/icons";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { DatePicker } from "../DatePicker";
-import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG, type ColumnToggles, buildDefaultColumnToggles } from "../AnomalyPanel";
+import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG } from "../AnomalyPanel";
 
 // ═══════════════════════════════════════
 // Date helpers
@@ -186,20 +186,6 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const [skipHiddenRows, setSkipHiddenRows] = useState(true);
   const [skipHiddenCols, setSkipHiddenCols] = useState(false);
   const [anomaly, setAnomaly] = useState<AnomalyConfig>(DEFAULT_ANOMALY_CONFIG);
-  const [columnToggles, setColumnToggles] = useState<ColumnToggles>(buildDefaultColumnToggles());
-  const [savedThresholds, setSavedThresholds] = useState<Record<string, Record<string, { enabled?: boolean }>>>();
-  const [savedStatCols, setSavedStatCols] = useState<Record<string, Record<string, { enabled?: boolean }>>>();
-
-  // 启动时加载异常检测配置（用于初始化逐列开关默认值）
-  useEffect(() => {
-    bridge
-      .call<Record<string, unknown>>("get_anomaly_config")
-      .then((cfg) => {
-        setSavedThresholds(cfg.thresholds as Record<string, Record<string, { enabled?: boolean }>> | undefined);
-        setSavedStatCols(cfg.statistical_columns as Record<string, Record<string, { enabled?: boolean }>> | undefined);
-      })
-      .catch(() => {});
-  }, [bridge]);
 
   // 启动时从配置加载上次目录，不存在则清空
   useEffect(() => {
@@ -252,7 +238,6 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
         anomaly_enabled: anomaly.enabled,
         anomaly_report: anomaly.report,
         anomaly_mode: anomaly.mode,
-        column_toggles: anomaly.enabled ? columnToggles : undefined,
       });
       setResult(res);
       const total = Object.values(res.results).reduce(
@@ -569,10 +554,6 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
       <AnomalyPanel
         config={anomaly}
         onChange={setAnomaly}
-        columnToggles={columnToggles}
-        onColumnTogglesChange={setColumnToggles}
-        savedThresholds={savedThresholds}
-        savedStatisticalColumns={savedStatCols}
       />
 
       <button
@@ -588,6 +569,50 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
         )}
         {loading ? "同步中..." : "开始同步"}
       </button>
+
+      {/* Summary bar */}
+      {result && (() => {
+        const totals = Object.values(result.results).reduce(
+          (acc, r) => ({
+            success: acc.success + r.success,
+            skipped: acc.skipped + r.skipped,
+            failed: acc.failed + r.failed,
+            warnings: acc.warnings + (r.warnings?.length ?? 0),
+          }),
+          { success: 0, skipped: 0, failed: 0, warnings: 0 },
+        );
+        return (
+          <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-2">
+            <h3 className="text-sm font-medium text-slate-700">同步汇总</h3>
+            <div className="flex items-center gap-4 text-xs">
+              {totals.success > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <CheckIcon className="w-3 h-3 text-emerald-600" />
+                  <span className="text-slate-600">成功 {totals.success}</span>
+                </div>
+              )}
+              {totals.skipped > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <MinusIcon />
+                  <span className="text-slate-600">跳过 {totals.skipped}</span>
+                </div>
+              )}
+              {totals.failed > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <XCircleIcon />
+                  <span className="text-red-600">失败 {totals.failed}</span>
+                </div>
+              )}
+              {totals.warnings > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <AlertTriangleIcon />
+                  <span className="text-amber-600">异常 {totals.warnings}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Result table — zebra-striped with status badges */}
       {result && (

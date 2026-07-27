@@ -517,15 +517,6 @@ def create_anomaly_controls() -> dict:
                 c.update()
             except (RuntimeError, AttributeError):
                 pass
-        for key, cb in column_toggles.items():
-            if key == "_section":
-                cb.visible = enabled
-            else:
-                cb.disabled = not enabled
-            try:
-                cb.update()
-            except (RuntimeError, AttributeError):
-                pass
 
     def _on_flag_change(e):
         if anomaly_flag.value:
@@ -565,76 +556,6 @@ def create_anomaly_controls() -> dict:
     for c in (anomaly_report, anomaly_flag, anomaly_filter, anomaly_handle):
         c.disabled = not anomaly_enabled.value
 
-    # --- 逐列检测开关 ---
-    _TYPE_COLUMN_LABELS: dict[str, str] = {
-        "fuel": "油耗", "fuel_engine": "发动机",
-        "production_running": "运行", "production": "生产",
-        "electrical": "电力", "worktime": "工时",
-    }
-    _TYPE_COLUMNS: dict[str, dict[str, list[str]]] = {
-        "fuel": {"threshold": ["油品消耗"], "statistical": ["油品消耗"]},
-        "fuel_engine": {"threshold": ["发动机小时数开始", "发动机小时数结束", "运行小时数"], "statistical": ["运行小时数"]},
-        "production_running": {"threshold": ["运行里程", "运行小时数", "趟次"], "statistical": ["运行里程", "运行小时数", "趟次"]},
-        "production": {"threshold": ["趟次", "产量"], "statistical": ["趟次", "产量"]},
-        "electrical": {"threshold": ["电力消耗"], "statistical": ["电力消耗"]},
-        "worktime": {"threshold": ["__all_numeric__"], "statistical": []},
-    }
-
-    ad_cfg = get_anomaly_detection_config()
-    column_toggles: dict[str, ft.Checkbox] = {}
-
-    def _get_col_enabled(dtype: str, col: str) -> bool:
-        t_cfg = (ad_cfg.get("thresholds") or {}).get(dtype, {})
-        s_cfg = (ad_cfg.get("statistical_columns") or {}).get(dtype, {})
-        t_val = t_cfg.get(col, {}).get("enabled", True) if isinstance(t_cfg.get(col), dict) else True
-        s_val = s_cfg.get(col, {}).get("enabled", True) if isinstance(s_cfg.get(col), dict) else True
-        return t_val and s_val
-
-    col_rows = []
-    for dtype, type_label in _TYPE_COLUMN_LABELS.items():
-        cols_cfg = _TYPE_COLUMNS.get(dtype, {})
-        all_cols = sorted(set(cols_cfg.get("threshold", []) + cols_cfg.get("statistical", [])))
-        if not all_cols:
-            continue
-
-        cbs: list[ft.Control] = []
-        for col in all_cols:
-            key = f"{dtype}:{col}"
-            label = "全部数值列" if col == "__all_numeric__" else col
-            cb = ft.Checkbox(
-                label=label,
-                value=_get_col_enabled(dtype, col),
-                visual_density=ft.VisualDensity.COMPACT,
-            )
-            column_toggles[key] = cb
-            cbs.append(cb)
-
-        col_rows.append(
-            ft.Column([
-                ft.Text(f"{type_label}:", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
-                ft.Container(
-                    content=ft.Row(cbs, wrap=True, spacing=4, run_spacing=0),
-                    padding=ft.Padding.only(left=8),
-                ),
-            ], spacing=2, tight=True)
-        )
-
-    column_toggle_section = ft.Container(
-        content=ft.Column(col_rows, spacing=4),
-        padding=ft.Padding.only(left=24),
-        visible=anomaly_enabled.value,
-    )
-    column_toggles["_section"] = column_toggle_section
-
-    def _on_column_toggle_change(e):
-        pass  # 配置在处理时实时读取
-
-    for key, cb in column_toggles.items():
-        if key == "_section":
-            continue
-        cb.on_change = _on_column_toggle_change
-        cb.disabled = not anomaly_enabled.value
-
     container = ft.Container(
         content=ft.Column([
             ft.Row([anomaly_enabled], spacing=8),
@@ -645,7 +566,6 @@ def create_anomaly_controls() -> dict:
                 ], spacing=4),
                 padding=ft.Padding.only(left=24),
             ),
-            column_toggle_section,
         ], spacing=4),
         padding=ft.Padding.symmetric(horizontal=8, vertical=6),
         border=ft.Border.all(1, theme.BORDER),
@@ -658,15 +578,16 @@ def create_anomaly_controls() -> dict:
         "_anomaly_enabled": anomaly_enabled,
         "_anomaly_report": anomaly_report,
         "_anomaly_mode": lambda: _mode[0],
-        "_anomaly_column_toggles": column_toggles,
     }
 
 
 def build_anomaly_config_from_refs(refs: dict):
-    """从 refs dict 构建 AnomalyConfig 实例（与 logic._build_anomaly_config 相同逻辑）。"""
+    """从 refs dict 构建 AnomalyConfig 实例。
+
+    逐列检测开关从用户配置中读取（持久化设置），不再从 GUI 运行时控件合并。
+    """
     from func.anomaly.rules import AnomalyConfig
     from func import config_loader
-    import copy
 
     enabled_ref = refs.get("_anomaly_enabled")
     if not enabled_ref or not enabled_ref.value:
@@ -677,26 +598,6 @@ def build_anomaly_config_from_refs(refs: dict):
     mode = mode_fn() if callable(mode_fn) else "flag"
 
     ad_config = config_loader.get_anomaly_detection_config()
-
-    # 合并 GUI 逐列开关覆盖
-    toggles = refs.get("_anomaly_column_toggles") or {}
-    has_toggles = any(k != "_section" for k in toggles)
-    if has_toggles:
-        thresholds = copy.deepcopy(ad_config.get("thresholds", {}))
-        stat_cols = copy.deepcopy(ad_config.get("statistical_columns", {}))
-        for key, cb in toggles.items():
-            if key == "_section":
-                continue
-            parts = key.split(":", 1)
-            if len(parts) != 2:
-                continue
-            dtype, col = parts
-            val = cb.value if hasattr(cb, "value") else True
-            if dtype in thresholds and col in thresholds[dtype]:
-                thresholds[dtype][col] = {**thresholds[dtype][col], "enabled": val}
-            if dtype in stat_cols and col in stat_cols[dtype]:
-                stat_cols[dtype][col] = {**stat_cols[dtype][col], "enabled": val}
-        ad_config = {**ad_config, "thresholds": thresholds, "statistical_columns": stat_cols}
 
     return AnomalyConfig(
         enabled=True,

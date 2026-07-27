@@ -53,6 +53,13 @@ export interface ScanResult {
   missing: string[];
 }
 
+/** 批量处理摘要 */
+export interface BatchSummary {
+  success_modules: string[];
+  failed_modules: string[];
+  warnings: string[];
+}
+
 /** 同步警告条目 */
 export interface SyncWarning {
   row: number | string;

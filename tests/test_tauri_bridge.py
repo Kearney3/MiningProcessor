@@ -381,7 +381,7 @@ class TestBatchProcessValidation:
 
     def test_table_merge_with_required_data_passes(self):
         """基础表存在时不应返回校验错误。"""
-        with patch("func.excel_batch.process_files", return_value={"fuel": {"success": 1}}):
+        with patch("func.excel_batch.process_files", return_value=({"fuel": {"success": 1}}, {})):
             result = tauri_bridge._batch_process({
                 "folder_path": "/tmp",
                 "matched": {"fuel": ["a.xlsx"], "production": ["b.xlsx"]},

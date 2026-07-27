@@ -8,6 +8,7 @@ import re
 from pathlib import Path
 
 import openpyxl
+import pandas as pd
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
 logger = logging.getLogger(__name__)
@@ -372,60 +373,51 @@ def import_classifications_from_excel(path: str) -> dict:
     Raises:
         ValueError: 文件格式错误或缺少必要 sheet。
     """
-    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    with pd.ExcelFile(path) as xl:
+        sheet_names = set(xl.sheet_names)
 
-    # ── Sheet 1: 分类规则 ──
-    if "分类规则" not in wb.sheetnames:
-        wb.close()
-        raise ValueError("Excel 文件缺少 '分类规则' sheet")
+        # ── Sheet 1: 分类规则 ──
+        if "分类规则" not in sheet_names:
+            raise ValueError("Excel 文件缺少 '分类规则' sheet")
 
-    classifications = []
-    ws = wb["分类规则"]
-    rows = list(ws.iter_rows(min_row=2, values_only=True))
-    for row in rows:
-        if not row or not row[0]:
-            continue
-        major = str(row[0]).strip()
-        minor = str(row[1]).strip() if len(row) > 1 and row[1] else ""
-        kw_raw = str(row[2]).strip() if len(row) > 2 and row[2] else ""
-        if not major or not minor:
-            continue
-        keywords = [k.strip() for k in kw_raw.split("、") if k.strip()]
-        if keywords:
-            classifications.append({"major": major, "minor": minor, "keywords": keywords})
-
-    # ── Sheet 2: 噪声过滤 ──
-    noise_exact: set[str] = set()
-    noise_patterns: list[str] = []
-    if "噪声过滤" in wb.sheetnames:
-        ws = wb["噪声过滤"]
-        for row in ws.iter_rows(min_row=2, values_only=True):
-            if not row or not row[0]:
+        classifications = []
+        df = xl.parse("分类规则")
+        for row in df.itertuples(index=False):
+            major = str(row[0]).strip() if row[0] is not None and str(row[0]).strip() != "nan" else ""
+            minor = str(row[1]).strip() if len(row) > 1 and row[1] is not None and str(row[1]).strip() != "nan" else ""
+            kw_raw = str(row[2]).strip() if len(row) > 2 and row[2] is not None and str(row[2]).strip() != "nan" else ""
+            if not major or not minor:
                 continue
-            filter_type = str(row[0]).strip()
-            value = str(row[1]).strip() if len(row) > 1 and row[1] else ""
-            if not value:
-                continue
-            if filter_type == "精确匹配":
-                noise_exact.add(value)
-            elif filter_type == "正则":
-                noise_patterns.append(value)
+            keywords = [k.strip() for k in kw_raw.split("、") if k.strip()]
+            if keywords:
+                classifications.append({"major": major, "minor": minor, "keywords": keywords})
 
-    # ── Sheet 3: 原因规则 ──
-    reason_rules: dict[str, str] = {}
-    _REASON_MAP = {"故障": "fault", "检查内容": "check_content", "非故障": "non_fault", "跳过": "skip"}
-    if "原因规则" in wb.sheetnames:
-        ws = wb["原因规则"]
-        for row in ws.iter_rows(min_row=2, values_only=True):
-            if not row or not row[0]:
-                continue
-            reason = str(row[0]).strip()
-            method = str(row[1]).strip() if len(row) > 1 and row[1] else ""
-            mapped = _REASON_MAP.get(method)
-            if reason and mapped:
-                reason_rules[reason] = mapped
+        # ── Sheet 2: 噪声过滤 ──
+        noise_exact: set[str] = set()
+        noise_patterns: list[str] = []
+        if "噪声过滤" in sheet_names:
+            df = xl.parse("噪声过滤")
+            for row in df.itertuples(index=False):
+                filter_type = str(row[0]).strip() if row[0] is not None and str(row[0]).strip() != "nan" else ""
+                value = str(row[1]).strip() if len(row) > 1 and row[1] is not None and str(row[1]).strip() != "nan" else ""
+                if not value:
+                    continue
+                if filter_type == "精确匹配":
+                    noise_exact.add(value)
+                elif filter_type == "正则":
+                    noise_patterns.append(value)
 
-    wb.close()
+        # ── Sheet 3: 原因规则 ──
+        reason_rules: dict[str, str] = {}
+        _REASON_MAP = {"故障": "fault", "检查内容": "check_content", "非故障": "non_fault", "跳过": "skip"}
+        if "原因规则" in sheet_names:
+            df = xl.parse("原因规则")
+            for row in df.itertuples(index=False):
+                reason = str(row[0]).strip() if row[0] is not None and str(row[0]).strip() != "nan" else ""
+                method = str(row[1]).strip() if len(row) > 1 and row[1] is not None and str(row[1]).strip() != "nan" else ""
+                mapped = _REASON_MAP.get(method)
+                if reason and mapped:
+                    reason_rules[reason] = mapped
 
     # 空值兜底
     if not classifications:

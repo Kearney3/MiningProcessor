@@ -110,7 +110,7 @@ def test_progress_updates_during_processing(tmp_path, monkeypatch):
             time.sleep(0.8)
             progress_cb({"stage": "writing", "percent": 1.0, "current": 2, "total": 2, "detail": "file2 done"})
             progress_cb({"stage": "finished", "percent": 1.0, "current": 2, "total": 2, "detail": "done"})
-        return {"fuel": {"油耗信息": None}}
+        return {"fuel": {"油耗信息": None}}, {}
 
     monkeypatch.setattr(logic, "process_files", fake_process_files)
 
@@ -137,7 +137,7 @@ def test_progress_bar_shows_intermediate_value(tmp_path, monkeypatch):
             progress_cb({"stage": "writing", "percent": 0.5, "current": 1, "total": 2, "detail": "halfway"})
             time.sleep(0.5)
             progress_cb({"stage": "finished", "percent": 1.0, "current": 2, "total": 2, "detail": "done"})
-        return {"fuel": {"油耗信息": None}}
+        return {"fuel": {"油耗信息": None}}, {}
 
     monkeypatch.setattr(logic, "process_files", fake_process_files)
 
@@ -159,7 +159,7 @@ def test_polling_task_cleans_up_on_completion(tmp_path, monkeypatch):
         progress_cb = kwargs.get("progress_cb")
         if progress_cb:
             progress_cb({"stage": "finished", "percent": 1.0, "current": 1, "total": 1, "detail": "done"})
-        return {"fuel": {"油耗信息": None}}
+        return {"fuel": {"油耗信息": None}}, {}
 
     monkeypatch.setattr(logic, "process_files", fake_process_files)
 
