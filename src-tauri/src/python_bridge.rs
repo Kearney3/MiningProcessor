@@ -102,7 +102,15 @@ impl PythonBridge {
     /// 发送 RPC 请求并等待响应
     ///
     /// 整个写入 + 读取过程由 `call_lock` 序列化，防止并发调用时响应错配 (H3)。
-    pub fn call(&self, method: &str, params: &serde_json::Value) -> Result<serde_json::Value, String> {
+    pub fn call<F>(
+        &self,
+        method: &str,
+        params: &serde_json::Value,
+        mut on_event: F,
+    ) -> Result<serde_json::Value, String>
+    where
+        F: FnMut(&serde_json::Value),
+    {
         // 序列化整个往返，防止响应错配
         let _guard = self.call_lock.lock().map_err(|e| e.to_string())?;
 
@@ -130,7 +138,9 @@ impl PythonBridge {
             let mut stdin = self.stdin.lock().map_err(|e| e.to_string())?;
             writeln!(stdin, "{}", request_line)
                 .map_err(|e| format!("Write to stdin failed: {}", e))?;
-            stdin.flush().map_err(|e| format!("Flush stdin failed: {}", e))?;
+            stdin
+                .flush()
+                .map_err(|e| format!("Flush stdin failed: {}", e))?;
         }
 
         // 读取 stdout 响应（跳过异步事件，匹配请求 ID）
@@ -156,18 +166,18 @@ impl PythonBridge {
                 continue;
             }
 
-            let response: serde_json::Value =
-                serde_json::from_str(trimmed).map_err(|e| {
-                    let preview = if trimmed.len() > 200 {
-                        format!("{}... ({} bytes total)", &trimmed[..200], trimmed.len())
-                    } else {
-                        trimmed.to_string()
-                    };
-                    format!("JSON parse error: {} (line: {})", e, preview)
-                })?;
+            let response: serde_json::Value = serde_json::from_str(trimmed).map_err(|e| {
+                let preview = if trimmed.len() > 200 {
+                    format!("{}... ({} bytes total)", &trimmed[..200], trimmed.len())
+                } else {
+                    trimmed.to_string()
+                };
+                format!("JSON parse error: {} (line: {})", e, preview)
+            })?;
 
-            // 异步事件（无 id）→ 跳过，继续读取
+            // 异步事件（无 id）→ 转发给 Tauri，再继续读取响应
             if response.get("event").is_some() {
+                on_event(&response);
                 continue;
             }
 

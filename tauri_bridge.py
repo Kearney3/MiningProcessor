@@ -7,7 +7,8 @@ Tauri-Python 桥接层 — JSON-RPC over stdin/stdout
   响应：{"id": int, "result": any} 或 {"id": int, "error": str}
   事件：{"event": str, "data": dict}  (异步推送，无 id)
 
-日志通过 stderr 流式推送：{"event": "log", "data": {"level": str, "message": str}}
+日志通过 stderr 流式推送，包含 seq、timestamp、logger、message，
+异常时额外携带 detail（完整 traceback）。
 """
 
 from __future__ import annotations
@@ -184,16 +185,27 @@ class _StderrLogHandler(logging.Handler):
     def __init__(self):
         super().__init__()
         self.addFilter(_SuppressNoisyFilter())
+        self._sequence = 0
+        self._sequence_lock = threading.Lock()
 
     def emit(self, record: logging.LogRecord) -> None:
         try:
-            msg = self.format(record)
-            # ERROR 级别且含 traceback 时，只保留第一行（用户友好的异常消息）
-            # log record 本身不变，完整 traceback 仍可通过 logger.exception 访问
-            if record.levelno >= logging.ERROR and "\nTraceback " in msg:
-                msg = msg.split("\n", 1)[0].rstrip()
+            detail = self.format(record)
+            message = detail.split("\n", 1)[0].rstrip()
+            with self._sequence_lock:
+                self._sequence += 1
+                sequence = self._sequence
+            data = {
+                "seq": sequence,
+                "timestamp": datetime.fromtimestamp(record.created).isoformat(timespec="milliseconds"),
+                "level": record.levelname,
+                "logger": record.name,
+                "message": message,
+            }
+            if detail != message:
+                data["detail"] = detail
             obj = json.dumps(
-                {"event": "log", "data": {"level": record.levelname, "message": msg}},
+                {"event": "log", "data": data},
                 ensure_ascii=False,
                 cls=_BridgeEncoder,
             )
@@ -212,9 +224,6 @@ def _setup_logging() -> None:
     # 清除已有 handler，避免重复
     root.handlers.clear()
     root.addHandler(handler)
-    # 全局 filter 挂 root logger，拦截第三方库噪音
-    if not any(isinstance(f, _SuppressNoisyFilter) for f in root.filters):
-        root.addFilter(_SuppressNoisyFilter())
 
 
 # ─── 取消令牌 ───
@@ -1209,7 +1218,7 @@ def _handle_request(req: dict) -> None:
 def main() -> None:
     """入口：从 stdin 逐行读取 JSON 请求，处理后写回 stdout。"""
     _setup_logging()
-    _emit("log", {"level": "INFO", "message": "Python bridge started"})
+    logger.info("Python bridge started")
 
     for line in sys.stdin:
         line = line.strip()

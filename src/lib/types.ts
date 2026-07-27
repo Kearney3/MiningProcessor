@@ -32,10 +32,13 @@ export interface PythonEvent {
 
 /** 日志事件 */
 export interface LogEntry {
+  seq: number;
   level: string;
   message: string;
-  timestamp?: string;
-  seq?: number;  // M13: 用于 React key，保证稳定性
+  timestamp: string;
+  logger?: string;
+  /** 完整诊断信息；界面显示 message，复制/导出使用 detail。 */
+  detail?: string;
 }
 
 /** 批处理进度事件 */

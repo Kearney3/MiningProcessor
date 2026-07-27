@@ -262,7 +262,7 @@ MiningProcessor/
 
 ### 统一日志
 
-`func/logger.py` 提供 `logging` + `get_logger()`，CLI 直接输出控制台。Flet 由进程级 `GuiLogHandler` 将记录广播给各页面订阅，每个页面通过单一异步刷新入口批量更新日志列表；Tauri 通过 JSON-RPC 事件推送。新增处理逻辑请使用 `logging` 而非 `print()`。
+`func/logger.py` 提供 `logging` + `get_logger()`，CLI 直接输出控制台。Flet 由进程级 `GuiLogHandler` 将记录广播给各页面订阅，每个页面通过单一异步刷新入口批量更新日志列表。Tauri 使用包含序号、时间、来源和异常详情的结构化事件，Rust 通过有界通道批量转发，React 再按 50ms 窗口合并渲染。新增处理逻辑请使用 `logging` 而非 `print()`。
 
 Flet 日志面板保留最近 5000 条历史记录、最多渲染 1000 个控件。用户上翻时会暂停自动跟随；队列高峰时优先保留 WARNING/ERROR。界面中的异常只显示根因，导出的日志保留完整 traceback 供诊断。
 
@@ -418,12 +418,13 @@ uv run scripts/bump_version.py --bump minor --dry-run
 - 🐛 油耗模块班次识别改进：改为扫描所有表头行（不再固定第 3 行），燃油类型增加关键字扫描后备机制
 - 🐛 油耗模块移除无油品类型的空记录，避免无效数据污染输出
 - 🐛 Flet 日志面板重构：进程级 Broker 隔离多页面订阅，页面使用单一异步刷新入口消除控制树竞态；支持上翻暂停跟随、有界渲染、高峰期优先保留警告/错误，日志级别筛选默认值为 INFO
+- 🐛 Tauri 日志链路重构：保留完整 traceback，Rust 使用有界批量转发，React 日志状态按 50ms 合并并限制渲染窗口；支持上翻暂停跟随、键盘调整高度和可访问级别标签
 - 🐛 生产处理摘要（_processing_summary）：process_folder 返回 warnings 和 errors 列表，调用方可获取未匹配型号等警告
 - 🎨 Tauri AnomalyPanel 简化：移除运行时逐列开关 UI（ColumnToggles），只保留开关和模式选择
 - 🎨 用户配置页面文件关键字区块默认折叠，减少视觉干扰
 - 🎨 ledger_match.py、maintenance_classification.py 代码精简
 - 🔧 全量版本号更新到 v1.5.0（pyproject.toml / package.json / tauri.conf.json / Cargo.toml）
-- 🧪 测试用例从 887 个增加到 937 个
+- 🧪 Python 测试用例从 887 个增加到 939 个，React 45 个，Rust 2 个
 
 ### v1.3.1 · 2026-07-20
 

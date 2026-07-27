@@ -76,12 +76,104 @@ describe("usePythonBridge", () => {
         payload: { event: "log", data: { level: "INFO", message: "test log" } },
       });
     });
+    expect(result.current.logs.length).toBe(0);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
     expect(result.current.logs.length).toBe(1);
 
     act(() => {
       result.current.clearLogs();
     });
     expect(result.current.logs.length).toBe(0);
+  });
+
+  it("clearing also discards logs waiting in the batch buffer", async () => {
+    let logHandler: (event: { payload: { event: string; data: Record<string, unknown> } }) => void;
+    mockListen.mockImplementation(async (_event, handler) => {
+      logHandler = handler as typeof logHandler;
+      return () => {};
+    });
+    const { result } = renderHook(() => usePythonBridge());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    act(() => {
+      logHandler!({
+        payload: { event: "log", data: { level: "INFO", message: "pending" } },
+      });
+      result.current.clearLogs();
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+
+    expect(result.current.logs).toEqual([]);
+  });
+
+  it("consumes Rust log batches in one state flush with stable sequences", async () => {
+    let logHandler: (event: { payload: { event: string; data: Record<string, unknown> } }) => void;
+    mockListen.mockImplementation(async (_event, handler) => {
+      logHandler = handler as typeof logHandler;
+      return () => {};
+    });
+    const { result } = renderHook(() => usePythonBridge());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    act(() => {
+      logHandler!({
+        payload: {
+          event: "log_batch",
+          data: {
+            entries: [
+              { event: "log", data: { seq: 1, level: "INFO", message: "first" } },
+              { event: "log", data: { seq: 2, level: "ERROR", message: "second" } },
+            ],
+          },
+        },
+      });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+
+    expect(result.current.logs.map((entry) => entry.message)).toEqual(["first", "second"]);
+    expect(result.current.logs.map((entry) => entry.seq)).toEqual([1, 2]);
+  });
+
+  it("bounds history while preserving warnings during a log burst", async () => {
+    let logHandler: (event: { payload: { event: string; data: Record<string, unknown> } }) => void;
+    mockListen.mockImplementation(async (_event, handler) => {
+      logHandler = handler as typeof logHandler;
+      return () => {};
+    });
+    const { result } = renderHook(() => usePythonBridge());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    const entries = [
+      { event: "log", data: { seq: 1, level: "WARNING", message: "keep-warning" } },
+      ...Array.from({ length: 5000 }, (_, index) => ({
+        event: "log",
+        data: { seq: index + 2, level: "INFO", message: `regular-${index}` },
+      })),
+    ];
+
+    act(() => {
+      logHandler!({
+        payload: { event: "log_batch", data: { entries } },
+      });
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(50);
+    });
+
+    expect(result.current.logs).toHaveLength(5000);
+    expect(result.current.logs.some((entry) => entry.message === "keep-warning")).toBe(true);
+    expect(result.current.logs.some((entry) => entry.message === "regular-0")).toBe(false);
   });
 
   it("handles ping failure and marks disconnected after max retries", async () => {

@@ -90,12 +90,20 @@ describe("LogPanel", () => {
     expect(onClear).toHaveBeenCalledOnce();
   });
 
-  it("toggles auto-scroll", () => {
-    render(<LogPanel logs={[]} onClear={onClear} />);
-    const autoBtn = screen.getByText("Auto");
-    expect(autoBtn).toHaveClass("text-blue-600");
-    fireEvent.click(autoBtn);
-    expect(autoBtn).toHaveClass("text-slate-400");
+  it("pauses following when user scrolls away and resumes on click", () => {
+    render(<LogPanel logs={[makeLog("INFO", "msg", 1)]} onClear={onClear} />);
+    const region = screen.getByRole("region", { name: "处理日志" });
+    Object.defineProperties(region, {
+      scrollHeight: { configurable: true, value: 1000 },
+      clientHeight: { configurable: true, value: 100 },
+      scrollTop: { configurable: true, writable: true, value: 200 },
+    });
+
+    fireEvent.scroll(region);
+    const followButton = screen.getByText("继续跟随");
+    expect(followButton).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(followButton);
+    expect(screen.getByText("跟随中")).toHaveAttribute("aria-pressed", "true");
   });
 
   it("copies logs to clipboard", async () => {
@@ -106,6 +114,30 @@ describe("LogPanel", () => {
     render(<LogPanel logs={logs} onClear={onClear} />);
     fireEvent.click(screen.getByTitle("复制全部"));
     expect(writeText).toHaveBeenCalledWith("[INFO] copy-test");
+  });
+
+  it("copies full diagnostic detail instead of the shortened display message", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    const log = { ...makeLog("ERROR", "processing failed", 1), detail: "processing failed\nTraceback detail" };
+
+    render(<LogPanel logs={[log]} onClear={onClear} />);
+    fireEvent.click(screen.getByTitle("复制全部"));
+
+    expect(writeText).toHaveBeenCalledWith("[ERROR] processing failed\nTraceback detail");
+    expect(screen.queryByText("Traceback detail")).not.toBeInTheDocument();
+  });
+
+  it("renders a bounded window while retaining the filtered count", () => {
+    const logs = Array.from(
+      { length: 1001 },
+      (_, index) => makeLog("INFO", `row-${index}`, index + 1),
+    );
+    render(<LogPanel logs={logs} onClear={onClear} />);
+
+    expect(screen.queryByText("row-0")).not.toBeInTheDocument();
+    expect(screen.getByText("row-1000")).toBeInTheDocument();
+    expect(screen.getByText("显示最近 1000 条")).toBeInTheDocument();
   });
 
   it("disables text selection during drag resize", () => {
@@ -135,6 +167,16 @@ describe("LogPanel", () => {
     const handle = document.querySelector(".cursor-row-resize");
     expect(handle).toBeTruthy();
     expect(handle!.className).toContain("select-none");
+  });
+
+  it("allows keyboard resizing through the separator", () => {
+    render(<LogPanel logs={[]} onClear={onClear} />);
+    const handle = screen.getByRole("separator", { name: "调整日志面板高度" });
+    expect(handle).toHaveAttribute("aria-valuenow", "180");
+
+    fireEvent.keyDown(handle, { key: "ArrowUp" });
+
+    expect(handle).toHaveAttribute("aria-valuenow", "200");
   });
 
   it("container adds select-none class during resize", () => {

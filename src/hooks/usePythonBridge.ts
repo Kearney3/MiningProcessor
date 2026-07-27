@@ -13,9 +13,26 @@ import type {
 const HEARTBEAT_INTERVAL = 30_000;
 const MAX_FAIL_COUNT = 2;
 const MAX_CONNECTION_LOGS = 50;
+const MAX_LOGS = 5000;
+const MAX_PENDING_LOGS = 10_000;
+const LOG_FLUSH_INTERVAL = 50;
 
 function now(): string {
   return new Date().toLocaleTimeString("zh-CN", { hour12: false });
+}
+
+function levelOrder(level: string): number {
+  return { DEBUG: 10, INFO: 20, WARNING: 30, ERROR: 40, CRITICAL: 50, STDERR: 40 }[level] ?? 0;
+}
+
+/** 保留最近日志；溢出时优先保留 WARNING 及以上。 */
+function trimLogs(entries: LogEntry[], capacity: number): LogEntry[] {
+  if (entries.length <= capacity) return entries;
+  const important = entries.filter((entry) => levelOrder(entry.level) >= 30);
+  if (important.length >= capacity) return important.slice(-capacity);
+  const regular = entries.filter((entry) => levelOrder(entry.level) < 30);
+  return [...regular.slice(-(capacity - important.length)), ...important]
+    .sort((a, b) => a.seq - b.seq);
 }
 
 /**
@@ -34,6 +51,9 @@ export function usePythonBridge() {
   const [bridgeInfo, setBridgeInfo] = useState<BridgeInfo | null>(null);
 
   const failCountRef = useRef(0);
+  const pendingLogsRef = useRef<LogEntry[]>([]);
+  const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clientSequenceRef = useRef(0);
 
   // 添加连接日志
   const addConnectionLog = useCallback((level: string, message: string) => {
@@ -42,6 +62,45 @@ export function usePythonBridge() {
       return next.length > MAX_CONNECTION_LOGS ? next.slice(-MAX_CONNECTION_LOGS) : next;
     });
   }, []);
+
+  const queueLogEntries = useCallback((rawEntries: Record<string, unknown>[]) => {
+    const normalized = rawEntries.map((raw): LogEntry => {
+      const incomingSequence = Number(raw.seq);
+      const sequence = Number.isFinite(incomingSequence)
+        && incomingSequence > clientSequenceRef.current
+        ? incomingSequence
+        : clientSequenceRef.current + 1;
+      clientSequenceRef.current = Math.max(clientSequenceRef.current, sequence);
+      return {
+        seq: sequence,
+        timestamp: typeof raw.timestamp === "string" ? raw.timestamp : new Date().toISOString(),
+        level: typeof raw.level === "string" ? raw.level : "INFO",
+        logger: typeof raw.logger === "string" ? raw.logger : undefined,
+        message: typeof raw.message === "string" ? raw.message : String(raw.message ?? ""),
+        detail: typeof raw.detail === "string" ? raw.detail : undefined,
+      };
+    });
+
+    pendingLogsRef.current = trimLogs(
+      [...pendingLogsRef.current, ...normalized],
+      MAX_PENDING_LOGS,
+    );
+    for (const entry of normalized) {
+      if (entry.level === "ERROR" || entry.level === "CRITICAL" || entry.level === "STDERR") {
+        addConnectionLog(entry.level, entry.message);
+      }
+    }
+    if (flushTimerRef.current === null) {
+      flushTimerRef.current = setTimeout(() => {
+        const batch = pendingLogsRef.current;
+        pendingLogsRef.current = [];
+        flushTimerRef.current = null;
+        if (batch.length > 0) {
+          setLogs((previous) => trimLogs([...previous, ...batch], MAX_LOGS));
+        }
+      }, LOG_FLUSH_INTERVAL);
+    }
+  }, [addConnectionLog]);
 
   // 心跳检测：ping Python 子进程
   const doPing = useCallback(async () => {
@@ -133,23 +192,27 @@ export function usePythonBridge() {
 
       // 普通日志事件
       if (data.event === "log") {
-        const entry = data.data as unknown as LogEntry;
-        setLogs((prev) => {
-          const next = [...prev, entry];
-          return next.length > 2000 ? next.slice(-2000) : next;
-        });
-        // 高级别日志也写入连接日志
-        if (entry.level === "ERROR" || entry.level === "STDERR") {
-          addConnectionLog(entry.level, entry.message);
-        }
+        queueLogEntries([data.data]);
+      } else if (data.event === "log_batch") {
+        const entries = (data.data as { entries?: PythonEvent[] }).entries ?? [];
+        queueLogEntries(
+          entries
+            .filter((entry) => entry.event === "log")
+            .map((entry) => entry.data),
+        );
       } else if (data.event === "progress") {
         setProgress(data.data as unknown as BatchProgress);
       }
     });
     return () => {
       unlisten.then((fn) => fn());
+      if (flushTimerRef.current !== null) {
+        clearTimeout(flushTimerRef.current);
+        flushTimerRef.current = null;
+      }
+      pendingLogsRef.current = [];
     };
-  }, [addConnectionLog]);
+  }, [queueLogEntries]);
 
   /**
    * 调用 Python RPC 方法
@@ -173,6 +236,11 @@ export function usePythonBridge() {
    * 清空日志
    */
   const clearLogs = useCallback(() => {
+    pendingLogsRef.current = [];
+    if (flushTimerRef.current !== null) {
+      clearTimeout(flushTimerRef.current);
+      flushTimerRef.current = null;
+    }
     setLogs([]);
   }, []);
 
