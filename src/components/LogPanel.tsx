@@ -1,4 +1,5 @@
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import type { LogEntry } from "../lib/types";
 
@@ -17,6 +18,8 @@ const LEVEL_DOT: Record<string, string> = {
 };
 
 const DEFAULT_DOT = "bg-slate-400";
+const MAX_RENDERED_LOGS = 1000;
+const SCROLL_BOTTOM_THRESHOLD = 48;
 
 /** 数字越大级别越高，用于"选中级别及以上"筛选 */
 const LEVEL_ORDER: Record<string, number> = {
@@ -70,16 +73,35 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState(180);
   const [isResizing, setIsResizing] = useState(false);
-  const [autoScroll, setAutoScroll] = useState(true);
+  const [followTail, setFollowTail] = useState(true);
   const [filterLevel, setFilterLevel] = useState<string>("INFO");
   const [copied, setCopied] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const feedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto-scroll to bottom
   useEffect(() => {
-    if (autoScroll && scrollRef.current) {
+    if (followTail && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [logs, autoScroll]);
+  }, [logs, followTail]);
+
+  useEffect(() => () => {
+    if (feedbackTimerRef.current !== null) {
+      clearTimeout(feedbackTimerRef.current);
+    }
+  }, []);
+
+  const showFeedback = useCallback((message: string) => {
+    setFeedback(message);
+    if (feedbackTimerRef.current !== null) {
+      clearTimeout(feedbackTimerRef.current);
+    }
+    feedbackTimerRef.current = setTimeout(() => {
+      setFeedback("");
+      feedbackTimerRef.current = null;
+    }, 2500);
+  }, []);
 
   // Drag to resize height
   useEffect(() => {
@@ -114,19 +136,30 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
     };
   }, [isResizing]);
 
-  const filteredLogs = logs.filter(
-    (l) => (LEVEL_ORDER[l.level] ?? 0) >= (LEVEL_ORDER[filterLevel] ?? 0),
+  const filteredLogs = useMemo(
+    () => logs.filter(
+      (entry) => (LEVEL_ORDER[entry.level] ?? 0) >= (LEVEL_ORDER[filterLevel] ?? 0),
+    ),
+    [logs, filterLevel],
+  );
+  const renderedLogs = useMemo(
+    () => filteredLogs.slice(-MAX_RENDERED_LOGS),
+    [filteredLogs],
   );
 
-  const handleCopyAll = useCallback(() => {
+  const handleCopyAll = useCallback(async () => {
     const text = filteredLogs
-      .map((e) => `[${e.level}] ${e.message}`)
+      .map((entry) => `[${entry.level}] ${entry.detail ?? entry.message}`)
       .join("\n");
-    navigator.clipboard.writeText(text).then(() => {
+    try {
+      await navigator.clipboard.writeText(text);
       setCopied(true);
+      showFeedback("日志已复制");
       setTimeout(() => setCopied(false), 2000);
-    });
-  }, [filteredLogs]);
+    } catch {
+      showFeedback("复制失败，请检查剪贴板权限");
+    }
+  }, [filteredLogs, showFeedback]);
 
   const handleExport = useCallback(async () => {
     const today = new Date().toISOString().slice(0, 10);
@@ -136,20 +169,30 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
     });
     if (!filePath) return;
     const text = filteredLogs
-      .map((e) => `[${e.level}] ${e.message}`)
+      .map((entry) => `[${entry.level}] ${entry.detail ?? entry.message}`)
       .join("\n");
-    // 通过 bridge 写入文件（Tauri 安全模型下前端无法直接写文件系统）
     try {
-      const { invoke } = await import("@tauri-apps/api/core");
       await invoke("invoke_python", {
         method: "write_text_file",
         params: { path: filePath, content: text },
       });
+      showFeedback("日志已导出");
     } catch {
-      // fallback: 复制到剪贴板
-      navigator.clipboard.writeText(text);
+      try {
+        await navigator.clipboard.writeText(text);
+        showFeedback("导出失败，日志已复制到剪贴板");
+      } catch {
+        showFeedback("日志导出失败");
+      }
     }
-  }, [filteredLogs]);
+  }, [filteredLogs, showFeedback]);
+
+  const resumeFollowing = useCallback(() => {
+    setFollowTail(true);
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, []);
 
   return (
     <div
@@ -160,11 +203,24 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
     >
       {/* Drag handle */}
       <div
-        className="h-1.5 cursor-row-resize flex items-center justify-center hover:bg-slate-100 group select-none"
+        role="separator"
+        aria-label="调整日志面板高度"
+        aria-orientation="horizontal"
+        aria-valuemin={80}
+        aria-valuemax={500}
+        aria-valuenow={height}
+        tabIndex={0}
+        className="h-3 cursor-row-resize flex items-center justify-center hover:bg-slate-100 focus:bg-blue-50 group select-none"
         onMouseDown={(e) => {
           e.preventDefault();
           window.getSelection()?.removeAllRanges();
           setIsResizing(true);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+          event.preventDefault();
+          const delta = event.key === "ArrowUp" ? 20 : -20;
+          setHeight((current) => Math.max(80, Math.min(500, current + delta)));
         }}
       >
         <div className="flex items-center gap-1">
@@ -180,11 +236,21 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
         <span className="inline-flex items-center justify-center min-w-[24px] h-4 px-1.5 ml-2 text-[10px] font-medium text-slate-400 bg-slate-50 rounded-full">
           {filteredLogs.length}
         </span>
+        {filteredLogs.length > renderedLogs.length && (
+          <span className="ml-2 text-xs text-slate-500">
+            显示最近 {renderedLogs.length} 条
+          </span>
+        )}
+        <span className="ml-2 text-xs text-slate-600" role="status" aria-live="polite">
+          {feedback}
+        </span>
         <div className="ml-auto flex items-center gap-1">
+          <label htmlFor="log-level-filter" className="sr-only">日志级别</label>
           <select
+            id="log-level-filter"
             value={filterLevel}
             onChange={(e) => setFilterLevel(e.target.value)}
-            className="text-xs bg-white border border-slate-200 rounded px-2 py-0.5 text-slate-500 cursor-pointer hover:border-slate-300 appearance-none"
+            className="text-xs bg-white border border-slate-200 rounded px-2 py-1 text-slate-600 cursor-pointer hover:border-slate-300"
           >
             <option value="DEBUG">DEBUG</option>
             <option value="INFO">INFO</option>
@@ -192,35 +258,43 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
             <option value="ERROR">ERROR</option>
           </select>
           <button
-            onClick={() => setAutoScroll(!autoScroll)}
+            onClick={resumeFollowing}
+            aria-pressed={followTail}
+            title={followTail ? "正在跟随最新日志" : "滚动到底部并恢复跟随"}
             className={`
-              text-xs px-2 py-0.5 rounded cursor-pointer transition-colors
-              ${autoScroll
+              text-xs px-2 py-1 rounded cursor-pointer transition-colors
+              ${followTail
                 ? "text-blue-600 font-medium"
-                : "text-slate-400 hover:text-slate-600"
+                : "text-amber-700 hover:text-amber-800"
               }
             `}
           >
-            Auto
+            {followTail ? "跟随中" : "继续跟随"}
           </button>
           <button
             onClick={handleCopyAll}
             title={copied ? "已复制" : "复制全部"}
-            className="p-1 rounded text-slate-400 hover:text-slate-600 cursor-pointer transition-colors"
+            aria-label={copied ? "日志已复制" : "复制全部日志"}
+            disabled={filteredLogs.length === 0}
+            className="p-1.5 rounded text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed cursor-pointer transition-colors"
           >
             {copied ? <IconCheck /> : <IconClipboard />}
           </button>
           <button
             onClick={handleExport}
             title="导出日志"
-            className="p-1 rounded text-slate-400 hover:text-slate-600 cursor-pointer transition-colors"
+            aria-label="导出日志"
+            disabled={filteredLogs.length === 0}
+            className="p-1.5 rounded text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed cursor-pointer transition-colors"
           >
             <IconDownload />
           </button>
           <button
             onClick={onClear}
             title="清空"
-            className="p-1 rounded text-slate-400 hover:text-slate-600 cursor-pointer transition-colors"
+            aria-label="清空日志"
+            disabled={logs.length === 0}
+            className="p-1.5 rounded text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed cursor-pointer transition-colors"
           >
             <IconTrash />
           </button>
@@ -228,21 +302,34 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
       </div>
 
       {/* Log entries */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto thin-scrollbar font-mono text-xs text-slate-600 px-4 py-1.5">
+      <div
+        ref={scrollRef}
+        role="region"
+        aria-label="处理日志"
+        onScroll={(event) => {
+          const element = event.currentTarget;
+          const distance = element.scrollHeight - element.scrollTop - element.clientHeight;
+          setFollowTail(distance <= SCROLL_BOTTOM_THRESHOLD);
+        }}
+        className="flex-1 overflow-y-auto thin-scrollbar font-mono text-xs text-slate-600 px-4 py-1.5"
+      >
         {filteredLogs.length === 0 ? (
-          <div className="text-slate-400 text-center py-6 text-xs">等待日志...</div>
+          <div className="text-slate-500 text-center py-6 text-xs">等待日志...</div>
         ) : (
-          filteredLogs.map((entry, i) => {
+          renderedLogs.map((entry) => {
             const dotColor = LEVEL_DOT[entry.level] || DEFAULT_DOT;
             return (
               <div
-                key={entry.seq ?? entry.timestamp ?? i}
+                key={entry.seq}
                 className="py-0.5 flex items-baseline gap-3 hover:bg-slate-50 rounded px-1 -mx-1"
               >
                 <span
                   className={`inline-block shrink-0 w-[3px] h-[3px] rounded-full mt-[5px] ${dotColor}`}
                 />
-                <span className="break-all">
+                <span className="w-12 shrink-0 text-[11px] font-medium text-slate-500">
+                  {entry.level === "WARNING" ? "WARN" : entry.level}
+                </span>
+                <span className="break-all min-w-0">
                   {entry.message}
                 </span>
               </div>

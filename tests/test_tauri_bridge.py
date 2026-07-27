@@ -1,6 +1,8 @@
 """tauri_bridge RPC 方法测试"""
 import importlib.util
+import io
 import json
+import logging
 import pathlib
 import sys
 from datetime import date
@@ -15,6 +17,49 @@ sys.path.insert(0, str(ROOT))
 import tauri_bridge
 
 _has_psycopg2 = importlib.util.find_spec("psycopg2") is not None
+
+
+class TestStructuredStderrLogging:
+    def test_exception_event_keeps_short_message_and_full_detail(self):
+        stream = io.StringIO()
+        handler = tauri_bridge._StderrLogHandler()
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        test_logger = logging.getLogger("test.tauri.structured")
+        test_logger.handlers = [handler]
+        test_logger.propagate = False
+        test_logger.setLevel(logging.DEBUG)
+
+        with patch.object(tauri_bridge.sys, "stderr", stream):
+            try:
+                raise ValueError("diagnostic detail")
+            except ValueError:
+                test_logger.exception("processing failed")
+
+        event = json.loads(stream.getvalue())
+        data = event["data"]
+        assert event["event"] == "log"
+        assert data["message"] == "processing failed"
+        assert "Traceback" in data["detail"]
+        assert "ValueError: diagnostic detail" in data["detail"]
+        assert data["logger"] == "test.tauri.structured"
+        assert data["seq"] == 1
+        assert data["timestamp"]
+
+    def test_sequence_increments_for_each_record(self):
+        stream = io.StringIO()
+        handler = tauri_bridge._StderrLogHandler()
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        test_logger = logging.getLogger("test.tauri.sequence")
+        test_logger.handlers = [handler]
+        test_logger.propagate = False
+        test_logger.setLevel(logging.INFO)
+
+        with patch.object(tauri_bridge.sys, "stderr", stream):
+            test_logger.info("first")
+            test_logger.warning("second")
+
+        events = [json.loads(line) for line in stream.getvalue().splitlines()]
+        assert [event["data"]["seq"] for event in events] == [1, 2]
 
 
 # ---------------------------------------------------------------------------

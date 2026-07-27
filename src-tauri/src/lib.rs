@@ -16,8 +16,11 @@ async fn invoke_python(
     method: String,
     params: serde_json::Value,
     state: State<'_, AppState>,
+    app: tauri::AppHandle,
 ) -> Result<serde_json::Value, String> {
-    state.bridge.call(&method, &params)
+    state.bridge.call(&method, &params, |event| {
+        let _ = app.emit("python-log", event);
+    })
 }
 
 #[tauri::command]
@@ -72,9 +75,7 @@ fn find_bridge_script() -> Result<std::path::PathBuf, String> {
 /// 查找 sidecar 二进制的候选路径（跨平台）
 /// onedir 模式下 sidecar 是一个目录，exe 在目录内
 fn sidecar_candidates(exe_dir: &std::path::Path) -> Vec<std::path::PathBuf> {
-    let mut candidates = vec![
-        exe_dir.join("tauri-bridge"),
-    ];
+    let mut candidates = vec![exe_dir.join("tauri-bridge")];
 
     // Windows: 带 .exe 后缀 + onedir 目录结构
     #[cfg(target_os = "windows")]
@@ -119,7 +120,10 @@ fn find_sidecar_binary(root: &std::path::Path, max_depth: u32) -> Option<std::pa
             }
         } else if path.file_name().map_or(false, |n| n == target) {
             // onedir 模式需要 _internal 目录在同级
-            if path.parent().map_or(false, |p| p.join("_internal").exists()) {
+            if path
+                .parent()
+                .map_or(false, |p| p.join("_internal").exists())
+            {
                 return Some(path);
             }
         }
@@ -174,34 +178,119 @@ fn try_start_dev() -> Option<(PythonBridge, String)> {
         .map(|b| (b, cmd_str))
 }
 
-/// 启动 stderr 日志转发线程
+fn stderr_line_to_event(line: String) -> serde_json::Value {
+    serde_json::from_str::<serde_json::Value>(&line).unwrap_or_else(|_| {
+        serde_json::json!({
+            "event": "log",
+            "data": { "level": "STDERR", "message": line }
+        })
+    })
+}
+
+fn is_important_log(event: &serde_json::Value) -> bool {
+    matches!(
+        event
+            .pointer("/data/level")
+            .and_then(|value| value.as_str()),
+        Some("WARNING" | "ERROR" | "CRITICAL" | "STDERR")
+    )
+}
+
+/// 启动 stderr 日志转发线程。
+/// reader 使用有界通道吸收突发日志，emitter 每 40ms 最多批量发送 200 条。
 fn spawn_stderr_logger(bridge: &PythonBridge, handle: &tauri::AppHandle) {
     if let Some(stderr) = bridge.take_stderr() {
-        let handle = handle.clone();
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::{mpsc, Arc};
+        use std::time::{Duration, Instant};
+
+        let (sender, receiver) = mpsc::sync_channel::<serde_json::Value>(10_000);
+        let dropped = Arc::new(AtomicUsize::new(0));
+        let reader_dropped = Arc::clone(&dropped);
+
         std::thread::spawn(move || {
             use std::io::{BufRead, BufReader};
             let reader = BufReader::new(stderr);
             for line in reader.lines() {
                 match line {
                     Ok(line) => {
-                        if let Ok(log_event) =
-                            serde_json::from_str::<serde_json::Value>(&line)
-                        {
-                            let _ = handle.emit("python-log", &log_event);
+                        let event = stderr_line_to_event(line);
+                        if is_important_log(&event) {
+                            if sender.send(event).is_err() {
+                                break;
+                            }
                         } else {
-                            let _ = handle.emit(
-                                "python-log",
-                                &serde_json::json!({
-                                    "event": "log",
-                                    "data": { "level": "STDERR", "message": line }
-                                }),
-                            );
+                            match sender.try_send(event) {
+                                Ok(()) => {}
+                                Err(mpsc::TrySendError::Full(_)) => {
+                                    reader_dropped.fetch_add(1, Ordering::Relaxed);
+                                }
+                                Err(mpsc::TrySendError::Disconnected(_)) => break,
+                            }
                         }
                     }
                     Err(_) => break,
                 }
             }
         });
+
+        let handle = handle.clone();
+        std::thread::spawn(move || {
+            while let Ok(first) = receiver.recv() {
+                let mut entries = vec![first];
+                let deadline = Instant::now() + Duration::from_millis(40);
+                while entries.len() < 200 {
+                    let now = Instant::now();
+                    if now >= deadline {
+                        break;
+                    }
+                    match receiver.recv_timeout(deadline - now) {
+                        Ok(event) => entries.push(event),
+                        Err(mpsc::RecvTimeoutError::Timeout) => break,
+                        Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                    }
+                }
+
+                let omitted = dropped.swap(0, Ordering::Relaxed);
+                if omitted > 0 {
+                    entries.push(serde_json::json!({
+                        "event": "log",
+                        "data": {
+                            "level": "WARNING",
+                            "logger": "rust.log_forwarder",
+                            "message": format!("日志流量过高，已省略 {} 条普通日志", omitted)
+                        }
+                    }));
+                }
+                let payload = serde_json::json!({
+                    "event": "log_batch",
+                    "data": { "entries": entries }
+                });
+                let _ = handle.emit("python-log", &payload);
+            }
+        });
+    }
+}
+
+#[cfg(test)]
+mod log_forwarder_tests {
+    use super::{is_important_log, stderr_line_to_event};
+
+    #[test]
+    fn preserves_structured_stderr_event() {
+        let event = stderr_line_to_event(
+            r#"{"event":"log","data":{"level":"ERROR","message":"failed"}}"#.into(),
+        );
+        assert_eq!(event["data"]["message"], "failed");
+        assert!(is_important_log(&event));
+    }
+
+    #[test]
+    fn wraps_plain_stderr_as_log_event() {
+        let event = stderr_line_to_event("plain stderr".into());
+        assert_eq!(event["event"], "log");
+        assert_eq!(event["data"]["level"], "STDERR");
+        assert_eq!(event["data"]["message"], "plain stderr");
     }
 }
 
@@ -214,10 +303,13 @@ fn init_bridge(app: &tauri::App) -> Result<(), String> {
         if let Some((bridge, info)) = try_start_dev() {
             let pid = bridge.pid();
             spawn_stderr_logger(&bridge, app.handle());
-            let _ = app.handle().emit("python-log", &serde_json::json!({
-                "event": "connection",
-                "data": { "status": "connected", "mode": "dev", "pid": pid, "command": info }
-            }));
+            let _ = app.handle().emit(
+                "python-log",
+                &serde_json::json!({
+                    "event": "connection",
+                    "data": { "status": "connected", "mode": "dev", "pid": pid, "command": info }
+                }),
+            );
             app.manage(AppState {
                 bridge,
                 mode: "dev".into(),
@@ -230,10 +322,13 @@ fn init_bridge(app: &tauri::App) -> Result<(), String> {
         if let Some(bridge) = try_start_sidecar(app) {
             let pid = bridge.pid();
             spawn_stderr_logger(&bridge, app.handle());
-            let _ = app.handle().emit("python-log", &serde_json::json!({
-                "event": "connection",
-                "data": { "status": "connected", "mode": "sidecar", "pid": pid }
-            }));
+            let _ = app.handle().emit(
+                "python-log",
+                &serde_json::json!({
+                    "event": "connection",
+                    "data": { "status": "connected", "mode": "sidecar", "pid": pid }
+                }),
+            );
             app.manage(AppState {
                 bridge,
                 mode: "sidecar".into(),
@@ -247,10 +342,13 @@ fn init_bridge(app: &tauri::App) -> Result<(), String> {
         if let Some(bridge) = try_start_sidecar(app) {
             let pid = bridge.pid();
             spawn_stderr_logger(&bridge, app.handle());
-            let _ = app.handle().emit("python-log", &serde_json::json!({
-                "event": "connection",
-                "data": { "status": "connected", "mode": "sidecar", "pid": pid }
-            }));
+            let _ = app.handle().emit(
+                "python-log",
+                &serde_json::json!({
+                    "event": "connection",
+                    "data": { "status": "connected", "mode": "sidecar", "pid": pid }
+                }),
+            );
             app.manage(AppState {
                 bridge,
                 mode: "sidecar".into(),
@@ -263,10 +361,13 @@ fn init_bridge(app: &tauri::App) -> Result<(), String> {
         if let Some((bridge, info)) = try_start_dev() {
             let pid = bridge.pid();
             spawn_stderr_logger(&bridge, app.handle());
-            let _ = app.handle().emit("python-log", &serde_json::json!({
-                "event": "connection",
-                "data": { "status": "connected", "mode": "dev", "pid": pid, "command": info }
-            }));
+            let _ = app.handle().emit(
+                "python-log",
+                &serde_json::json!({
+                    "event": "connection",
+                    "data": { "status": "connected", "mode": "dev", "pid": pid, "command": info }
+                }),
+            );
             app.manage(AppState {
                 bridge,
                 mode: "dev".into(),
@@ -282,7 +383,9 @@ fn init_bridge(app: &tauri::App) -> Result<(), String> {
         .ok()
         .and_then(|p| p.parent().map(|d| d.to_string_lossy().to_string()))
         .unwrap_or_else(|| "unknown".into());
-    let resource_dir = app.path().resource_dir()
+    let resource_dir = app
+        .path()
+        .resource_dir()
         .map(|p| p.display().to_string())
         .unwrap_or_else(|_| "unknown".into());
     let searched: Vec<String> = sidecar_candidates(std::path::Path::new(&exe_dir))
@@ -292,17 +395,25 @@ fn init_bridge(app: &tauri::App) -> Result<(), String> {
     let msg = format!(
         "Python bridge 未找到。已搜索：exe_dir={} resource_dir={} 候选={}。\
          请确保已运行 PyInstaller 打包 sidecar 并嵌入应用。",
-        exe_dir, resource_dir, searched.join("、")
+        exe_dir,
+        resource_dir,
+        searched.join("、")
     );
     eprintln!("Warning: {}", msg);
-    let _ = app.handle().emit("python-log", &serde_json::json!({
-        "event": "connection",
-        "data": { "status": "error", "error": msg }
-    }));
-    let _ = app.handle().emit("python-log", &serde_json::json!({
-        "event": "log",
-        "data": { "level": "ERROR", "message": msg }
-    }));
+    let _ = app.handle().emit(
+        "python-log",
+        &serde_json::json!({
+            "event": "connection",
+            "data": { "status": "error", "error": msg }
+        }),
+    );
+    let _ = app.handle().emit(
+        "python-log",
+        &serde_json::json!({
+            "event": "log",
+            "data": { "level": "ERROR", "message": msg }
+        }),
+    );
     Ok(())
 }
 
@@ -315,7 +426,11 @@ pub fn run() {
             init_bridge(app).unwrap_or_else(|e| eprintln!("Bridge init warning: {}", e));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![invoke_python, cancel_task, get_bridge_info])
+        .invoke_handler(tauri::generate_handler![
+            invoke_python,
+            cancel_task,
+            get_bridge_info
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
