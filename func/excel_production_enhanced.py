@@ -48,6 +48,7 @@ class MiningDataProcessor:
         self._hidden_cols: set[str] = set()
         self._unmatched_trucks: dict[str, int] = {}
         self._unmatched_lock = threading.Lock()
+        self._processing_summary: dict | None = None
         if raw_start == -1:
             self.auto_detect = True
         else:
@@ -586,10 +587,11 @@ class MiningDataProcessor:
     # ---------------------------
     # 文件夹处理（多线程）
     # ---------------------------
-    def process_folder(self, folder_path, output_file=None, max_workers=4, return_sheets=False):
+    def process_folder(self, folder_path, output_file=None, max_workers=4, return_sheets=False, cancel_event=None):
         all_running = []
         all_production = []
         success_files = 0
+        file_errors: list[dict] = []
 
         file_list = self.collect_excel_files(folder_path)
         total_files = len(file_list)
@@ -606,6 +608,7 @@ class MiningDataProcessor:
 
         logger.info(f"共发现 {total_files} 个待处理文件，启动 {max_workers} 个线程...")
 
+        cancelled = False
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_file = {
                 executor.submit(self.process_single_file_safe, file_path, folder_path): file_path
@@ -613,6 +616,14 @@ class MiningDataProcessor:
             }
 
             for future in as_completed(future_to_file):
+                # 检查取消信号
+                if cancel_event is not None and cancel_event.is_set():
+                    cancelled = True
+                    # 取消尚未开始的 future
+                    for f in future_to_file:
+                        f.cancel()
+                    break
+
                 file_path = future_to_file[future]
                 rel_path = os.path.relpath(file_path, folder_path)
 
@@ -624,9 +635,24 @@ class MiningDataProcessor:
                         success_files += 1
                         logger.info(f"处理成功: {rel_path}")
                     else:
+                        file_errors.append({"file": rel_path, "error": error_msg})
                         logger.error(f"处理失败: {rel_path} -> {error_msg}")
                 except Exception as e:
+                    file_errors.append({"file": rel_path, "error": str(e)})
                     logger.error(f"处理异常: {rel_path} -> {e}")
+
+        if cancelled:
+            logger.warning("生产数据处理已取消，已完成 %d/%d 个文件", success_files, total_files)
+            self._processing_summary = {
+                "total_files": total_files,
+                "success_files": success_files,
+                "failed_files": total_files - success_files,
+                "errors": file_errors,
+                "warnings": ["任务已取消"],
+            }
+            if return_sheets:
+                return None
+            return
 
         final_running = pd.concat(all_running, ignore_index=True) if all_running else pd.DataFrame()
         final_production = pd.concat(all_production, ignore_index=True) if all_production else pd.DataFrame()
@@ -661,6 +687,25 @@ class MiningDataProcessor:
             logger.info(
                 f"统计信息：共处理 {total_files} 个文件，成功 {success_files} 个，失败 {total_files - success_files} 个")
             self._log_unmatched_trucks()
+            # 存储处理摘要供调用方获取
+            warnings = []
+            with self._unmatched_lock:
+                if self._unmatched_trucks:
+                    total = sum(self._unmatched_trucks.values())
+                    details = ", ".join(
+                        f"{name}({count}条)" for name, count in
+                        sorted(self._unmatched_trucks.items(), key=lambda x: x[1], reverse=True)
+                    )
+                    warnings.append(
+                        f"以下矿卡型号未匹配到装载量配置，产量将为 0（共 {total} 条记录受影响）: {details}"
+                    )
+            self._processing_summary = {
+                "total_files": total_files,
+                "success_files": success_files,
+                "failed_files": total_files - success_files,
+                "errors": file_errors,
+                "warnings": warnings,
+            }
             return sheets if sheets else None
 
         from func.excel_formatter import write_formatted_excel
@@ -670,6 +715,25 @@ class MiningDataProcessor:
         logger.info(
             f"统计信息：共处理 {total_files} 个文件，成功 {success_files} 个，失败 {total_files - success_files} 个")
         self._log_unmatched_trucks()
+        # 存储处理摘要供调用方获取
+        warnings = []
+        with self._unmatched_lock:
+            if self._unmatched_trucks:
+                total = sum(self._unmatched_trucks.values())
+                details = ", ".join(
+                    f"{name}({count}条)" for name, count in
+                    sorted(self._unmatched_trucks.items(), key=lambda x: x[1], reverse=True)
+                )
+                warnings.append(
+                    f"以下矿卡型号未匹配到装载量配置，产量将为 0（共 {total} 条记录受影响）: {details}"
+                )
+        self._processing_summary = {
+            "total_files": total_files,
+            "success_files": success_files,
+            "failed_files": total_files - success_files,
+            "errors": file_errors,
+            "warnings": warnings,
+        }
 
 
 def main():

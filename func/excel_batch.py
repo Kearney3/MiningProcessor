@@ -148,8 +148,8 @@ def _process_electrical_module(files: list[str], year: int, skip_hidden: bool = 
 
 def _process_production_module(folder_path: str, raw_start: int, skip_hidden: bool = False,
                                skip_hidden_rows: bool = False, skip_hidden_cols: bool = False,
-                               anomaly_config=None) -> dict[str, pd.DataFrame]:
-    """处理生产数据，返回 sheets 字典或空字典。"""
+                               anomaly_config=None, cancel_event=None) -> tuple[dict[str, pd.DataFrame], list[str]]:
+    """处理生产数据，返回 (sheets 字典, 警告列表)。"""
     if skip_hidden:
         skip_hidden_rows = True
         skip_hidden_cols = True
@@ -157,13 +157,17 @@ def _process_production_module(folder_path: str, raw_start: int, skip_hidden: bo
         processor = MiningDataProcessor(version="new", raw_start=raw_start,
                                         skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
                                         anomaly_config=anomaly_config)
-        sheets = processor.process_folder(folder_path, return_sheets=True)
+        sheets = processor.process_folder(folder_path, return_sheets=True, cancel_event=cancel_event)
+        # 提取生产模块的处理摘要和警告
+        warnings = []
+        if getattr(processor, "_processing_summary", None):
+            warnings = processor._processing_summary.get("warnings", [])
         if sheets:
-            return sheets
+            return sheets, warnings
         logger.warning("生产数据处理无结果")
     except Exception as e:
         logger.error(f"生产数据处理失败: {e}", exc_info=True)
-    return {}
+    return {}, []
 
 
 def _process_worktime_module(
@@ -232,6 +236,7 @@ def process_files(
         month = now.month
 
     all_results: dict[str, dict[str, pd.DataFrame]] = {}
+    module_warnings: dict[str, list[str]] = {}
 
     if skip_hidden:
         skip_hidden_rows = True
@@ -244,7 +249,7 @@ def process_files(
     _emit_progress(progress_cb, {"stage": "preparing", "percent": 0.0, "current": 0, "total": 0, "detail": "开始处理"})
     if _check_cancel(cancel_event):
         _emit_progress(progress_cb, {"stage": "cancelled", "percent": 0.0, "current": 0, "total": 0, "detail": "用户取消，已完成部分输出"})
-        return all_results
+        return all_results, {}
 
     # ── 燃油数据 ──
     if "fuel" in matched:
@@ -260,11 +265,13 @@ def process_files(
 
     # ── 生产数据 ──
     if "production" in matched:
-        result = _process_production_module(folder_path, raw_start,
+        result, prod_warnings = _process_production_module(folder_path, raw_start,
                                             skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
-                                            anomaly_config=anomaly_config)
+                                            anomaly_config=anomaly_config, cancel_event=cancel_event)
         if result:
             all_results["production"] = result
+        if prod_warnings:
+            module_warnings["production"] = prod_warnings
 
     # ── 工时数据 ──
     if "worktime" in matched:
@@ -285,11 +292,23 @@ def process_files(
         total_anomalies = sum(count for _, count in anomaly_config._anomaly_counts)
         if total_anomalies > 0:
             logger.warning(f"共检测到 {total_anomalies} 个异常值")
+            module_warnings["anomaly"] = [f"共检测到 {total_anomalies} 个异常值"]
         anomaly_config._anomaly_counts = None
+
+    # ── 构建处理摘要 ──
+    all_warnings: list[str] = []
+    for _mod, warns in module_warnings.items():
+        all_warnings.extend(warns)
+    summary = {
+        "success_modules": success_labels,
+        "failed_modules": failed_labels,
+        "warnings": all_warnings,
+        "per_module_warnings": module_warnings,
+    }
 
     if not all_results:
         logger.error("所有模块均无数据")
-        return {}
+        return {}, summary
 
     # ── 日期筛选 ──
     if filter_date is not None:
@@ -297,11 +316,11 @@ def process_files(
         remaining = sum(len(s) for s in all_results.values())
         if remaining == 0:
             logger.warning(f"日期筛选后无剩余数据 ({filter_date})")
-            return {}
+            return {}, summary
 
     if _check_cancel(cancel_event):
         _emit_progress(progress_cb, {"stage": "cancelled", "percent": 0.0, "current": 0, "total": 0, "detail": "用户取消，已完成部分输出"})
-        return all_results
+        return all_results, summary
 
     # ── 台账匹配 ──
     if equipment_ledger or oil_ledger:
@@ -312,7 +331,7 @@ def process_files(
 
     if _check_cancel(cancel_event):
         _emit_progress(progress_cb, {"stage": "cancelled", "percent": 0.0, "current": 0, "total": 0, "detail": "用户取消，已完成部分输出"})
-        return all_results
+        return all_results, summary
 
     # ── 输出 ──
     if table_merge_config:
@@ -322,7 +341,7 @@ def process_files(
     else:
         _write_separate(all_results, folder_path, year, month, progress_cb=progress_cb, cancel_event=cancel_event)
 
-    return all_results
+    return all_results, summary
 
 
 # ---------------------------------------------------------------------------

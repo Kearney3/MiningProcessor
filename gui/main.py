@@ -5,7 +5,13 @@ GUI 主窗口 - Flet 实现
 """
 import flet as ft
 import logging
+from importlib.metadata import version, PackageNotFoundError
 from pathlib import Path
+
+try:
+    __version__ = version("MiningProcessor")
+except PackageNotFoundError:
+    __version__ = "dev"
 
 from . import components as cmp
 from . import logic as logic
@@ -162,7 +168,7 @@ def main(page: ft.Page):
             [
                 ft.Icon(ft.Icons.DATASET, size=24, color=theme.PRIMARY),
                 ft.Text("矿山数据处理工具", size=18, weight=ft.FontWeight.BOLD, color=theme.TEXT_PRIMARY),
-                ft.Text("v1.2.0", size=12, color=theme.TEXT_SECONDARY),
+                ft.Text(f"v{__version__}", size=12, color=theme.TEXT_SECONDARY),
             ],
             spacing=theme.SPACING_SM,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -224,3 +230,11 @@ def main(page: ft.Page):
     # ---- 初始化（放在 page.add 之后） ----
     logic.init(config_refs)
     log("已就绪")
+
+    # ---- 页面关闭回调：取消所有正在运行的后台任务 ----
+    def _on_page_close(e):
+        logic.shutdown_tasks()
+        log_system.shutdown()
+
+    page.on_disconnect = _on_page_close
+    page.on_close = _on_page_close

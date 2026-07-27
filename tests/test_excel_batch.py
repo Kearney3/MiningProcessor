@@ -85,14 +85,14 @@ class TestProcessFilesAllModulesCalled:
 
     @patch("func.excel_batch._write_merged")
     @patch("func.excel_batch._process_worktime_module", return_value=_mock_sheets("worktime"))
-    @patch("func.excel_batch._process_production_module", return_value=_mock_sheets("production"))
+    @patch("func.excel_batch._process_production_module", return_value=(_mock_sheets("production"), []))
     @patch("func.excel_batch._process_electrical_module", return_value=_mock_sheets("electrical"))
     @patch("func.excel_batch._process_fuel_module", return_value=_mock_sheets("fuel"))
     def test_all_four_processors_called(
         self, mock_fuel, mock_electrical, mock_production, mock_worktime, mock_write
     ):
         matched = _make_matched()
-        result = process_files(
+        result, summary = process_files(
             folder_path="/data",
             matched=matched,
             year=2025,
@@ -108,7 +108,7 @@ class TestProcessFilesAllModulesCalled:
                                                 anomaly_config=None)
         mock_production.assert_called_once_with("/data", -1,
                                                 skip_hidden_rows=False, skip_hidden_cols=False,
-                                                anomaly_config=None)
+                                                anomaly_config=None, cancel_event=None)
         mock_worktime.assert_called_once_with(
             matched["worktime"], 2025, 6, None,
             skip_hidden_rows=False, skip_hidden_cols=False,
@@ -126,7 +126,7 @@ class TestProcessFilesMissingModule:
 
     @patch("func.excel_batch._write_merged")
     @patch("func.excel_batch._process_worktime_module", return_value=_mock_sheets("worktime"))
-    @patch("func.excel_batch._process_production_module", return_value=_mock_sheets("production"))
+    @patch("func.excel_batch._process_production_module", return_value=(_mock_sheets("production"), []))
     @patch("func.excel_batch._process_electrical_module", return_value={})
     @patch("func.excel_batch._process_fuel_module", return_value=_mock_sheets("fuel"))
     def test_empty_result_for_electrical_included_but_empty(
@@ -134,7 +134,7 @@ class TestProcessFilesMissingModule:
     ):
         """When a module returns empty dict, its key appears in result with {}."""
         matched = _make_matched(["fuel", "electrical", "production", "worktime"])
-        result = process_files(
+        result, summary = process_files(
             folder_path="/data",
             matched=matched,
             year=2025,
@@ -150,14 +150,14 @@ class TestProcessFilesMissingModule:
 
     @patch("func.excel_batch._write_merged")
     @patch("func.excel_batch._process_worktime_module", return_value=_mock_sheets("worktime"))
-    @patch("func.excel_batch._process_production_module", return_value={})
+    @patch("func.excel_batch._process_production_module", return_value=({}, []))
     @patch("func.excel_batch._process_electrical_module", return_value=_mock_sheets("elec"))
     @patch("func.excel_batch._process_fuel_module", return_value=_mock_sheets("fuel"))
     def test_empty_production_does_not_appear(
         self, mock_fuel, mock_electrical, mock_production, mock_worktime, mock_write
     ):
         matched = _make_matched(["fuel", "electrical", "production", "worktime"])
-        result = process_files(
+        result, summary = process_files(
             folder_path="/data",
             matched=matched,
             year=2025,
@@ -169,7 +169,7 @@ class TestProcessFilesMissingModule:
 
     @patch("func.excel_batch._write_merged")
     @patch("func.excel_batch._process_worktime_module", return_value=_mock_sheets("worktime"))
-    @patch("func.excel_batch._process_production_module", return_value=_mock_sheets("production"))
+    @patch("func.excel_batch._process_production_module", return_value=(_mock_sheets("production"), []))
     @patch("func.excel_batch._process_electrical_module", return_value=_mock_sheets("elec"))
     @patch("func.excel_batch._process_fuel_module", return_value={})
     def test_exception_in_fuel_returns_empty_for_fuel(
@@ -177,7 +177,7 @@ class TestProcessFilesMissingModule:
     ):
         """When _process_fuel_module returns {}, fuel key appears with empty dict."""
         matched = _make_matched(["fuel", "electrical", "production", "worktime"])
-        result = process_files(
+        result, summary = process_files(
             folder_path="/data",
             matched=matched,
             year=2025,
@@ -203,10 +203,10 @@ class TestProcessFilesMissingModule:
         as empty dicts (direct assignment)."""
         mock_fuel.return_value = {}
         mock_electrical.return_value = {}
-        mock_production.return_value = {}
+        mock_production.return_value = ({}, [])
         mock_worktime.return_value = {}
         matched = _make_matched()
-        result = process_files(
+        result, summary = process_files(
             folder_path="/data",
             matched=matched,
             year=2025,
@@ -227,7 +227,7 @@ class TestProgressQueueUpdates:
 
     @patch("func.excel_batch._write_merged")
     @patch("func.excel_batch._process_worktime_module", return_value=_mock_sheets("worktime"))
-    @patch("func.excel_batch._process_production_module", return_value=_mock_sheets("production"))
+    @patch("func.excel_batch._process_production_module", return_value=(_mock_sheets("production"), []))
     @patch("func.excel_batch._process_electrical_module", return_value=_mock_sheets("elec"))
     @patch("func.excel_batch._process_fuel_module", return_value=_mock_sheets("fuel"))
     def test_preparing_stage_emitted(
@@ -253,7 +253,7 @@ class TestCancelEvent:
 
     @patch("func.excel_batch._write_merged")
     @patch("func.excel_batch._process_worktime_module", return_value=_mock_sheets("worktime"))
-    @patch("func.excel_batch._process_production_module", return_value=_mock_sheets("production"))
+    @patch("func.excel_batch._process_production_module", return_value=(_mock_sheets("production"), []))
     @patch("func.excel_batch._process_electrical_module", return_value=_mock_sheets("elec"))
     @patch("func.excel_batch._process_fuel_module", return_value=_mock_sheets("fuel"))
     def test_cancel_before_processing_returns_empty(
@@ -264,7 +264,7 @@ class TestCancelEvent:
         ev.set()
 
         matched = _make_matched()
-        result = process_files(
+        result, summary = process_files(
             folder_path="/data",
             matched=matched,
             year=2025,
@@ -282,7 +282,7 @@ class TestCancelEvent:
 
     @patch("func.excel_batch._write_merged")
     @patch("func.excel_batch._process_worktime_module", return_value=_mock_sheets("worktime"))
-    @patch("func.excel_batch._process_production_module", return_value=_mock_sheets("production"))
+    @patch("func.excel_batch._process_production_module", return_value=(_mock_sheets("production"), []))
     @patch("func.excel_batch._process_electrical_module", return_value=_mock_sheets("elec"))
     @patch("func.excel_batch._process_fuel_module", return_value=_mock_sheets("fuel"))
     def test_cancel_emits_cancelled_stage(
@@ -313,7 +313,7 @@ class TestReturnSheetsPassthrough:
 
     @patch("func.excel_batch._write_merged")
     @patch("func.excel_batch._process_worktime_module", return_value=_mock_sheets("worktime"))
-    @patch("func.excel_batch._process_production_module", return_value=_mock_sheets("production"))
+    @patch("func.excel_batch._process_production_module", return_value=(_mock_sheets("production"), []))
     @patch("func.excel_batch._process_electrical_module", return_value=_mock_sheets("elec"))
     @patch("func.excel_batch._process_fuel_module", return_value=_mock_sheets("fuel"))
     def test_merge_output_true_writes_merged_file(
@@ -331,7 +331,7 @@ class TestReturnSheetsPassthrough:
 
     @patch("func.excel_batch._write_separate")
     @patch("func.excel_batch._process_worktime_module", return_value=_mock_sheets("worktime"))
-    @patch("func.excel_batch._process_production_module", return_value=_mock_sheets("production"))
+    @patch("func.excel_batch._process_production_module", return_value=(_mock_sheets("production"), []))
     @patch("func.excel_batch._process_electrical_module", return_value=_mock_sheets("elec"))
     @patch("func.excel_batch._process_fuel_module", return_value=_mock_sheets("fuel"))
     def test_merge_output_false_writes_separate_files(
@@ -349,7 +349,7 @@ class TestReturnSheetsPassthrough:
 
     @patch("func.excel_batch._write_merged")
     @patch("func.excel_batch._process_worktime_module", return_value=_mock_sheets("worktime"))
-    @patch("func.excel_batch._process_production_module", return_value=_mock_sheets("production"))
+    @patch("func.excel_batch._process_production_module", return_value=(_mock_sheets("production"), []))
     @patch("func.excel_batch._process_electrical_module", return_value=_mock_sheets("elec"))
     @patch("func.excel_batch._process_fuel_module", return_value=_mock_sheets("fuel"))
     def test_sheets_returned_per_module(
@@ -357,7 +357,7 @@ class TestReturnSheetsPassthrough:
     ):
         """Verify that process_files returns the sheets dict keyed by module type."""
         matched = _make_matched()
-        result = process_files(
+        result, summary = process_files(
             folder_path="/data",
             matched=matched,
             year=2025,
