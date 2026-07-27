@@ -149,11 +149,11 @@ interface SidebarProps {
 
 export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
   const renderGroup = (title: string, items: NavItem[]) => (
-    <div className="mb-3">
-      <div className="px-3 mb-1 text-[10px] font-medium text-slate-400 uppercase tracking-wider">
+    <div className="mb-5">
+      <div className="px-3 mb-1.5 text-[11px] font-semibold text-slate-500">
         {title}
       </div>
-      <div className="space-y-0.5 px-2">
+      <div className="space-y-1 px-2">
         {items.map((item) => {
           const isActive = currentPage === item.id;
           const Icon = ICONS[item.id];
@@ -161,16 +161,21 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
+              aria-current={isActive ? "page" : undefined}
               className={`
-                w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-[13px]
-                transition-colors duration-150 cursor-pointer
+                group w-full flex items-center gap-2.5 min-h-9 px-2.5 rounded-lg text-[13px]
+                transition-[background-color,color,box-shadow] duration-150 cursor-pointer
                 ${isActive
-                  ? "bg-blue-50 text-blue-700 font-medium border-l-2 border-blue-600"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-800"
+                  ? "bg-[var(--color-accent-subtle)] text-[var(--color-accent)] font-semibold shadow-[inset_0_0_0_1px_rgba(36,87,214,0.08)]"
+                  : "text-slate-600 hover:bg-white hover:text-slate-900 hover:shadow-[0_1px_2px_rgba(23,32,51,0.05)]"
                 }
               `}
             >
-              <span className="shrink-0 leading-none">
+              <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-md leading-none transition-colors ${
+                isActive
+                  ? "bg-white text-[var(--color-accent)] shadow-[0_1px_2px_rgba(36,87,214,0.1)]"
+                  : "text-slate-500 group-hover:text-slate-700"
+              }`}>
                 {Icon ? <Icon /> : null}
               </span>
               <span className="truncate">{item.label}</span>
@@ -182,17 +187,18 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
   );
 
   return (
-    <aside className="w-48 shrink-0 bg-slate-50 border-r border-slate-200 overflow-y-auto thin-scrollbar flex flex-col">
+    <aside className="w-52 shrink-0 bg-[#F1F4F8] border-r border-[var(--color-border)] overflow-y-auto flex flex-col">
       {/* Nav sections */}
-      <nav className="py-3 flex-1">
+      <nav className="py-4 flex-1" aria-label="主导航">
         {renderGroup("工作区", WORKSPACE_ITEMS)}
         {renderGroup("管理", MANAGEMENT_ITEMS)}
       </nav>
 
       {/* Footer */}
-      <div className="px-3 py-3 border-t border-slate-200">
-        <span className="text-[10px] text-slate-400">
-          Tauri + Python
+      <div className="px-4 py-3 border-t border-[var(--color-border)]">
+        <span className="flex items-center gap-2 text-[11px] text-slate-500">
+          <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+          本地处理引擎
         </span>
       </div>
     </aside>

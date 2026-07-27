@@ -26,10 +26,10 @@ describe("Sidebar", () => {
 
   it("highlights the current page", () => {
     render(<Sidebar currentPage="batch-processing" onNavigate={onNavigate} />);
-    const batchBtn = screen.getByText("批量处理");
-    expect(batchBtn.closest("button")).toHaveClass("bg-blue-50", "text-blue-700");
-    const dataBtn = screen.getByText("数据处理");
-    expect(dataBtn.closest("button")).not.toHaveClass("bg-blue-50");
+    const batchBtn = screen.getByRole("button", { name: "批量处理" });
+    expect(batchBtn).toHaveAttribute("aria-current", "page");
+    const dataBtn = screen.getByRole("button", { name: "数据处理" });
+    expect(dataBtn).not.toHaveAttribute("aria-current");
   });
 
   it("calls onNavigate when item clicked", () => {

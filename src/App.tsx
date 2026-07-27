@@ -29,50 +29,57 @@ function App() {
 
   return (
     <ToastProvider>
-    <div className="flex flex-col h-screen bg-[var(--color-bg)]">
+    <div className="app-shell flex flex-col h-screen">
       {/* Header */}
       <header
         data-tauri-drag-region
-        className="flex items-center h-11 px-4 bg-white border-b border-slate-200 select-none shrink-0"
+        className="app-header flex items-center select-none shrink-0"
       >
         {/* Logo */}
-        <div className="flex items-center gap-2">
+        <div className="app-brand flex items-center gap-2.5">
+          <span className="app-brand-mark">
           <svg
-            width="20"
-            height="20"
+            width="17"
+            height="17"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="text-slate-700"
+            aria-hidden="true"
           >
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            <path d="M4 18.5 9.2 9l3.1 5 2.4-3.5L20 18.5" />
+            <path d="M4 18.5h16" />
+            <path d="M6.2 15.5h11.6" opacity=".65" />
           </svg>
+          </span>
           <span className="text-sm font-semibold text-slate-800">
-            矿山数据处理工具
+            矿山数据处理
           </span>
         </div>
 
-        {/* Connection badge */}
-        <ConnectionStatusBadge
-          status={bridge.connectionStatus}
-          error={bridge.connectionError}
-          logs={bridge.connectionLogs}
-          bridgeInfo={bridge.bridgeInfo}
-          onReconnect={bridge.reconnect}
-        />
+        <div className="flex flex-1 items-center px-4">
+          {/* Connection badge */}
+          <ConnectionStatusBadge
+            status={bridge.connectionStatus}
+            error={bridge.connectionError}
+            logs={bridge.connectionLogs}
+            bridgeInfo={bridge.bridgeInfo}
+            onReconnect={bridge.reconnect}
+          />
 
-        {/* Version */}
-        <span className="text-xs text-slate-400 ml-auto">{appVersion}</span>
+          {/* Version */}
+          <span className="text-xs text-slate-500 ml-auto tabular-nums">
+            {appVersion}
+          </span>
+        </div>
       </header>
 
       {/* Main content area */}
       <div className="flex flex-1 overflow-hidden">
         <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
-        <main className="flex-1 overflow-auto p-5">
+        <main className="workspace-content flex-1 overflow-auto">
           <div style={{ display: currentPage === "data-processing" ? "block" : "none" }}>
             <DataProcessingPage bridge={bridge} />
           </div>

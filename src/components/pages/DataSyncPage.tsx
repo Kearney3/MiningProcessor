@@ -267,7 +267,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-5">
+    <div className="w-full space-y-5">
       <div>
         <h2 className="text-lg font-semibold text-slate-800">数据同步</h2>
         <p className="text-sm text-slate-500">将处理后的数据同步至 MineBase</p>

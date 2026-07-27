@@ -1,8 +1,4 @@
-"""
-GUI 主窗口 - Flet 实现
-深色模式 + 侧边栏导航布局
-使用模块化结构：components.py（UI组件）+ logic.py（业务逻辑）
-"""
+"""GUI 主窗口：浅色桌面工作台与侧边栏导航布局。"""
 import flet as ft
 import logging
 from importlib.metadata import version, PackageNotFoundError
@@ -43,9 +39,65 @@ def main(page: ft.Page):
     }
     page.theme_mode = ft.ThemeMode.LIGHT
     page.theme = ft.Theme(
-        color_scheme_seed=ft.Colors.CYAN,
+        font_family="MiSans",
+        use_material3=True,
+        color_scheme=ft.ColorScheme(
+            primary=theme.PRIMARY,
+            on_primary="#FFFFFF",
+            primary_container=theme.PRIMARY_CONTAINER,
+            on_primary_container=theme.TEXT_PRIMARY,
+            secondary=theme.TEXT_SECONDARY,
+            surface=theme.SURFACE,
+            on_surface=theme.TEXT_PRIMARY,
+            on_surface_variant=theme.TEXT_SECONDARY,
+            outline=theme.BORDER_STRONG,
+            outline_variant=theme.BORDER,
+            error=theme.ERROR,
+        ),
+        scaffold_bgcolor=theme.BG,
+        canvas_color=theme.BG,
+        divider_color=theme.BORDER,
+        hint_color=theme.TEXT_SECONDARY,
+        focus_color=theme.PRIMARY_CONTAINER,
+        hover_color=theme.SURFACE_HIGH,
+        scrollbar_theme=ft.ScrollbarTheme(
+            thickness=6,
+            radius=8,
+            thumb_color=theme.BORDER_STRONG,
+            track_color="transparent",
+        ),
+        divider_theme=ft.DividerTheme(
+            color=theme.BORDER,
+            thickness=1,
+            space=1,
+        ),
+        progress_indicator_theme=ft.ProgressIndicatorTheme(
+            color=theme.PRIMARY,
+            linear_track_color=theme.SURFACE_HIGH,
+            linear_min_height=5,
+            border_radius=99,
+        ),
+        tooltip_theme=ft.TooltipTheme(
+            text_style=ft.TextStyle(size=12, color="#FFFFFF"),
+            wait_duration=450,
+            show_duration=1800,
+            padding=ft.Padding.symmetric(horizontal=10, vertical=7),
+        ),
+        data_table_theme=ft.DataTableTheme(
+            heading_row_color=theme.SURFACE_HIGH,
+            heading_text_style=ft.TextStyle(
+                size=12,
+                weight=ft.FontWeight.W_600,
+                color=theme.TEXT_PRIMARY,
+            ),
+            data_text_style=ft.TextStyle(size=12, color=theme.TEXT_PRIMARY),
+            divider_thickness=1,
+            column_spacing=20,
+        ),
         visual_density=ft.VisualDensity.COMPACT,
     )
+    page.bgcolor = theme.BG
+    page.padding = 0
     page.window.width = INITIAL_WINDOW_WIDTH
     page.window.height = INITIAL_WINDOW_HEIGHT
     page.window.min_width = MIN_WINDOW_WIDTH
@@ -147,36 +199,78 @@ def main(page: ft.Page):
             icon_ctrl = row.controls[0]
             text_ctrl = row.controls[1]
             item.bgcolor = theme.SIDEBAR_SELECTED if is_selected else "transparent"
-            icon_ctrl.color = theme.PRIMARY if is_selected else theme.TEXT_SECONDARY
-            text_ctrl.color = theme.PRIMARY if is_selected else theme.TEXT_SECONDARY
+            icon_ctrl.color = theme.PRIMARY if is_selected else theme.TEXT_TERTIARY
+            text_ctrl.color = theme.PRIMARY_HOVER if is_selected else theme.TEXT_SECONDARY
+            text_ctrl.weight = (
+                ft.FontWeight.W_600 if is_selected else ft.FontWeight.W_500
+            )
             try:
                 item.update()
             except (RuntimeError, AttributeError):
                 pass
 
     sidebar = ft.Container(
-        content=ft.Column(
+        content=ft.ListView(
             sidebar_nav_items,
             spacing=2,
+            expand=True,
+            padding=ft.Padding.only(bottom=theme.SPACING_SM),
         ),
         width=theme.SIDEBAR_WIDTH,
         bgcolor=theme.SIDEBAR_BG,
-        padding=ft.Padding.symmetric(horizontal=8, vertical=12),
+        padding=ft.Padding.symmetric(horizontal=10, vertical=8),
+        border=ft.Border.only(right=ft.BorderSide(1, theme.BORDER)),
     )
 
     # ---- Header ----
+    app_mark = ft.Container(
+        content=ft.Icon(ft.Icons.DATASET_OUTLINED, size=21, color="#FFFFFF"),
+        width=36,
+        height=36,
+        alignment=ft.Alignment.CENTER,
+        bgcolor=theme.PRIMARY,
+        border_radius=theme.RADIUS_MD,
+    )
+    version_badge = ft.Container(
+        content=ft.Text(
+            f"v{__version__}",
+            size=11,
+            weight=ft.FontWeight.W_500,
+            color=theme.TEXT_SECONDARY,
+        ),
+        padding=ft.Padding.symmetric(horizontal=9, vertical=4),
+        bgcolor=theme.SURFACE_HIGH,
+        border=ft.Border.all(1, theme.BORDER),
+        border_radius=99,
+    )
     header = ft.Container(
         content=ft.Row(
             [
-                ft.Icon(ft.Icons.DATASET, size=24, color=theme.PRIMARY),
-                ft.Text("矿山数据处理工具", size=18, weight=ft.FontWeight.BOLD, color=theme.TEXT_PRIMARY),
-                ft.Text(f"v{__version__}", size=12, color=theme.TEXT_SECONDARY),
+                app_mark,
+                ft.Column(
+                    [
+                        ft.Text(
+                            "矿山数据处理工具",
+                            size=17,
+                            weight=ft.FontWeight.W_700,
+                            color=theme.TEXT_PRIMARY,
+                        ),
+                        ft.Text(
+                            "报表处理与数据管理",
+                            size=11,
+                            color=theme.TEXT_SECONDARY,
+                        ),
+                    ],
+                    spacing=0,
+                ),
+                ft.Container(expand=True),
+                version_badge,
             ],
-            spacing=theme.SPACING_SM,
+            spacing=theme.SPACING_MD,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         ),
         bgcolor=theme.SURFACE,
-        padding=ft.Padding.symmetric(horizontal=theme.SPACING_LG, vertical=10),
+        padding=ft.Padding.symmetric(horizontal=theme.SPACING_LG, vertical=12),
         border=ft.Border.only(bottom=ft.BorderSide(1, theme.BORDER)),
     )
 
@@ -185,6 +279,7 @@ def main(page: ft.Page):
         [pages["modules"]],
         spacing=0,
         expand=True,
+        padding=theme.SPACING_LG,
     )
 
     # Sidebar + content wrapped in a single card container
@@ -195,10 +290,15 @@ def main(page: ft.Page):
             vertical_alignment=ft.CrossAxisAlignment.STRETCH,
         ),
         expand=True,
-        bgcolor=theme.SURFACE,
+        bgcolor=theme.BG,
         border=ft.Border.all(1, theme.BORDER),
         border_radius=theme.RADIUS_LG,
         clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+        margin=ft.Margin.only(
+            left=theme.SPACING_LG,
+            right=theme.SPACING_LG,
+            top=theme.SPACING_LG,
+        ),
     )
 
     # ---- 组装页面 ----
@@ -206,12 +306,22 @@ def main(page: ft.Page):
         content=ft.Row(
             [
                 ft.Icon(ft.Icons.TERMINAL, size=16, color=theme.TEXT_SECONDARY),
-                ft.Text("日志", size=13, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                ft.Text(
+                    "运行日志",
+                    size=13,
+                    weight=ft.FontWeight.W_600,
+                    color=theme.TEXT_PRIMARY,
+                ),
+                ft.Text(
+                    "处理进度和问题原因会显示在这里",
+                    size=11,
+                    color=theme.TEXT_SECONDARY,
+                ),
             ],
-            spacing=4,
+            spacing=6,
             vertical_alignment=ft.CrossAxisAlignment.CENTER,
         ),
-        padding=ft.Padding.only(left=8, top=4, bottom=2),
+        padding=ft.Padding.symmetric(horizontal=12, vertical=8),
     )
 
     page.add(
@@ -221,7 +331,16 @@ def main(page: ft.Page):
                 unified_body,
                 ft.Container(
                     content=ft.Column([log_header, log_view], spacing=0),
-                    border=ft.Border.only(top=ft.BorderSide(1, theme.BORDER)),
+                    margin=ft.Margin.only(
+                        left=theme.SPACING_LG,
+                        right=theme.SPACING_LG,
+                        top=theme.SPACING_SM,
+                        bottom=theme.SPACING_LG,
+                    ),
+                    bgcolor=theme.SURFACE,
+                    border=ft.Border.all(1, theme.BORDER),
+                    border_radius=theme.RADIUS_LG,
+                    clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
                 ),
             ],
             expand=True,

@@ -19,12 +19,14 @@ const MODE_OPTIONS = [
 export function AnomalyPanel({
   config,
   onChange,
+  embedded = false,
 }: {
   config: AnomalyConfig;
   onChange: (c: AnomalyConfig) => void;
+  embedded?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2">
+    <div className={embedded ? "space-y-2" : "rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2"}>
       <label className="flex items-center gap-2.5 cursor-pointer select-none">
         <button
           role="switch"

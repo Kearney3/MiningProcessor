@@ -70,15 +70,19 @@ export function ConnectionStatusBadge({
       {/* Badge 触发器 */}
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 ml-4 cursor-pointer hover:opacity-80 transition-opacity"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        className="flex min-h-8 items-center gap-1.5 cursor-pointer rounded-md px-2 hover:bg-slate-50 transition-colors"
       >
         <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-        <span className="text-xs text-slate-400">{cfg.label}</span>
+        <span className="text-xs text-slate-500">{cfg.label}</span>
       </button>
 
       {/* Popover 浮层 */}
       {open && (
         <div
+          role="dialog"
+          aria-label="处理引擎连接状态"
           className={`absolute top-full left-0 mt-1.5 w-80 bg-white rounded-lg shadow-lg border border-slate-200 z-50 ring-1 ${cfg.ring}`}
         >
           {/* 状态头部 */}
