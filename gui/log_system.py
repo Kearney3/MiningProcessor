@@ -3,6 +3,7 @@
 封装日志队列、消费者线程、UI 刷新逻辑，从 main.py 中独立出来 (M5)。
 """
 import bisect
+import inspect
 import flet as ft
 import logging
 import queue
@@ -19,6 +20,33 @@ MAX_LOG_RECORDS = 5000
 MIN_LOG_HEIGHT = 140
 MAX_LOG_HEIGHT = 520
 
+# 第三方库 DEBUG 日志噪音，通过 root logger filter 从源头拦截
+_NOISY_LOGGERS = frozenset({
+    "flet", "flet_controls", "flet_object_patch",
+    "flet_transport", "flet_components",
+    "watchfiles", "uvicorn",
+})
+
+
+def _suppress_noisy_loggers():
+    """将第三方库的 logger 级别设为 INFO，从源头阻止 DEBUG 记录产生。"""
+    for name in _NOISY_LOGGERS:
+        logging.getLogger(name).setLevel(logging.INFO)
+
+
+class _SuppressNoisyFilter(logging.Filter):
+    """挂在 root logger 上，拦截第三方库的 DEBUG 日志，项目自身日志正常放行。"""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.levelno < logging.INFO:
+            name = record.name or ""
+            if name in _NOISY_LOGGERS:
+                return False
+            for prefix in _NOISY_LOGGERS:
+                if name.startswith(prefix + "."):
+                    return False
+        return True
+
 
 class LogSystem:
     """封装日志队列、消费者线程、UI 刷新逻辑。"""
@@ -30,7 +58,6 @@ class LogSystem:
         self._level_filter = log_refs["level_filter"]
         self._export_button = log_refs["export_button"]
         self._resize_handle = log_refs["resize_handle"]
-        self._is_at_bottom = log_refs["_is_at_bottom"]
         self._clear_button = log_refs["clear_button"]
         self._scroll_bottom_button = log_refs["scroll_bottom_button"]
 
@@ -44,6 +71,13 @@ class LogSystem:
             if isinstance(h, QueueHandler):
                 self._root_logger.removeHandler(h)
         self._root_logger.addHandler(self._queue_handler)
+        # root logger 始终 DEBUG，确保所有级别日志都能被采集到；
+        # 前端/控制台的级别筛选只控制显示，不控制采集。
+        self._root_logger.setLevel(logging.DEBUG)
+        # 全局 filter 挂 root logger，拦截第三方库噪音（任何 handler 都受控）
+        _suppress_noisy_loggers()
+        if not any(isinstance(f, _SuppressNoisyFilter) for f in self._root_logger.filters):
+            self._root_logger.addFilter(_SuppressNoisyFilter())
 
         # 状态
         self._log_records: list[dict[str, object]] = []
@@ -103,6 +137,7 @@ class LogSystem:
         self._page.on_close = lambda e: self.shutdown()
 
     def _level_color(self, levelno: int):
+        # 保留接口以兼容导出等功能，但 TextField 不支持逐行着色
         if levelno >= logging.ERROR:
             return ft.Colors.RED
         if levelno >= logging.WARNING:
@@ -114,52 +149,59 @@ class LogSystem:
         "INFO": logging.INFO,
         "WARNING": logging.WARNING,
         "ERROR": logging.ERROR,
-        "CRITICAL": logging.CRITICAL,
     }
 
     def _get_selected_level(self) -> str:
-        raw_value = getattr(self._level_filter, "value", "ALL")
+        raw_value = getattr(self._level_filter, "value", "INFO")
         if raw_value is None:
-            return "ALL"
-        return str(raw_value).strip() or "ALL"
+            return "INFO"
+        return str(raw_value).strip() or "INFO"
 
     def _pass_level_filter(self, record: dict[str, object]) -> bool:
         """判断记录是否通过当前级别筛选（选中级别及以上）。"""
         selected = self._get_selected_level()
-        if selected == "ALL":
-            return True
-        threshold = self._LEVEL_THRESHOLD.get(selected, logging.DEBUG)
+        threshold = self._LEVEL_THRESHOLD.get(selected, logging.INFO)
         return int(record.get("levelno", 0)) >= threshold
 
     def _get_filtered_log_records(self) -> list[dict[str, object]]:
         with self._log_records_lock:
             return [r for r in self._log_records if self._pass_level_filter(r)]
 
-    def _flush_pending_to_ui(self):
-        """将待显示记录追加到 ListView。"""
+    async def _flush_pending_to_ui(self):
+        """将待显示记录追加到 ListView。
+
+        必须在事件循环线程上运行（通过 run_task 调度），
+        避免与 Flet 的 ObjectPatch.from_diff 并发修改 controls。
+        run_thread 会在线程池中执行，与事件循环线程并发导致 IndexError。
+        """
         with self._pending_lock:
             batch = self._pending_records[:]
             self._pending_records.clear()
         if not batch or self._shutdown_event.is_set():
             return
         batch.sort(key=lambda r: r.get("seq", 0))
+        new_controls = list(self._log_list.controls)
         for record in batch:
             if not self._pass_level_filter(record):
                 continue
-            self._log_list.controls.append(
+            new_controls.append(
                 ft.Text(
                     str(record["message"]),
                     size=13,
                     selectable=True,
-                    color=self._level_color(int(record["levelno"])),
                 )
             )
-        if len(self._log_list.controls) > MAX_LOG_RECORDS:
-            self._log_list.controls = self._log_list.controls[-MAX_LOG_RECORDS:]
+        if len(new_controls) > MAX_LOG_RECORDS:
+            new_controls = new_controls[-MAX_LOG_RECORDS:]
+        self._log_list.controls = new_controls
         try:
             self._log_list.update()
-            if self._is_at_bottom[0]:
-                self._page.run_task(self._log_list.scroll_to, offset=-1)
+        except Exception as ex:
+            logging.getLogger(__name__).debug("flush_update 异常: %s", ex)
+        try:
+            scroll_result = self._log_list.scroll_to(offset=-1)
+            if inspect.isawaitable(scroll_result):
+                await scroll_result
         except (RuntimeError, AttributeError):
             pass
         self._last_flush_time = time.monotonic()
@@ -175,9 +217,9 @@ class LogSystem:
         with self._pending_lock:
             self._flush_timer = None
         try:
-            self._page.run_thread(self._flush_pending_to_ui)
+            self._page.run_task(self._flush_pending_to_ui)
         except Exception:
-            logging.getLogger(__name__).debug("page.run_thread 失败（页面可能已关闭）")
+            logging.getLogger(__name__).debug("page.run_task 失败（页面可能已关闭）")
 
     def _append_log_record(self, log_item: dict[str, object]):
         raw_msg = str(log_item["message"])
@@ -206,23 +248,22 @@ class LogSystem:
         with self._pending_lock:
             self._pending_records.append(record)
 
-    def _apply_filters(self, _e=None):
-        with self._log_records_lock:
-            records = list(self._log_records)
-        filtered = [r for r in records if self._pass_level_filter(r)]
-        self._log_list.controls = [
-            ft.Text(
-                str(r["message"]),
-                size=13,
-                selectable=True,
-                color=self._level_color(int(r["levelno"])),
-            )
-            for r in filtered
-        ]
+    async def _apply_filters(self, _e=None):
         try:
+            with self._log_records_lock:
+                records = list(self._log_records)
+            filtered = [r for r in records if self._pass_level_filter(r)]
+            self._log_list.controls = [
+                ft.Text(str(r["message"]), size=13, selectable=True)
+                for r in filtered
+            ]
             self._log_list.update()
-            if self._is_at_bottom[0]:
-                self._page.run_task(self._log_list.scroll_to, offset=-1)
+        except (RuntimeError, AttributeError, Exception) as ex:
+            logging.getLogger(__name__).debug("apply_filters 异常: %s", ex)
+        try:
+            scroll_result = self._log_list.scroll_to(offset=-1)
+            if inspect.isawaitable(scroll_result):
+                await scroll_result
         except (RuntimeError, AttributeError):
             pass
         self._last_flush_time = time.monotonic()
@@ -264,18 +305,20 @@ class LogSystem:
             )
             logging.getLogger(__name__).info(f"日志已导出: {export_path}")
 
-    def _clear_logs(self, e=None):
-        self._log_list.controls.clear()
-        with self._log_records_lock:
-            self._log_records.clear()
+    async def _clear_logs(self, e=None):
         try:
+            self._log_list.controls = []
+            with self._log_records_lock:
+                self._log_records.clear()
             self._log_list.update()
-        except (RuntimeError, AttributeError):
-            pass
+        except (RuntimeError, AttributeError, Exception) as ex:
+            logging.getLogger(__name__).debug("clear_logs 异常: %s", ex)
 
-    def _scroll_to_bottom(self, e=None):
+    async def _scroll_to_bottom(self, e=None):
         try:
-            self._page.run_task(self._log_list.scroll_to, offset=-1)
+            scroll_result = self._log_list.scroll_to(offset=-1)
+            if inspect.isawaitable(scroll_result):
+                await scroll_result
         except (RuntimeError, AttributeError):
             pass
 
@@ -290,7 +333,7 @@ class LogSystem:
                     elapsed = time.monotonic() - self._last_flush_time
                     if elapsed > self.FALLBACK_FLUSH_TIMEOUT:
                         try:
-                            self._page.run_thread(self._flush_pending_to_ui)
+                            self._page.run_task(self._flush_pending_to_ui)
                         except Exception:
                             pass
                 continue
@@ -322,7 +365,7 @@ class LogSystem:
                             "fallback flush: %d pending records stuck for %.1fs", pending_count, elapsed
                         )
                         try:
-                            self._page.run_thread(self._flush_pending_to_ui)
+                            self._page.run_task(self._flush_pending_to_ui)
                         except Exception:
                             pass
             except Exception as ex:

@@ -36,6 +36,14 @@ sys.modules["gui.main"] = gui_main
 main_spec.loader.exec_module(gui_main)
 
 
+def _invoke(handler, *args, **kwargs):
+    """调用 handler，自动处理 async/sync 两种情况。"""
+    import asyncio
+    result = handler(*args, **kwargs)
+    if asyncio.iscoroutine(result):
+        asyncio.run(result)
+
+
 class DummyPage:
     def __init__(self):
         self.overlay = []
@@ -74,6 +82,7 @@ class PageSpy:
         self.controls = []
         self.services = []
         self.thread_calls = []
+        self.task_calls = []
         self.on_close = None
         self.on_disconnect = None
         self.overlay = []
@@ -96,13 +105,22 @@ class PageSpy:
                 return dlg
         return None
 
-    def run_task(self, coro):
+    def run_task(self, coro, *args, **kwargs):
+        """同步执行 coroutine（测试专用），确保 controls 在断言前已更新。"""
+        self.task_calls.append((coro, args, kwargs))
+        import asyncio
         try:
-            import asyncio
             loop = asyncio.get_running_loop()
-            return loop.create_task(coro())
         except RuntimeError:
-            return None
+            loop = None
+        if loop and loop.is_running():
+            loop.create_task(coro(*args, **kwargs))
+        else:
+            try:
+                asyncio.run(coro(*args, **kwargs))
+            except RuntimeError:
+                pass
+        return None
 
     def run_thread(self, handler, *args):
         self.thread_calls.append((handler, args))
@@ -145,14 +163,13 @@ class DummyDragEvent:
 
 class StubLogView:
     def __init__(self):
-        self.log_list = types.SimpleNamespace(controls=[], auto_scroll=True, spacing=4, update=lambda: None)
-        self.level_filter = types.SimpleNamespace(value="ALL", on_select=None)
+        self.log_list = types.SimpleNamespace(controls=[], auto_scroll=True, spacing=4, update=lambda: None, scroll_to=lambda **kw: None)
+        self.level_filter = types.SimpleNamespace(value="INFO", on_select=None)
         self.export_button = types.SimpleNamespace(on_click=None)
         self.clear_button = types.SimpleNamespace(on_click=None)
         self.scroll_bottom_button = types.SimpleNamespace(on_click=None)
         self.resize_handle = types.SimpleNamespace(on_vertical_drag_update=None)
         self.list_container = types.SimpleNamespace(height=200, update=lambda: None)
-        self._is_at_bottom = [True]
         self.content = types.SimpleNamespace(
             controls=[
                 types.SimpleNamespace(),
@@ -175,7 +192,6 @@ def make_stub_log_view():
         "resize_handle": view.resize_handle,
         "list_container": view.list_container,
         "log_list": view.log_list,
-        "_is_at_bottom": view._is_at_bottom,
     }
     return view, refs
 
@@ -535,7 +551,6 @@ def test_gui_main_log_helper_supports_custom_levels(monkeypatch):
     log_view = page.controls[0].controls[-1]
     last_text = refs["log_list"].controls[-1]
     assert last_text.value.endswith("警告消息")
-    assert last_text.color == components.ft.Colors.ORANGE
 
 
     monkeypatch.setattr(gui_main.cmp, "create_ledger_section", lambda page, log: (object(), {}))
@@ -552,7 +567,7 @@ def test_gui_main_log_helper_supports_custom_levels(monkeypatch):
     gui_main.main(page)
     time.sleep(0.3)
 
-    assert page.thread_calls, "expected GUI log updates to be scheduled through run_thread"
+    assert page.task_calls, "expected GUI log updates to be scheduled through run_task"
 
 
 def test_gui_main_stops_log_consumer_on_disconnect(monkeypatch):
@@ -573,19 +588,19 @@ def test_gui_main_stops_log_consumer_on_disconnect(monkeypatch):
     gui_main.main(page)
     assert page.on_disconnect is not None
 
-    before_disconnect = len(page.thread_calls)
+    before_disconnect = len(page.task_calls)
     page.on_disconnect(None)
     logging.getLogger().info("关闭后日志")
     time.sleep(0.05)
 
-    assert len(page.thread_calls) == before_disconnect
+    assert len(page.task_calls) == before_disconnect
 
     # Test real create_log_view (undo monkeypatch first)
     monkeypatch.undo()
     log_view, refs = real_create_log_view()
 
     assert isinstance(log_view, components.ft.Container)
-    assert refs["log_list"].auto_scroll is False
+    assert refs["log_list"].auto_scroll is True
     assert refs["log_list"].spacing == 4
     assert refs["list_container"].height == 300
     assert getattr(refs["export_button"], "tooltip", None) == "导出日志"
@@ -601,7 +616,7 @@ def test_log_view_exposes_filter_resize_and_export_controls():
     assert toolbar.controls[0] is refs["level_filter"]
     assert toolbar.controls[1] is refs["export_button"]
     assert toolbar.spacing == 4
-    assert refs["level_filter"].value == "ALL"
+    assert refs["level_filter"].value == "INFO"
     assert resize_handle is refs["resize_handle"]
     assert list_container is refs["list_container"]
     assert refs["list_container"].height == 260
@@ -634,12 +649,12 @@ def test_gui_main_filters_logs_by_level(monkeypatch):
     time.sleep(0.3)
 
     refs["level_filter"].value = "ERROR"
-    refs["level_filter"].on_select(DummyControlEvent(refs["level_filter"]))
+    _invoke(refs["level_filter"].on_select, DummyControlEvent(refs["level_filter"]))
     assert len(refs["log_list"].controls) == 1
     assert refs["log_list"].controls[0].value.endswith("错误消息")
 
-    refs["level_filter"].value = "ALL"
-    refs["level_filter"].on_select(DummyControlEvent(refs["level_filter"]))
+    refs["level_filter"].value = "INFO"
+    _invoke(refs["level_filter"].on_select, DummyControlEvent(refs["level_filter"]))
     assert len(refs["log_list"].controls) >= 2
 
 
@@ -683,7 +698,7 @@ def test_gui_main_filters_logs_by_level_and_above(monkeypatch):
 
     # WARNING 及以上：应包含 WARNING + ERROR，不含 INFO / DEBUG
     refs["level_filter"].value = "WARNING"
-    refs["level_filter"].on_select(DummyControlEvent(refs["level_filter"]))
+    _invoke(refs["level_filter"].on_select, DummyControlEvent(refs["level_filter"]))
     values = [c.value for c in refs["log_list"].controls]
     assert any("warning消息" in v for v in values)
     assert any("error消息" in v for v in values)
@@ -692,7 +707,7 @@ def test_gui_main_filters_logs_by_level_and_above(monkeypatch):
 
     # INFO 及以上：应包含 INFO + WARNING + ERROR，不含 DEBUG
     refs["level_filter"].value = "INFO"
-    refs["level_filter"].on_select(DummyControlEvent(refs["level_filter"]))
+    _invoke(refs["level_filter"].on_select, DummyControlEvent(refs["level_filter"]))
     values = [c.value for c in refs["log_list"].controls]
     assert any("info消息" in v for v in values)
     assert any("warning消息" in v for v in values)
@@ -701,7 +716,7 @@ def test_gui_main_filters_logs_by_level_and_above(monkeypatch):
 
     # DEBUG 及以上：应包含全部 4 条测试日志
     refs["level_filter"].value = "DEBUG"
-    refs["level_filter"].on_select(DummyControlEvent(refs["level_filter"]))
+    _invoke(refs["level_filter"].on_select, DummyControlEvent(refs["level_filter"]))
     values = [c.value for c in refs["log_list"].controls]
     assert sum(1 for v in values if "消息" in v) == 4
 
@@ -737,7 +752,7 @@ def test_gui_main_exports_filtered_logs(monkeypatch, tmp_path):
     time.sleep(0.3)
 
     refs["level_filter"].value = "ERROR"
-    refs["level_filter"].on_select(DummyControlEvent(refs["level_filter"]))
+    _invoke(refs["level_filter"].on_select, DummyControlEvent(refs["level_filter"]))
 
     import asyncio
     asyncio.run(refs["export_button"].on_click(DummyControlEvent(refs["export_button"])))
