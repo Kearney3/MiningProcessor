@@ -51,6 +51,9 @@ uv sync
 
 # 安装前端依赖
 pnpm install
+
+# 启用 Git hooks（push 前自动运行测试）
+git config core.hooksPath hooks
 ```
 
 ### 启动开发环境
@@ -206,6 +209,8 @@ MiningProcessor/
 ├── config.json                 # 持久化默认配置（提交 Git）
 ├── config.user.json            # 用户覆盖配置（gitignore，含凭据）
 ├── tests/                      # pytest 测试（37 个文件，747 个用例）
+├── hooks/                      # Git hooks（push 前自动运行测试）
+│   └── pre-push
 ├── .github/workflows/
 │   ├── ci.yml                  # push/PR → 自动跑测试 + 类型 + Rust 检查
 │   ├── build-tauri.yml         # CI 通过 → Tauri 桌面构建（macOS + Windows）
