@@ -71,7 +71,7 @@ function IconDownload() {
 
 export function LogPanel({ logs, onClear }: LogPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState(180);
+  const [height, setHeight] = useState(280);
   const [isResizing, setIsResizing] = useState(false);
   const [followTail, setFollowTail] = useState(true);
   const [filterLevel, setFilterLevel] = useState<string>("INFO");

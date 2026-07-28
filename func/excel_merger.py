@@ -2,7 +2,7 @@ import argparse
 import json
 import os
 import sys
-from typing import List, Tuple
+from typing import List
 
 import pandas as pd
 from func.logger import get_logger
@@ -44,6 +44,7 @@ def merge_excel_files(
         skip_hidden: bool = False,
         skip_hidden_rows: bool = False,
         skip_hidden_cols: bool = False,
+        tolerant_header: bool = False,
 ) -> str:
     """
     合并指定文件夹中包含关键字的 Excel 文件。
@@ -58,6 +59,8 @@ def merge_excel_files(
         skip_hidden: 若为 True，跳过 Excel 中的隐藏行和隐藏列（向后兼容）
         skip_hidden_rows: 若为 True，仅跳过 Excel 中的隐藏行
         skip_hidden_cols: 若为 True，仅跳过 Excel 中的隐藏列
+        tolerant_header: 若为 True，表头不一致时自动对齐合并（缺失列填空）；
+                         若为 False（默认），表头不一致时抛出 ValueError
 
     返回:
         输出文件的完整路径
@@ -107,11 +110,28 @@ def merge_excel_files(
                 logger.error(f"读取文件 '{fpath}' 的 Sheet '{sname}' 表头失败: {e}")
                 header_dict[os.path.basename(fpath)][sname] = ()
 
-    # 3. 按 sheet_name 逐组合并（逐文件读取，避免同时缓存所有文件数据）
+    # 3. 如果 tolerant_header，预扫描各 sheet 列并集；否则在合并时严格校验
+    sheet_all_headers: dict[str, list[str]] = {}
+    if tolerant_header:
+        for sname in sorted(all_sheet_names):
+            union_headers: list[str] = []
+            seen: set[str] = set()
+            for fpath in matched_files:
+                if sname not in file_sheet_names.get(fpath, []):
+                    continue
+                headers = header_dict[os.path.basename(fpath)].get(sname, ())
+                for h in headers:
+                    if h not in seen:
+                        seen.add(h)
+                        union_headers.append(h)
+            sheet_all_headers[sname] = union_headers
+
+    # 4. 按 sheet_name 逐组合并（逐文件读取，避免同时缓存所有文件数据）
     merged_sheets: dict[str, pd.DataFrame] = {}
     for sname in sorted(all_sheet_names):
         sheet_dataframes: List[pd.DataFrame] = []
-        expected_headers: Tuple | None = None
+        union_headers = sheet_all_headers.get(sname, [])
+        expected_headers: tuple | None = None
 
         for fpath in matched_files:
             if sname not in file_sheet_names.get(fpath, []):
@@ -139,20 +159,34 @@ def merge_excel_files(
                 logger.warning(f"  警告: {os.path.basename(fpath)} 的 Sheet '{sname}' 为空，已跳过")
                 continue
 
-            current_headers = tuple(clean_string(h) for h in df.columns)
-            if expected_headers is None:
-                expected_headers = current_headers
+            # 清洗列名
+            df.columns = [clean_string(h) for h in df.columns]
+
+            if tolerant_header:
+                # 宽容模式：对齐到并集列，缺失列填 NaN
+                current_headers = list(df.columns)
+                if current_headers != union_headers:
+                    missing = set(union_headers) - set(current_headers)
+                    extra = set(current_headers) - set(union_headers)
+                    if missing or extra:
+                        logger.warning(
+                            f"  Sheet '{sname}' 表头不一致 ({os.path.basename(fpath)})，已自动对齐。"
+                            f" 缺失列: {sorted(missing) if missing else '无'}"
+                            f"，多余列: {sorted(extra) if extra else '无'}"
+                        )
+                    df = df.reindex(columns=union_headers)
             else:
-                if current_headers != expected_headers:
-                    # 格式化输出所有文件的表名和对应的表头（header_dict）
+                # 严格模式：表头必须完全一致，否则报错
+                current_headers = tuple(df.columns)
+                if expected_headers is None:
+                    expected_headers = current_headers
+                elif current_headers != expected_headers:
                     error_string = ""
-                    # 遍历外层字典
                     for outer_key, inner_dict in header_dict.items():
                         error_string += f"【{outer_key}】\n"
-                        # 遍历内层字典
                         for inner_key, value_tuple in inner_dict.items():
                             error_string += f"  {inner_key}: {value_tuple}\t"
-                        error_string += f"\n-{'-' * 30}\n"  # 分隔线
+                        error_string += f"\n-{'-' * 30}\n"
 
                     raise ValueError(
                         f"Sheet '{sname}' 的表头不一致！\n"
@@ -162,7 +196,6 @@ def merge_excel_files(
                         f"  所有已导入的表头: \n{error_string}"
                     )
 
-            # 去掉空行/全空行（可选，保留原样更稳妥，只在非首表时去掉表头）
             sheet_dataframes.append(df)
 
         if not sheet_dataframes:
@@ -257,6 +290,7 @@ def main():
     parser.add_argument("--skiphidden", action="store_true", help="跳过 Excel 中的隐藏行和隐藏列（向后兼容）")
     parser.add_argument("--skip-hidden-rows", action="store_true", help="跳过 Excel 中的隐藏行")
     parser.add_argument("--skip-hidden-cols", action="store_true", help="跳过 Excel 中的隐藏列")
+    parser.add_argument("--tolerant-header", action="store_true", help="表头不一致时自动对齐合并（缺失列填空），而非报错")
     args = parser.parse_args()
 
     folder = os.path.abspath(args.folder)
@@ -277,7 +311,8 @@ def main():
         merge_excel_files(folder, args.keyword, args.output, strip_time=args.strip_time, sort_configs=sort_configs,
                           skip_hidden=args.skiphidden,
                           skip_hidden_rows=args.skip_hidden_rows,
-                          skip_hidden_cols=args.skip_hidden_cols)
+                          skip_hidden_cols=args.skip_hidden_cols,
+                          tolerant_header=args.tolerant_header)
     except Exception as e:
         logger.error(f"错误: {e}")
         sys.exit(1)

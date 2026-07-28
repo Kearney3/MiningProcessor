@@ -128,13 +128,34 @@ class TestMergeExcelFiles:
         result = pd.read_excel(out)
         assert result["值"].iloc[0] == 3
 
-    def test_header_mismatch_raises(self, tmp_path):
-        """表头不一致应报错"""
+    def test_header_mismatch_raises_by_default(self, tmp_path):
+        """表头不一致默认应报错（严格模式）"""
         _make_excel(tmp_path / "数据_A.xlsx", {"日期": ["2025-01-01"], "值": [1]})
         _make_excel(tmp_path / "数据_B.xlsx", {"时间": ["2025-01-02"], "金额": [2]})
 
         with pytest.raises(ValueError, match="表头不一致"):
             merge_excel_files(str(tmp_path), "数据")
+
+    def test_header_mismatch_tolerant_merge(self, tmp_path):
+        """tolerant_header=True 时，表头不一致应自动对齐合并，缺失列填空"""
+        _make_excel(tmp_path / "数据_A.xlsx", {"日期": ["2025-01-01"], "值": [1]})
+        _make_excel(tmp_path / "数据_B.xlsx", {"时间": ["2025-01-02"], "金额": [2]})
+
+        out = merge_excel_files(str(tmp_path), "数据", tolerant_header=True)
+        result = pd.read_excel(out)
+        # 并集列：日期、值、时间、金额
+        assert list(result.columns) == ["日期", "值", "时间", "金额"]
+        assert len(result) == 2
+        # 第一行来自 A：有日期、值，时间、金额为空
+        assert pd.notna(result["日期"].iloc[0])
+        assert result["值"].iloc[0] == 1
+        assert pd.isna(result["时间"].iloc[0])
+        assert pd.isna(result["金额"].iloc[0])
+        # 第二行来自 B：有时间、金额，日期、值为空
+        assert pd.isna(result["日期"].iloc[1])
+        assert pd.isna(result["值"].iloc[1])
+        assert pd.notna(result["时间"].iloc[1])
+        assert result["金额"].iloc[1] == 2
 
     def test_custom_output_path(self, tmp_path):
         _make_excel(tmp_path / "数据_A.xlsx", {"值": [1]})

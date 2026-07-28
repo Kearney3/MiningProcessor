@@ -776,6 +776,7 @@ function MergeCard({
   const [folderPath, setFolderPath] = useState("");
   const [keyword, setKeyword] = useState("");
   const [stripTime, setStripTime] = useState(false);
+  const [tolerantHeader, setTolerantHeader] = useState(false);
   const [sortConfigs, setSortConfigs] = useState<SortConfig[]>([]);
   const [nextId, setNextId] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -806,6 +807,7 @@ function MergeCard({
         folder_path: folderPath,
         keyword,
         strip_time: stripTime,
+        tolerant_header: tolerantHeader,
         sort_configs: sortConfigs
           .filter((s) => s.column.trim() !== "")
           .map((s) => ({ column: s.column.trim(), ascending: s.ascending })),
@@ -846,6 +848,15 @@ function MergeCard({
           className="rounded border-slate-300"
         />
         去除时间部分
+      </label>
+      <label className="mt-1 flex items-center gap-1.5 text-xs text-slate-600">
+        <input
+          type="checkbox"
+          checked={tolerantHeader}
+          onChange={(e) => setTolerantHeader(e.target.checked)}
+          className="rounded border-slate-300"
+        />
+        兼容表头
       </label>
 
       {/* Sort configuration */}

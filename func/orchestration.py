@@ -306,6 +306,7 @@ def process_single(
             sort_configs=sort_configs,
             skip_hidden_rows=skip_hidden_rows,
             skip_hidden_cols=skip_hidden_cols,
+            tolerant_header=kwargs.get("tolerant_header", False),
         )
 
     else:

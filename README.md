@@ -3,7 +3,7 @@
 > 矿山运营 Excel 报表批量处理工具
 
 <p>
-  <img src="https://img.shields.io/badge/version-v2.0.0-blue?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-v2.0.1-blue?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/Python-≥3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="python" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square" alt="license" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="platform" />
@@ -425,6 +425,11 @@ uv run scripts/bump_version.py --bump minor --dry-run
 ---
 
 ## 📋 更新日志
+
+### v2.0.1 · 2026-07-28
+
+- 🆕 文件合并新增"兼容表头"开关（Flet / Tauri / CLI `--tolerant-header`）：勾选后表头不一致的文件也能合并，缺失列自动填空；未勾选时保持原有严格校验行为
+- 🎨 Tauri 默认窗口高度从 800 提升至 950，日志面板默认高度从 180 提升至 280
 
 ### v2.0.0 · 2026-07-28
 
