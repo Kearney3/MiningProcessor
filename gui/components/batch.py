@@ -105,6 +105,26 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         value=False,
         tooltip="勾选后，运行小时数为 0 或为空的记录将被过滤",
     )
+    batch_filter_zero_hours_meter = ft.Checkbox(
+        label="过滤零小时仪表",
+        value=False,
+        tooltip="勾选后，小时数仪表开始或结束为 0 或为空的记录将被过滤",
+    )
+    batch_filter_zero_km_meter = ft.Checkbox(
+        label="过滤零公里仪表",
+        value=False,
+        tooltip="勾选后，公里数仪表开始或结束为 0 或为空的记录将被过滤",
+    )
+    batch_filter_zero_run_hours = ft.Checkbox(
+        label="过滤零运行小时数",
+        value=False,
+        tooltip="勾选后，运行小时数为 0 或为空的记录将被过滤",
+    )
+    batch_filter_zero_run_km = ft.Checkbox(
+        label="过滤零运行里程",
+        value=False,
+        tooltip="勾选后，运行里程为 0 或为空的记录将被过滤",
+    )
 
     # --- 异常值检测 ---
     _anomaly = create_anomaly_controls()
@@ -351,6 +371,10 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
                             ft.Container(batch_skip_hidden_cols, col={"xs": 6}),
                             ft.Container(batch_filter_zero_hours, col={"xs": 6}),
                             ft.Container(batch_filter_zero_work_hours, col={"xs": 6}),
+                            ft.Container(batch_filter_zero_hours_meter, col={"xs": 6}),
+                            ft.Container(batch_filter_zero_km_meter, col={"xs": 6}),
+                            ft.Container(batch_filter_zero_run_hours, col={"xs": 6}),
+                            ft.Container(batch_filter_zero_run_km, col={"xs": 6}),
                         ],
                         run_spacing=4,
                     ),
@@ -398,6 +422,10 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "_skip_hidden_cols_toggle": batch_skip_hidden_cols,
         "_filter_zero_hours_toggle": batch_filter_zero_hours,
         "_filter_zero_work_hours_toggle": batch_filter_zero_work_hours,
+        "_filter_zero_hours_meter_toggle": batch_filter_zero_hours_meter,
+        "_filter_zero_km_meter_toggle": batch_filter_zero_km_meter,
+        "_filter_zero_run_hours_toggle": batch_filter_zero_run_hours,
+        "_filter_zero_run_km_toggle": batch_filter_zero_run_km,
         "_anomaly_enabled": _anomaly["_anomaly_enabled"],
         "_anomaly_report": _anomaly["_anomaly_report"],
         "_anomaly_mode": _anomaly["_anomaly_mode"],

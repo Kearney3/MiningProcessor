@@ -427,6 +427,10 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
   const [skipHiddenCols, setSkipHiddenCols] = useState(false);
   const [filterZeroEngineHours, setFilterZeroEngineHours] = useState(false);
   const [filterZeroWorkHours, setFilterZeroWorkHours] = useState(false);
+  const [filterZeroHoursMeter, setFilterZeroHoursMeter] = useState(false);
+  const [filterZeroKmMeter, setFilterZeroKmMeter] = useState(false);
+  const [filterZeroRunHours, setFilterZeroRunHours] = useState(false);
+  const [filterZeroRunKm, setFilterZeroRunKm] = useState(false);
   const [anomaly, setAnomaly] = useState<AnomalyConfig>(DEFAULT_ANOMALY_CONFIG);
 
   // -- Date filter --
@@ -490,6 +494,10 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
         skip_hidden_cols: skipHiddenCols,
         filter_zero_engine_hours: filterZeroEngineHours,
         filter_zero_work_hours: filterZeroWorkHours,
+        filter_zero_hours_meter: filterZeroHoursMeter,
+        filter_zero_km_meter: filterZeroKmMeter,
+        filter_zero_run_hours: filterZeroRunHours,
+        filter_zero_run_km: filterZeroRunKm,
         anomaly_enabled: anomaly.enabled,
         anomaly_report: anomaly.report,
         anomaly_mode: anomaly.mode,
@@ -533,7 +541,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
       setProcessing(false);
       bridge.setProgress(null);
     }
-  }, [scanResult, folderPath, year, month, rawStart, useEquipmentLedger, useOilLedger, skipHiddenRows, skipHiddenCols, filterZeroEngineHours, filterZeroWorkHours, tableMergeMode, baseTableType, dateFilterEnabled, filterDate, useHeaderMapping, headerMode, fuzzyMatch, bridge]);
+  }, [scanResult, folderPath, year, month, rawStart, useEquipmentLedger, useOilLedger, skipHiddenRows, skipHiddenCols, filterZeroEngineHours, filterZeroWorkHours, filterZeroHoursMeter, filterZeroKmMeter, filterZeroRunHours, filterZeroRunKm, tableMergeMode, baseTableType, dateFilterEnabled, filterDate, useHeaderMapping, headerMode, fuzzyMatch, bridge]);
 
   const handleProcess = () => {
     if (hasMissing) {
@@ -712,6 +720,34 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
               checked={filterZeroWorkHours}
               onChange={setFilterZeroWorkHours}
               label="过滤零运行小时数"
+            />
+          </div>
+          <div className="flex items-end pb-0.5">
+            <Toggle
+              checked={filterZeroHoursMeter}
+              onChange={setFilterZeroHoursMeter}
+              label="过滤零小时仪表"
+            />
+          </div>
+          <div className="flex items-end pb-0.5">
+            <Toggle
+              checked={filterZeroKmMeter}
+              onChange={setFilterZeroKmMeter}
+              label="过滤零公里仪表"
+            />
+          </div>
+          <div className="flex items-end pb-0.5">
+            <Toggle
+              checked={filterZeroRunHours}
+              onChange={setFilterZeroRunHours}
+              label="过滤零运行小时数"
+            />
+          </div>
+          <div className="flex items-end pb-0.5">
+            <Toggle
+              checked={filterZeroRunKm}
+              onChange={setFilterZeroRunKm}
+              label="过滤零运行里程"
             />
           </div>
         </div>

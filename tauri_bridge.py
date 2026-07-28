@@ -348,6 +348,10 @@ def _process_production(params: dict) -> dict:
         skip_hidden_rows=params.get("skip_hidden_rows", False),
         skip_hidden_cols=params.get("skip_hidden_cols", False),
         anomaly_config=_build_anomaly_config(params),
+        filter_zero_hours_meter=params.get("filter_zero_hours_meter", False),
+        filter_zero_km_meter=params.get("filter_zero_km_meter", False),
+        filter_zero_run_hours=params.get("filter_zero_run_hours", False),
+        filter_zero_run_km=params.get("filter_zero_run_km", False),
     )
     path = str(_sanitize_path(params["path"], must_exist=True))
     p = Path(path)
@@ -585,6 +589,10 @@ def _batch_process(params: dict) -> dict:
         anomaly_config=_build_anomaly_config(params),
         filter_zero_engine_hours=params.get("filter_zero_engine_hours", False),
         filter_zero_work_hours=params.get("filter_zero_work_hours", False),
+        filter_zero_hours_meter=params.get("filter_zero_hours_meter", False),
+        filter_zero_km_meter=params.get("filter_zero_km_meter", False),
+        filter_zero_run_hours=params.get("filter_zero_run_hours", False),
+        filter_zero_run_km=params.get("filter_zero_run_km", False),
     )
     return {"cancelled": _cancel_event.is_set(), "summary": summary}
 

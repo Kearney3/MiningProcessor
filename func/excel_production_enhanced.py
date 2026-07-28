@@ -23,7 +23,9 @@ logger = get_logger(__name__)
 class MiningDataProcessor:
     def __init__(self, version: str = "new", raw_start: int = -1, device_load_map: dict[str, int] | None = None,
                  target_text: str = "Мото цагийн заалт", skip_hidden: bool = False,
-                 skip_hidden_rows: bool = False, skip_hidden_cols: bool = False, anomaly_config=None):
+                 skip_hidden_rows: bool = False, skip_hidden_cols: bool = False, anomaly_config=None,
+                 filter_zero_hours_meter=False, filter_zero_km_meter=False,
+                 filter_zero_run_hours=False, filter_zero_run_km=False):
         """
         初始化数据处理器
         :param version: 版本，"new"或"old"
@@ -34,6 +36,10 @@ class MiningDataProcessor:
         :param skip_hidden_rows: 若为 True，跳过 Excel 中的隐藏行
         :param skip_hidden_cols: 若为 True，跳过 Excel 中的隐藏列
         :param anomaly_config: 异常值检测配置，为 None 时从 config_loader 加载
+        :param filter_zero_hours_meter: 若为 True，过滤小时数仪表开始或结束为 0 或空的记录
+        :param filter_zero_km_meter: 若为 True，过滤公里数仪表开始或结束为 0 或空的记录
+        :param filter_zero_run_hours: 若为 True，过滤运行小时数为 0 或空的记录
+        :param filter_zero_run_km: 若为 True，过滤运行里程为 0 或空的记录
         """
         self.version = version
         self.raw_start = raw_start
@@ -55,6 +61,10 @@ class MiningDataProcessor:
             self.auto_detect = False
         self.target_text = target_text
         self.anomaly_config = anomaly_config
+        self.filter_zero_hours_meter = filter_zero_hours_meter
+        self.filter_zero_km_meter = filter_zero_km_meter
+        self.filter_zero_run_hours = filter_zero_run_hours
+        self.filter_zero_run_km = filter_zero_run_km
         if device_load_map is not None:
             self.load_map: dict[str, int] = dict(device_load_map)
             return
@@ -475,6 +485,47 @@ class MiningDataProcessor:
         return (0, 1)
 
     # ---------------------------
+    # 运行数据过滤
+    # ---------------------------
+
+    def _filter_running_df(self, df: pd.DataFrame) -> pd.DataFrame:
+        """根据配置过滤运行数据中的零值/空值记录。"""
+        if df.empty:
+            return df
+        mask = pd.Series(False, index=df.index)
+        reasons = pd.Series("", index=df.index)
+
+        if self.filter_zero_hours_meter:
+            start = df["小时数仪表开始"]
+            end = df["小时数仪表结束"]
+            m = (start.fillna(0) == 0) | (end.fillna(0) == 0)
+            reasons = reasons.where(~m, reasons + "小时数仪表为0或空;")
+            mask = mask | m
+
+        if self.filter_zero_km_meter:
+            start = df["公里数仪表开始"]
+            end = df["公里数仪表结束"]
+            m = (start.fillna(0) == 0) | (end.fillna(0) == 0)
+            reasons = reasons.where(~m, reasons + "公里数仪表为0或空;")
+            mask = mask | m
+
+        if self.filter_zero_run_hours:
+            m = df["运行小时数"].fillna(0) == 0
+            reasons = reasons.where(~m, reasons + "运行小时数为0或空;")
+            mask = mask | m
+
+        if self.filter_zero_run_km:
+            m = df["运行里程"].fillna(0) == 0
+            reasons = reasons.where(~m, reasons + "运行里程为0或空;")
+            mask = mask | m
+
+        filtered_count = mask.sum()
+        if filtered_count > 0:
+            df = df[~mask]
+            logger.info(f"已过滤 {filtered_count} 条运行数据（零值/空值）")
+        return df
+
+    # ---------------------------
     # 单文件处理
     # ---------------------------
     def process_single_file(self, file_path, output_file=None):
@@ -551,6 +602,9 @@ class MiningDataProcessor:
                 running_df, "production_running", anomaly_cfg, output_dir=output_dir)
             production_df, _ = detect_and_filter(
                 production_df, "production", anomaly_cfg, output_dir=output_dir)
+
+        # 过滤运行数据中的零值/空值记录
+        running_df = self._filter_running_df(running_df)
 
         # 输出单文件结果
         if output_file:
@@ -686,6 +740,9 @@ class MiningDataProcessor:
                 final_running, "production_running", anomaly_cfg, output_dir=output_dir)
             final_production, _ = detect_and_filter(
                 final_production, "production", anomaly_cfg, output_dir=output_dir)
+
+        # 过滤运行数据中的零值/空值记录
+        final_running = self._filter_running_df(final_running)
 
         if return_sheets:
             sheets = {}

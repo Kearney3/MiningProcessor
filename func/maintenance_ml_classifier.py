@@ -344,12 +344,14 @@ class MaintenanceMLClassifier:
             centroid_agreement,
             centroid_similarity,
         ):
+            # 置信度达到阈值时放宽质心一致性要求
+            centroid_ok = agrees or confidence >= self.config.min_confidence
             if (
                 len(text) < self.config.min_text_length
                 or "正常" in text
                 or confidence < self.config.min_confidence
                 or margin < self.config.min_margin
-                or not agrees
+                or not centroid_ok
                 or similarity < self.config.min_centroid_similarity
             ):
                 results.append(None)

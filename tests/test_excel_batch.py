@@ -109,7 +109,9 @@ class TestProcessFilesAllModulesCalled:
                                                 anomaly_config=None)
         mock_production.assert_called_once_with("/data", -1,
                                                 skip_hidden_rows=False, skip_hidden_cols=False,
-                                                anomaly_config=None, cancel_event=None)
+                                                anomaly_config=None, cancel_event=None,
+                                                filter_zero_hours_meter=False, filter_zero_km_meter=False,
+                                                filter_zero_run_hours=False, filter_zero_run_km=False)
         mock_worktime.assert_called_once_with(
             matched["worktime"], 2025, 6, None,
             skip_hidden_rows=False, skip_hidden_cols=False,
