@@ -280,6 +280,7 @@ def _dispatch_module(module_type: str, path: str, cancel_event: threading.Event 
             skip_hidden_cols=skip_hidden_cols,
             split_by_year=kwargs.get("split_by_year", False),
             details_only=kwargs.get("details_only", False),
+            use_ml_fallback=kwargs.get("use_ml_fallback", True),
         )
     # batch 模块由 _execute_batch_task 单独处理
     return None
@@ -529,7 +530,7 @@ async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=
                          anomaly_config=anomaly_config)
 
 
-async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False) -> None:
+async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None) -> None:
     """Excel 合并按钮回调"""
     btn = merge_refs["btn"]
     path = merge_refs["path"].value
@@ -553,7 +554,7 @@ async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledge
                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols)
 
 
-async def on_maint_process(page: ft.Page, maint_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False) -> None:
+async def on_maint_process(page: ft.Page, maint_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None) -> None:
     """维修记录处理按钮回调"""
     btn = maint_refs["btn"]
     path = maint_refs["path"].value
@@ -562,10 +563,15 @@ async def on_maint_process(page: ft.Page, maint_refs: dict, log, equipment_ledge
         return
     split_by_year = bool(maint_refs.get("split_year") and maint_refs["split_year"].value)
     details_only = bool(maint_refs.get("details_only") and maint_refs["details_only"].value)
+    use_ml_fallback = bool(
+        maint_refs.get("use_ml") is None or maint_refs["use_ml"].value
+    )
     await _safe_run_task(page, btn, "处理", path, log, "maint",
                          equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
-                         split_by_year=split_by_year, details_only=details_only)
+                         split_by_year=split_by_year, details_only=details_only,
+                         use_ml_fallback=use_ml_fallback,
+                         anomaly_config=anomaly_config)
 
 
 def _set_controls_visible(controls: list, visible: bool):

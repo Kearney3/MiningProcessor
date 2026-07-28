@@ -8,6 +8,8 @@ on:
     paths:
       - 'func/**'
       - 'gui/**'
+      - 'models/maintenance_classifier.joblib'
+      - 'models/maintenance_classifier.metrics.json'
       - 'src/**'
       - 'src-tauri/**'
       - 'tests/**'
@@ -28,6 +30,8 @@ on:
     paths:
       - 'func/**'
       - 'gui/**'
+      - 'models/maintenance_classifier.joblib'
+      - 'models/maintenance_classifier.metrics.json'
       - 'src/**'
       - 'src-tauri/**'
       - 'tests/**'
@@ -67,6 +71,11 @@ jobs:
 
       - name: Run pytest
         run: uv run pytest -x -q
+
+      - name: Verify bundled maintenance model
+        run: |
+          test -s models/maintenance_classifier.joblib
+          uv run python -c "from func.maintenance_ml_classifier import MaintenanceMLClassifier; model = MaintenanceMLClassifier.load(); assert model.is_fitted"
 
   # ─── TypeScript 类型检查 ──────────────────────────────────
   typecheck:

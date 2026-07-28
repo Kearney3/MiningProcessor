@@ -69,6 +69,29 @@ jobs:
             --distpath build-sidecar \
             --clean --noconfirm
           ls -lh build-sidecar/tauri-bridge/tauri-bridge
+          test -s build-sidecar/tauri-bridge/_internal/models/maintenance_classifier.joblib
+          uv run python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+          from openpyxl import Workbook
+
+          source = Path("build-sidecar/maintenance-model-smoke.xlsx")
+          Workbook().save(source)
+          request = json.dumps({
+              "id": 1,
+              "method": "process_maintenance",
+              "params": {"path": str(source.resolve()), "use_ml_fallback": True},
+          }) + "\n"
+          result = subprocess.run(
+              ["build-sidecar/tauri-bridge/tauri-bridge"],
+              input=request,
+              text=True,
+              capture_output=True,
+              timeout=90,
+          )
+          assert "已加载维修 ML 二级分类模型" in result.stderr, result.stderr
+          PY
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -161,6 +184,29 @@ jobs:
             --distpath build-sidecar \
             --clean --noconfirm
           ls -lh build-sidecar/tauri-bridge/tauri-bridge.exe
+          test -s build-sidecar/tauri-bridge/_internal/models/maintenance_classifier.joblib
+          uv run python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+          from openpyxl import Workbook
+
+          source = Path("build-sidecar/maintenance-model-smoke.xlsx")
+          Workbook().save(source)
+          request = json.dumps({
+              "id": 1,
+              "method": "process_maintenance",
+              "params": {"path": str(source.resolve()), "use_ml_fallback": True},
+          }) + "\n"
+          result = subprocess.run(
+              ["build-sidecar/tauri-bridge/tauri-bridge.exe"],
+              input=request,
+              text=True,
+              capture_output=True,
+              timeout=90,
+          )
+          assert "已加载维修 ML 二级分类模型" in result.stderr, result.stderr
+          PY
 
       - name: Build frontend
         run: pnpm build

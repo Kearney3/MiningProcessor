@@ -36,6 +36,7 @@ docs/superpowers/
 
 # Exploration notebooks & generated output
 Notebook/
+outputs/
 
 # Worktrees
 .worktrees/
@@ -49,8 +50,14 @@ Notebook/
 *.db
 data/
 
+# 只提交并打包当前生效的维修分类模型
+models/*
+!models/maintenance_classifier.joblib
+!models/maintenance_classifier.metrics.json
+
 # User config (contains database credentials etc.)
 config.user.json
+.maintenance_llm.env
 
 # CodeGraph
 .codegraph/

@@ -1,6 +1,6 @@
 [project]
 name = "MiningProcessor"
-version = "1.5.0"
+version = "2.0.0"
 description = "矿山运营 Excel 报表批量处理工具 — 支持 CLI 与 Flet 桌面 GUI"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -13,6 +13,7 @@ dependencies = [
     "cryptography>=41.0.0",
     "psycopg2-binary>=2.9,<3.0",
     "xlrd>=2.0.1",
+    "scikit-learn>=1.9.0",
 ]
 
 [project.scripts]
@@ -24,6 +25,8 @@ worktime = "func.excel_worktime:main"
 worktime-batch = "func.excel_worktime_multifile:main"
 merge = "func.excel_merger:main"
 sync-minebase = "func.sync_to_minebase:main"
+maintenance-train = "func.train_maintenance_classifier:main"
+maintenance-llm-label = "func.label_maintenance_with_llm:main"
 
 [dependency-groups]
 dev = [
@@ -38,6 +41,14 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["func", "gui"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"models/maintenance_classifier.joblib" = "models/maintenance_classifier.joblib"
+"models/maintenance_classifier.metrics.json" = "models/maintenance_classifier.metrics.json"
+
+[tool.flet.app]
+# 只打包当前生效模型；训练轮次与候选模型不进入桌面安装包。
+exclude = ["models/maintenance_classifier_*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

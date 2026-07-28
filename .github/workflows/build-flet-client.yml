@@ -58,7 +58,29 @@ jobs:
       - name: Build app
         shell: bash
         run: |
+          test -s models/maintenance_classifier.joblib
+          uv run python -c "from func.maintenance_ml_classifier import MaintenanceMLClassifier; model = MaintenanceMLClassifier.load(); assert model.is_fitted"
           uv run ${{ matrix.build_cmd }} --yes --verbose
+
+      - name: Verify model in Flet package
+        shell: bash
+        run: |
+          uv run python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          artifact = Path("${{ matrix.artifact_path }}")
+          archives = list(artifact.rglob("app.zip"))
+          if not archives:
+              raise SystemExit(f"app.zip not found under {artifact}")
+          model_suffix = "models/maintenance_classifier.joblib"
+          if not any(
+              any(name.endswith(model_suffix) for name in ZipFile(archive).namelist())
+              for archive in archives
+          ):
+              raise SystemExit("maintenance classifier is missing from Flet app.zip")
+          print(f"Verified maintenance classifier in {archives[0]}")
+          PY
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v5.0.0

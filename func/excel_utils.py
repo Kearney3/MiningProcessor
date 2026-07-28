@@ -274,6 +274,7 @@ MODULE_OUTPUT_FILES: dict[str, str] = {
     "fuel": "Fuel.xlsx",
     "electrical": "电力消耗统计.xlsx",
     "production": "合并产量.xlsx",
+    "maint": "维修记录统计.xlsx",
     "maintenance": "维修记录统计.xlsx",
 }
 

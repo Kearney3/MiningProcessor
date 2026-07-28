@@ -1,301 +1,289 @@
-"""maintenance_classification 模块测试
+"""维修记录分类引擎测试。"""
+from pathlib import Path
 
-覆盖两级层次匹配的 classify() 函数：
-- 主效果：跨大类截胡问题已修复
-- 回归保证：简单单关键词、噪声过滤行为不变
-- 边界：打平、无匹配、空内容
-"""
-import re
 import pytest
 
 from func.maintenance_classification import (
     _DEFAULT_CLASSIFICATIONS,
-    _DEFAULT_NOISE_EXACT,
-    _DEFAULT_NOISE_PATTERNS,
     _best_major,
     _group_by_major,
     classify,
     compile_noise_patterns,
+    export_classification_template,
+    import_classifications_from_excel,
+    is_fault_record,
+    normalize_maintenance_content,
 )
 
-
-# ── 辅助 fixture ──────────────────────────────────────────────
 
 @pytest.fixture
 def default_grouped():
     return _group_by_major(_DEFAULT_CLASSIFICATIONS)
 
 
-# ── _group_by_major ───────────────────────────────────────────
-
-class TestGroupByMajor:
-    def test_groups_by_major_preserving_order(self):
+class TestRuleStructure:
+    def test_groups_preserve_order(self):
         data = [
             {"major": "B", "minor": "x", "keywords": ["x"]},
             {"major": "A", "minor": "y", "keywords": ["y"]},
             {"major": "B", "minor": "z", "keywords": ["z"]},
-            {"major": "C", "minor": "w", "keywords": ["w"]},
         ]
         grouped = _group_by_major(data)
-        majors = list(grouped.keys())
-        assert majors == ["B", "A", "C"]  # 按首次出现顺序
+        assert list(grouped) == ["B", "A"]
+        assert [entry["minor"] for entry in grouped["B"]] == ["x", "z"]
 
-    def test_preserves_inner_entry_order(self):
-        data = [
-            {"major": "A", "minor": "x", "keywords": ["x"]},
-            {"major": "A", "minor": "y", "keywords": ["y"]},
-            {"major": "A", "minor": "z", "keywords": ["z"]},
-        ]
-        grouped = _group_by_major(data)
-        assert [e["minor"] for e in grouped["A"]] == ["x", "y", "z"]
+    def test_default_taxonomy_has_19_rule_majors_plus_other_fallback(
+        self, default_grouped
+    ):
+        assert len(default_grouped) == 19
+        assert len(_DEFAULT_CLASSIFICATIONS) == 99
 
-    def test_default_classifications_12_majors(self, default_grouped):
-        assert len(default_grouped) == 12
-
-    def test_engine_has_13_subcategories(self, default_grouped):
-        assert len(default_grouped["发动机"]) == 13
-
-
-# ── _best_major ───────────────────────────────────────────────
-
-class TestBestMajor:
-    def test_selects_by_entry_count(self):
-        """主指标：entry_count 更高的胜出。"""
+    def test_best_major_compatibility_helper(self):
         data = [
             {"major": "A", "minor": "a1", "keywords": ["X", "Y"]},
             {"major": "A", "minor": "a2", "keywords": ["Z"]},
             {"major": "B", "minor": "b1", "keywords": ["X"]},
         ]
-        grouped = _group_by_major(data)
-        # "X Y Z" → A 命中 2 个小类, B 命中 1 个
-        assert _best_major("X Y Z", grouped) == "A"
-
-    def test_uses_max_len_as_tiebreaker(self):
-        """entry_count 持平，max_keyword_len 更高的胜出。"""
-        data = [
-            {"major": "A", "minor": "a1", "keywords": ["ABC"]},
-            {"major": "B", "minor": "b1", "keywords": ["ABCD"]},
-        ]
-        grouped = _group_by_major(data)
-        # "ABCD" → A 命中 len=3, B 命中 len=4
-        assert _best_major("ABCD", grouped) == "B"
-
-    def test_tie_goes_to_first_major_in_list(self):
-        """entry_count 和 max_len 都一致，按列表顺序。"""
-        data = [
-            {"major": "A", "minor": "a1", "keywords": ["XYZ"]},
-            {"major": "B", "minor": "b1", "keywords": ["XYZ"]},
-        ]
-        grouped = _group_by_major(data)
-        assert _best_major("XYZ", grouped) == "A"
-
-    def test_returns_none_when_no_match(self):
-        data = [{"major": "A", "minor": "a1", "keywords": ["NEVER"]}]
-        grouped = _group_by_major(data)
-        assert _best_major("NOTHING HERE", grouped) is None
+        assert _best_major("X Y Z", _group_by_major(data)) == "A"
 
 
-# ── classify 回归测试（行为不变项） ────────────────────────────
+class TestNormalizationAndNoise:
+    def test_casefold_and_metadata_cleanup(self):
+        normalized = normalize_maintenance_content(
+            "Author: A; 发动机小时数: 12345; IGBT 报警"
+        )
+        assert normalized == "igbt 报警"
 
-class TestClassifyRegression:
-    """与原 flat-scan 行为保持一致的关键场景。"""
-
-    def test_noise_exact(self):
-        assert classify("出车") == (None, None)
-        assert classify("已点检") == (None, None)
-        assert classify("正常") == (None, None)
-
-    def test_noise_pattern(self):
-        assert classify("点检正常") == (None, None)
-        assert classify("已吹清空滤，出车。") == (None, None)
-
-    def test_empty_content(self):
+    def test_empty_or_noise_content(self):
         assert classify("") == (None, None)
-        # 纯空格不视为 empty，行为保持与原 flat-scan 一致
+        assert classify("已点检") == (None, None)
+        assert classify("点检正常") == (None, None)
+        assert classify("发动机小时数：12345") == (None, None)
 
-    def test_unmatched_returns_other(self):
-        assert classify("这台设备没有已知故障描述") == ("其他", "未分类")
+    def test_noise_with_fault_content_is_not_discarded(self):
+        assert classify("发动机异响，点检正常") == (
+            "发动机系统",
+            "性能/工况异常",
+        )
 
-    def test_simple_keyword_match(self):
-        assert classify("发动机报警") == ("发动机", "报警/故障灯")
-        assert classify("变速箱油更换") == ("变速箱", "变速箱保养")
-
-    def test_noise_before_classification(self):
-        """含噪声关键词的内容应先被过滤，不作分类。"""
-        # '出车'是精确噪声，不因含其他词而误分类
-        r = classify("出车")
-        assert r == (None, None), f"应为 (None, None), 实际 {r}"
-
-    def test_custom_classifications(self):
-        """传入自定义 classifications 应正确使用。"""
-        custom = [
-            {"major": "自定义大类", "minor": "A", "keywords": ["alpha"]},
-            {"major": "自定义大类", "minor": "B", "keywords": ["beta"]},
-        ]
-        assert classify("alpha", classifications=custom) == ("自定义大类", "A")
-        assert classify("beta", classifications=custom) == ("自定义大类", "B")
-        assert classify("gamma", classifications=custom) == ("其他", "未分类")
-
-    def test_noise_exact_custom(self):
-        """传入自定义 noise_exact 应正确过滤。"""
-        custom_noise = {"测试噪声"}
-        r = classify("测试噪声", noise_exact=custom_noise)
-        assert r == (None, None)
-
-    def test_compiled_noise(self):
-        """传入预编译的 compiled_noise 应正确过滤。"""
+    def test_custom_noise_regex(self):
         compiled = compile_noise_patterns([r"^测试噪声.*$"])
-        r = classify("测试噪声xx", compiled_noise=compiled)
-        assert r == (None, None)
+        assert classify("测试噪声xx", compiled_noise=compiled) == (None, None)
 
 
-# ── 两级层次匹配的关键修复验证 ────────────────────────────────
+class TestConfirmedTaxonomy:
+    @pytest.mark.parametrize(
+        ("content", "expected"),
+        [
+            ("主发电机励磁故障", ("电驱动系统", "主发电机")),
+            ("左后轮马达报警", ("电驱动系统", "轮马达/电动轮")),
+            ("IGBT功率模块损坏", ("电驱动系统", "逆变/功率模块")),
+            ("举升缸漏油", ("液压系统", "举升/工作装置油缸")),
+            ("转向油缸渗油", ("液压系统", "转向油缸")),
+            ("右前悬挂缸漏油", ("液压系统", "悬挂油缸")),
+        ],
+    )
+    def test_user_confirmed_boundaries(self, content, expected):
+        assert classify(content) == expected
 
-class TestClassifyHierarchicalFix:
-    """本次改造的核心修复：跨大类截胡问题已解决。"""
+    @pytest.mark.parametrize(
+        ("content", "expected"),
+        [
+            ("轮马达电气报警", ("电驱动系统", "轮马达/电动轮")),
+            ("主发电机电气故障", ("电驱动系统", "主发电机")),
+            ("IGBT控制模块报警", ("电驱动系统", "逆变/功率模块")),
+            ("举升缸不工作", ("液压系统", "举升/工作装置油缸")),
+            ("转向缸液压油漏", ("液压系统", "转向油缸")),
+            ("悬挂缸报警", ("液压系统", "悬挂油缸")),
+        ],
+    )
+    def test_confirmed_boundaries_win_over_generic_terms(self, content, expected):
+        assert classify(content) == expected
 
-    def test_engine_oil_refill(self):
-        """发动机补加机油 → 日常维护（不是发动机/发动机通用）"""
-        major, minor = classify("发动机补加机油")
-        assert (major, minor) == ("日常维护", "动力系统保养")
+    @pytest.mark.parametrize(
+        ("content", "expected"),
+        [
+            ("差速器异响", ("传动与车桥", "车桥/差速器/半轴")),
+            ("变速箱漏油", ("变速箱与变矩器", "油路/滤清/冷却")),
+            ("SCR系统报警", ("发动机系统", "排气与尾气后处理")),
+            ("DPF再生故障", ("发动机系统", "排气与尾气后处理")),
+            ("ECM异常报码", ("低压电气与控制", "控制器/模块/故障码")),
+            ("液压油缸漏油需要更换密封圈", ("液压系统", "通用液压油缸")),
+        ],
+    )
+    def test_specific_system_matches(self, content, expected):
+        assert classify(content) == expected
 
-    def test_transmission_noise_and_shifting(self):
-        """换挡时变速箱有异响 → 变速箱（不是发动机/异响）"""
-        major, minor = classify("换挡时变速箱有异响")
-        assert (major, minor) == ("变速箱", "换挡/离合器")
+    def test_generic_cab_noise_does_not_become_engine(self):
+        assert classify("驾驶室异响") == ("其他/待确认", "仅现象未定位")
 
-    def test_ac_and_sensor(self):
-        """空调不工作，传感器坏了 → 空调（不是电气系统/传感器）"""
-        major, minor = classify("空调不工作，传感器坏了")
-        assert (major, minor) == ("空调", "空调故障")
-
-    def test_brake_pad_noise(self):
-        """刹车片异响 → 制动系统（不是发动机/异响）"""
-        major, minor = classify("刹车片异响")
-        assert (major, minor) == ("制动系统", "制动通用")
-
-    def test_engine_greasing(self):
-        """给发动机加注黄油 → 日常维护（不是润滑系统）"""
-        major, minor = classify("给发动机加注黄油")
-        assert (major, minor) == ("日常维护", "润滑系统保养")
-
-    def test_transmission_sensor_tie(self):
-        """变速箱传感器故障 → 变速箱（平局时按列表顺序）"""
-        major, minor = classify("变速箱传感器故障")
-        assert major == "变速箱"
-
-
-# ── 大类内匹配具体优先 ───────────────────────────────────────
-
-class TestClassifyWithinMajorSpecificFirst:
-    """胜出大类内按具体优先顺序匹配小类。"""
-
-    def test_engine_specific_before_general(self):
-        """发动机报警 → 报警/故障灯（具体），不是发动机通用"""
-        assert classify("发动机报警") == ("发动机", "报警/故障灯")
-
-    def test_engine_shutdown_specific(self):
-        """发动机熄火 → 发动机通用（停机/熄火小类已合并）"""
-        assert classify("发动机熄火") == ("发动机", "发动机通用")
-
-    def test_transmission_leak_specific(self):
-        """变速箱漏油 → 漏油/渗油（具体），不是变速箱通用"""
-        assert classify("变速箱漏油") == ("变速箱", "漏油/渗油")
-
-
-# ── 边界场景 ─────────────────────────────────────────────────
-
-class TestClassifyEdgeCases:
-    def test_english_keywords(self):
-        assert classify("ECM异常") == ("发动机", "ECM/ECU")
-        assert classify("SCR系统报警") == ("发动机", "排气异常")
-
-    def test_mixed_zh_en(self):
-        assert classify("DPF再生故障") == ("发动机", "排气异常")
-
-    def test_noise_with_valid_content(self):
-        """噪声过滤后仍有实质内容 → 正常分类。"""
-        r = classify("发动机异响，点检正常")
-        assert r is not None and r != (None, None)
-
-    def test_brake_noise_goes_to_brake_not_engine(self):
-        """刹车异响 → 制动系统/制动通用（不是发动机/异响冒烟）"""
-        major, minor = classify("刹车异响")
-        assert (major, minor) == ("制动系统", "制动通用")
-
-    def test_brake_noise_synonym(self):
-        """制动异响 → 制动系统/制动通用"""
-        assert classify("制动异响") == ("制动系统", "制动通用")
-
-    def test_hydraulic_noise_goes_to_hydraulic_not_engine(self):
-        """液压异响 → 液压系统/液压通用（不是发动机/异响冒烟）"""
-        assert classify("液压异响") == ("液压系统", "液压通用")
-
-    def test_transmission_noise_goes_to_transmission_not_engine(self):
-        """变速箱异响 → 变速箱/换挡/离合器（不是发动机/异响冒烟）"""
-        assert classify("变速箱异响") == ("变速箱", "换挡/离合器")
-
-    def test_multiple_majors_matched(self):
-        """涉及多个大类的复杂语句选择最佳大类。"""
-        major, minor = classify("液压油缸漏油需要更换密封圈")
-        assert major == "液压系统"
-
-    def test_single_character_noise_not_blocking(self):
-        """不应将包含单个噪声字的非噪声内容误过滤。"""
-        r = classify("停车时发动机异响")
-        assert r is not None and r[0] is not None
+    def test_unmatched_uses_single_fallback(self):
+        assert classify("这台设备没有已知故障描述") == (
+            "其他/待确认",
+            "仅现象未定位",
+        )
 
 
-# ── process_maintenance_data details_only ─────────────────────
+class TestPlannedMaintenance:
+    @pytest.mark.parametrize(
+        ("content", "minor"),
+        [
+            ("完成500小时保养", "周期保养"),
+            ("吹清空滤后出车", "滤芯保养"),
+            ("补加防冻液20升", "油液补加/更换"),
+            ("轮胎换位", "轮胎充气/换位"),
+        ],
+    )
+    def test_plan_is_classified_for_details(self, content, minor):
+        assert classify(content) == ("计划保养与非故障作业", minor)
 
-class TestProcessMaintenanceDetailsOnly:
-    """验证 process_maintenance_data 的 details_only 选项。"""
+    def test_plan_is_not_fault(self):
+        assert not is_fault_record("检修", "完成500小时保养")
+        assert not is_fault_record("保养", "更换机油")
 
-    def test_details_only_filters_non_detail_sheets(self):
-        """details_only=True 时只保留维修明细 sheet。"""
-        from func.building import build_sheets
-        from datetime import date
+    def test_fault_marker_prevents_plan_rule_from_hiding_fault(self):
+        major, _ = classify("补加防冻液时发现水箱漏水")
+        assert major != "计划保养与非故障作业"
 
-        classified = [
+    def test_normal_inspection_is_not_fault(self):
+        assert not is_fault_record("检修", "点检正常")
+        assert not is_fault_record("点检", "检查均为正常")
+
+    @pytest.mark.parametrize(
+        ("content", "expected"),
+        [
+            ("已充黄油，出车", ("计划保养与非故障作业", "润滑/补脂")),
+            ("补加液压油200升", ("计划保养与非故障作业", "油液补加/更换")),
+            (
+                "500小时保养时发现转向泵油管漏油并更换",
+                ("转向系统", "转向泵/阀"),
+            ),
+            (
+                "液压管破裂，补加液压油200升",
+                ("液压系统", "管路/接头/密封"),
+            ),
+        ],
+    )
+    def test_pure_maintenance_and_fault_boundary(self, content, expected):
+        assert classify(content) == expected
+
+
+class TestEngineElectricalBoundary:
+    @pytest.mark.parametrize(
+        ("content", "expected"),
+        [
+            ("发动机打不着", ("其他/待确认", "仅现象未定位")),
+            (
+                "发动机打不着，更换启动机",
+                ("低压电气与控制", "启动机/启动回路"),
+            ),
+            (
+                "发动机无法启动，检查飞轮齿圈损坏",
+                ("发动机系统", "启动机械/飞轮"),
+            ),
+            (
+                "发动机报警，ECM报码",
+                ("低压电气与控制", "控制器/模块/故障码"),
+            ),
+            (
+                "发动机没劲，第3喷油器故障",
+                ("发动机系统", "燃油供给与喷射"),
+            ),
+        ],
+    )
+    def test_root_cause_component_owns_starting_fault(self, content, expected):
+        assert classify(content) == expected
+
+
+class TestStructureOwnershipBoundary:
+    @pytest.mark.parametrize(
+        ("content", "expected"),
+        [
+            ("空调没有皮带", ("空调与暖风", "制冷回路")),
+            ("制动底座损坏", ("制动系统", "行车制动")),
+            ("主发轴承异响", ("电驱动系统", "主发电机")),
+            ("悬挂轴承裂了", ("悬挂与车架", "减震/弹簧/悬挂通用")),
+            ("铲斗销断裂", ("工作装置", "销轴/衬套")),
+            ("支架断裂", ("结构件与通用机械", "支架/底座/护架")),
+        ],
+    )
+    def test_specific_system_owns_generic_part(self, content, expected):
+        assert classify(content) == expected
+
+
+class TestAdvancedExcelRuleSchema:
+    def test_export_import_round_trip(self, tmp_path: Path):
+        path = tmp_path / "rules.xlsx"
+        export_classification_template(str(path), with_defaults=True)
+        rules = import_classifications_from_excel(str(path))
+        assert rules["classifications"]
+        assert any(
+            entry.get("exclude_keywords")
+            for entry in rules["classifications"]
+        )
+        assert any(
+            entry.get("regex_keywords")
+            for entry in rules["classifications"]
+        )
+
+    def test_custom_combination_and_exclusion(self):
+        custom = [
             {
-                "日期": date(2025, 3, 15),
-                "原始设备名称": "EX01",
-                "标准设备名称": "EX01",
-                "设备型号": "CAT390",
-                "原因": "检修",
-                "班次": "白班",
-                "大类": "发动机",
-                "小类": "报警/故障灯",
-                "是否故障": "是",
-                "维修内容": "发动机报警，更换传感器",
-                "工时_分钟": 120,
-            },
-            {
-                "日期": date(2025, 3, 16),
-                "原始设备名称": "EX02",
-                "标准设备名称": "EX02",
-                "设备型号": "CAT390",
-                "原因": "检修",
-                "班次": "夜班",
-                "大类": "制动系统",
-                "小类": "制动通用",
-                "是否故障": "是",
-                "维修内容": "刹车异响",
-                "工时_分钟": 60,
-            },
+                "major": "A",
+                "minor": "组合",
+                "keywords": [],
+                "all_keywords": [["液压", "报警"]],
+                "exclude_keywords": ["正常"],
+            }
         ]
+        assert classify("液压系统报警", classifications=custom) == ("A", "组合")
+        assert classify("液压报警后检查正常", classifications=custom) == (
+            "其他/待确认",
+            "仅现象未定位",
+        )
 
-        # 全量 sheets（模拟 process_maintenance_data 中的 build_sheets 调用）
-        full_sheets = build_sheets(classified, classified)
-        assert "维修明细" in full_sheets
-        assert "每月设备故障统计" in full_sheets
-        assert len(full_sheets) > 1
+    def test_equal_cross_system_scores_go_to_single_review_category(self):
+        custom = [
+            {"major": "A", "minor": "A1", "keywords": ["同词"]},
+            {"major": "B", "minor": "B1", "keywords": ["同词"]},
+        ]
+        assert classify("同词", classifications=custom) == (
+            "其他/待确认",
+            "多系统/需拆分",
+        )
 
-        # details_only 过滤：只保留维修明细
-        detail_only = {k: v for k, v in full_sheets.items() if k == "维修明细"}
-        assert set(detail_only.keys()) == {"维修明细"}
 
-        # 验证明细内容完整
-        df = detail_only["维修明细"]
-        assert len(df) == 2
-        assert list(df.columns)[0] == "日期"
+class TestMaintenanceDetails:
+    def test_planned_maintenance_keeps_category_but_not_fault(
+        self, monkeypatch, tmp_path: Path
+    ):
+        from datetime import date
+        from func import excel_maintenance
+
+        source = tmp_path / "input.xlsx"
+        source.touch()
+        records = [
+            {
+                "日期": date(2026, 7, 1),
+                "原始设备名称": "TR001",
+                "原因": "保养",
+                "班次": "白班",
+                "维修内容": "完成500小时保养",
+                "工时_分钟": 120,
+            }
+        ]
+        monkeypatch.setattr(
+            excel_maintenance,
+            "extract_all_records",
+            lambda *args, **kwargs: records,
+        )
+
+        sheets = excel_maintenance.process_maintenance_data(
+            str(source),
+            return_sheets=True,
+            details_only=True,
+        )
+        row = sheets["维修明细"].iloc[0]
+        assert row["大类"] == "计划保养与非故障作业"
+        assert row["小类"] == "周期保养"
+        assert row["是否故障"] == "否"

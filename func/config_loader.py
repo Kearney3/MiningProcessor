@@ -564,11 +564,19 @@ def get_maintenance_classifications() -> dict:
         分类配置 dict，结构同
         maintenance_classification.get_default_classifications()。
     """
-    from func.maintenance_classification import get_default_classifications
+    from func.maintenance_classification import (
+        MAINTENANCE_CLASSIFICATION_SCHEMA_VERSION,
+        get_default_classifications,
+    )
 
     config = load_config()
     class_data = config.get("maintenance_classifications")
-    if class_data and isinstance(class_data, list):
+    schema_version = int(config.get("maintenance_classification_schema_version", 1) or 1)
+    if (
+        class_data
+        and isinstance(class_data, list)
+        and schema_version >= MAINTENANCE_CLASSIFICATION_SCHEMA_VERSION
+    ):
         noise_exact = set(config.get("maintenance_noise_exact", []))
         noise_patterns = config.get("maintenance_noise_patterns", [])
         reason_rules = config.get("maintenance_reason_rules", {})
@@ -582,6 +590,7 @@ def get_maintenance_classifications() -> dict:
             defaults = get_default_classifications()
             reason_rules = defaults["reason_rules"]
         return {
+            "schema_version": schema_version,
             "classifications": class_data,
             "noise_exact": noise_exact,
             "noise_patterns": noise_patterns,
@@ -599,9 +608,14 @@ def apply_maintenance_classifications(rules: dict) -> dict:
     Returns:
         应用后的分类配置。
     """
+    from func.maintenance_classification import MAINTENANCE_CLASSIFICATION_SCHEMA_VERSION
+
     global _runtime_config
     with _runtime_lock:
         config = load_config()
+        config["maintenance_classification_schema_version"] = (
+            MAINTENANCE_CLASSIFICATION_SCHEMA_VERSION
+        )
         config["maintenance_classifications"] = rules.get("classifications", [])
         config["maintenance_noise_exact"] = list(rules.get("noise_exact", []))
         config["maintenance_noise_patterns"] = rules.get("noise_patterns", [])
@@ -619,8 +633,13 @@ def update_maintenance_classifications(rules: dict) -> dict:
     Returns:
         写入后的分类配置。
     """
+    from func.maintenance_classification import MAINTENANCE_CLASSIFICATION_SCHEMA_VERSION
+
     global _runtime_config
     config = _load_json(_CONFIG_FILE)
+    config["maintenance_classification_schema_version"] = (
+        MAINTENANCE_CLASSIFICATION_SCHEMA_VERSION
+    )
     config["maintenance_classifications"] = rules.get("classifications", [])
     config["maintenance_noise_exact"] = list(rules.get("noise_exact", []))
     config["maintenance_noise_patterns"] = rules.get("noise_patterns", [])

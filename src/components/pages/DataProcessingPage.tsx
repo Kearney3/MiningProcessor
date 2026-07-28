@@ -935,6 +935,7 @@ function MaintenanceCard({
   const [path, setPath] = useState("");
   const [splitByYear, setSplitByYear] = useState(false);
   const [detailsOnly, setDetailsOnly] = useState(false);
+  const [useMlFallback, setUseMlFallback] = useState(true);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -951,6 +952,7 @@ function MaintenanceCard({
         skip_hidden_cols: skipHiddenCols,
         split_by_year: splitByYear,
         details_only: detailsOnly,
+        use_ml_fallback: useMlFallback,
       });
       const msg = res.output_files
         ? `输出: ${res.output_files.length} 个文件`
@@ -974,6 +976,16 @@ function MaintenanceCard({
       </div>
       <div className="mt-2">
         <StyledToggle checked={detailsOnly} onChange={setDetailsOnly} label="仅导出明细" />
+      </div>
+      <div className="mt-2">
+        <StyledToggle
+          checked={useMlFallback}
+          onChange={setUseMlFallback}
+          label="启用机器学习辅助识别"
+        />
+        <p className="mt-1 pl-[42px] text-xs leading-5 text-slate-500">
+          仅对规则仍判为“其他/待确认”的记录进行高置信度回填，不覆盖规则结果
+        </p>
       </div>
       <ProcessButton loading={loading} onClick={handleProcess} disabled={path === ""} />
       {result && <SuccessBadge message={result} />}

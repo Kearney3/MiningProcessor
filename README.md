@@ -3,13 +3,13 @@
 > 矿山运营 Excel 报表批量处理工具
 
 <p>
-  <img src="https://img.shields.io/badge/version-v1.5.0-blue?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-v2.0.0-blue?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/Python-≥3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="python" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square" alt="license" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="platform" />
   <img src="https://img.shields.io/badge/Tauri-v2-FFC131?style=flat-square&logo=tauri&logoColor=black" alt="tauri" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="react" />
-  <img src="https://img.shields.io/badge/tests-935%20passed-brightgreen?style=flat-square" alt="tests" />
+  <img src="https://img.shields.io/badge/tests-996%20passed-brightgreen?style=flat-square" alt="tests" />
 </p>
 
 <p>
@@ -30,6 +30,7 @@
 | `excel_production_enhanced.py` | `production` | 增强版生产报表解析（GUI 默认） | 生产报表文件/文件夹 | 生产数据汇总 |
 | `excel_merger.py` | `merge` | 按关键字批量合并同结构 Excel | 文件夹 + 关键字 | 合并后的 Excel |
 | `excel_batch.py` | — | 批量多报表综合处理 | 文件夹 | 综合统计表 |
+| `excel_maintenance.py` | — | 维修记录提取、规则分类及可选 ML 辅助识别 | 出勤统计表文件或文件夹 | `维修记录统计.xlsx` |
 | `anomaly/` | — | 异常值检测与处理 | 各类 DataFrame | 标记/过滤/替换 + 异常报告 |
 
 ---
@@ -92,6 +93,24 @@ uv run production <输入文件或文件夹>
 
 # 批量合并
 uv run merge <输入文件夹> <关键字> [--strip-time] [--sort '<json>']
+
+# 用 LLM checkpoint 作为补充监督数据训练维修分类器
+uv run maintenance-train <维修明细.xlsx> \
+  --llm-checkpoint <LLM标注.xlsx.checkpoint.jsonl> \
+  --llm-input <待确认记录.xlsx> \
+  --llm-record-id-column 原始记录ID \
+  --output models/maintenance_classifier.joblib \
+  --llm-min-confidence 0.90 \
+  --llm-min-agreement 0.75
+
+# 维修记录处理中禁用 ML 二级识别（默认开启且只回填规则待确认项）
+uv run python func/excel_maintenance.py <输入文件或文件夹> --no-ml
+
+# 对抽取子集标注时，用稳定 ID 保证 checkpoint 可映射回完整原始表
+uv run maintenance-llm-label <待确认记录.xlsx> \
+  --model <模型名> \
+  --category-column 新版大类 \
+  --record-id-column 原始记录ID
 
 # 所有命令均支持跳过隐藏行/列
 uv run fuel <输入文件> --year 2025 --skip-hidden-rows           # 仅跳过隐藏行
@@ -406,6 +425,17 @@ uv run scripts/bump_version.py --bump minor --dry-run
 ---
 
 ## 📋 更新日志
+
+### v2.0.0 · 2026-07-28
+
+- 🆕 建立面向露天矿山工程机械的维修分类体系：20 个大类、102 个小类，每条记录只保留一个大类/小类；主发电机、轮马达和 IGBT 明确归入电驱动系统，举升缸、转向缸、悬挂缸统一归入液压系统
+- 🆕 新增字符级 TF-IDF + 分层线性分类器，对规则仍判为“其他/待确认”的故障记录进行高置信度二级识别；规则结果始终优先
+- 🆕 Flet、Tauri 和 CLI 均支持启用/关闭机器学习辅助识别，维修明细增加“分类方式”和“分类置信度”
+- 🆕 新增 `maintenance-llm-label`：支持 OpenAI 兼容接口、每批最多 50 条、checkpoint 断点续标、稳定记录 ID，以及从 `.maintenance_llm.env` 读取 URL、API Key 和模型名
+- 🆕 新增 `maintenance-train`：可合并重复 LLM 标注、按记录与内容进行置信度加权投票，并以高置信度共识标签补充规则训练集
+- 🆕 桌面安装包内置当前生效模型；Flet、Tauri 和 CI 构建流程增加模型存在性、可加载性及打包完整性检查
+- 🎯 最终模型使用 47,630 条训练样本、覆盖 84 个可训练分类；留出集准确率 83.99%，Macro F1 80.48%，安全接收准确率 97.84%
+- 🔧 全量版本号更新到 v2.0.0，Python 全量测试 996 个通过
 
 ### v1.5.0 · 2026-07-27
 
