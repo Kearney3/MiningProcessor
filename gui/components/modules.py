@@ -399,6 +399,28 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         tooltip="勾选后，运行小时数为 0 或为空的记录将被过滤",
     )
 
+    # --- 生产模块过滤开关 ---
+    prod_filter_zero_hours_meter = ft.Checkbox(
+        label="过滤零小时仪表",
+        value=False,
+        tooltip="勾选后，小时数仪表开始或结束为 0 或为空的记录将被过滤",
+    )
+    prod_filter_zero_km_meter = ft.Checkbox(
+        label="过滤零公里仪表",
+        value=False,
+        tooltip="勾选后，公里数仪表开始或结束为 0 或为空的记录将被过滤",
+    )
+    prod_filter_zero_run_hours = ft.Checkbox(
+        label="过滤零运行小时数",
+        value=False,
+        tooltip="勾选后，运行小时数为 0 或为空的记录将被过滤",
+    )
+    prod_filter_zero_run_km = ft.Checkbox(
+        label="过滤零运行里程",
+        value=False,
+        tooltip="勾选后，运行里程为 0 或为空的记录将被过滤",
+    )
+
     # --- 异常值检测开关 ---
     _anomaly_mode = "flag"  # 内部状态：flag | filter | handle
 
@@ -531,6 +553,8 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                 theme.module_card([
                     ft.Row([prod_path, prod_btn], spacing=8),
                     ft.Row([prod_file_btn, prod_folder_btn, prod_auto_detect, prod_raw_start], spacing=8),
+                    ft.Row([prod_filter_zero_hours_meter, prod_filter_zero_km_meter,
+                            prod_filter_zero_run_hours, prod_filter_zero_run_km], spacing=8, wrap=True),
                     prod_summary_container,
                 ]),
                 theme.module_card([
@@ -589,7 +613,9 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         "_anomaly_handle": anomaly_handle,
         "_anomaly_mode": lambda: _anomaly_mode,
         "fuel": {"path": fuel_path, "year": fuel_year, "btn": fuel_btn, "_filter_zero_hours_toggle": filter_zero_hours_toggle, "_filter_zero_work_hours_toggle": filter_zero_work_hours_toggle},
-        "prod": {"path": prod_path, "raw_start": prod_raw_start, "btn": prod_btn, "auto_detect": prod_auto_detect, "summary_container": prod_summary_container},
+        "prod": {"path": prod_path, "raw_start": prod_raw_start, "btn": prod_btn, "auto_detect": prod_auto_detect, "summary_container": prod_summary_container,
+                 "_filter_zero_hours_meter_toggle": prod_filter_zero_hours_meter, "_filter_zero_km_meter_toggle": prod_filter_zero_km_meter,
+                 "_filter_zero_run_hours_toggle": prod_filter_zero_run_hours, "_filter_zero_run_km_toggle": prod_filter_zero_run_km},
         "elec": {"path": elec_path, "year": elec_year, "btn": elec_btn, "add_shift": elec_add_shift, "default_shift": elec_default_shift},
         "work": {"path": work_path, "year": work_year, "month": work_month, "header_toggle": _work_hmc.toggle, "header_mode": _work_hmc.mode, "header_fuzzy": _work_hmc.fuzzy, "btn": work_btn},
         "merge": {

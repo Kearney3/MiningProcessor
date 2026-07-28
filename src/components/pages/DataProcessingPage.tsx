@@ -439,6 +439,10 @@ function ProductionCard({
     failed_files: number;
     warnings: string[];
   } | null>(null);
+  const [filterZeroHoursMeter, setFilterZeroHoursMeter] = useState(false);
+  const [filterZeroKmMeter, setFilterZeroKmMeter] = useState(false);
+  const [filterZeroRunHours, setFilterZeroRunHours] = useState(false);
+  const [filterZeroRunKm, setFilterZeroRunKm] = useState(false);
 
   const handleAutoDetectChange = (v: boolean) => {
     setAutoDetect(v);
@@ -461,6 +465,10 @@ function ProductionCard({
         use_oil_ledger: useOilLedger,
         skip_hidden_rows: skipHiddenRows,
         skip_hidden_cols: skipHiddenCols,
+        filter_zero_hours_meter: filterZeroHoursMeter,
+        filter_zero_km_meter: filterZeroKmMeter,
+        filter_zero_run_hours: filterZeroRunHours,
+        filter_zero_run_km: filterZeroRunKm,
         anomaly_enabled: anomaly.enabled,
         anomaly_report: anomaly.report,
         anomaly_mode: anomaly.mode,
@@ -508,6 +516,12 @@ function ProductionCard({
           <p className="text-xs text-slate-400">复合表头（矿车+矿石类型）所在的行号，默认6</p>
         </div>
       )}
+      <div className="mt-2 space-y-1">
+        <StyledToggle checked={filterZeroHoursMeter} onChange={setFilterZeroHoursMeter} label="过滤零小时仪表" />
+        <StyledToggle checked={filterZeroKmMeter} onChange={setFilterZeroKmMeter} label="过滤零公里仪表" />
+        <StyledToggle checked={filterZeroRunHours} onChange={setFilterZeroRunHours} label="过滤零运行小时数" />
+        <StyledToggle checked={filterZeroRunKm} onChange={setFilterZeroRunKm} label="过滤零运行里程" />
+      </div>
       <ProcessButton
         loading={loading}
         onClick={handleProcess}

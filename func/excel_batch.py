@@ -151,7 +151,9 @@ def _process_electrical_module(files: list[str], year: int, skip_hidden: bool = 
 
 def _process_production_module(folder_path: str, raw_start: int, skip_hidden: bool = False,
                                skip_hidden_rows: bool = False, skip_hidden_cols: bool = False,
-                               anomaly_config=None, cancel_event=None) -> tuple[dict[str, pd.DataFrame], list[str]]:
+                               anomaly_config=None, cancel_event=None,
+                               filter_zero_hours_meter=False, filter_zero_km_meter=False,
+                               filter_zero_run_hours=False, filter_zero_run_km=False) -> tuple[dict[str, pd.DataFrame], list[str]]:
     """处理生产数据，返回 (sheets 字典, 警告列表)。"""
     if skip_hidden:
         skip_hidden_rows = True
@@ -159,7 +161,11 @@ def _process_production_module(folder_path: str, raw_start: int, skip_hidden: bo
     try:
         processor = MiningDataProcessor(version="new", raw_start=raw_start,
                                         skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
-                                        anomaly_config=anomaly_config)
+                                        anomaly_config=anomaly_config,
+                                        filter_zero_hours_meter=filter_zero_hours_meter,
+                                        filter_zero_km_meter=filter_zero_km_meter,
+                                        filter_zero_run_hours=filter_zero_run_hours,
+                                        filter_zero_run_km=filter_zero_run_km)
         sheets = processor.process_folder(folder_path, return_sheets=True, cancel_event=cancel_event)
         # 提取生产模块的处理摘要和警告
         warnings = []
@@ -216,6 +222,10 @@ def process_files(
     anomaly_config=None,
     filter_zero_engine_hours: bool = False,
     filter_zero_work_hours: bool = False,
+    filter_zero_hours_meter: bool = False,
+    filter_zero_km_meter: bool = False,
+    filter_zero_run_hours: bool = False,
+    filter_zero_run_km: bool = False,
 ) -> dict[str, dict[str, pd.DataFrame]]:
     """
     根据已匹配的文件列表执行批量处理。
@@ -274,7 +284,11 @@ def process_files(
     if "production" in matched:
         result, prod_warnings = _process_production_module(folder_path, raw_start,
                                             skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
-                                            anomaly_config=anomaly_config, cancel_event=cancel_event)
+                                            anomaly_config=anomaly_config, cancel_event=cancel_event,
+                                            filter_zero_hours_meter=filter_zero_hours_meter,
+                                            filter_zero_km_meter=filter_zero_km_meter,
+                                            filter_zero_run_hours=filter_zero_run_hours,
+                                            filter_zero_run_km=filter_zero_run_km)
         if result:
             all_results["production"] = result
         if prod_warnings:

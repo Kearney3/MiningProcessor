@@ -224,7 +224,11 @@ def _dispatch_module(module_type: str, path: str, cancel_event: threading.Event 
         device_load_map = config_loader.get_device_load_map(load_map_ver)
         processor = ProdProcessor(raw_start=raw_start, device_load_map=device_load_map,
                                   skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
-                                  anomaly_config=anomaly_config)
+                                  anomaly_config=anomaly_config,
+                                  filter_zero_hours_meter=kwargs.get("filter_zero_hours_meter", False),
+                                  filter_zero_km_meter=kwargs.get("filter_zero_km_meter", False),
+                                  filter_zero_run_hours=kwargs.get("filter_zero_run_hours", False),
+                                  filter_zero_run_km=kwargs.get("filter_zero_run_km", False))
         logging.info(f"装载量参数：{device_load_map}")
         if os.path.isdir(path):
             output_file = os.path.join(path, "合并产量.xlsx")
@@ -445,7 +449,7 @@ def _update_prod_summary(container: ft.Column, summary: dict | None) -> None:
         container.update()
 
 
-async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None) -> None:
+async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None, filter_zero_hours_meter=False, filter_zero_km_meter=False, filter_zero_run_hours=False, filter_zero_run_km=False) -> None:
     """生产处理按钮回调"""
     btn = prod_refs["btn"]
     path = prod_refs["path"].value
@@ -469,7 +473,11 @@ async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=
     summary = await _safe_run_task(page, btn, "处理", path, log, "production",
                          raw_start=raw_start, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
-                         anomaly_config=anomaly_config)
+                         anomaly_config=anomaly_config,
+                         filter_zero_hours_meter=filter_zero_hours_meter,
+                         filter_zero_km_meter=filter_zero_km_meter,
+                         filter_zero_run_hours=filter_zero_run_hours,
+                         filter_zero_run_km=filter_zero_run_km)
 
     # 更新汇总显示
     summary_container = prod_refs.get("summary_container")
@@ -811,6 +819,24 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
         if _fzw_toggle:
             filter_zero_work_hours = _fzw_toggle.value
 
+        # 生产模块过滤开关
+        filter_zero_hours_meter = False
+        filter_zero_km_meter = False
+        filter_zero_run_hours = False
+        filter_zero_run_km = False
+        _fzm = batch_refs.get("_filter_zero_hours_meter_toggle")
+        if _fzm:
+            filter_zero_hours_meter = _fzm.value
+        _fkm = batch_refs.get("_filter_zero_km_meter_toggle")
+        if _fkm:
+            filter_zero_km_meter = _fkm.value
+        _frh = batch_refs.get("_filter_zero_run_hours_toggle")
+        if _frh:
+            filter_zero_run_hours = _frh.value
+        _frk = batch_refs.get("_filter_zero_run_km_toggle")
+        if _frk:
+            filter_zero_run_km = _frk.value
+
         set_btn_state(btn, False, "处理中...")
         done_flag = asyncio.Event()
         progress_poller = asyncio.create_task(
@@ -832,6 +858,10 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
                         anomaly_config=anomaly_config,
                         filter_zero_engine_hours=filter_zero_engine_hours,
                         filter_zero_work_hours=filter_zero_work_hours,
+                        filter_zero_hours_meter=filter_zero_hours_meter,
+                        filter_zero_km_meter=filter_zero_km_meter,
+                        filter_zero_run_hours=filter_zero_run_hours,
+                        filter_zero_run_km=filter_zero_run_km,
                     )
                     thread_result["value"] = results
                     thread_result["summary"] = summary
@@ -939,6 +969,24 @@ def _make_module_handler(
         if _fzw:
             filter_zero_work_hours = _fzw.value
 
+        # 生产模块专属过滤开关
+        filter_zero_hours_meter = False
+        filter_zero_km_meter = False
+        filter_zero_run_hours = False
+        filter_zero_run_km = False
+        _fzm = _fuel_refs.get("_filter_zero_hours_meter_toggle")
+        if _fzm:
+            filter_zero_hours_meter = _fzm.value
+        _fkm = _fuel_refs.get("_filter_zero_km_meter_toggle")
+        if _fkm:
+            filter_zero_km_meter = _fkm.value
+        _frh = _fuel_refs.get("_filter_zero_run_hours_toggle")
+        if _frh:
+            filter_zero_run_hours = _frh.value
+        _frk = _fuel_refs.get("_filter_zero_run_km_toggle")
+        if _frk:
+            filter_zero_run_km = _frk.value
+
         # 构建异常检测配置
         anomaly_config = _build_anomaly_config(module_refs)
 
@@ -946,6 +994,11 @@ def _make_module_handler(
         if module_key == "fuel":
             extra_kwargs["filter_zero_engine_hours"] = filter_zero_hours
             extra_kwargs["filter_zero_work_hours"] = filter_zero_work_hours
+        elif module_key == "prod":
+            extra_kwargs["filter_zero_hours_meter"] = filter_zero_hours_meter
+            extra_kwargs["filter_zero_km_meter"] = filter_zero_km_meter
+            extra_kwargs["filter_zero_run_hours"] = filter_zero_run_hours
+            extra_kwargs["filter_zero_run_km"] = filter_zero_run_km
 
         await callback(page, module_refs[module_key], log,
                        equipment_ledger=eq, oil_ledger=oil,
