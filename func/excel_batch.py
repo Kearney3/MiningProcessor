@@ -108,7 +108,8 @@ def scan_files(folder_path: str, keywords: dict[str, list[str]] | None = None) -
 
 def _process_fuel_module(files: list[str], year: int, skip_hidden: bool = False,
                          skip_hidden_rows: bool = False, skip_hidden_cols: bool = False,
-                         anomaly_config=None) -> dict[str, pd.DataFrame]:
+                         anomaly_config=None, filter_zero_engine_hours: bool = False,
+                         filter_zero_work_hours: bool = False) -> dict[str, pd.DataFrame]:
     """处理燃油数据文件列表，返回第一个成功的 sheets 字典。"""
     if skip_hidden:
         skip_hidden_rows = True
@@ -118,7 +119,9 @@ def _process_fuel_module(files: list[str], year: int, skip_hidden: bool = False,
             logger.info(f"燃油数据源: {os.path.basename(fpath)}")
             sheets = process_fuel_data(fpath, target_year=year, return_sheets=True,
                                        skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
-                                       anomaly_config=anomaly_config)
+                                       anomaly_config=anomaly_config,
+                                       filter_zero_engine_hours=filter_zero_engine_hours,
+                                       filter_zero_work_hours=filter_zero_work_hours)
             if sheets:
                 return sheets
         except Exception as e:
@@ -211,6 +214,8 @@ def process_files(
     skip_hidden_rows: bool = False,
     skip_hidden_cols: bool = False,
     anomaly_config=None,
+    filter_zero_engine_hours: bool = False,
+    filter_zero_work_hours: bool = False,
 ) -> dict[str, dict[str, pd.DataFrame]]:
     """
     根据已匹配的文件列表执行批量处理。
@@ -255,7 +260,9 @@ def process_files(
     if "fuel" in matched:
         all_results["fuel"] = _process_fuel_module(matched["fuel"], year,
                                                     skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
-                                                    anomaly_config=anomaly_config)
+                                                    anomaly_config=anomaly_config,
+                                                    filter_zero_engine_hours=filter_zero_engine_hours,
+                                                    filter_zero_work_hours=filter_zero_work_hours)
 
     # ── 电力数据 ──
     if "electrical" in matched:

@@ -74,7 +74,8 @@ def _find_fuel_brand_row(header_rows):
 
 
 def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_hidden=False,
-                        skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None):
+                        skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None,
+                        filter_zero_engine_hours=False, filter_zero_work_hours=False):
     """处理设备柴油消耗报表，提取发动机与油耗数据。
 
     Args:
@@ -84,6 +85,8 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
         skip_hidden: 向后兼容，True 时等价于 skip_hidden_rows=True, skip_hidden_cols=True。
         skip_hidden_rows: 若为 True，跳过 Excel 中的隐藏行。
         skip_hidden_cols: 若为 True，跳过 Excel 中的隐藏列。
+        filter_zero_engine_hours: 若为 True，过滤掉发动机小时数为 0 或为空的记录。
+        filter_zero_work_hours: 若为 True，过滤掉运行小时数为 0 或为空的记录。
 
     Returns:
         当 return_sheets=False 时返回输出文件路径 (str)；
@@ -150,7 +153,7 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
                 # 备份最原始的日期行（用于判断该列是否是Excel中真实存在的日期格）
                 raw_header_date_row = header_rows.iloc[_date_row_idx if _date_row_idx >= 0 else 0, :].copy()
 
-                # 日期行：按日期块 ffill（不跨越日期头边界）
+                # 日期行：按日期块 ffill（不跨越日期头边界，不延伸到汇总列）
                 if _date_positions:
                     _dr = header_rows.iloc[_date_row_idx, :].copy()
                     _first = _date_positions[0]
@@ -160,8 +163,13 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
                     for _i in range(len(_date_positions) - 1):
                         _s, _e = _date_positions[_i], _date_positions[_i + 1]
                         _dr.iloc[_s:_e] = _dr.iloc[_s:_e].ffill()
-                    # 最后一个日期头之后的列
-                    _dr.iloc[_date_positions[-1]:] = _dr.iloc[_date_positions[-1]:].ffill()
+                    # 最后一个日期头：只填充到该日期块结束，不延伸到后面的汇总列
+                    if len(_date_positions) >= 2:
+                        _block_w = _date_positions[-1] - _date_positions[-2]
+                    else:
+                        _block_w = 12  # 典型日期块宽度
+                    _last_end = _date_positions[-1] + _block_w
+                    _dr.iloc[_date_positions[-1]:_last_end] = _dr.iloc[_date_positions[-1]:_last_end].ffill()
                     header_rows.iloc[_date_row_idx, :] = _dr
                 else:
                     header_rows.iloc[0, :] = header_rows.iloc[0, :].ffill()
@@ -197,6 +205,12 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
                     if "按照班子柴油准备" in h3 or "Түлш зэхэлт" in h3 or "Нийт" in h3:
                         stop_signal = True
                         continue
+                    # 防御性检查：汇总区标题可能在 shift 行上方一行（如 "Түлш зэхэлт ээлжээр"）
+                    if _shift_row_idx > 0:
+                        h_above = clean_string(header_rows.iloc[_shift_row_idx - 1, idx])
+                        if "Түлш зэхэлт" in h_above or "按照班子柴油准备" in h_above:
+                            stop_signal = True
+                            continue
 
                     if idx < 3:
                         col_mapping.append({"type": "info", "name": f"col_{idx}"})
@@ -337,6 +351,25 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
         df_engine = df_engine.drop(columns=['shift_rank'])
     if not df_fuel.empty and 'shift_rank' in df_fuel.columns:
         df_fuel = df_fuel.drop(columns=['shift_rank'])
+
+    # 过滤发动机小时数为 0 或为空的记录
+    if filter_zero_engine_hours and not df_engine.empty:
+        start = df_engine["发动机小时数开始"]
+        end = df_engine["发动机小时数结束"]
+        mask = (start.fillna(0) == 0) | (end.fillna(0) == 0)
+        filtered_count = mask.sum()
+        if filtered_count > 0:
+            df_engine = df_engine[~mask]
+            logger.info(f"已过滤 {filtered_count} 条发动机小时数为 0 或为空的记录")
+
+    # 过滤运行小时数为 0 或为空的记录
+    if filter_zero_work_hours and not df_engine.empty:
+        work = df_engine["运行小时数"]
+        mask = work.fillna(0) == 0
+        filtered_count = mask.sum()
+        if filtered_count > 0:
+            df_engine = df_engine[~mask]
+            logger.info(f"已过滤 {filtered_count} 条运行小时数为 0 或为空的记录")
 
     # 去重
     df_engine = dedup_dataframe(df_engine, "设备信息")

@@ -95,6 +95,16 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         value=False,
         tooltip="勾选后，Excel 中被隐藏的列将不会被读取",
     )
+    batch_filter_zero_hours = ft.Checkbox(
+        label="过滤零小时数",
+        value=False,
+        tooltip="勾选后，发动机小时数为 0 或为空的记录将被过滤",
+    )
+    batch_filter_zero_work_hours = ft.Checkbox(
+        label="过滤零运行小时数",
+        value=False,
+        tooltip="勾选后，运行小时数为 0 或为空的记录将被过滤",
+    )
 
     # --- 异常值检测 ---
     _anomaly = create_anomaly_controls()
@@ -339,6 +349,8 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
                             ft.Container(batch_match_oil, col={"xs": 6}),
                             ft.Container(batch_skip_hidden_rows, col={"xs": 6}),
                             ft.Container(batch_skip_hidden_cols, col={"xs": 6}),
+                            ft.Container(batch_filter_zero_hours, col={"xs": 6}),
+                            ft.Container(batch_filter_zero_work_hours, col={"xs": 6}),
                         ],
                         run_spacing=4,
                     ),
@@ -384,6 +396,8 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "match_oil_toggle": batch_match_oil,
         "_skip_hidden_rows_toggle": batch_skip_hidden_rows,
         "_skip_hidden_cols_toggle": batch_skip_hidden_cols,
+        "_filter_zero_hours_toggle": batch_filter_zero_hours,
+        "_filter_zero_work_hours_toggle": batch_filter_zero_work_hours,
         "_anomaly_enabled": _anomaly["_anomaly_enabled"],
         "_anomaly_report": _anomaly["_anomaly_report"],
         "_anomaly_mode": _anomaly["_anomaly_mode"],

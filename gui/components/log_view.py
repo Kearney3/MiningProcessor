@@ -9,7 +9,7 @@ except ImportError:
     import gui.theme as theme
 
 
-def create_log_view(height: int = 300) -> tuple[ft.Container, "LogViewRefs"]:
+def create_log_view(height: int = 400) -> tuple[ft.Container, "LogViewRefs"]:
     """创建适合实时追加的日志视图组件
 
     使用 ListView（逐行 Text 控件）：

@@ -322,6 +322,8 @@ def _process_fuel(params: dict) -> dict:
         skip_hidden_rows=params.get("skip_hidden_rows", False),
         skip_hidden_cols=params.get("skip_hidden_cols", False),
         anomaly_config=_build_anomaly_config(params),
+        filter_zero_engine_hours=params.get("filter_zero_engine_hours", False),
+        filter_zero_work_hours=params.get("filter_zero_work_hours", False),
     )
     output_file = str(result) if result else None
     if output_file:
@@ -581,6 +583,8 @@ def _batch_process(params: dict) -> dict:
         skip_hidden_rows=params.get("skip_hidden_rows", False),
         skip_hidden_cols=params.get("skip_hidden_cols", False),
         anomaly_config=_build_anomaly_config(params),
+        filter_zero_engine_hours=params.get("filter_zero_engine_hours", False),
+        filter_zero_work_hours=params.get("filter_zero_work_hours", False),
     )
     return {"cancelled": _cancel_event.is_set(), "summary": summary}
 

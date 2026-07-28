@@ -211,10 +211,13 @@ def _dispatch_module(module_type: str, path: str, cancel_event: threading.Event 
     skip_hidden_rows = kwargs.get("skip_hidden_rows", False)
     skip_hidden_cols = kwargs.get("skip_hidden_cols", False)
     anomaly_config = kwargs.get("anomaly_config")
+    filter_zero_engine_hours = kwargs.get("filter_zero_engine_hours", False)
+    filter_zero_work_hours = kwargs.get("filter_zero_work_hours", False)
     if module_type == "fuel":
         process_fuel_data(path, kwargs.get("year"),
                           skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
-                          anomaly_config=anomaly_config)
+                          anomaly_config=anomaly_config, filter_zero_engine_hours=filter_zero_engine_hours,
+                          filter_zero_work_hours=filter_zero_work_hours)
     elif module_type == "production":
         raw_start = kwargs.get("raw_start", -1)
         load_map_ver = config_loader.get_load_map_version()
@@ -384,7 +387,7 @@ async def _safe_run_task(
 # ---------------------------------------------------------------------------
 # 各模块按钮回调
 # ---------------------------------------------------------------------------
-async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None) -> None:
+async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None, filter_zero_engine_hours=False, filter_zero_work_hours=False) -> None:
     """燃油处理按钮回调"""
     btn = fuel_refs["btn"]
     path = fuel_refs["path"].value
@@ -399,7 +402,8 @@ async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=
     await _safe_run_task(page, btn, "处理", path, log, "fuel",
                          year=year, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
-                         anomaly_config=anomaly_config)
+                         anomaly_config=anomaly_config, filter_zero_engine_hours=filter_zero_engine_hours,
+                         filter_zero_work_hours=filter_zero_work_hours)
 
 
 def _update_prod_summary(container: ft.Column, summary: dict | None) -> None:
@@ -797,6 +801,16 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
         if _sh_cols_toggle:
             skip_hidden_cols = _sh_cols_toggle.value
 
+        filter_zero_engine_hours = False
+        _fzh_toggle = batch_refs.get("_filter_zero_hours_toggle")
+        if _fzh_toggle:
+            filter_zero_engine_hours = _fzh_toggle.value
+
+        filter_zero_work_hours = False
+        _fzw_toggle = batch_refs.get("_filter_zero_work_hours_toggle")
+        if _fzw_toggle:
+            filter_zero_work_hours = _fzw_toggle.value
+
         set_btn_state(btn, False, "处理中...")
         done_flag = asyncio.Event()
         progress_poller = asyncio.create_task(
@@ -816,6 +830,8 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
                         skip_hidden_rows=skip_hidden_rows,
                         skip_hidden_cols=skip_hidden_cols,
                         anomaly_config=anomaly_config,
+                        filter_zero_engine_hours=filter_zero_engine_hours,
+                        filter_zero_work_hours=filter_zero_work_hours,
                     )
                     thread_result["value"] = results
                     thread_result["summary"] = summary
@@ -913,13 +929,28 @@ def _make_module_handler(
         if _sh_cols:
             skip_hidden_cols = _sh_cols.value
 
+        filter_zero_hours = False
+        filter_zero_work_hours = False
+        _fuel_refs = module_refs.get(module_key, {})
+        _fzh = _fuel_refs.get("_filter_zero_hours_toggle")
+        if _fzh:
+            filter_zero_hours = _fzh.value
+        _fzw = _fuel_refs.get("_filter_zero_work_hours_toggle")
+        if _fzw:
+            filter_zero_work_hours = _fzw.value
+
         # 构建异常检测配置
         anomaly_config = _build_anomaly_config(module_refs)
+
+        extra_kwargs = {}
+        if module_key == "fuel":
+            extra_kwargs["filter_zero_engine_hours"] = filter_zero_hours
+            extra_kwargs["filter_zero_work_hours"] = filter_zero_work_hours
 
         await callback(page, module_refs[module_key], log,
                        equipment_ledger=eq, oil_ledger=oil,
                        skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
-                       anomaly_config=anomaly_config)
+                       anomaly_config=anomaly_config, **extra_kwargs)
 
     return handler
 
