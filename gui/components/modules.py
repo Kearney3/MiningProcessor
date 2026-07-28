@@ -171,6 +171,11 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         value=False,
         tooltip="勾选后，时间列将去除时分秒，格式为 YYYY-MM-DD",
     )
+    merge_tolerant_header = ft.Checkbox(
+        label="兼容表头",
+        value=False,
+        tooltip="勾选后，表头不一致的文件也会合并，缺失列填空",
+    )
     merge_btn = theme.primary_btn("合并", icon=ft.Icons.MERGE_TYPE, disabled=False)
 
     # --- 排序配置列表（Excel 合并用） ---
@@ -530,7 +535,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                     header_hint,
                 ]),
                 theme.module_card([
-                    ft.Row([merge_path, merge_keyword, merge_strip_time, merge_btn], spacing=8),
+                    ft.Row([merge_path, merge_keyword, merge_strip_time, merge_tolerant_header, merge_btn], spacing=8),
                     ft.Text("排序配置（可选，留空则自动按第一个时间列排序）", size=12,
                             color=theme.TEXT_SECONDARY),
                     ft.Row([sort_rules_column, add_sort_btn], spacing=8,
@@ -582,6 +587,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
             "path": merge_path,
             "keyword": merge_keyword,
             "strip_time": merge_strip_time,
+            "tolerant_header": merge_tolerant_header,
             "btn": merge_btn,
             "sort_configs_state": sort_configs_state,
         },

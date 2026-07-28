@@ -268,7 +268,8 @@ def _dispatch_module(module_type: str, path: str, cancel_event: threading.Event 
         strip_time = kwargs.get("strip_time", False)
         sort_configs = kwargs.get("sort_configs", None)
         merge_excel_files(path, keyword, strip_time=strip_time, sort_configs=sort_configs,
-                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols)
+                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
+                          tolerant_header=kwargs.get("tolerant_header", False))
     elif module_type == "maint":
         eq_ledger = kwargs.get("equipment_ledger")
         classifications = config_loader.get_maintenance_classifications()
@@ -548,10 +549,12 @@ async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledge
         if col:
             sort_configs.append({"column": col, "ascending": bool(cfg.get("ascending", True))})
     strip_time = bool(merge_refs["strip_time"].value)
+    tolerant_header = bool(merge_refs.get("tolerant_header") and merge_refs["tolerant_header"].value)
     await _safe_run_task(page, btn, "合并", path, log, "merge",
                          keyword=keyword, strip_time=strip_time, sort_configs=sort_configs,
                          equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
-                         skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols)
+                         skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
+                         tolerant_header=tolerant_header)
 
 
 async def on_maint_process(page: ft.Page, maint_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None) -> None:

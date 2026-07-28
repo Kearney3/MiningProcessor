@@ -126,7 +126,7 @@ def _write_sheet(wb: xlsxwriter.Workbook, ws_name: str, df: pd.DataFrame, fmts: 
     for row_idx, row in enumerate(rows):
         is_alt = row_idx % 2 == 1
         for col_idx, val in enumerate(row):
-            if val is None:
+            if val is None or (isinstance(val, float) and val != val):
                 ws.write(row_idx + 1, col_idx, "", fmts["a_txt"] if is_alt else fmts["txt"])
             elif col_idx in date_cols and isinstance(val, (date, pd.Timestamp)):
                 ws.write_datetime(row_idx + 1, col_idx, pd.Timestamp(val).to_pydatetime(), fmts["a_date"] if is_alt else fmts["date"])

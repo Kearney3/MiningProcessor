@@ -102,7 +102,10 @@ def process_maintenance_data(
             model_path = ml_model_path or str(DEFAULT_MODEL_PATH)
             if os.path.isfile(model_path):
                 ml_classifier = MaintenanceMLClassifier.load(model_path)
-                logger.info("已加载维修 ML 二级分类模型: %s", model_path)
+                # 降低置信度阈值以提高覆盖率
+                from dataclasses import replace
+                ml_classifier.config = replace(ml_classifier.config, min_confidence=0.60)
+                logger.info("已加载维修 ML 二级分类模型: %s (min_confidence=0.60)", model_path)
         except Exception as exc:
             logger.warning("维修 ML 模型加载失败，继续使用规则分类: %s", exc)
 

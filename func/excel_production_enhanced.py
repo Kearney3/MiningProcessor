@@ -91,14 +91,23 @@ class MiningDataProcessor:
 
         return date_val, shift
 
+    @staticmethod
+    def _normalize(text: str) -> str:
+        """大写并删除空格，统一匹配基准。连字符保留（型号语义分隔符）。"""
+        return text.upper().replace(" ", "")
+
     def get_load_capacity(self, truck_name):
-        """根据矿卡名称模糊匹配装载量，优先匹配更长（更具体）的型号"""
+        """根据矿卡名称模糊匹配装载量，优先匹配更长（更具体）的型号。
+
+        匹配前会删除空格，使 "CAT 777" 与 "CAT777" 等价。
+        连字符保留不删除，避免 "TR60-02" 误匹配 "TR600"。
+        """
         if pd.isna(truck_name):
             return 0
 
-        truck_name_upper = clean_string(truck_name).upper()
+        truck_name_norm = self._normalize(clean_string(truck_name))
         for model, capacity in sorted(self.load_map.items(), key=lambda x: len(x[0]), reverse=True):
-            if model.upper() in truck_name_upper:
+            if self._normalize(model) in truck_name_norm:
                 return capacity
         return 0
 

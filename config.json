@@ -41,7 +41,10 @@
         "CAT773": 20,
         "KOMATSU 785": 37,
         "MT 4400": 80,
-        "CAT 773D": 20
+        "CAT 777": 37,
+        "BLZ-220": 80,
+        "BLZ220": 80,
+        "BELAZ 75135": 45
     },
     "default_year": 2025,
     "default_month": 1,

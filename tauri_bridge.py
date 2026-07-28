@@ -455,6 +455,7 @@ def _process_merge(params: dict) -> dict:
         skip_hidden=params.get("skip_hidden", False),
         skip_hidden_rows=params.get("skip_hidden_rows", False),
         skip_hidden_cols=params.get("skip_hidden_cols", False),
+        tolerant_header=params.get("tolerant_header", False),
     )
     if output:
         _post_process_ledger(
