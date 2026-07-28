@@ -3,7 +3,7 @@
 > 矿山运营 Excel 报表批量处理工具
 
 <p>
-  <img src="https://img.shields.io/badge/version-v2.0.1-blue?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-v2.0.2-blue?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/Python-≥3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="python" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square" alt="license" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="platform" />
@@ -425,6 +425,12 @@ uv run scripts/bump_version.py --bump minor --dry-run
 ---
 
 ## 📋 更新日志
+
+### v2.0.2 · 2026-07-28
+
+- 🆕 油耗模块新增"过滤零小时数"开关（Flet / Tauri / CLI）：勾选后发动机小时数开始或结束为 0 或为空的记录将被过滤
+- 🆕 油耗模块新增"过滤零运行小时数"开关（Flet / Tauri / CLI）：勾选后运行小时数为 0 或为空的记录将被过滤
+- 🎨 两个新开关位于油耗模块卡片内部，而非全局选项区，更符合模块专属配置的直觉
 
 ### v2.0.1 · 2026-07-28
 

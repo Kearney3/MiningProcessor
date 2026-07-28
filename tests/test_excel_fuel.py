@@ -456,3 +456,131 @@ class TestDeduplication:
         # Assert - dedup should reduce rows; fuel data for D001 should have
         # exactly the same count as non-dup run (3 data rows per device)
         assert result is not None
+
+
+class TestSummaryColumnExclusion:
+    """Test that monthly summary columns are excluded from output.
+
+    Real-world files like '2020.01 сар түлш.xlsx' have summary columns
+    (Түлш зэхэлт ээлжээр) after the last date block with total fuel values.
+    These must NOT be treated as regular data columns.
+    """
+
+    @staticmethod
+    def _build_sheet_with_summary(ws):
+        """Build a sheet with one date block + summary columns.
+
+        Layout (pandas iloc):
+        Row 0: filler
+        Row 1: h1 (date row) — dates in data cols, NaN in summary
+        Row 2: h2 (leader/summary header row) — "Түлш зэхэлт ээлжээр" in summary area
+        Row 3: h3 (shift row) — "өдөр"/"шөнө" in data, "Өдөр"/"Шөнө"/"Нийт" in summary
+        Row 4: h4 (brand row) — "Primary" in data, empty in summary
+        Row 5: marker (col A == 1)
+        Row 6+: data rows
+
+        Data cols: 4-9 (мц, АМЦ, өдөр fuel, -, -, шөнө fuel)
+        Summary cols: 10-12 (Өдөр total, Шөнө total, Нийт total)
+        """
+        # Row 1 (h1 - date row)
+        ws.cell(row=2, column=1, value="Парк дугаар")  # anchor
+        ws.cell(row=2, column=2, value="Атомашин төрөл")
+        ws.cell(row=2, column=3, value="Парк дугаар")
+        ws.cell(row=2, column=5, value="2020-01-15")  # date in col 4 (0-indexed)
+
+        # Row 2 (h2 - leader/summary header row)
+        ws.cell(row=3, column=6, value="өдөр")  # day shift label
+        ws.cell(row=3, column=10, value="Өдөр")  # summary day
+        ws.cell(row=3, column=11, value="Шөнө")  # summary night
+        ws.cell(row=3, column=12, value="Нийт түлш авалт")  # summary total
+
+        # Row 3 (h3 - shift row)
+        ws.cell(row=4, column=5, value="мц")     # end hours
+        ws.cell(row=4, column=6, value="АМЦ")    # work hours
+        ws.cell(row=4, column=7, value="өдөр")   # day shift
+        ws.cell(row=4, column=11, value="Өдөр")  # summary day label
+        ws.cell(row=4, column=12, value="Шөнө")  # summary night label
+
+        # Row 4 (h4 - brand row)
+        ws.cell(row=5, column=7, value="Primary")  # fuel brand for day
+        ws.cell(row=5, column=8, value="НИК")      # another fuel brand
+
+        # Row 5: summary header "Түлш зэхэлт ээлжээр" in h2 row
+        # This is in iloc row 2 (Excel row 3), col 10 area
+        ws.cell(row=3, column=11, value="Түлш зэхэлт ээлжээр")
+
+        # Marker row
+        ws.cell(row=6, column=1, value=1)
+
+        # Data row: Device with small daily fuel, large summary totals
+        ws.cell(row=7, column=1, value=1)
+        ws.cell(row=7, column=2, value="TEREX TR100")
+        ws.cell(row=7, column=3, value="HT0001")
+        ws.cell(row=7, column=4, value=1000.0)  # initial hours
+        ws.cell(row=7, column=5, value=1010.0)  # end hours
+        ws.cell(row=7, column=6, value=5.0)     # work hours
+        ws.cell(row=7, column=7, value=500.0)   # day fuel (real daily value)
+        ws.cell(row=7, column=8, value=300.0)   # night fuel (real daily value)
+        # Summary columns with much larger values (monthly totals)
+        ws.cell(row=7, column=11, value=15000.0)  # summary day total
+        ws.cell(row=7, column=12, value=12000.0)  # summary night total
+        ws.cell(row=7, column=13, value=27000.0)  # summary grand total
+
+    def test_summary_columns_excluded(self, tmp_path):
+        """Summary fuel columns must not appear in output."""
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Техник_түлш_зарцуулалт"
+        self._build_sheet_with_summary(ws)
+        path = tmp_path / "summary.xlsx"
+        wb.save(path)
+
+        result = process_diesel_data(str(path), return_sheets=True)
+        assert result is not None
+
+        df_fuel = result.get("油耗信息")
+        assert df_fuel is not None
+
+        # All fuel values should be small daily values, NOT the summary totals
+        max_fuel = df_fuel["油品消耗"].max()
+        assert max_fuel <= 500.0, (
+            f"Summary column value leaked into output: max fuel = {max_fuel}"
+        )
+
+    def test_summary_total_keyword_stops_columns(self, tmp_path):
+        """The 'Нийт' keyword in the shift row must trigger stop."""
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Техник_түлш_зарцуулалт"
+
+        # Minimal layout with summary section marked by "Нийт" in shift row
+        ws.cell(row=2, column=1, value="Парк дугаар")
+        ws.cell(row=2, column=5, value="2020-01-15")
+
+        # Shift row with "Нийт" in summary area
+        ws.cell(row=4, column=5, value="мц")
+        ws.cell(row=4, column=6, value="АМЦ")
+        ws.cell(row=4, column=7, value="өдөр")
+        ws.cell(row=4, column=11, value="Нийт")
+
+        # Brand row
+        ws.cell(row=5, column=7, value="Primary")
+
+        ws.cell(row=6, column=1, value=1)  # marker
+
+        # Data row
+        ws.cell(row=7, column=1, value=1)
+        ws.cell(row=7, column=2, value="Device")
+        ws.cell(row=7, column=3, value="D001")
+        ws.cell(row=7, column=7, value=100.0)   # real fuel
+        ws.cell(row=7, column=11, value=99000.0)  # summary value
+
+        path = tmp_path / "nithit.xlsx"
+        wb.save(path)
+
+        result = process_diesel_data(str(path), return_sheets=True)
+        if result and "油耗信息" in result:
+            max_fuel = result["油耗信息"]["油品消耗"].max()
+            assert max_fuel <= 100.0, (
+                f"'Нийт' stop condition failed: max fuel = {max_fuel}"
+            )

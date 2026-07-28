@@ -102,7 +102,8 @@ class TestProcessFilesAllModulesCalled:
 
         mock_fuel.assert_called_once_with(matched["fuel"], 2025,
                                           skip_hidden_rows=False, skip_hidden_cols=False,
-                                          anomaly_config=None)
+                                          anomaly_config=None, filter_zero_engine_hours=False,
+                                          filter_zero_work_hours=False)
         mock_electrical.assert_called_once_with(matched["electrical"], 2025,
                                                 skip_hidden_rows=False, skip_hidden_cols=False,
                                                 anomaly_config=None)

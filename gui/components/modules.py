@@ -388,6 +388,16 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         value=False,
         tooltip="勾选后，Excel 中被隐藏的列将不会被读取",
     )
+    filter_zero_hours_toggle = ft.Checkbox(
+        label="过滤零小时数",
+        value=False,
+        tooltip="勾选后，发动机小时数为 0 或为空的记录将被过滤",
+    )
+    filter_zero_work_hours_toggle = ft.Checkbox(
+        label="过滤零运行小时数",
+        value=False,
+        tooltip="勾选后，运行小时数为 0 或为空的记录将被过滤",
+    )
 
     # --- 异常值检测开关 ---
     _anomaly_mode = "flag"  # 内部状态：flag | filter | handle
@@ -516,6 +526,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                 ),
                 theme.module_card([
                     ft.Row([fuel_path, fuel_year, fuel_btn], spacing=8),
+                    ft.Row([filter_zero_hours_toggle, filter_zero_work_hours_toggle], spacing=8),
                 ]),
                 theme.module_card([
                     ft.Row([prod_path, prod_btn], spacing=8),
@@ -542,17 +553,15 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                            alignment=ft.MainAxisAlignment.START),
                 ], spacing=4),
                 theme.module_card([
-                    ft.Row([maint_path, maint_btn], spacing=8),
+                    maint_path,
                     ft.Row(
-                        [
-                            maint_file_btn,
-                            maint_folder_btn,
-                            maint_split_year,
-                            maint_details_only,
-                            maint_use_ml,
-                        ],
+                        [maint_file_btn, maint_folder_btn, maint_btn],
                         spacing=8,
-                        wrap=True,
+                    ),
+                    ft.Row(
+                        [maint_split_year, maint_details_only, maint_use_ml],
+                        spacing=4,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
                 ]),
                 anomaly_panel,
@@ -579,7 +588,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         "_anomaly_filter": anomaly_filter,
         "_anomaly_handle": anomaly_handle,
         "_anomaly_mode": lambda: _anomaly_mode,
-        "fuel": {"path": fuel_path, "year": fuel_year, "btn": fuel_btn},
+        "fuel": {"path": fuel_path, "year": fuel_year, "btn": fuel_btn, "_filter_zero_hours_toggle": filter_zero_hours_toggle, "_filter_zero_work_hours_toggle": filter_zero_work_hours_toggle},
         "prod": {"path": prod_path, "raw_start": prod_raw_start, "btn": prod_btn, "auto_detect": prod_auto_detect, "summary_container": prod_summary_container},
         "elec": {"path": elec_path, "year": elec_year, "btn": elec_btn, "add_shift": elec_add_shift, "default_shift": elec_default_shift},
         "work": {"path": work_path, "year": work_year, "month": work_month, "header_toggle": _work_hmc.toggle, "header_mode": _work_hmc.mode, "header_fuzzy": _work_hmc.fuzzy, "btn": work_btn},

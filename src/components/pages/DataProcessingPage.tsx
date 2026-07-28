@@ -335,6 +335,8 @@ function FuelCard({
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [filterZeroEngineHours, setFilterZeroEngineHours] = useState(false);
+  const [filterZeroWorkHours, setFilterZeroWorkHours] = useState(false);
 
   const handleProcess = async () => {
     setLoading(true);
@@ -347,6 +349,8 @@ function FuelCard({
         use_oil_ledger: useOilLedger,
         skip_hidden_rows: skipHiddenRows,
         skip_hidden_cols: skipHiddenCols,
+        filter_zero_engine_hours: filterZeroEngineHours,
+        filter_zero_work_hours: filterZeroWorkHours,
         anomaly_enabled: anomaly.enabled,
         anomaly_report: anomaly.report,
         anomaly_mode: anomaly.mode,
@@ -377,6 +381,20 @@ function FuelCard({
           onChange={setYear}
           placeholder="年份（可选）"
           options={yearOptions.map((y) => ({ label: `${y}年`, value: String(y) }))}
+        />
+      </div>
+      <div className="mt-2">
+        <StyledToggle
+          checked={filterZeroEngineHours}
+          onChange={setFilterZeroEngineHours}
+          label="过滤零小时数"
+        />
+      </div>
+      <div className="mt-1">
+        <StyledToggle
+          checked={filterZeroWorkHours}
+          onChange={setFilterZeroWorkHours}
+          label="过滤零运行小时数"
         />
       </div>
       <ProcessButton loading={loading} onClick={handleProcess} disabled={path === ""} />

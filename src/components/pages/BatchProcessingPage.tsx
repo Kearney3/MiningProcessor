@@ -425,6 +425,8 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
   const [useOilLedger, setUseOilLedger] = useState(false);
   const [skipHiddenRows, setSkipHiddenRows] = useState(false);
   const [skipHiddenCols, setSkipHiddenCols] = useState(false);
+  const [filterZeroEngineHours, setFilterZeroEngineHours] = useState(false);
+  const [filterZeroWorkHours, setFilterZeroWorkHours] = useState(false);
   const [anomaly, setAnomaly] = useState<AnomalyConfig>(DEFAULT_ANOMALY_CONFIG);
 
   // -- Date filter --
@@ -486,6 +488,8 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
         use_oil_ledger: useOilLedger,
         skip_hidden_rows: skipHiddenRows,
         skip_hidden_cols: skipHiddenCols,
+        filter_zero_engine_hours: filterZeroEngineHours,
+        filter_zero_work_hours: filterZeroWorkHours,
         anomaly_enabled: anomaly.enabled,
         anomaly_report: anomaly.report,
         anomaly_mode: anomaly.mode,
@@ -529,7 +533,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
       setProcessing(false);
       bridge.setProgress(null);
     }
-  }, [scanResult, folderPath, year, month, rawStart, useEquipmentLedger, useOilLedger, skipHiddenRows, skipHiddenCols, tableMergeMode, baseTableType, dateFilterEnabled, filterDate, useHeaderMapping, headerMode, fuzzyMatch, bridge]);
+  }, [scanResult, folderPath, year, month, rawStart, useEquipmentLedger, useOilLedger, skipHiddenRows, skipHiddenCols, filterZeroEngineHours, filterZeroWorkHours, tableMergeMode, baseTableType, dateFilterEnabled, filterDate, useHeaderMapping, headerMode, fuzzyMatch, bridge]);
 
   const handleProcess = () => {
     if (hasMissing) {
@@ -694,6 +698,20 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
               checked={skipHiddenCols}
               onChange={setSkipHiddenCols}
               label="跳过隐藏列"
+            />
+          </div>
+          <div className="flex items-end pb-0.5">
+            <Toggle
+              checked={filterZeroEngineHours}
+              onChange={setFilterZeroEngineHours}
+              label="过滤零小时数"
+            />
+          </div>
+          <div className="flex items-end pb-0.5">
+            <Toggle
+              checked={filterZeroWorkHours}
+              onChange={setFilterZeroWorkHours}
+              label="过滤零运行小时数"
             />
           </div>
         </div>

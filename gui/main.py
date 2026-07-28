@@ -25,7 +25,7 @@ from func.logger import setup_logging
 MIN_WINDOW_HEIGHT = 800
 MIN_WINDOW_WIDTH = 800
 INITIAL_WINDOW_WIDTH = 1000
-INITIAL_WINDOW_HEIGHT = 900
+INITIAL_WINDOW_HEIGHT = 1050
 
 
 def main(page: ft.Page):
