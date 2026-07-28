@@ -621,7 +621,7 @@ def test_gui_main_stops_log_consumer_on_disconnect(monkeypatch):
     assert isinstance(log_view, components.ft.Container)
     assert refs["log_list"].auto_scroll is False
     assert refs["log_list"].spacing == 4
-    assert refs["list_container"].height == 300
+    assert refs["list_container"].height == 400
     assert getattr(refs["export_button"], "tooltip", None) == "导出日志"
     assert refs["follow_status"].visible is False
 
