@@ -179,7 +179,7 @@ def match_sheets(
                 _match_equipment_rows(new_df, "矿卡名称", id_col, equipment_ledger, "（矿卡）")
                 _match_equipment_rows(new_df, "挖机名称", None, equipment_ledger, "（挖机）")
             else:
-                name_col = _find_col(cols, ["设备名称", "矿卡名称"])
+                name_col = _find_col(cols, ["设备名称", "矿卡名称", "原始设备名称"])
                 id_col = "设备编号" if "设备编号" in cols else None
                 if name_col:
                     _match_equipment_rows(new_df, name_col, id_col, equipment_ledger)

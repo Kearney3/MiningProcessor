@@ -301,6 +301,16 @@ def test_work_month_dropdown_offers_all_calendar_months(monkeypatch):
     assert month_options == [str(month) for month in range(1, 13)]
 
 
+def test_maintenance_module_enables_ml_fallback_by_default(monkeypatch):
+    monkeypatch.setattr(components, "datetime", FrozenDateTime, raising=False)
+
+    _, module_refs = components.create_modules_section(DummyPage())
+
+    ml_toggle = module_refs["maint"]["use_ml"]
+    assert ml_toggle.value is True
+    assert "其他/待确认" in ml_toggle.tooltip
+
+
 def test_config_rows_render_with_explicit_checkbox_controls():
     _, refs = components.create_config_section(DummyPage(), lambda message: None)
 

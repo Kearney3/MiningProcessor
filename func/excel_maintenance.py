@@ -46,6 +46,9 @@ def process_maintenance_data(
     return_sheets: bool = False,
     split_by_year: bool = False,
     details_only: bool = False,
+    use_ml_fallback: bool = True,
+    ml_classifier=None,
+    ml_model_path: str | None = None,
 ) -> str | list[str] | dict:
     """维修记录处理统一入口。
 
@@ -61,6 +64,9 @@ def process_maintenance_data(
         return_sheets: True 时返回 dict[str, DataFrame]，False 时写文件。
         split_by_year: True 时按年份拆分输出为多个文件。
         details_only: True 时只输出维修明细 sheet（不含统计表）。
+        use_ml_fallback: 是否用轻量模型二次识别“其他/待确认”故障。
+        ml_classifier: 已加载的 MaintenanceMLClassifier；主要用于测试或复用。
+        ml_model_path: 模型文件路径；为空时使用项目 models 下的默认模型。
 
     Returns:
         输出文件路径（str）、文件路径列表（split_by_year=True）或 sheets 字典。
@@ -85,6 +91,20 @@ def process_maintenance_data(
 
     # 预编译噪声正则（编译一次，复用于所有记录）
     compiled_noise = compile_noise_patterns(noise_patterns)
+
+    if use_ml_fallback and ml_classifier is None:
+        try:
+            from func.maintenance_ml_classifier import (
+                DEFAULT_MODEL_PATH,
+                MaintenanceMLClassifier,
+            )
+
+            model_path = ml_model_path or str(DEFAULT_MODEL_PATH)
+            if os.path.isfile(model_path):
+                ml_classifier = MaintenanceMLClassifier.load(model_path)
+                logger.info("已加载维修 ML 二级分类模型: %s", model_path)
+        except Exception as exc:
+            logger.warning("维修 ML 模型加载失败，继续使用规则分类: %s", exc)
 
     # 1. 提取记录
     raw_records = extract_all_records(
@@ -150,15 +170,16 @@ def process_maintenance_data(
             reason_rules=reason_rules,
         )
 
-        # 分类（使用预编译正则）
-        major, minor = (None, None)
-        if is_fault:
-            major, minor = classify(
-                rec["维修内容"],
-                classifications=class_rules,
-                noise_exact=noise_exact,
-                compiled_noise=compiled_noise,
-            )
+        # 所有有实质内容的记录均分类，计划保养可保留在维修明细中；
+        # 只有故障记录进入故障统计。
+        major, minor = classify(
+            rec["维修内容"],
+            classifications=class_rules,
+            noise_exact=noise_exact,
+            compiled_noise=compiled_noise,
+        )
+        if major == "计划保养与非故障作业":
+            is_fault = False
 
         classified_rec = {
             "日期": rec["日期"],
@@ -169,13 +190,51 @@ def process_maintenance_data(
             "班次": rec["班次"],
             "大类": major,
             "小类": minor,
+            "分类方式": (
+                "噪声过滤"
+                if major is None
+                else "待确认"
+                if major == "其他/待确认"
+                else "规则"
+            ),
+            "分类置信度": None,
             "是否故障": "是" if is_fault else "否",
             "维修内容": rec["维修内容"],
             "工时_分钟": rec["工时_分钟"],
         }
         classified.append(classified_rec)
-        if is_fault and major is not None:
-            fault_records.append(classified_rec)
+
+    # 规则优先，ML 只处理仍为“其他/待确认”的故障记录。
+    if use_ml_fallback and ml_classifier is not None:
+        pending = [
+            rec
+            for rec in classified
+            if rec["是否故障"] == "是" and rec["大类"] == "其他/待确认"
+        ]
+        if pending:
+            predictions = ml_classifier.predict_many(
+                rec["维修内容"] for rec in pending
+            )
+            accepted = 0
+            for rec, prediction in zip(pending, predictions):
+                if prediction is None:
+                    continue
+                rec["大类"] = prediction.major
+                rec["小类"] = prediction.minor
+                rec["分类方式"] = "ML辅助"
+                rec["分类置信度"] = round(prediction.confidence, 4)
+                accepted += 1
+            logger.info(
+                "ML 二级分类: 待确认 %d 条, 高置信度回填 %d 条",
+                len(pending),
+                accepted,
+            )
+
+    fault_records = [
+        rec
+        for rec in classified
+        if rec["是否故障"] == "是" and rec["大类"] is not None
+    ]
 
     logger.info("分类完成: 总 %d 条, 故障 %d 条, 台账匹配 %d 条",
                 len(classified), len(fault_records), matched_count)
@@ -271,6 +330,8 @@ def main():
     parser.add_argument("--skip-hidden-rows", action="store_true", help="跳过隐藏行")
     parser.add_argument("--skip-hidden-cols", action="store_true", help="跳过隐藏列")
     parser.add_argument("--details-only", action="store_true", help="只导出维修明细 sheet（不含统计表）")
+    parser.add_argument("--no-ml", action="store_true", help="禁用“其他/待确认”的 ML 二级分类")
+    parser.add_argument("--ml-model", default=None, help="维修 ML 分类模型路径")
     args = parser.parse_args()
 
     setup_logging()
@@ -296,6 +357,8 @@ def main():
         skip_hidden_rows=args.skip_hidden_rows,
         skip_hidden_cols=args.skip_hidden_cols,
         details_only=args.details_only,
+        use_ml_fallback=not args.no_ml,
+        ml_model_path=args.ml_model,
     )
     print(f"\n输出: {output}")
 

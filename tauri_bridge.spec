@@ -6,7 +6,7 @@ PyInstaller spec — 将 tauri_bridge.py + func/* + 依赖打包为可执行程�
   pyinstaller tauri_bridge.spec
   输出: dist/tauri-bridge/ 目录（onedir 模式，避免 Windows Defender 误杀）
 
-注意: 使用 onedir 而非 onefile，因为 onefile 解压到 %TEMP%\_MEI* 会被
+注意: 使用 onedir 而非 onefile，因为 onefile 解压到 %TEMP%\\_MEI* 会被
       Windows Defender 立即删除，导致 LoadLibrary 失败。
 """
 
@@ -28,6 +28,16 @@ if os.path.isdir(func_dir):
 config_json = os.path.join(os.path.dirname(os.path.abspath(SPEC)), 'config.json')
 if os.path.isfile(config_json):
     func_datas.append((config_json, '.'))
+
+# 维修 ML 模型（规则分类后的可选二级兜底）
+model_dir = os.path.join(os.path.dirname(os.path.abspath(SPEC)), 'models')
+maintenance_model = os.path.join(model_dir, 'maintenance_classifier.joblib')
+maintenance_metrics = os.path.join(model_dir, 'maintenance_classifier.metrics.json')
+if not os.path.isfile(maintenance_model):
+    raise FileNotFoundError(f'Missing maintenance classifier: {maintenance_model}')
+func_datas.append((maintenance_model, 'models'))
+if os.path.isfile(maintenance_metrics):
+    func_datas.append((maintenance_metrics, 'models'))
 
 # data/ 目录（台账缓存等）
 data_dir = os.path.join(os.path.dirname(os.path.abspath(SPEC)), 'data')
@@ -62,6 +72,12 @@ a = Analysis(
         'func.excel_worktime_multifile',
         'func.excel_merger',
         'func.excel_batch',
+        'func.excel_maintenance',
+        'func.maintenance_classification',
+        'func.maintenance_utils',
+        'func.maintenance_ml_classifier',
+        'scipy._external.array_api_compat.numpy.fft',
+        'sklearn.externals.array_api_compat.numpy.fft',
         'func.excel_utils',
         'func.equipment_ledger',
         'func.oil_ledger',
@@ -78,7 +94,6 @@ a = Analysis(
     excludes=[
         'tkinter',
         'matplotlib',
-        'scipy',
         'PIL',
         'pytest',
         'IPython',

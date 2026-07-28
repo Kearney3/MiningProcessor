@@ -292,6 +292,11 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         value=False,
         tooltip="勾选后只输出维修明细 sheet（不含统计表），文件更小、打开更快",
     )
+    maint_use_ml = ft.Checkbox(
+        label="启用机器学习辅助识别",
+        value=True,
+        tooltip="仅对规则仍判为“其他/待确认”的记录进行高置信度回填，不覆盖规则结果",
+    )
 
     # --- FilePicker instances (must be added to page.overlay to work repeatedly) ---
     _fuel_picker = ft.FilePicker()
@@ -533,7 +538,17 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                 ], spacing=4),
                 theme.module_card([
                     ft.Row([maint_path, maint_btn], spacing=8),
-                    ft.Row([maint_file_btn, maint_folder_btn, maint_split_year, maint_details_only], spacing=8),
+                    ft.Row(
+                        [
+                            maint_file_btn,
+                            maint_folder_btn,
+                            maint_split_year,
+                            maint_details_only,
+                            maint_use_ml,
+                        ],
+                        spacing=8,
+                        wrap=True,
+                    ),
                 ]),
                 anomaly_panel,
                 ft.Row([match_eq_toggle, match_oil_toggle, skip_hidden_rows_toggle, skip_hidden_cols_toggle], spacing=8),
@@ -570,6 +585,12 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
             "btn": merge_btn,
             "sort_configs_state": sort_configs_state,
         },
-        "maint": {"path": maint_path, "btn": maint_btn, "split_year": maint_split_year, "details_only": maint_details_only},
+        "maint": {
+            "path": maint_path,
+            "btn": maint_btn,
+            "split_year": maint_split_year,
+            "details_only": maint_details_only,
+            "use_ml": maint_use_ml,
+        },
     }
     return container, module_refs

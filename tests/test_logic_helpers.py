@@ -12,7 +12,13 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from func.ledger_postprocess import _find_col, match_sheets
-from gui.logic import _get_output_file, _log_message, _apply_ledger_matching, _execute_task
+from gui.logic import (
+    _apply_ledger_matching,
+    _dispatch_module,
+    _execute_task,
+    _get_output_file,
+    _log_message,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -98,6 +104,16 @@ class TestGetOutputFile:
     def test_unknown_type_returns_none(self, tmp_path):
         result = _get_output_file("unknown", str(tmp_path))
         assert result is None
+
+
+def test_maintenance_dispatch_forwards_ml_switch(tmp_path):
+    input_file = str(tmp_path / "maintenance.xlsx")
+    pathlib.Path(input_file).touch()
+
+    with patch("gui.logic.process_maintenance_data") as process:
+        _dispatch_module("maint", input_file, use_ml_fallback=False)
+
+    assert process.call_args.kwargs["use_ml_fallback"] is False
 
 
 # ---------------------------------------------------------------------------

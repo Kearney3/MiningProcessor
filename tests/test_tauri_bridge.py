@@ -486,6 +486,41 @@ class TestProcessProductionRPC:
 
 
 # ---------------------------------------------------------------------------
+# process_maintenance RPC
+# ---------------------------------------------------------------------------
+
+
+class TestProcessMaintenanceRPC:
+    def test_forwards_ml_fallback_switch(self, tmp_path):
+        input_file = tmp_path / "maintenance.xlsx"
+        input_file.touch()
+        expected_output = str(tmp_path / "维修记录统计.xlsx")
+
+        with patch(
+            "func.excel_maintenance.process_maintenance_data",
+            return_value=expected_output,
+        ) as process:
+            result = tauri_bridge._process_maintenance(
+                {"path": str(input_file), "use_ml_fallback": False}
+            )
+
+        assert result["output_file"] == expected_output
+        assert process.call_args.kwargs["use_ml_fallback"] is False
+
+    def test_ml_fallback_defaults_to_enabled(self, tmp_path):
+        input_file = tmp_path / "maintenance.xlsx"
+        input_file.touch()
+
+        with patch(
+            "func.excel_maintenance.process_maintenance_data",
+            return_value=str(tmp_path / "output.xlsx"),
+        ) as process:
+            tauri_bridge._process_maintenance({"path": str(input_file)})
+
+        assert process.call_args.kwargs["use_ml_fallback"] is True
+
+
+# ---------------------------------------------------------------------------
 # apply_device_load_map / get_default_load_map RPC
 # ---------------------------------------------------------------------------
 
