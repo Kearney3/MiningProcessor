@@ -389,7 +389,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
               <select
                 value={year}
                 onChange={(e) => setYear(e.target.value)}
-                className={`${inputClass} w-full`}
+                className={`${inputClass} w-full h-9`}
               >
                 {Array.from({ length: 61 }, (_, i) => currentYear - 30 + i).map((y) => (
                   <option key={y} value={y}>{y}</option>
@@ -401,7 +401,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
               <select
                 value={month}
                 onChange={(e) => setMonth(e.target.value)}
-                className={`${inputClass} w-full`}
+                className={`${inputClass} w-full h-9`}
               >
                 {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                   <option key={m} value={m}>{m}月</option>
@@ -416,7 +416,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
                 onChange={(e) => setHeaderRow(e.target.value)}
                 placeholder="自动检测"
                 min="1"
-                className={`${inputClass} w-full`}
+                className={`${inputClass} w-full h-9`}
               />
             </div>
           </div>

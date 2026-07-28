@@ -584,3 +584,153 @@ class TestSummaryColumnExclusion:
             assert max_fuel <= 100.0, (
                 f"'Нийт' stop condition failed: max fuel = {max_fuel}"
             )
+
+
+# ---------------------------------------------------------------------------
+# Filter zero hours tests
+# ---------------------------------------------------------------------------
+
+
+def _build_fuel_sheet_with_zero_rows(ws):
+    """Build a fuel sheet where some devices have zero engine hours."""
+    ws.cell(row=1, column=1, value="设备柴油消耗月报表")
+    ws.cell(row=2, column=1, value="2025年1月")
+    ws.cell(row=3, column=1, value="序号")
+    ws.cell(row=3, column=2, value="设备名称")
+    ws.cell(row=3, column=3, value="设备编号")
+    ws.cell(row=3, column=4, value="起运小时数")
+    ws.cell(row=3, column=5, value="2025-01-15")
+    ws.cell(row=3, column=6, value="2025-01-15")
+    ws.cell(row=3, column=7, value="2025-01-15")
+    ws.cell(row=3, column=8, value="2025-01-15")
+    ws.cell(row=3, column=9, value="2025-01-15")
+    ws.cell(row=3, column=10, value="2025-01-15")
+    ws.cell(row=4, column=1, value="班组A")
+    ws.cell(row=5, column=1, value="白班")
+    ws.cell(row=5, column=5, value="白班小时数")
+    ws.cell(row=5, column=6, value="白班已使用小时数")
+    ws.cell(row=5, column=7, value="白班柴油")
+    ws.cell(row=5, column=8, value="夜班小时数")
+    ws.cell(row=5, column=9, value="夜班已使用小时数")
+    ws.cell(row=5, column=10, value="夜班柴油")
+    ws.cell(row=6, column=7, value="柴油")
+    ws.cell(row=6, column=10, value="柴油")
+    ws.cell(row=7, column=1, value=1)
+
+    # Device 1: normal hours
+    ws.cell(row=8, column=1, value=1)
+    ws.cell(row=8, column=2, value="CAT 785D")
+    ws.cell(row=8, column=3, value="D001")
+    ws.cell(row=8, column=4, value=1000.0)
+    ws.cell(row=8, column=5, value=1010.0)   # Day end_hours
+    ws.cell(row=8, column=6, value=10.0)     # Day work_hours
+    ws.cell(row=8, column=7, value=150.0)    # Day fuel
+    ws.cell(row=8, column=8, value=1020.0)   # Night end_hours
+    ws.cell(row=8, column=9, value=10.0)     # Night work_hours
+    ws.cell(row=8, column=10, value=120.0)   # Night fuel
+
+    # Device 2: zero end hours, zero work hours
+    ws.cell(row=9, column=1, value=2)
+    ws.cell(row=9, column=2, value="KOM 730E")
+    ws.cell(row=9, column=3, value="D002")
+    ws.cell(row=9, column=4, value=0.0)      # initial start = 0
+    ws.cell(row=9, column=5, value=0.0)      # Day end_hours = 0
+    ws.cell(row=9, column=6, value=0.0)      # Day work_hours = 0
+    ws.cell(row=9, column=7, value=180.0)    # Day fuel
+    ws.cell(row=9, column=8, value=0.0)      # Night end_hours = 0
+    ws.cell(row=9, column=9, value=0.0)      # Night work_hours = 0
+    ws.cell(row=9, column=10, value=130.0)   # Night fuel
+
+
+def _create_fuel_excel_with_zeros(path):
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "设备柴油消耗表"
+    _build_fuel_sheet_with_zero_rows(ws)
+    wb.save(path)
+    return path
+
+
+class TestFilterZeroEngineHours:
+    """Tests for filter_zero_engine_hours parameter."""
+
+    def test_zero_start_and_end_filtered(self, tmp_path):
+        """Rows where start=0 and end=0 should be filtered."""
+        excel_path = _create_fuel_excel_with_zeros(tmp_path / "fuel.xlsx")
+        result = process_diesel_data(str(excel_path), return_sheets=True,
+                                     filter_zero_engine_hours=True)
+        df = result["设备信息"]
+        # Device D002 has start=0 end=0 on both shifts -> all rows filtered
+        assert not (df["设备编号"] == "D002").any()
+        # Device D001 remains
+        assert (df["设备编号"] == "D001").any()
+
+    def test_filter_disabled_keeps_all(self, tmp_path):
+        """When disabled, rows with zero hours are kept."""
+        excel_path = _create_fuel_excel_with_zeros(tmp_path / "fuel.xlsx")
+        result = process_diesel_data(str(excel_path), return_sheets=True,
+                                     filter_zero_engine_hours=False)
+        df = result["设备信息"]
+        assert (df["设备编号"] == "D002").any()
+
+    def test_partial_zero_filtered(self, tmp_path):
+        """Row with start=0 but end!=0 should also be filtered."""
+        excel_path = _create_fuel_excel_with_zeros(tmp_path / "fuel.xlsx")
+        wb = openpyxl.load_workbook(excel_path)
+        ws = wb.active
+        ws.cell(row=9, column=5, value=50.0)   # Day end_hours = 50 (start still 0)
+        wb.save(excel_path)
+
+        result = process_diesel_data(str(excel_path), return_sheets=True,
+                                     filter_zero_engine_hours=True)
+        df = result["设备信息"]
+        d002_rows = df[df["设备编号"] == "D002"]
+        assert len(d002_rows) == 0
+
+    def test_none_start_filtered(self, tmp_path):
+        """Row with NaN start should be filtered."""
+        excel_path = _create_fuel_excel_with_zeros(tmp_path / "fuel.xlsx")
+        wb = openpyxl.load_workbook(excel_path)
+        ws = wb.active
+        ws.cell(row=9, column=4, value=None)    # initial start = None -> NaN
+        ws.cell(row=9, column=5, value=50.0)    # Day end = 50
+        ws.cell(row=9, column=8, value=50.0)    # Night end = 50
+        wb.save(excel_path)
+
+        result = process_diesel_data(str(excel_path), return_sheets=True,
+                                     filter_zero_engine_hours=True)
+        df = result["设备信息"]
+        d002_day = df[(df["设备编号"] == "D002") & (df["班次"] == "Day")]
+        assert len(d002_day) == 0
+
+
+class TestFilterZeroWorkHours:
+    """Tests for filter_zero_work_hours parameter."""
+
+    def test_zero_work_hours_filtered(self, tmp_path):
+        """Rows where 运行小时数 is 0 should be filtered."""
+        excel_path = _create_fuel_excel_with_zeros(tmp_path / "fuel.xlsx")
+        result = process_diesel_data(str(excel_path), return_sheets=True,
+                                     filter_zero_work_hours=True)
+        df = result["设备信息"]
+        # D002 has end=0, start=0, so work_hours = end-start = 0 -> filtered
+        assert not (df["设备编号"] == "D002").any()
+
+    def test_normal_work_hours_kept(self, tmp_path):
+        """Rows with non-zero 运行小时数 should be kept."""
+        excel_path = _create_fuel_excel_with_zeros(tmp_path / "fuel.xlsx")
+        result = process_diesel_data(str(excel_path), return_sheets=True,
+                                     filter_zero_work_hours=True)
+        df = result["设备信息"]
+        assert (df["设备编号"] == "D001").any()
+
+    def test_both_filters_combined(self, tmp_path):
+        """Both filters can be enabled simultaneously."""
+        excel_path = _create_fuel_excel_with_zeros(tmp_path / "fuel.xlsx")
+        result = process_diesel_data(str(excel_path), return_sheets=True,
+                                     filter_zero_engine_hours=True,
+                                     filter_zero_work_hours=True)
+        df = result["设备信息"]
+        assert len(df) > 0
+        assert (df["设备编号"] == "D001").any()
+        assert not (df["设备编号"] == "D002").any()

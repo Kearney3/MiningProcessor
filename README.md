@@ -3,7 +3,7 @@
 > 矿山运营 Excel 报表批量处理工具
 
 <p>
-  <img src="https://img.shields.io/badge/version-v2.0.2-blue?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-v2.0.3-blue?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/Python-≥3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="python" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square" alt="license" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="platform" />
@@ -430,6 +430,17 @@ uv run scripts/bump_version.py --bump minor --dry-run
 ---
 
 ## 📋 更新日志
+
+### v2.0.3 · 2026-07-28
+
+- 🆕 油耗模块新增"过滤零小时数"和"过滤零运行小时数"开关：发动机小时数或运行小时数为 0 / 空时自动过滤（Flet / Tauri / CLI）
+- 🆕 生产模块运行数据新增 4 个过滤开关：过滤零小时仪表、零公里仪表、零运行小时数、零运行里程（Flet / Tauri / CLI）
+- 🎨 Tauri 批量处理：过滤开关移入高级选项折叠面板（Toggle switch 风格），参数配置区分台账匹配与 Excel 选项两组
+- 🎨 Tauri 单文件处理：过滤开关改为紧凑 checkbox 样式（参考文件合并模块）
+- 🎨 Flet 批量处理：过滤开关独立为"数据过滤"栏目，油耗/生产两组用分割线分隔
+- 🎨 Tauri 数据同步：年份/月份/表头起始行统一 `h-9` 高度，消除 select 与 input 高度不一致
+- 🐛 Tauri 设备台账搜索框：修复文字与搜索图标重叠（CSS 优先级问题）
+- 🧪 新增 15 个过滤功能单元测试（fuel 7 个 + production 8 个）
 
 ### v2.0.2 · 2026-07-28
 

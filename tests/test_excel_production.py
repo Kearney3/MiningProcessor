@@ -26,12 +26,18 @@ from func.excel_production_enhanced import MiningDataProcessor
 # Helper: build a processor that bypasses config-file lookups
 # ---------------------------------------------------------------------------
 
-def _make_processor(load_map=None, raw_start=-1, target_text="Мото цагийн заалт"):
+def _make_processor(load_map=None, raw_start=-1, target_text="Мото цагийн заалт",
+                    filter_zero_hours_meter=False, filter_zero_km_meter=False,
+                    filter_zero_run_hours=False, filter_zero_run_km=False):
     """Create a MiningDataProcessor with a custom device_load_map."""
     return MiningDataProcessor(
         device_load_map=load_map or {},
         raw_start=raw_start,
         target_text=target_text,
+        filter_zero_hours_meter=filter_zero_hours_meter,
+        filter_zero_km_meter=filter_zero_km_meter,
+        filter_zero_run_hours=filter_zero_run_hours,
+        filter_zero_run_km=filter_zero_run_km,
     )
 
 
@@ -718,3 +724,96 @@ class TestProcessFolder:
         assert "运行数据" in sheets
         assert "生产数据" in sheets
         assert len(sheets["运行数据"]) == 2  # one per file
+
+
+# ---------------------------------------------------------------------------
+# Filter zero running data tests
+# ---------------------------------------------------------------------------
+
+
+class TestFilterRunningDf:
+    """Tests for _filter_running_df on MiningDataProcessor."""
+
+    @staticmethod
+    def _make_running_df():
+        """Create a sample running DataFrame for testing."""
+        return pd.DataFrame({
+            "日期": [date(2025, 1, 15)] * 4,
+            "班次": ["Day", "Night", "Day", "Night"],
+            "设备名称": ["TR100", "TR100", "XDE120", "XDE120"],
+            "公司": ["A", "A", "B", "B"],
+            "小时数仪表开始": [100.0, 110.0, 0.0, 200.0],
+            "小时数仪表结束": [110.0, 120.0, 0.0, 210.0],
+            "运行小时数": [10.0, 10.0, 0.0, 10.0],
+            "公里数仪表开始": [500.0, 510.0, 0.0, 0.0],
+            "公里数仪表结束": [510.0, 520.0, 0.0, 0.0],
+            "运行里程": [10.0, 10.0, 0.0, 0.0],
+            "趟次": [5, 5, 0, 3],
+        })
+
+    def test_no_filter_keeps_all(self):
+        proc = _make_processor()
+        df = self._make_running_df()
+        result = proc._filter_running_df(df)
+        assert len(result) == 4
+
+    def test_filter_zero_hours_meter(self):
+        proc = _make_processor(filter_zero_hours_meter=True)
+        df = self._make_running_df()
+        result = proc._filter_running_df(df)
+        # Row 2: start=0, end=0 -> filtered
+        assert len(result) == 3
+        assert not ((result["设备名称"] == "XDE120") & (result["班次"] == "Day")).any()
+
+    def test_filter_zero_km_meter(self):
+        proc = _make_processor(filter_zero_km_meter=True)
+        df = self._make_running_df()
+        result = proc._filter_running_df(df)
+        # Rows 2,3: km start/end = 0 -> filtered
+        assert len(result) == 2
+        assert not (result["设备名称"] == "XDE120").any()
+
+    def test_filter_zero_run_hours(self):
+        proc = _make_processor(filter_zero_run_hours=True)
+        df = self._make_running_df()
+        result = proc._filter_running_df(df)
+        # Row 2: 运行小时数 = 0 -> filtered
+        assert len(result) == 3
+        assert not ((result["设备名称"] == "XDE120") & (result["班次"] == "Day")).any()
+
+    def test_filter_zero_run_km(self):
+        proc = _make_processor(filter_zero_run_km=True)
+        df = self._make_running_df()
+        result = proc._filter_running_df(df)
+        # Rows 2,3: 运行里程 = 0 -> filtered
+        assert len(result) == 2
+        assert not (result["设备名称"] == "XDE120").any()
+
+    def test_multiple_filters_combined(self):
+        proc = _make_processor(filter_zero_hours_meter=True, filter_zero_run_km=True)
+        df = self._make_running_df()
+        result = proc._filter_running_df(df)
+        # Row 2: hours_meter zero + run_km zero -> filtered
+        # Row 3: run_km zero -> filtered
+        assert len(result) == 2
+        assert (result["设备名称"] == "TR100").all()
+
+    def test_empty_df_returns_empty(self):
+        proc = _make_processor(filter_zero_hours_meter=True)
+        df = pd.DataFrame(columns=["日期", "班次", "设备名称", "公司",
+                                    "小时数仪表开始", "小时数仪表结束",
+                                    "运行小时数", "公里数仪表开始", "公里数仪表结束",
+                                    "运行里程", "趟次"])
+        result = proc._filter_running_df(df)
+        assert len(result) == 0
+
+    def test_nan_treated_as_zero(self):
+        """NaN values should be treated as 0 for filtering."""
+        proc = _make_processor(filter_zero_hours_meter=True)
+        df = self._make_running_df()
+        df.loc[1, "小时数仪表开始"] = float("nan")
+        result = proc._filter_running_df(df)
+        # Row 1: start=NaN -> fillna(0)==0 -> filtered
+        # Row 2: start=0, end=0 -> filtered
+        assert len(result) == 2
+        assert (result["设备名称"] == "TR100").sum() == 1
