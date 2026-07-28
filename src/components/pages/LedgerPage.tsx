@@ -654,7 +654,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
         <div className="flex items-center gap-2">
           {/* Search */}
           <div className="relative">
-            <span className="absolute left-2.5 top-1/2 -translate-y-1/2">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
               <IconSearch />
             </span>
             <input
@@ -662,7 +662,8 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
               placeholder="搜索..."
-              className="input text-sm pl-8 pr-3 py-1.5 w-44 border-slate-300"
+              className="input text-sm w-44 border-slate-300"
+              style={{ paddingLeft: "2.25rem", paddingRight: "0.75rem" }}
             />
             {searchTerm && (
               <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">

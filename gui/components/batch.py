@@ -369,8 +369,25 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
                             ft.Container(batch_match_oil, col={"xs": 6}),
                             ft.Container(batch_skip_hidden_rows, col={"xs": 6}),
                             ft.Container(batch_skip_hidden_cols, col={"xs": 6}),
+                        ],
+                        run_spacing=4,
+                    ),
+                ], label="处理参数"),
+
+                # ── 数据过滤 ──
+                theme.module_card([
+                    ft.Text("油耗处理", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                    ft.ResponsiveRow(
+                        [
                             ft.Container(batch_filter_zero_hours, col={"xs": 6}),
                             ft.Container(batch_filter_zero_work_hours, col={"xs": 6}),
+                        ],
+                        run_spacing=4,
+                    ),
+                    ft.Divider(height=1, color=theme.BORDER),
+                    ft.Text("生产数据", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                    ft.ResponsiveRow(
+                        [
                             ft.Container(batch_filter_zero_hours_meter, col={"xs": 6}),
                             ft.Container(batch_filter_zero_km_meter, col={"xs": 6}),
                             ft.Container(batch_filter_zero_run_hours, col={"xs": 6}),
@@ -378,7 +395,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
                         ],
                         run_spacing=4,
                     ),
-                ], label="处理参数"),
+                ], label="数据过滤"),
 
                 # ── 输出方式 ──
                 theme.module_card([

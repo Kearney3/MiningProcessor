@@ -554,7 +554,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                     ft.Row([prod_path, prod_btn], spacing=8),
                     ft.Row([prod_file_btn, prod_folder_btn, prod_auto_detect, prod_raw_start], spacing=8),
                     ft.Row([prod_filter_zero_hours_meter, prod_filter_zero_km_meter,
-                            prod_filter_zero_run_hours, prod_filter_zero_run_km], spacing=8, wrap=True),
+                            prod_filter_zero_run_hours, prod_filter_zero_run_km], spacing=8),
                     prod_summary_container,
                 ]),
                 theme.module_card([

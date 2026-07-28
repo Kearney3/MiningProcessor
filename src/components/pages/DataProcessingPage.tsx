@@ -383,19 +383,15 @@ function FuelCard({
           options={yearOptions.map((y) => ({ label: `${y}年`, value: String(y) }))}
         />
       </div>
-      <div className="mt-2">
-        <StyledToggle
-          checked={filterZeroEngineHours}
-          onChange={setFilterZeroEngineHours}
-          label="过滤零小时数"
-        />
-      </div>
-      <div className="mt-1">
-        <StyledToggle
-          checked={filterZeroWorkHours}
-          onChange={setFilterZeroWorkHours}
-          label="过滤零运行小时数"
-        />
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+        <label className="flex items-center gap-1.5 text-xs text-slate-600">
+          <input type="checkbox" checked={filterZeroEngineHours} onChange={(e) => setFilterZeroEngineHours(e.target.checked)} className="rounded border-slate-300" />
+          过滤零小时数
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-slate-600">
+          <input type="checkbox" checked={filterZeroWorkHours} onChange={(e) => setFilterZeroWorkHours(e.target.checked)} className="rounded border-slate-300" />
+          过滤零运行小时数
+        </label>
       </div>
       <ProcessButton loading={loading} onClick={handleProcess} disabled={path === ""} />
       {result && <SuccessBadge message={result} />}
@@ -516,11 +512,23 @@ function ProductionCard({
           <p className="text-xs text-slate-400">复合表头（矿车+矿石类型）所在的行号，默认6</p>
         </div>
       )}
-      <div className="mt-2 space-y-1">
-        <StyledToggle checked={filterZeroHoursMeter} onChange={setFilterZeroHoursMeter} label="过滤零小时仪表" />
-        <StyledToggle checked={filterZeroKmMeter} onChange={setFilterZeroKmMeter} label="过滤零公里仪表" />
-        <StyledToggle checked={filterZeroRunHours} onChange={setFilterZeroRunHours} label="过滤零运行小时数" />
-        <StyledToggle checked={filterZeroRunKm} onChange={setFilterZeroRunKm} label="过滤零运行里程" />
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+        <label className="flex items-center gap-1.5 text-xs text-slate-600">
+          <input type="checkbox" checked={filterZeroHoursMeter} onChange={(e) => setFilterZeroHoursMeter(e.target.checked)} className="rounded border-slate-300" />
+          过滤零小时仪表
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-slate-600">
+          <input type="checkbox" checked={filterZeroKmMeter} onChange={(e) => setFilterZeroKmMeter(e.target.checked)} className="rounded border-slate-300" />
+          过滤零公里仪表
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-slate-600">
+          <input type="checkbox" checked={filterZeroRunHours} onChange={(e) => setFilterZeroRunHours(e.target.checked)} className="rounded border-slate-300" />
+          过滤零运行小时数
+        </label>
+        <label className="flex items-center gap-1.5 text-xs text-slate-600">
+          <input type="checkbox" checked={filterZeroRunKm} onChange={(e) => setFilterZeroRunKm(e.target.checked)} className="rounded border-slate-300" />
+          过滤零运行里程
+        </label>
       </div>
       <ProcessButton
         loading={loading}

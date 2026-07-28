@@ -149,6 +149,11 @@ const QuestionIcon = () => (
     <line x1="12" y1="17" x2="12.01" y2="17" />
   </svg>
 );
+const FilterIcon = () => (
+  <svg className="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+  </svg>
+);
 
 // ═══════════════════════════════════════
 // Constants
@@ -652,7 +657,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
             <select
               value={year}
               onChange={(e) => setYear(e.target.value)}
-              className={inputClass}
+              className={`${inputClass} h-9`}
             >
               {Array.from({ length: 61 }, (_, i) => new Date().getFullYear() - 30 + i).map((y) => (
                 <option key={y} value={y}>{y}年</option>
@@ -664,7 +669,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
             <select
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className={inputClass}
+              className={`${inputClass} h-9`}
             >
               {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                 <option key={m} value={m}>{m}月</option>
@@ -677,78 +682,25 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
               type="number"
               value={rawStart}
               onChange={(e) => setRawStart(e.target.value)}
-              className={inputClass}
+              className={`${inputClass} h-9`}
             />
           </div>
-          <div className="flex items-end pb-0.5">
-            <Toggle
-              checked={useEquipmentLedger}
-              onChange={setUseEquipmentLedger}
-              label="设备台账匹配"
-            />
+        </div>
+
+        <div className="mt-3 space-y-3">
+          <div>
+            <p className="text-xs font-medium text-slate-500 mb-2">台账匹配</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              <Toggle checked={useEquipmentLedger} onChange={setUseEquipmentLedger} label="设备台账匹配" />
+              <Toggle checked={useOilLedger} onChange={setUseOilLedger} label="油品台账匹配" />
+            </div>
           </div>
-          <div className="flex items-end pb-0.5">
-            <Toggle
-              checked={useOilLedger}
-              onChange={setUseOilLedger}
-              label="油品台账匹配"
-            />
-          </div>
-          <div className="flex items-end pb-0.5">
-            <Toggle
-              checked={skipHiddenRows}
-              onChange={setSkipHiddenRows}
-              label="跳过隐藏行"
-            />
-          </div>
-          <div className="flex items-end pb-0.5">
-            <Toggle
-              checked={skipHiddenCols}
-              onChange={setSkipHiddenCols}
-              label="跳过隐藏列"
-            />
-          </div>
-          <div className="flex items-end pb-0.5">
-            <Toggle
-              checked={filterZeroEngineHours}
-              onChange={setFilterZeroEngineHours}
-              label="过滤零小时数"
-            />
-          </div>
-          <div className="flex items-end pb-0.5">
-            <Toggle
-              checked={filterZeroWorkHours}
-              onChange={setFilterZeroWorkHours}
-              label="过滤零运行小时数"
-            />
-          </div>
-          <div className="flex items-end pb-0.5">
-            <Toggle
-              checked={filterZeroHoursMeter}
-              onChange={setFilterZeroHoursMeter}
-              label="过滤零小时仪表"
-            />
-          </div>
-          <div className="flex items-end pb-0.5">
-            <Toggle
-              checked={filterZeroKmMeter}
-              onChange={setFilterZeroKmMeter}
-              label="过滤零公里仪表"
-            />
-          </div>
-          <div className="flex items-end pb-0.5">
-            <Toggle
-              checked={filterZeroRunHours}
-              onChange={setFilterZeroRunHours}
-              label="过滤零运行小时数"
-            />
-          </div>
-          <div className="flex items-end pb-0.5">
-            <Toggle
-              checked={filterZeroRunKm}
-              onChange={setFilterZeroRunKm}
-              label="过滤零运行里程"
-            />
+          <div className="border-t border-slate-100 pt-3">
+            <p className="text-xs font-medium text-slate-500 mb-2">Excel 选项</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              <Toggle checked={skipHiddenRows} onChange={setSkipHiddenRows} label="跳过隐藏行" />
+              <Toggle checked={skipHiddenCols} onChange={setSkipHiddenCols} label="跳过隐藏列" />
+            </div>
           </div>
         </div>
 
@@ -795,7 +747,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
           </span>
         }
       >
-        <div className="grid grid-cols-1 xl:grid-cols-3 xl:divide-x divide-slate-100">
+        <div className="grid grid-cols-1 xl:grid-cols-4 xl:divide-x divide-slate-100">
           {/* ── Date filter ── */}
           <section className="py-4 xl:pr-5">
             <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
@@ -905,6 +857,32 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
               onChange={setAnomaly}
               embedded
             />
+          </section>
+
+          {/* ── Data filters ── */}
+          <section className="border-t border-slate-100 py-4 xl:border-t-0 xl:pl-5">
+            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
+              <span className="text-slate-500"><FilterIcon /></span>
+              数据过滤
+            </div>
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-medium text-slate-500 mb-2">油耗处理</p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  <Toggle checked={filterZeroEngineHours} onChange={setFilterZeroEngineHours} label="过滤零小时数" />
+                  <Toggle checked={filterZeroWorkHours} onChange={setFilterZeroWorkHours} label="过滤零运行小时数" />
+                </div>
+              </div>
+              <div className="border-t border-slate-100 pt-3">
+                <p className="text-xs font-medium text-slate-500 mb-2">生产数据</p>
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  <Toggle checked={filterZeroHoursMeter} onChange={setFilterZeroHoursMeter} label="过滤零小时仪表" />
+                  <Toggle checked={filterZeroKmMeter} onChange={setFilterZeroKmMeter} label="过滤零公里仪表" />
+                  <Toggle checked={filterZeroRunHours} onChange={setFilterZeroRunHours} label="过滤零运行小时数" />
+                  <Toggle checked={filterZeroRunKm} onChange={setFilterZeroRunKm} label="过滤零运行里程" />
+                </div>
+              </div>
+            </div>
           </section>
         </div>
       </Collapsible>
