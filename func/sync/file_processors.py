@@ -365,9 +365,10 @@ def _process_work_efficiency_file(
             df = sheets.get("工时数据")
             if df is None or df.empty:
                 return None
-            if apply_header_mapping and hdr_map and hdr_map.get("entries"):
-                from func.excel_utils import apply_header_mapping as _apply_hdr_map
-                df = _apply_hdr_map(df, hdr_map)
+            # 注意：不要在此处再次调用 apply_header_mapping。
+            # process_excel_data 已在每个 sheet 内部按原始表头完成映射，
+            # 最终 DataFrame 的列名已是中文标准名。再次按 position 映射
+            # 会把 '日期'→'序号'、'班次'→'设备名称' 等，导致列错位。
             return df
 
         result = process_file_generic(
