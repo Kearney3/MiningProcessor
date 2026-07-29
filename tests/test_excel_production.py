@@ -681,13 +681,18 @@ class TestFindFirstMatchingColumn:
 class TestProcessFolder:
     def test_collect_excel_files(self, tmp_path):
         proc = _make_processor({})
+        # 顶层文件
         (tmp_path / "2025.01.15 白班.xlsx").touch()
         (tmp_path / "2025.01.15 夜班.xlsx").touch()
-        (tmp_path / "2025.01.16 白班.xlsm").touch()
-        # These should be filtered out
+        # 子文件夹内的文件
+        sub = tmp_path / "subfolder"
+        sub.mkdir()
+        (sub / "2025.01.16 白班.xlsm").touch()
+        # 应被过滤
         (tmp_path / "2025.01.15 日报.xlsx").touch()
         (tmp_path / "~$temp.xlsx").touch()
         (tmp_path / "readme.txt").touch()
+        (sub / "~$temp.xlsx").touch()
 
         files = proc.collect_excel_files(str(tmp_path))
         assert len(files) == 3
@@ -699,7 +704,10 @@ class TestProcessFolder:
         proc = _make_processor({})
         output_path = tmp_path / "output.xlsx"
         proc.process_folder(str(tmp_path), str(output_path))
-        assert output_path.exists()
+        # 未找到符合条件的 Excel 文件时不应生成结果文件
+        assert not output_path.exists()
+        assert proc._processing_summary["total_files"] == 0
+        assert proc._processing_summary["success_files"] == 0
 
     def test_process_folder_with_valid_files(self, tmp_path):
         load_map = {"TR600": 85}

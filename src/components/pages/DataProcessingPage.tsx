@@ -689,7 +689,6 @@ function WorktimeCard({
   const [month, setMonth] = useState(String(new Date().getMonth() + 1));
   const [useHeaderMapping, setUseHeaderMapping] = useState(false);
   const [headerMode, setHeaderMode] = useState("position");
-  const [fuzzyMatch, setFuzzyMatch] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -714,7 +713,6 @@ function WorktimeCard({
       };
       if (useHeaderMapping) {
         params.header_mode = headerMode;
-        params.fuzzy_match = fuzzyMatch;
       }
       await bridge.call("process_worktime", params);
       setResult("处理完成");
@@ -766,15 +764,6 @@ function WorktimeCard({
                 ]}
               />
             </div>
-            <label className="flex items-center gap-1.5 text-xs text-slate-600">
-              <input
-                type="checkbox"
-                checked={fuzzyMatch}
-                onChange={(e) => setFuzzyMatch(e.target.checked)}
-                className="rounded border-slate-300"
-              />
-              启用模糊匹配
-            </label>
             <p className="text-xs text-slate-400 leading-relaxed">
               映射规则可在「用户配置 → 工作效率表头映射配置」中编辑
             </p>

@@ -149,36 +149,18 @@ class TestPostprocessFromCache:
 class TestBuildWorktimeHeaderMapping:
     @patch("func.config_loader.get_worktime_header_mapping")
     def test_returns_base_mapping_when_no_overrides(self, mock_get):
-        mock_get.return_value = {"mode": "position", "fuzzy": False, "entries": []}
+        mock_get.return_value = {"mode": "position", "entries": []}
         result = build_worktime_header_mapping()
-        assert result == {"mode": "position", "fuzzy": False, "entries": []}
+        assert result == {"mode": "position", "entries": []}
 
     @patch("func.config_loader.get_worktime_header_mapping")
     def test_overrides_mode(self, mock_get):
-        mock_get.return_value = {"mode": "position", "fuzzy": False, "entries": []}
+        mock_get.return_value = {"mode": "position", "entries": []}
         result = build_worktime_header_mapping(mode="name")
         assert result["mode"] == "name"
 
     @patch("func.config_loader.get_worktime_header_mapping")
-    def test_overrides_fuzzy(self, mock_get):
-        mock_get.return_value = {"mode": "position", "fuzzy": False, "entries": []}
-        result = build_worktime_header_mapping(fuzzy=True)
-        assert result["fuzzy"] is True
-
-    @patch("func.config_loader.get_worktime_header_mapping")
-    def test_fuzzy_match_alias_used_when_fuzzy_is_none(self, mock_get):
-        mock_get.return_value = {"mode": "position", "fuzzy": False, "entries": []}
-        result = build_worktime_header_mapping(fuzzy_match=True)
-        assert result["fuzzy"] is True
-
-    @patch("func.config_loader.get_worktime_header_mapping")
-    def test_fuzzy_takes_priority_over_fuzzy_match(self, mock_get):
-        mock_get.return_value = {"mode": "position", "fuzzy": False, "entries": []}
-        result = build_worktime_header_mapping(fuzzy=False, fuzzy_match=True)
-        assert result["fuzzy"] is False
-
-    @patch("func.config_loader.get_worktime_header_mapping")
-    def test_all_params_together(self, mock_get):
-        mock_get.return_value = {"mode": "position", "fuzzy": False, "entries": [{"index": 1}]}
-        result = build_worktime_header_mapping(mode="name", fuzzy=True)
-        assert result == {"mode": "name", "fuzzy": True, "entries": [{"index": 1}]}
+    def test_mode_none_uses_default(self, mock_get):
+        mock_get.return_value = {"mode": "position", "entries": [{"index": 1}]}
+        result = build_worktime_header_mapping()
+        assert result == {"mode": "position", "entries": [{"index": 1}]}

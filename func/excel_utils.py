@@ -472,15 +472,17 @@ def clean_split_dataframe(
 
     result = df.copy()
 
-    # 列名统一转为 str（split_day_night_shifts 可能产生 float/int 列名）
-    result.columns = [str(c) if not isinstance(c, str) else c for c in result.columns]
+    # 列名统一转为 clean string（split_day_night_shifts 可能产生 float/int/NaN 列名）
+    # clean_string 将 NaN → ""，后续会自动移除这些空列名
+    result.columns = [clean_string(c) for c in result.columns]
 
-    # 移除 NaN 列
-    result = result.loc[:, result.columns.notna()]
-
-    # 移除空列名列
+    # 移除空列名列（包括原始 NaN 列名被转为 "" 的情况）
     if "" in result.columns:
         result = result.drop(columns=[""])
+
+    # 注意：不在 per-sheet 阶段移除全 NaN 数据列，因为不同 sheet 的空列集合不同，
+    # 过早移除会导致 pd.concat 时列顺序错乱。全 NaN 列的移除应延迟到 concat 之后。
+    # 参见 drop_all_nan_columns()。
 
     # 按关键字列去空行
     if len(result.columns) > 1:
@@ -498,6 +500,26 @@ def clean_split_dataframe(
     result = result.dropna(how="all", subset=subset_cols)
 
     return result
+
+
+def drop_all_nan_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """移除 DataFrame 中所有值均为 NaN 的列。
+
+    应在 pd.concat 合并多个 sheet 之后调用，而非在单个 sheet 处理阶段。
+    这样可以避免因不同 sheet 的空列集合不同而导致 concat 时列顺序错乱。
+
+    Args:
+        df: 合并后的 DataFrame（返回新对象，不修改原 df）。
+
+    Returns:
+        移除全 NaN 列后的新 DataFrame。
+    """
+    if df.empty:
+        return df
+    nan_cols = [c for c in df.columns if df[c].isna().all()]
+    if nan_cols:
+        return df.drop(columns=nan_cols)
+    return df
 
 
 def dedup_dataframe(
@@ -535,23 +557,38 @@ def apply_header_mapping(
     df: pd.DataFrame,
     mapping_config: dict,
     fuzzy_threshold: int = 70,
+    mode_filter: str | None = None,
 ) -> pd.DataFrame:
     """Rename DataFrame columns according to a mapping configuration.
 
-    Supports two modes:
+    Supports two modes (controlled by ``mapping_config["mode"]`` and
+    the ``mode_filter`` parameter):
 
-    - ``"position"``: match columns by 1-based index.
-    - ``"name"``: match columns by original name (exact match only).
+    - ``"position"``: match columns by 1-based index in the **original**
+      DataFrame (before ``clean_split_dataframe``).  The ``index`` field
+      in each entry corresponds to the column's position in the raw
+      Excel data.
 
-    When *fuzzy* is enabled in the config, it falls back to exact matching
-    (fuzzy matching via rapidfuzz has been removed).
+    - ``"name"``: match columns by keyword search.  Each entry provides
+      a ``keywords`` list.  A column matches if **any** keyword appears
+      in the cleaned column name (OR logic, case-sensitive substring).
+      The first matching entry wins; once a column is renamed it is
+      excluded from subsequent entries.
+
+      Example entry::
+
+          {"keywords": ["设备种类", "төрөл"], "new": "设备种类"}
 
     Args:
         df: The source DataFrame (returned as a new object).
         mapping_config: A dict with ``mode``, ``fuzzy``, and ``entries`` keys.
-            ``entries`` is a list of dicts with ``index``, ``original``, and
+            ``entries`` is a list of dicts with ``index``, ``keywords``, and
             ``new`` keys.
         fuzzy_threshold: Deprecated, kept for API compatibility.
+        mode_filter: If set, only apply entries that match this mode.
+            ``"position"`` — only position-based entries (index != None).
+            ``"name"`` — only keyword-based entries (keywords/非空).
+            ``None`` — apply all entries (default).
 
     Returns:
         A new DataFrame with matched columns renamed.
@@ -559,56 +596,114 @@ def apply_header_mapping(
     if not mapping_config or not mapping_config.get("entries"):
         return df
 
-    mode = mapping_config.get("mode", "position")
-    fuzzy = mapping_config.get("fuzzy", False)
     entries = mapping_config["entries"]
     cols = list(df.columns)
     rename_map: dict[str, str] = {}
 
-    if mode == "position":
-        for entry in entries:
-            idx = entry.get("index")
-            new_name = clean_string(entry.get("new"))
-            if idx is None or not new_name:
-                continue
-            try:
-                idx = int(idx)
-            except (TypeError, ValueError):
-                continue
-            # Config uses 1-based indices; convert to 0-based.
-            if 1 <= idx <= len(cols):
-                idx = idx - 1
-                old_name = cols[idx]
-                rename_map[old_name] = new_name
-    else:
-        # name mode
-        orig_to_new: dict[str, str] = {}
-        for entry in entries:
-            orig = clean_string(entry.get("original"))
-            new_name = clean_string(entry.get("new"))
-            if orig and new_name:
-                orig_to_new[orig] = new_name
-
-        if fuzzy:
-            logger.info("模糊匹配已禁用，回退到精确匹配")
-            for col in cols:
-                col_str = clean_string(col)
-                if col_str in orig_to_new:
-                    rename_map[col] = orig_to_new[col_str]
+    # 按 entry 自身特征和 mode 分类
+    # - 当 mode_filter 指定时，以 mode_filter 为准（有对应字段即收录）
+    # - 否则检查 config 的 mode 字段
+    # - 都没有时按 entry 自身特征分类（向后兼容：有 keywords 优先当 name）
+    effective_mode = mode_filter or mapping_config.get("mode")
+    pos_entries = []
+    kw_entries = []
+    for entry in entries:
+        has_keywords = bool(entry.get("keywords"))
+        has_index = entry.get("index") is not None
+        if effective_mode == "position":
+            # position 模式：只按 index 分类，忽略 keywords
+            if has_index:
+                pos_entries.append(entry)
+        elif effective_mode == "name":
+            # name 模式：只按 keywords 分类，忽略 index
+            if has_keywords:
+                kw_entries.append(entry)
         else:
-            for col in cols:
-                col_str = clean_string(col)
-                if col_str in orig_to_new:
-                    rename_map[col] = orig_to_new[col_str]
+            # 无明确 mode：按 entry 自身特征分类（向后兼容）
+            if has_keywords:
+                kw_entries.append(entry)
+            elif has_index:
+                pos_entries.append(entry)
+
+    # 位置映射（应在 clean_split_dataframe 之前调用，index 对应原始列位置）
+    for entry in pos_entries:
+        idx = entry.get("index")
+        new_name = clean_string(entry.get("new"))
+        if idx is None or not new_name:
+            continue
+        try:
+            idx = int(idx)
+        except (TypeError, ValueError):
+            continue
+        # Config uses 1-based indices; convert to 0-based.
+        if 1 <= idx <= len(cols):
+            old_name = cols[idx - 1]
+            rename_map[old_name] = new_name
+
+    # 关键字映射（应在 clean_split_dataframe 之前调用，关键字匹配原始列名）
+    if kw_entries:
+        kw_map = _match_name_by_keyword(kw_entries, cols)
+        rename_map.update(kw_map)
 
     if rename_map:
+        pos_count = len(pos_entries) if not mode_filter or mode_filter == "position" else 0
+        kw_count = len(kw_entries) if not mode_filter or mode_filter == "name" else 0
+        mode_desc = mode_filter or ("position+name" if pos_count and kw_count else "position" if pos_count else "name")
         logger.info(
             "表头映射生效（模式: %s），重命名 %d 列: %s",
-            mode,
+            mode_desc,
             len(rename_map),
             rename_map,
         )
     return df.rename(columns=rename_map)
+
+
+def _match_name_by_keyword(
+    entries: list[dict],
+    cols: list[str],
+) -> dict[str, str]:
+    """Match mapping entries to DataFrame columns using keyword OR logic.
+
+    Each entry provides a ``keywords`` list.  A column matches if **any**
+    keyword is a substring of the cleaned column name.  First match
+    wins — once a column is renamed it is excluded from later entries.
+
+    Entry format::
+
+        {"keywords": ["设备种类", "төрөл"], "new": "设备种类"}
+
+    Returns:
+        ``{original_col_name: new_name}`` rename mapping.
+    """
+    rename_map: dict[str, str] = {}
+
+    # Prepare entries: (keywords_list, new_name)
+    prepared: list[tuple[list[str], str]] = []
+    for entry in entries:
+        new_name = clean_string(entry.get("new"))
+        if not new_name:
+            continue
+        raw_keywords = entry.get("keywords")
+        if not raw_keywords or not isinstance(raw_keywords, list):
+            continue
+        keywords = [clean_string(kw) for kw in raw_keywords if clean_string(kw)]
+        if keywords:
+            prepared.append((keywords, new_name))
+
+    # Build cleaned column list: (clean_name, original_name)
+    col_pairs: list[tuple[str, str]] = [(clean_string(c), c) for c in cols]
+
+    matched: set[str] = set()  # original column names already matched
+    for keywords, new_name in prepared:
+        for col_clean, col_orig in col_pairs:
+            if col_orig in matched:
+                continue
+            if any(kw in col_clean for kw in keywords):
+                rename_map[col_orig] = new_name
+                matched.add(col_orig)
+                break
+
+    return rename_map
 
 
 def strip_date_only_times(df: pd.DataFrame) -> pd.DataFrame:

@@ -407,8 +407,6 @@ def _process_worktime(params: dict) -> dict:
     if params.get("use_header_mapping"):
         header_mapping = build_worktime_header_mapping(
             mode=params.get("header_mode"),
-            fuzzy=params.get("header_fuzzy"),
-            fuzzy_match=params.get("fuzzy_match"),
         )
 
     year, month = params["year"], params["month"]
@@ -635,8 +633,6 @@ def _batch_process(params: dict) -> dict:
     if params.get("use_worktime_header_mapping"):
         worktime_header_mapping = build_worktime_header_mapping(
             mode=params.get("header_mode"),
-            fuzzy=params.get("header_fuzzy"),
-            fuzzy_match=params.get("fuzzy_match"),
         )
 
     # 重置取消标记

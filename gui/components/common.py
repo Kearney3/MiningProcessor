@@ -153,48 +153,34 @@ def create_confirm_dialog(
 
 
 class HeaderModeConfig:
-    """工时表头模式切换控件组（Checkbox + ChipToggle + 模糊匹配 Checkbox）。
+    """工时表头模式切换控件组（Checkbox + ChipToggle）。
 
     用法：
         hmc = HeaderModeConfig(label="表头修改", tooltip="...")
-        # 在布局中使用 hmc.toggle, hmc.mode.row, hmc.fuzzy
-        # 在 refs 中注册 hmc.toggle, hmc.mode, hmc.fuzzy
+        # 在布局中使用 hmc.toggle, hmc.mode.row
+        # 在 refs 中注册 hmc.toggle, hmc.mode
     """
 
     def __init__(
         self,
         label: str = "表头修改",
         tooltip: str = "开启后按配置的映射关系重命名输出表头",
-        fuzzy_label: str = "模糊匹配",
-        fuzzy_tooltip: str = "按列名匹配时启用模糊匹配（允许列名部分匹配）",
         on_toggle_extra=None,
     ):
         self.toggle = ft.Checkbox(label=label, value=True, tooltip=tooltip)
-        self.fuzzy = ft.Checkbox(
-            label=fuzzy_label, value=False, tooltip=fuzzy_tooltip, visible=False,
-        )
         self.mode = ChipToggle(
             options=[("position", "按位置"), ("name", "按列名")],
-            on_change=self._on_mode_change,
         )
         self.mode.row.visible = self.toggle.value
         self._on_toggle_extra = on_toggle_extra
         self.toggle.on_change = self._on_toggle_change
-
-    def _on_mode_change(self, val):
-        self.fuzzy.visible = (val != "position")
-        safe_update(self.fuzzy)
 
     def _on_toggle_change(self, e):
         enabled = self.toggle.value
         for chip in self.mode._chips:
             chip.disabled = not enabled
         self.mode.row.visible = enabled
-        if not enabled:
-            self.fuzzy.visible = False
-        else:
-            self.fuzzy.visible = (self.mode.value == "name")
-        safe_update(self.mode.row, self.fuzzy)
+        safe_update(self.mode.row)
         if self._on_toggle_extra:
             self._on_toggle_extra(enabled)
 

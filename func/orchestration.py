@@ -147,20 +147,13 @@ def postprocess_from_cache(
 
 def build_worktime_header_mapping(
     mode: Optional[str] = None,
-    fuzzy: Optional[bool] = None,
-    fuzzy_match: Optional[bool] = None,
 ) -> dict:
     """构建工时表头映射配置。
 
-    从 config_loader 获取基础配置，然后按传入参数覆盖 mode 和 fuzzy。
-
-    支持 ``fuzzy_match`` 别名（前端兼容），当 ``fuzzy`` 为 None 时回退到
-    ``fuzzy_match`` 的值。
+    从 config_loader 获取基础配置，然后按传入参数覆盖 mode。
 
     Args:
         mode: 覆盖映射模式（"position" 或 "name"），None 时使用配置默认值
-        fuzzy: 是否启用模糊匹配，None 时回退到 fuzzy_match
-        fuzzy_match: fuzzy 的别名，用于兼容前端参数名
 
     Returns:
         完整的 header_mapping dict，可直接传给 process_worktime_data / process_excel_data
@@ -170,10 +163,6 @@ def build_worktime_header_mapping(
     mapping = get_worktime_header_mapping()
     if mode is not None:
         mapping["mode"] = mode
-    if fuzzy is not None:
-        mapping["fuzzy"] = fuzzy
-    elif fuzzy_match is not None:
-        mapping["fuzzy"] = fuzzy_match
     return mapping
 
 

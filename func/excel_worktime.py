@@ -5,7 +5,7 @@ import argparse
 # 假设 func.logger 已经正确配置
 from func.logger import get_logger
 from func.string_utils import clean_string
-from func.excel_utils import apply_header_mapping, split_day_night_shifts, clean_split_dataframe, strip_date_column, sort_by_date_shift, dedup_dataframe, get_hidden_indices, filter_hidden_from_df, adjust_index_for_hidden, open_workbook
+from func.excel_utils import apply_header_mapping, split_day_night_shifts, clean_split_dataframe, strip_date_column, sort_by_date_shift, dedup_dataframe, drop_all_nan_columns, get_hidden_indices, filter_hidden_from_df, adjust_index_for_hidden, open_workbook
 from func.anomaly import detect_and_filter
 from func.anomaly.rules import AnomalyConfig
 from func import config_loader
@@ -89,6 +89,16 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
                 else:
                     combined_day_df = split_day_night_shifts(df_raw)
 
+                # 2.5 表头映射（在 clean 之前，按 mode 决定映射方式）
+                # - position: 按原始列位置映射
+                # - name: 按关键字子串匹配原始列名
+                if header_mapping and header_mapping.get('entries'):
+                    mode = header_mapping.get("mode", "name")
+                    combined_day_df = apply_header_mapping(
+                        combined_day_df, header_mapping,
+                        mode_filter="position" if mode == "position" else "name",
+                    )
+
                 # 插入日期列到第一列
                 combined_day_df.insert(0, '日期', date_str)
 
@@ -112,6 +122,9 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
 
     final_df = pd.concat(all_data, axis=0, ignore_index=True)
 
+    # 合并后统一移除全 NaN 列（避免 per-sheet 移除导致 concat 列顺序错乱）
+    final_df = drop_all_nan_columns(final_df)
+
     # 5. 排序：按日期排序, 并将日期列转换为日期类型, 去除时间部分
     final_df = strip_date_column(final_df, date_format="%Y-%m-%d")
     final_df = sort_by_date_shift(final_df)
@@ -119,10 +132,6 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
     # 把日期和班次的位置放在第一列和第二列
     other_cols = [col for col in final_df.columns if col not in ['日期', '班次']]
     final_df = final_df[['日期', '班次'] + other_cols]
-
-    # 6. 应用表头映射（数据处理完成后，对最终列结构进行重命名）
-    if header_mapping and header_mapping.get('entries'):
-        final_df = apply_header_mapping(final_df, header_mapping)
 
     # 去重
     final_df = dedup_dataframe(final_df, "工时数据")

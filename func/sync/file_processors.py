@@ -365,10 +365,8 @@ def _process_work_efficiency_file(
             df = sheets.get("工时数据")
             if df is None or df.empty:
                 return None
-            # 注意：不要在此处再次调用 apply_header_mapping。
-            # process_excel_data 已在每个 sheet 内部按原始表头完成映射，
-            # 最终 DataFrame 的列名已是中文标准名。再次按 position 映射
-            # 会把 '日期'→'序号'、'班次'→'设备名称' 等，导致列错位。
+            # 注意：process_excel_data 已在内部完成表头映射（关键字+位置），
+            # 此处不再重复调用 apply_header_mapping，否则会导致二次映射。
             return df
 
         result = process_file_generic(

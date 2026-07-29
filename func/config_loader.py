@@ -114,37 +114,7 @@ DEFAULT_FILE_KEYWORDS: dict[str, list[str]] = {
     "maintenance": ["设备出勤统计表"],
 }
 
-DEFAULT_WORKTIME_HEADER_MAPPING: dict = {
-    "mode": "position",
-    "fuzzy": False,
-    "entries": [
-        {"index": 1, "original": "", "new": "日期"},
-        {"index": 2, "original": "", "new": "班次"},
-        {"index": 3, "original": "", "new": "序号"},
-        {"index": 4, "original": "", "new": "设备名称"},
-        {"index": 5, "original": "", "new": "公司"},
-        {"index": 6, "original": "", "new": "应运行分钟"},
-        {"index": 7, "original": "", "new": "应运行小时数"},
-        {"index": 8, "original": "", "new": "停车/换班"},
-        {"index": 9, "original": "", "new": "转移"},
-        {"index": 10, "original": "", "new": "挖机场地推土/清理墙壁"},
-        {"index": 11, "original": "", "new": "等待装货"},
-        {"index": 12, "original": "", "new": "爆破"},
-        {"index": 13, "original": "", "new": "就餐/休息时间"},
-        {"index": 14, "original": "", "new": "柴油"},
-        {"index": 15, "original": "", "new": "计划维修/润滑"},
-        {"index": 16, "original": "", "new": "未计划/故障"},
-        {"index": 17, "original": "", "new": "待命"},
-        {"index": 18, "original": "", "new": "因天气：大风暴，雨，雪"},
-        {"index": 19, "original": "", "new": "扬尘：洒水车不足"},
-        {"index": 20, "original": "", "new": "排队/装水"},
-        {"index": 21, "original": "", "new": "总产量生产运行分钟"},
-        {"index": 22, "original": "", "new": "因电力原因停车/计划"},
-        {"index": 23, "original": "", "new": "因电力原因停车/未计划"},
-        {"index": 24, "original": "", "new": "总产量生产运行小时"},
-        {"index": 25, "original": "", "new": "注释"},
-    ],
-}
+# DEFAULT_WORKTIME_HEADER_MAPPING 已移至 config.json
 
 DEFAULT_ANOMALY_DETECTION: dict[str, Any] = {
     "enabled": False,
@@ -689,25 +659,27 @@ def import_maintenance_classifications(path: str) -> dict:
 def get_worktime_header_mapping() -> dict:
     """获取工作效率表头映射配置。
 
+    优先返回 config.user.json 中的用户覆盖，否则返回 config.json 中的默认值。
+
     返回格式::
 
         {
             "mode": "position" | "name",
-            "fuzzy": False,
             "entries": [
-                {"index": 0, "original": "原始列名", "new": "新列名"},
+                {"index": 1, "keywords": ["设备种类", "төрөл"], "new": "设备种类"},
                 ...
             ]
         }
     """
     saved = get_user_config("worktime_header_mapping", None)
-    if saved and isinstance(saved, dict):
-        merged = dict(DEFAULT_WORKTIME_HEADER_MAPPING)
-        merged.update({k: v for k, v in saved.items() if k in DEFAULT_WORKTIME_HEADER_MAPPING})
-        if not isinstance(merged.get("entries"), list):
-            merged["entries"] = []
-        return merged
-    return dict(DEFAULT_WORKTIME_HEADER_MAPPING)
+    if saved and isinstance(saved, dict) and isinstance(saved.get("entries"), list):
+        return dict(saved)
+    # 从 config.json 读取默认配置
+    cfg = load_config()
+    default = cfg.get("worktime_header_mapping", {})
+    if isinstance(default, dict) and isinstance(default.get("entries"), list):
+        return dict(default)
+    return {"mode": "position", "entries": []}
 
 
 def save_worktime_header_mapping(mapping: dict) -> None:
