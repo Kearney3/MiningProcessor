@@ -1170,7 +1170,7 @@ def process_maintenance_llm(
         classified: list[dict] = []
 
         def _safe_str(val: Any) -> str:
-            if val is None or (isinstance(val, float) and math.isnan(val)):
+            if val is None:
                 return ""
             try:
                 if pd.isna(val):
