@@ -660,17 +660,7 @@ def _build_records(
 
 
 class BatchProgressBar:
-    """实时进度条：每批次状态追踪 + 活动日志 + 总进度固定在底部。"""
-
-    _GREEN = "\033[92m"
-    _CYAN = "\033[96m"
-    _YELLOW = "\033[93m"
-    _MAGENTA = "\033[95m"
-    _RED = "\033[91m"
-    _DIM = "\033[2m"
-    _BOLD = "\033[1m"
-    _RESET = "\033[0m"
-    _MAX_ACTIVITY_LINES = 5
+    """实时进度追踪：每批次状态 + 活动日志 + 进度前缀。"""
 
     def __init__(
         self,
@@ -679,181 +669,123 @@ class BatchProgressBar:
         total_records: int,
         completed_from_checkpoint: int,
         concurrency: int,
+        progress_fn=None,
+        show_progress_bar: bool = False,
     ) -> None:
         self._total_batches = total_batches
         self._total_records = total_records
         self._completed = completed_from_checkpoint
         self._done_batches = 0
-        self._batch_states: dict[int, str] = {}
-        self._activity_log: list[str] = []
+        self._batch_states = {}
         self._lock = threading.Lock()
         self._start = time.monotonic()
-        self._prev_activity_lines = 0
-        self._is_tty = hasattr(sys.stderr, "isatty") and sys.stderr.isatty()
-        self._logger = logging.getLogger(__name__)
-        self._orig_level: int | None = None
-
-    def start(self) -> None:
-        if self._total_batches == 0:
-            return
-        self._orig_level = self._logger.level
-        self._logger.setLevel(max(self._orig_level, logging.WARNING))
-        if self._is_tty:
-            self._render({}, [])
-
-    def record_running(self, batch_num: int) -> None:
-        with self._lock:
-            self._batch_states[batch_num] = "running"
-            states = dict(self._batch_states)
-            activity = list(self._activity_log[-self._MAX_ACTIVITY_LINES:])
-        self._render(states, activity)
-
-    def record_retry(self, batch_num: int, attempt: int, error: Exception) -> None:
-        entry = (
-            f"{self._YELLOW}↻ 批次 #{batch_num} 第{attempt}次重试"
-            f" ({error}){self._RESET}"
-        )
-        with self._lock:
-            self._batch_states[batch_num] = "retrying"
-            self._activity_log.append(entry)
-            states = dict(self._batch_states)
-            activity = list(self._activity_log[-self._MAX_ACTIVITY_LINES:])
-        self._render(states, activity)
-
-    def record_success(self, batch_num: int, records: int = 0) -> None:
-        entry = (
-            f"{self._GREEN}✓ 批次 #{batch_num} 完成"
-            f" ({records}条){self._RESET}"
-        )
-        with self._lock:
-            self._done_batches += 1
-            self._completed += records
-            self._batch_states[batch_num] = "success"
-            self._activity_log.append(entry)
-            done = self._done_batches
-            completed = self._completed
-            states = dict(self._batch_states)
-            activity = list(self._activity_log[-self._MAX_ACTIVITY_LINES:])
-        if self._is_tty:
-            self._render(states, activity)
-        else:
-            elapsed = time.monotonic() - self._start
-            rate = completed / elapsed if elapsed > 0 else 0
-            self._logger.warning(
-                "进度: %d/%d 批次 | %d/%d 条 | %.1f 条/秒",
-                done, self._total_batches, completed, self._total_records, rate,
-            )
-
-    def record_failure(self, batch_num: int, error: Exception) -> None:
-        entry = f"{self._RED}✗ 批次 #{batch_num} 失败 ({error}){self._RESET}"
-        with self._lock:
-            self._done_batches += 1
-            self._batch_states[batch_num] = "failed"
-            self._activity_log.append(entry)
-            done = self._done_batches
-            states = dict(self._batch_states)
-            activity = list(self._activity_log[-self._MAX_ACTIVITY_LINES:])
-        if self._is_tty:
-            self._render(states, activity)
-        else:
-            self._logger.error(
-                "批次 #%d 失败: %s (%d/%d 完成)",
-                batch_num, error, done, self._total_batches,
-            )
-
-    def stop(self) -> None:
-        if self._orig_level is not None:
-            self._logger.setLevel(self._orig_level)
-        if self._is_tty:
-            with self._lock:
-                states = dict(self._batch_states)
-                activity = list(self._activity_log[-self._MAX_ACTIVITY_LINES:])
-            self._render(states, activity)
-            sys.stderr.write("\n")
-            sys.stderr.flush()
+        self._progress_fn = progress_fn
+        self._show_progress_bar = show_progress_bar
+        self._log = logging.getLogger(__name__)
 
     def _format_elapsed(self, seconds: float) -> str:
         m, s = divmod(int(seconds), 60)
         return f"{m:02d}:{s:02d}" if m else f"{s}s"
 
-    def _render(
-        self, batch_states: dict[int, str], activity: list[str]
-    ) -> None:
+    def _progress_prefix(self) -> str:
+        done = self._done_batches
+        total = self._total_batches
+        completed = self._completed
+        pct = done / total if total else 0
+        elapsed = time.monotonic() - self._start
+        rate = completed / elapsed if elapsed > 0 else 0
+        remaining = (total - done) / (done / elapsed) if done > 0 else 0
+        return (
+            f"[{pct:>3.0%} {done}/{total}\u6279"
+            f" {completed}/{self._total_records}\u6761"
+            f" {rate:.1f}/s ETA {self._format_elapsed(remaining)}]"
+        )
+
+    def _emit_progress(self) -> None:
+        if not self._progress_fn and not self._show_progress_bar:
+            return
         now = time.monotonic()
         done = self._done_batches
         completed = self._completed
         total = self._total_batches
         elapsed = now - self._start
         pct = done / total if total else 0
-        bar_w = 30
-        filled = int(bar_w * pct)
-        bar = "█" * filled + "░" * (bar_w - filled)
         rate = completed / elapsed if elapsed > 0 else 0
         remaining = (total - done) / (done / elapsed) if done > 0 else 0
-
         n_running = sum(
-            1 for v in batch_states.values() if v in ("running", "retrying")
+            1 for v in self._batch_states.values() if v in ("running", "retrying")
         )
-        n_success = sum(1 for v in batch_states.values() if v == "success")
-        n_failed = sum(1 for v in batch_states.values() if v == "failed")
-        n_retrying = sum(1 for v in batch_states.values() if v == "retrying")
-
-        stats_parts = [
-            f"{self._GREEN}{n_success}{self._RESET}",
-        ]
-        if n_failed > 0:
-            stats_parts.append(f"{self._RED}{n_failed}{self._RESET}")
-        if n_retrying > 0:
-            stats_parts.append(f"{self._YELLOW}{n_retrying}重试{self._RESET}")
-        stats_str = " ".join(stats_parts)
-
-        run_parts = []
-        if n_running > 0:
-            run_parts.append(f"{self._CYAN}●{n_running}处理中{self._RESET}")
-        run_str = (
-            f" {self._DIM}|{self._RESET} " + " ".join(run_parts)
-            if run_parts
-            else ""
+        n_retrying = sum(
+            1 for v in self._batch_states.values() if v == "retrying"
         )
-
-        line1 = (
-            f"\r\033[2K{self._BOLD}LLM 标注{self._RESET} "
-            f"{bar} {self._BOLD}{pct:.0%}{self._RESET} "
-            f"{done}/{total}批次 "
-            f"({stats_str}){run_str}"
+        n_failed = sum(
+            1 for v in self._batch_states.values() if v == "failed"
         )
-        line2 = (
-            f"\r\033[2K  {self._DIM}└{self._RESET} "
-            f"{self._CYAN}{completed}{self._RESET}"
-            f"/{self._total_records}条"
-            f" {self._DIM}|{self._RESET} "
-            f"{self._YELLOW}{rate:.1f}条/s{self._RESET}"
-            f" {self._DIM}|{self._RESET} "
-            f"ETA {self._MAGENTA}{self._format_elapsed(remaining)}{self._RESET}"
-            f" {self._DIM}|{self._RESET} "
-            f"{self._format_elapsed(elapsed)}"
+        detail = (
+            f"{done}/{total}\u6279\u6b21 | {completed}/{self._total_records}\u6761"
+            + (f" | {n_running}\u5904\u7406\u4e2d" if n_running else "")
+            + (f" | {n_retrying}\u91cd\u8bd5" if n_retrying else "")
+            + (f" | {n_failed}\u5931\u8d25" if n_failed else "")
+            + f" | {rate:.1f}\u6761/s | ETA {self._format_elapsed(remaining)}"
         )
+        data = {
+            "stage": "llm_labeling",
+            "percent": round(pct * 100),
+            "current": completed,
+            "total": self._total_records,
+            "detail": detail,
+        }
+        if self._progress_fn:
+            self._progress_fn(detail, data)
+        if self._show_progress_bar:
+            import json as _json
+            sys.stderr.write(
+                _json.dumps(
+                    {"event": "progress", "data": data}, ensure_ascii=False,
+                ) + "\n"
+            )
+            sys.stderr.flush()
 
-        buf = []
-        prev = self._prev_activity_lines
-        n_activity = len(activity)
+    def start(self) -> None:
+        pass
 
-        if prev > 0:
-            buf.append(f"\033[{prev + 2}A")
+    def record_running(self, batch_num: int) -> None:
+        with self._lock:
+            self._batch_states[batch_num] = "running"
+        self._emit_progress()
 
-        for ln in activity:
-            buf.append(f"\r\033[2K {ln}\n")
-        for _ in range(prev - n_activity):
-            buf.append("\r\033[2K\n")
+    def record_retry(self, batch_num: int, attempt: int, error: Exception) -> None:
+        with self._lock:
+            self._batch_states[batch_num] = "retrying"
+        self._log.warning(
+            "%s\u21bb \u6279\u6b21 #%d \u7b2c%d\u6b21\u91cd\u8bd5 (%s)",
+            self._progress_prefix(), batch_num, attempt, error,
+        )
+        self._emit_progress()
 
-        buf.append(f"{line1}\n")
-        buf.append(line2)
+    def record_success(self, batch_num: int, records: int = 0) -> None:
+        with self._lock:
+            self._done_batches += 1
+            self._completed += records
+            self._batch_states[batch_num] = "success"
+        self._log.info(
+            "%s\u2713 \u6279\u6b21 #%d \u5b8c\u6210 (%d\u6761)",
+            self._progress_prefix(), batch_num, records,
+        )
+        self._emit_progress()
 
-        sys.stderr.write("".join(buf))
-        sys.stderr.flush()
-        self._prev_activity_lines = n_activity
+    def record_failure(self, batch_num: int, error: Exception) -> None:
+        with self._lock:
+            self._done_batches += 1
+            self._batch_states[batch_num] = "failed"
+        self._log.error(
+            "%s\u2717 \u6279\u6b21 #%d \u5931\u8d25 (%s)",
+            self._progress_prefix(), batch_num, error,
+        )
+        self._emit_progress()
 
-
+    def stop(self) -> None:
+        self._emit_progress()
 def label_file(
     input_path: str,
     *,
@@ -1060,6 +992,9 @@ def process_maintenance_llm(
     checkpoint_path: str | None = None,
     max_content_chars: int = 800,
     cancel_event: threading.Event | None = None,
+    cancel_file: Path | None = None,
+    progress_fn: Callable[[str, dict], None] | None = None,
+    show_progress_bar: bool = False,
 ) -> dict:
     """对本地已分类的维修明细进行 LLM 标注并导出结果。
 
@@ -1140,10 +1075,16 @@ def process_maintenance_llm(
         total_records=len(pending_indexes),
         completed_from_checkpoint=len(completed),
         concurrency=min(concurrency, total_batches) if total_batches else 1,
+        progress_fn=progress_fn,
+        show_progress_bar=show_progress_bar,
     )
 
     def _process_batch(batch_indexes: list, prog: BatchProgressBar) -> list[str]:
         if cancel_event is not None and cancel_event.is_set():
+            raise _Cancelled("标注已取消")
+        if cancel_file is not None and cancel_file.exists():
+            if cancel_event is not None:
+                cancel_event.set()
             raise _Cancelled("标注已取消")
         nonlocal done_count
         batch_num = batches.index(batch_indexes) + 1
@@ -1189,6 +1130,8 @@ def process_maintenance_llm(
                     failed_errors.append(exc)
     finally:
         progress.stop()
+        if cancel_file is not None:
+            cancel_file.unlink(missing_ok=True)
 
     if cancelled:
         logger.warning("标注已取消，已完成 %d 条", len(completed))

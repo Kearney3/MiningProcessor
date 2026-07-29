@@ -200,6 +200,12 @@ export function usePythonBridge() {
             .filter((entry) => entry.event === "log")
             .map((entry) => entry.data),
         );
+        // Extract progress events from the batch
+        for (const entry of entries) {
+          if (entry.event === "progress") {
+            setProgress(entry.data as unknown as BatchProgress);
+          }
+        }
       } else if (data.event === "progress") {
         setProgress(data.data as unknown as BatchProgress);
       }

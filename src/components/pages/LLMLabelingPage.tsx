@@ -1,6 +1,7 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { BridgeProp } from "../../lib/types";
+import { invoke } from "@tauri-apps/api/core";
+import type { BridgeProp, BatchProgress } from "../../lib/types";
 import { useToast } from "../Toast";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { useLastDirectory } from "../../hooks/useLastDirectory";
@@ -131,9 +132,19 @@ interface PreviewData {
   sample: Record<string, unknown>[];
 }
 
-export function LLMLabelingPage({ bridge }: { bridge: BridgeProp }) {
+export function LLMLabelingPage({ bridge, progress, setProgress }: {
+  bridge: BridgeProp;
+  progress: BatchProgress | null;
+  setProgress: (p: BatchProgress | null) => void;
+}) {
   const { notify } = useToast();
   const { initialDir } = useLastDirectory(bridge);
+
+  // Clear stale progress on mount
+  useEffect(() => {
+    setProgress(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Step state
   const [step, setStep] = useState(1);
@@ -236,7 +247,7 @@ export function LLMLabelingPage({ bridge }: { bridge: BridgeProp }) {
   // ── Cancel labeling ──
   const handleCancel = async () => {
     try {
-      await bridge.call("cancel_llm_labeling", {});
+      await invoke("cancel_task");
       notify("正在取消...", "info");
     } catch {
       // ignore
@@ -248,6 +259,7 @@ export function LLMLabelingPage({ bridge }: { bridge: BridgeProp }) {
     setLoading(true);
     setError(null);
     setResult(null);
+    setProgress(null);
     try {
       const res = await bridge.call<{
         input_rows: number;
@@ -278,6 +290,7 @@ export function LLMLabelingPage({ bridge }: { bridge: BridgeProp }) {
       notify(`LLM 标注失败: ${e}`, "error");
     } finally {
       setLoading(false);
+      setProgress(null);
     }
   };
 
@@ -483,6 +496,29 @@ export function LLMLabelingPage({ bridge }: { bridge: BridgeProp }) {
               </button>
             )}
           </div>
+
+          {/* Progress bar */}
+          {loading && progress && (
+            <div className="mt-3 space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-600 font-medium">
+                  {progress.stage === "llm_labeling" ? "LLM 标注" : progress.stage}
+                </span>
+                <span className="text-slate-500 tabular-nums">
+                  {progress.current}/{progress.total} 条 ({progress.percent}%)
+                </span>
+              </div>
+              <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-blue-500 h-2 rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${Math.max(1, progress.percent)}%` }}
+                />
+              </div>
+              {progress.detail && (
+                <p className="text-xs text-slate-400 truncate">{progress.detail}</p>
+              )}
+            </div>
+          )}
         </div>
       )}
 
