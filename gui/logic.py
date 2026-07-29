@@ -530,10 +530,8 @@ async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=
     if header_toggle and header_toggle.value:
         from func.orchestration import build_worktime_header_mapping
         header_mode = work_refs.get("header_mode")
-        header_fuzzy = work_refs.get("header_fuzzy")
         header_mapping = build_worktime_header_mapping(
             mode=header_mode.value if header_mode else None,
-            fuzzy=header_fuzzy.value if header_fuzzy else None,
         )
     await _safe_run_task(page, btn, "处理", path, log, "worktime",
                          year=year, month=month,
@@ -792,10 +790,8 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
         if header_toggle and header_toggle.value:
             from func.orchestration import build_worktime_header_mapping
             header_mode = batch_refs.get("header_mode")
-            header_fuzzy = batch_refs.get("header_fuzzy")
             worktime_header_mapping = build_worktime_header_mapping(
                 mode=header_mode.value if header_mode else None,
-                fuzzy=header_fuzzy.value if header_fuzzy else None,
             )
 
         # ── 第三阶段：执行处理 ──

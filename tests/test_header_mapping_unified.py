@@ -7,21 +7,20 @@ from func.excel_utils import apply_header_mapping
 
 
 # ---------------------------------------------------------------------------
-# Exact matching (name mode, fuzzy=False)
+# Exact matching (name mode, single keyword = substring)
 # ---------------------------------------------------------------------------
 
 
 class TestExactNameMatching:
-    """Exact column-name matching without fuzzy."""
+    """Single-keyword name matching (substring OR logic)."""
 
     def test_basic_exact_match(self):
         df = pd.DataFrame({"A": [1], "B": [2], "C": [3]})
         cfg = {
             "mode": "name",
-            "fuzzy": False,
             "entries": [
-                {"original": "A", "new": "Alpha"},
-                {"original": "B", "new": "Beta"},
+                {"keywords": ["A"], "new": "Alpha"},
+                {"keywords": ["B"], "new": "Beta"},
             ],
         }
         result = apply_header_mapping(df, cfg)
@@ -31,8 +30,7 @@ class TestExactNameMatching:
         df = pd.DataFrame({"X": [1], "Y": [2]})
         cfg = {
             "mode": "name",
-            "fuzzy": False,
-            "entries": [{"original": "Z", "new": "Zeta"}],
+            "entries": [{"keywords": ["Z"], "new": "Zeta"}],
         }
         result = apply_header_mapping(df, cfg)
         assert list(result.columns) == ["X", "Y"]
@@ -41,10 +39,9 @@ class TestExactNameMatching:
         df = pd.DataFrame({"  A  ": [1], "B\n": [2]})
         cfg = {
             "mode": "name",
-            "fuzzy": False,
             "entries": [
-                {"original": "A", "new": "Alpha"},
-                {"original": "B", "new": "Beta"},
+                {"keywords": ["A"], "new": "Alpha"},
+                {"keywords": ["B"], "new": "Beta"},
             ],
         }
         result = apply_header_mapping(df, cfg)
@@ -103,40 +100,6 @@ class TestPositionMatching:
 
 
 # ---------------------------------------------------------------------------
-# Fuzzy matching
-# ---------------------------------------------------------------------------
-
-
-class TestFuzzyFlagDeprecated:
-    """fuzzy=True 时回退到精确匹配（rapidfuzz 已移除）"""
-
-    def test_fuzzy_flag_falls_back_to_exact(self):
-        df = pd.DataFrame({"Equipment Name": [1], "Company": [2]})
-        cfg = {
-            "mode": "name",
-            "fuzzy": True,
-            "entries": [
-                {"original": "Equipment Name", "new": "设备名称"},
-                {"original": "Company", "new": "公司"},
-            ],
-        }
-        # 精确匹配应正常工作
-        result = apply_header_mapping(df, cfg)
-        assert list(result.columns) == ["设备名称", "公司"]
-
-    def test_fuzzy_flag_no_partial_match(self):
-        """fuzzy=True 不再进行模糊匹配，不精确的名称不会被重命名"""
-        df = pd.DataFrame({"equipment name": [1]})
-        cfg = {
-            "mode": "name",
-            "fuzzy": True,
-            "entries": [{"original": "Equipment Name", "new": "设备名称"}],
-        }
-        result = apply_header_mapping(df, cfg)
-        assert list(result.columns) == ["equipment name"]
-
-
-# ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
 
@@ -163,7 +126,7 @@ class TestEdgeCases:
         df = pd.DataFrame()
         cfg = {
             "mode": "name",
-            "entries": [{"original": "A", "new": "B"}],
+            "entries": [{"keywords": ["A"], "new": "B"}],
         }
         result = apply_header_mapping(df, cfg)
         assert result.empty
@@ -173,20 +136,20 @@ class TestEdgeCases:
         cfg = {
             "mode": "name",
             "entries": [
-                {"original": "A", "new": ""},
-                {"original": "B", "new": "Beta"},
+                {"keywords": ["A"], "new": ""},
+                {"keywords": ["B"], "new": "Beta"},
             ],
         }
         result = apply_header_mapping(df, cfg)
         assert list(result.columns) == ["A", "Beta"]
 
-    def test_entry_with_empty_original_is_skipped(self):
+    def test_entry_with_empty_keywords_is_skipped(self):
         df = pd.DataFrame({"A": [1], "B": [2]})
         cfg = {
             "mode": "name",
             "entries": [
-                {"original": "", "new": "Nope"},
-                {"original": "B", "new": "Beta"},
+                {"keywords": [], "new": "Nope"},
+                {"keywords": ["B"], "new": "Beta"},
             ],
         }
         result = apply_header_mapping(df, cfg)
@@ -197,7 +160,7 @@ class TestEdgeCases:
         original_cols = list(df.columns)
         cfg = {
             "mode": "name",
-            "entries": [{"original": "A", "new": "Alpha"}],
+            "entries": [{"keywords": ["A"], "new": "Alpha"}],
         }
         result = apply_header_mapping(df, cfg)
         assert list(df.columns) == original_cols
@@ -228,10 +191,9 @@ class TestPartialMatches:
         df = pd.DataFrame({"A": [1], "B": [2], "C": [3]})
         cfg = {
             "mode": "name",
-            "fuzzy": False,
             "entries": [
-                {"original": "A", "new": "Alpha"},
-                {"original": "Z", "new": "Zeta"},
+                {"keywords": ["A"], "new": "Alpha"},
+                {"keywords": ["Z"], "new": "Zeta"},
             ],
         }
         result = apply_header_mapping(df, cfg)
@@ -262,8 +224,216 @@ class TestDataPreservation:
         df = pd.DataFrame({"A": [1, 2, 3], "B": ["x", "y", "z"]})
         cfg = {
             "mode": "name",
-            "entries": [{"original": "A", "new": "Alpha"}],
+            "entries": [{"keywords": ["A"], "new": "Alpha"}],
         }
         result = apply_header_mapping(df, cfg)
         assert list(result["Alpha"]) == [1, 2, 3]
         assert list(result["B"]) == ["x", "y", "z"]
+
+
+# ---------------------------------------------------------------------------
+# Substring matching (single keyword)
+# ---------------------------------------------------------------------------
+
+
+class TestSubstringMatch:
+    """Name matching with single keyword = substring containment."""
+
+    def test_substring_single_match(self):
+        """Entry '设备种类' matches column '设备种类 Техникийн төрөл'."""
+        df = pd.DataFrame({
+            "设备种类                             Техникийн төрөл ": ["EX5600"],
+            "公司 Компани": ["Normount"],
+        })
+        cfg = {
+            "mode": "name",
+            "entries": [{"keywords": ["设备种类"], "new": "EquipmentType"}],
+        }
+        result = apply_header_mapping(df, cfg)
+        assert "EquipmentType" in result.columns
+        assert "公司 Компани" in result.columns
+
+    def test_substring_ambiguous_picks_first_column(self):
+        """Ambiguous substring match picks the first matching column."""
+        df = pd.DataFrame({
+            "运行分钟 总计": [100],
+            "运行分钟 计划": [80],
+            "其他": [20],
+        })
+        cfg = {
+            "mode": "name",
+            "entries": [{"keywords": ["运行分钟"], "new": "RunMin"}],
+        }
+        result = apply_header_mapping(df, cfg)
+        assert "RunMin" in result.columns
+        assert result.columns.tolist() == ["RunMin", "运行分钟 计划", "其他"]
+
+    def test_substring_first_column_in_df_order_wins(self):
+        """When multiple columns match, the first in DataFrame order wins."""
+        df = pd.DataFrame({
+            "A": [1],
+            "A extended": [2],
+        })
+        cfg = {
+            "mode": "name",
+            "entries": [{"keywords": ["A"], "new": "Alpha"}],
+        }
+        result = apply_header_mapping(df, cfg)
+        assert result.columns.tolist() == ["Alpha", "A extended"]
+
+
+# ---------------------------------------------------------------------------
+# Multi-keyword matching (OR logic with keywords list)
+# ---------------------------------------------------------------------------
+
+
+class TestMultiKeywordMatch:
+    """Name matching with keyword list (OR logic)."""
+
+    def test_multi_keyword_or_match(self):
+        """Entry ['应运行', 'мин'] matches '应运行分钟 Ажиллах мин' (either keyword)."""
+        df = pd.DataFrame({
+            "应运行分钟 Ажиллах мин": [720],
+            "公司 Компани": ["Normount"],
+        })
+        cfg = {
+            "mode": "name",
+            "entries": [{"keywords": ["应运行", "мин"], "new": "RequiredMin"}],
+        }
+        result = apply_header_mapping(df, cfg)
+        assert "RequiredMin" in result.columns
+        assert "公司 Компани" in result.columns
+
+    def test_multi_keyword_any_order_matches(self):
+        """OR logic: keyword order in config doesn't matter."""
+        df = pd.DataFrame({
+            "应运行分钟 Ажиллах мин": [720],
+        })
+        cfg = {
+            "mode": "name",
+            "entries": [{"keywords": ["мин", "应运行"], "new": "Matched"}],
+        }
+        result = apply_header_mapping(df, cfg)
+        assert "Matched" in result.columns
+
+    def test_multi_keyword_with_whitespace(self):
+        """Keywords with surrounding whitespace are trimmed."""
+        df = pd.DataFrame({
+            "停车/换班/ Сул Зогсолт": [30],
+        })
+        cfg = {
+            "mode": "name",
+            "entries": [{"keywords": ["停车", "Зогсолт"], "new": "Downtime"}],
+        }
+        result = apply_header_mapping(df, cfg)
+        assert "Downtime" in result.columns
+
+    def test_single_keyword_works(self):
+        """Single keyword entry works as substring match."""
+        df = pd.DataFrame({
+            "应运行分钟 Ажиллах мин": [720],
+        })
+        cfg = {
+            "mode": "name",
+            "entries": [{"keywords": ["应运行"], "new": "Required"}],
+        }
+        result = apply_header_mapping(df, cfg)
+        assert "Required" in result.columns
+
+    def test_multi_keyword_real_worktime_headers(self):
+        """Real-world worktime column names with multi-keyword matching."""
+        df = pd.DataFrame({
+            "序号 Д/д": [1],
+            "设备种类 Техникийн төрөл": ["EX5600"],
+            "公司 Компани": ["Normount"],
+            "应运行分钟 Ажиллах мин": [720],
+            "应运行小时数 Ажиллах мот цаг": [12],
+        })
+        cfg = {
+            "mode": "name",
+            "entries": [
+                {"keywords": ["序号", "Д/д"], "new": "序号"},
+                {"keywords": ["设备种类", "төрөл"], "new": "设备种类"},
+                {"keywords": ["应运行分钟", "мин"], "new": "应运行分钟"},
+                {"keywords": ["应运行小时", "мот цаг"], "new": "应运行小时"},
+            ],
+        }
+        result = apply_header_mapping(df, cfg)
+        assert result.columns.tolist() == [
+            "序号", "设备种类", "公司 Компани", "应运行分钟", "应运行小时",
+        ]
+
+    def test_multi_keyword_first_match_wins(self):
+        """When multiple entries could match the same column, first entry wins."""
+        df = pd.DataFrame({
+            "应运行分钟 Ажиллах мин": [720],
+        })
+        cfg = {
+            "mode": "name",
+            "entries": [
+                {"keywords": ["应运行"], "new": "First"},
+                {"keywords": ["мин"], "new": "Second"},
+            ],
+        }
+        result = apply_header_mapping(df, cfg)
+        assert result.columns.tolist() == ["First"]
+
+    def test_plus_in_keywords_matched_literally(self):
+        """Keywords containing special chars match literally."""
+        df = pd.DataFrame({
+            "柴油 Түлш Fuel": [100],
+            "其他列": [200],
+        })
+        cfg = {
+            "mode": "name",
+            "entries": [{"keywords": ["柴油", "Fuel"], "new": "FuelCol"}],
+        }
+        result = apply_header_mapping(df, cfg)
+        assert "FuelCol" in result.columns
+
+
+# ---------------------------------------------------------------------------
+# First-match-wins semantics
+# ---------------------------------------------------------------------------
+
+
+class TestFirstMatchWins:
+    """Verify that once a column is matched, it can't be re-matched."""
+
+    def test_column_excluded_after_first_match(self):
+        df = pd.DataFrame({"A": [1], "B": [2]})
+        cfg = {
+            "mode": "name",
+            "entries": [
+                {"keywords": ["A"], "new": "First"},
+                {"keywords": ["A"], "new": "Second"},
+            ],
+        }
+        result = apply_header_mapping(df, cfg)
+        assert result.columns.tolist() == ["First", "B"]
+
+    def test_no_match_entry_ignored(self):
+        """Entries that match nothing are silently ignored."""
+        df = pd.DataFrame({"A": [1], "B": [2]})
+        cfg = {
+            "mode": "name",
+            "entries": [
+                {"keywords": ["NONEXISTENT"], "new": "Nope"},
+                {"keywords": ["A"], "new": "Alpha"},
+            ],
+        }
+        result = apply_header_mapping(df, cfg)
+        assert result.columns.tolist() == ["Alpha", "B"]
+
+    def test_entry_without_keywords_skipped(self):
+        """Entry with no keywords list is skipped."""
+        df = pd.DataFrame({"A": [1], "B": [2]})
+        cfg = {
+            "mode": "name",
+            "entries": [
+                {"new": "Nope"},
+                {"keywords": ["A"], "new": "Alpha"},
+            ],
+        }
+        result = apply_header_mapping(df, cfg)
+        assert result.columns.tolist() == ["Alpha", "B"]

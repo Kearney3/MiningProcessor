@@ -147,8 +147,6 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
     _batch_hmc = HeaderModeConfig(
         label="工作效率表头修改",
         tooltip="开启后按配置的映射关系重命名工作效率表输出表头",
-        fuzzy_label="模糊匹配",
-        fuzzy_tooltip="按列名匹配时启用模糊匹配（容错错别字）",
     )
 
     # ── 表内合并 / 合并输出 互斥 & 台账依赖 ──
@@ -310,7 +308,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
             ft.Container(ft.Row([batch_auto_detect, batch_raw_start], spacing=4), col={"xs": 12, "md": 6}),
             ft.Container(_batch_hmc.toggle, col={"xs": 12, "md": 6}),
             ft.Container(
-                ft.Row([_batch_hmc.mode.row, _batch_hmc.fuzzy], spacing=4, wrap=True),
+                _batch_hmc.mode.row,
                 col={"xs": 12, "md": 6},
             ),
         ],
@@ -448,8 +446,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "_anomaly_mode": _anomaly["_anomaly_mode"],
         "header_toggle": _batch_hmc.toggle,
         "header_mode": _batch_hmc.mode,
-        "header_fuzzy": _batch_hmc.fuzzy,
-        "date_filter_toggle": date_filter_toggle,
+                "date_filter_toggle": date_filter_toggle,
         "selected_date": _selected_date,
         "btn": batch_btn,
         "progress_bar": batch_progress_bar,

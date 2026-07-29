@@ -376,15 +376,15 @@ class TestConnectionFunctions:
 
 
 # ---------------------------------------------------------------------------
-# process_worktime RPC — header_mode / header_fuzzy
+# process_worktime RPC — header_mode
 # ---------------------------------------------------------------------------
 
 
 class TestProcessWorktimeRPC:
     """process_worktime handler 测试。"""
 
-    def test_header_mode_fuzzy_injected(self, tmp_path):
-        """header_mode 和 header_fuzzy 应注入到 mapping 中。"""
+    def test_header_mode_injected(self, tmp_path):
+        """header_mode 应注入到 mapping 中。"""
         captured_mapping = {}
 
         def fake_process(path, year, month, output_file=None, return_sheets=False, header_mapping=None, **_kwargs):
@@ -400,10 +400,8 @@ class TestProcessWorktimeRPC:
                 "path": input_file, "year": 2025, "month": 1,
                 "use_header_mapping": True,
                 "header_mode": "name",
-                "header_fuzzy": True,
             })
         assert captured_mapping.get("mode") == "name"
-        assert captured_mapping.get("fuzzy") is True
 
 
 # ---------------------------------------------------------------------------

@@ -445,7 +445,6 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
   // -- Header mapping --
   const [useHeaderMapping, setUseHeaderMapping] = useState(false);
   const [headerMode, setHeaderMode] = useState("position");
-  const [fuzzyMatch, setFuzzyMatch] = useState(false);
 
   // ── Derived ──
   const hasMissing = useMemo(() => scanResult && scanResult.missing.length > 0, [scanResult]);
@@ -524,7 +523,6 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
       if (useHeaderMapping) {
         params.use_worktime_header_mapping = true;
         params.header_mode = headerMode;
-        params.fuzzy_match = fuzzyMatch;
       }
 
       const res = await bridge.call<{ cancelled?: boolean; summary?: BatchSummary }>("batch_process", params);
@@ -546,7 +544,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
       setProcessing(false);
       bridge.setProgress(null);
     }
-  }, [scanResult, folderPath, year, month, rawStart, useEquipmentLedger, useOilLedger, skipHiddenRows, skipHiddenCols, filterZeroEngineHours, filterZeroWorkHours, filterZeroHoursMeter, filterZeroKmMeter, filterZeroRunHours, filterZeroRunKm, tableMergeMode, baseTableType, dateFilterEnabled, filterDate, useHeaderMapping, headerMode, fuzzyMatch, bridge]);
+  }, [scanResult, folderPath, year, month, rawStart, useEquipmentLedger, useOilLedger, skipHiddenRows, skipHiddenCols, filterZeroEngineHours, filterZeroWorkHours, filterZeroHoursMeter, filterZeroKmMeter, filterZeroRunHours, filterZeroRunKm, tableMergeMode, baseTableType, dateFilterEnabled, filterDate, useHeaderMapping, headerMode, bridge]);
 
   const handleProcess = () => {
     if (hasMissing) {
@@ -829,15 +827,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
                       ]}
                     />
                   </div>
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={fuzzyMatch}
-                      onChange={(e) => setFuzzyMatch(e.target.checked)}
-                      className="rounded border-slate-300"
-                    />
-                    <span className="text-xs text-slate-600">启用模糊匹配</span>
-                  </label>
+                  
                   <p className="text-xs text-slate-400 leading-relaxed">
                     映射规则可在「用户配置 &rarr; 工作效率表头映射配置」中编辑
                   </p>

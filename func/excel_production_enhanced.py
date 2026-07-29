@@ -619,17 +619,27 @@ class MiningDataProcessor:
     # ---------------------------
     def collect_excel_files(self, folder_path):
         file_list = []
-        for root, dirs, files in os.walk(folder_path):
-            for filename in files:
-                if filename.startswith("~$"):
+        for item in sorted(os.listdir(folder_path)):
+            item_path = os.path.join(folder_path, item)
+            if os.path.isdir(item_path):
+                # 子文件夹：扫描其中的 Excel 文件
+                for filename in sorted(os.listdir(item_path)):
+                    if filename.startswith("~$"):
+                        continue
+                    if not filename.lower().endswith((".xlsx", ".xlsm", ".xls")):
+                        continue
+                    if "白班" not in filename and "夜班" not in filename:
+                        continue
+                    file_list.append(os.path.join(item_path, filename))
+            else:
+                # 顶层文件：直接匹配
+                if item.startswith("~$"):
                     continue
-                if not filename.lower().endswith((".xlsx", ".xlsm", ".xls")):
+                if not item.lower().endswith((".xlsx", ".xlsm", ".xls")):
                     continue
-                if "白班" not in filename and "夜班" not in filename:
+                if "白班" not in item and "夜班" not in item:
                     continue
-
-                file_path = os.path.join(root, filename)
-                file_list.append(file_path)
+                file_list.append(item_path)
         return file_list
 
     # ---------------------------
@@ -665,9 +675,14 @@ class MiningDataProcessor:
 
         if total_files == 0:
             logger.warning("未找到符合条件的 Excel 文件。")
-            from func.excel_formatter import write_formatted_excel
-            write_formatted_excel(output_file, {"运行数据": pd.DataFrame(), "生产数据": pd.DataFrame()})
-            return
+            self._processing_summary = {
+                "total_files": 0,
+                "success_files": 0,
+                "failed_files": 0,
+                "errors": [],
+                "warnings": ["未找到符合条件的 Excel 文件"],
+            }
+            return None if return_sheets else None
 
         logger.info(f"共发现 {total_files} 个待处理文件，启动 {max_workers} 个线程...")
 
@@ -773,6 +788,18 @@ class MiningDataProcessor:
                 "warnings": warnings,
             }
             return sheets if sheets else None
+
+        if success_files == 0:
+            logger.warning("所有文件处理失败，未生成结果文件。")
+            warnings = []
+            self._processing_summary = {
+                "total_files": total_files,
+                "success_files": 0,
+                "failed_files": total_files,
+                "errors": file_errors,
+                "warnings": warnings,
+            }
+            return
 
         from func.excel_formatter import write_formatted_excel
         write_formatted_excel(output_file, {"运行数据": final_running, "生产数据": final_production})

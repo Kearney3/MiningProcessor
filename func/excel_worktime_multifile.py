@@ -24,6 +24,7 @@ from func.excel_utils import (
     adjust_index_for_hidden,
     clean_split_dataframe,
     dedup_dataframe,
+    drop_all_nan_columns,
     filter_hidden_from_df,
     get_hidden_indices,
     open_workbook,
@@ -140,6 +141,7 @@ def process_directory(
                 df_processed = _extract_one_day(
                     df_raw, year, month, target_day,
                     h_rows if skip_hidden_rows else set(),
+                    header_mapping=header_mapping,
                 )
 
                 if df_processed is not None and not df_processed.empty:
@@ -184,6 +186,7 @@ def _extract_one_day(
     month: int,
     day: int,
     h_rows: set[int],
+    header_mapping: dict | None = None,
 ) -> pd.DataFrame | None:
     """从单个 DataFrame 中提取白班和夜班数据。"""
     if len(df_raw) < 2:
@@ -203,6 +206,16 @@ def _extract_one_day(
 
     if combined is None or combined.empty:
         return None
+
+    # 表头映射（在 clean 之前，按 mode 决定映射方式）
+    # - position: 按原始列位置映射
+    # - name: 按关键字子串匹配原始列名
+    if header_mapping and header_mapping.get("entries"):
+        mode = header_mapping.get("mode", "name")
+        combined = apply_header_mapping(
+            combined, header_mapping,
+            mode_filter="position" if mode == "position" else "name",
+        )
 
     combined.insert(0, "日期", date_str)
     combined = clean_split_dataframe(combined)
@@ -233,6 +246,9 @@ def _finalize(
 
     final_df = pd.concat(all_data, axis=0, ignore_index=True)
 
+    # 合并后统一移除全 NaN 列（避免 per-sheet 移除导致 concat 列顺序错乱）
+    final_df = drop_all_nan_columns(final_df)
+
     # 排序与列格式化
     final_df = strip_date_column(final_df, date_format="%Y-%m-%d")
     final_df = sort_by_date_shift(final_df)
@@ -243,10 +259,6 @@ def _finalize(
 
     # 全局剔除混入的重复表头
     final_df = _remove_header_rows(final_df, other_cols)
-
-    # 表头映射
-    if header_mapping and header_mapping.get("entries"):
-        final_df = apply_header_mapping(final_df, header_mapping)
 
     # 去重
     final_df = dedup_dataframe(final_df, "多文件工时合并")

@@ -563,7 +563,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                 theme.module_card([
                     ft.Row([work_path, work_year, work_month, work_btn], spacing=6),
                     ft.Row(
-                        [_work_hmc.toggle, _work_hmc.mode.row, _work_hmc.fuzzy],
+                        [_work_hmc.toggle, _work_hmc.mode.row],
                         spacing=theme.SPACING_SM,
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
@@ -617,7 +617,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                  "_filter_zero_hours_meter_toggle": prod_filter_zero_hours_meter, "_filter_zero_km_meter_toggle": prod_filter_zero_km_meter,
                  "_filter_zero_run_hours_toggle": prod_filter_zero_run_hours, "_filter_zero_run_km_toggle": prod_filter_zero_run_km},
         "elec": {"path": elec_path, "year": elec_year, "btn": elec_btn, "add_shift": elec_add_shift, "default_shift": elec_default_shift},
-        "work": {"path": work_path, "year": work_year, "month": work_month, "header_toggle": _work_hmc.toggle, "header_mode": _work_hmc.mode, "header_fuzzy": _work_hmc.fuzzy, "btn": work_btn},
+        "work": {"path": work_path, "year": work_year, "month": work_month, "header_toggle": _work_hmc.toggle, "header_mode": _work_hmc.mode, "btn": work_btn},
         "merge": {
             "path": merge_path,
             "keyword": merge_keyword,

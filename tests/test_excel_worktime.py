@@ -511,17 +511,18 @@ class TestHeaderMapping:
     """Verify header_mapping renames columns in the output."""
 
     def test_header_mapping_position_mode(self, tmp_path):
-        """Position-based header mapping renames columns correctly."""
+        """Position-based header mapping renames raw data columns (before 日期/班次 insertion)."""
         excel_path = str(tmp_path / "worktime.xlsx")
         _create_worktime_excel(excel_path, days=[1])
 
+        # Position mapping now applies to the raw data columns (without 日期/班次).
+        # Raw columns: col 0='Equipment', col 1='Hours'
+        # Position 1-based: 1→Equipment, 2→Hours
         mapping = {
             "mode": "position",
             "entries": [
-                {"index": 1, "new": "Date"},       # 1-based: col 0 = 日期
-                {"index": 2, "new": "Shift"},      # col 1 = 班次
-                {"index": 3, "new": "EquipName"},   # col 2 = Equipment
-                {"index": 4, "new": "WorkHours"},   # col 3 = Hours
+                {"index": 1, "new": "EquipName"},   # col 0 = Equipment
+                {"index": 2, "new": "WorkHours"},   # col 1 = Hours
             ],
         }
 
@@ -534,8 +535,8 @@ class TestHeaderMapping:
         )
 
         df = result["工时数据"]
-        assert "Date" in df.columns
-        assert "Shift" in df.columns
+        assert "日期" in df.columns       # 日期 not affected by mapping
+        assert "班次" in df.columns       # 班次 not affected by mapping
         assert "EquipName" in df.columns
         assert "WorkHours" in df.columns
 

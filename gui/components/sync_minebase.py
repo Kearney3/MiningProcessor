@@ -3,6 +3,8 @@ from datetime import date, datetime, timedelta
 
 import flet as ft
 
+from func.config_loader import get_minebase_mode
+
 from .common import (
     _get_initial_directory,
     _last_directory,
@@ -69,7 +71,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     # --- 同步模式 ---
     mode_toggle = ChipToggle(
         options=[("api", "API 模式"), ("database", "直连数据库")],
-        initial="api",
+        initial=get_minebase_mode(),
     )
 
     # --- 数据类型选择 ---

@@ -60,130 +60,191 @@
         "entries": [
             {
                 "index": 1,
-                "original": "",
-                "new": "日期"
-            },
-            {
-                "index": 2,
-                "original": "",
-                "new": "班次"
-            },
-            {
-                "index": 3,
-                "original": "",
+                "keywords": [
+                    "序号",
+                    "Д/д"
+                ],
                 "new": "序号"
             },
             {
-                "index": 4,
-                "original": "",
+                "index": 2,
+                "keywords": [
+                    "设备种类",
+                    "Техникийн төрөл"
+                ],
                 "new": "设备名称"
             },
             {
-                "index": 5,
-                "original": "",
+                "index": 4,
+                "keywords": [
+                    "公司",
+                    "Компани"
+                ],
                 "new": "公司"
             },
             {
-                "index": 6,
-                "original": "",
+                "index": 5,
+                "keywords": [
+                    "应运行分钟",
+                    "Ажиллах мин"
+                ],
                 "new": "应运行分钟"
             },
             {
-                "index": 7,
-                "original": "",
+                "index": 6,
+                "keywords": [
+                    "应运行小时数",
+                    "Ажиллах мот цаг"
+                ],
                 "new": "应运行小时数"
             },
             {
-                "index": 8,
-                "original": "",
+                "index": 7,
+                "keywords": [
+                    "停车/换班",
+                    "Сул Зогсолт"
+                ],
                 "new": "停车/换班"
             },
             {
-                "index": 9,
-                "original": "",
+                "index": 8,
+                "keywords": [
+                    "转移",
+                    "Шилжих"
+                ],
                 "new": "转移"
             },
             {
-                "index": 10,
-                "original": "",
+                "index": 9,
+                "keywords": [
+                    "挖机场地推土/清理墙壁",
+                    "Ул талбай түрүүлэх"
+                ],
                 "new": "挖机场地推土/清理墙壁"
             },
             {
-                "index": 11,
-                "original": "",
+                "index": 10,
+                "keywords": [
+                    "等待装货",
+                    "Ачилт хүлээх"
+                ],
                 "new": "等待装货"
             },
             {
-                "index": 12,
-                "original": "",
+                "index": 11,
+                "keywords": [
+                    "爆破",
+                    "Тэсэлгээ"
+                ],
                 "new": "爆破"
             },
             {
-                "index": 13,
-                "original": "",
+                "index": 12,
+                "keywords": [
+                    "就餐/休息时间",
+                    "Хоолны"
+                ],
                 "new": "就餐/休息时间"
             },
             {
-                "index": 14,
-                "original": "",
+                "index": 13,
+                "keywords": [
+                    "柴油",
+                    "Түлш"
+                ],
                 "new": "柴油"
             },
             {
-                "index": 15,
-                "original": "",
+                "index": 14,
+                "keywords": [
+                    "计划维修/润滑",
+                    "тосолгоо"
+                ],
                 "new": "计划维修/润滑"
             },
             {
-                "index": 16,
-                "original": "",
+                "index": 15,
+                "keywords": [
+                    "未计划/故障",
+                    "эвдрэл"
+                ],
                 "new": "未计划/故障"
             },
             {
-                "index": 17,
-                "original": "",
+                "index": 16,
+                "keywords": [
+                    "待命",
+                    "Бэлэн байдалд"
+                ],
                 "new": "待命"
             },
             {
-                "index": 18,
-                "original": "",
+                "index": 17,
+                "keywords": [
+                    "大风暴",
+                    "Хүчтэй",
+                    "салхи"
+                ],
                 "new": "因天气：大风暴，雨，雪"
             },
             {
-                "index": 19,
-                "original": "",
+                "index": 18,
+                "keywords": [
+                    "扬尘",
+                    "Усны машин"
+                ],
                 "new": "扬尘：洒水车不足"
             },
             {
-                "index": 20,
-                "original": "",
+                "index": 19,
+                "keywords": [
+                    "装水",
+                    "Дараалалд"
+                ],
                 "new": "排队/装水"
             },
             {
-                "index": 21,
-                "original": "",
+                "index": 20,
+                "keywords": [
+                    "总产量生产运行分钟",
+                    "Нийт бүтээлтэй ажилласан мин"
+                ],
                 "new": "总产量生产运行分钟"
             },
             {
-                "index": 22,
-                "original": "",
+                "index": 21,
+                "keywords": [
+                    "因电力原因停车/计划",
+                    "Төлөвлөсөн"
+                ],
                 "new": "因电力原因停车/计划"
             },
             {
-                "index": 23,
-                "original": "",
+                "index": 22,
+                "keywords": [
+                    "因电力原因停车/未计划",
+                    "Төлөвлөгөөт бус"
+                ],
                 "new": "因电力原因停车/未计划"
             },
             {
-                "index": 24,
-                "original": "",
+                "index": 23,
+                "keywords": [
+                    "总产量生产运行小时",
+                    "Нийт бүтээлтэй ажилласан цаг"
+                ],
                 "new": "总产量生产运行小时"
             },
             {
-                "index": 25,
-                "original": "",
+                "index": 24,
+                "keywords": [
+                    "注释",
+                    "Тайлбар"
+                ],
                 "new": "注释"
             }
-        ]
+        ],
+        "mode": "position"
     },
     "minebase_column_mapping": {
         "work_efficiency": {
@@ -895,42 +956,88 @@
         "percentile_high": 99.0,
         "thresholds": {
             "fuel": {
-                "油品消耗": {"min": 0, "max": 50000}
+                "油品消耗": {
+                    "min": 0,
+                    "max": 50000
+                }
             },
             "fuel_engine": {
-                "发动机小时数开始": {"min": 0},
-                "发动机小时数结束": {"min": 0},
-                "运行小时数": {"min": 0, "max": 14}
+                "发动机小时数开始": {
+                    "min": 0
+                },
+                "发动机小时数结束": {
+                    "min": 0
+                },
+                "运行小时数": {
+                    "min": 0,
+                    "max": 14
+                }
             },
             "production_running": {
-                "运行里程": {"min": 0, "max": 500},
-                "运行小时数": {"min": 0, "max": 14},
-                "趟次": {"min": 0, "max": 50}
+                "运行里程": {
+                    "min": 0,
+                    "max": 500
+                },
+                "运行小时数": {
+                    "min": 0,
+                    "max": 14
+                },
+                "趟次": {
+                    "min": 0,
+                    "max": 50
+                }
             },
             "production": {
-                "趟次": {"min": 0, "max": 50},
-                "产量": {"min": 0, "max": 50000}
+                "趟次": {
+                    "min": 0,
+                    "max": 50
+                },
+                "产量": {
+                    "min": 0,
+                    "max": 50000
+                }
             },
             "electrical": {
-                "电力消耗": {"min": 0, "max": 50000}
+                "电力消耗": {
+                    "min": 0,
+                    "max": 50000
+                }
             },
             "worktime": {
-                "__all_numeric__": {"min": 0, "max": 720}
+                "__all_numeric__": {
+                    "min": 0,
+                    "max": 720
+                }
             }
         },
         "handling_rules": {
             "production_running": {
-                "趟次": {"strategy": "default_value", "default": 0}
+                "趟次": {
+                    "strategy": "default_value",
+                    "default": 0
+                }
             },
             "production": {
-                "趟次": {"strategy": "default_value", "default": 0},
-                "产量": {"strategy": "default_value", "default": 0}
+                "趟次": {
+                    "strategy": "default_value",
+                    "default": 0
+                },
+                "产量": {
+                    "strategy": "default_value",
+                    "default": 0
+                }
             },
             "electrical": {
-                "电力消耗": {"strategy": "default_value", "default": 0}
+                "电力消耗": {
+                    "strategy": "default_value",
+                    "default": 0
+                }
             },
             "worktime": {
-                "__all_numeric__": {"strategy": "default_value", "default": 0}
+                "__all_numeric__": {
+                    "strategy": "default_value",
+                    "default": 0
+                }
             }
         }
     }
