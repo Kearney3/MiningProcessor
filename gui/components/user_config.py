@@ -212,7 +212,7 @@ def _create_keywords_section(page: ft.Page, log):
 def _create_header_mapping_section(page: ft.Page, log):
     """创建工作效率表头映射配置卡片，返回 (card, refs_dict)。"""
 
-    _header_mapping_state: list[dict] = []  # [{index: int|None, original: str, new: str}, ...]
+    _header_mapping_state: list[dict] = []  # [{index: int|None, keywords: list[str], new: str}, ...]
 
     header_rows_column = ft.Column(spacing=4, expand=True)
     header_status_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
@@ -225,8 +225,8 @@ def _create_header_mapping_section(page: ft.Page, log):
         header_labels = ft.Row(
             [
                 ft.Text("列号", width=80, size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
-                ft.Text("原始列名", expand=True, size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
-                ft.Text("匹配列名", expand=True, size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                ft.Text("关键字（名称匹配）", expand=True, size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                ft.Text("新列名", expand=True, size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
                 ft.Text("", width=40),
             ],
             spacing=4,
@@ -248,20 +248,17 @@ def _create_header_mapping_section(page: ft.Page, log):
                 focused_border_color=theme.PRIMARY,
                 input_filter=ft.InputFilter(allow=True, regex_string=r"^[0-9]*$"),
             )
-            orig_field = ft.TextField(
-                value=entry.get("original", ""),
-                hint_text="原始列名",
-                expand=True,
-                text_size=13,
-                dense=True,
-                color=theme.TEXT_PRIMARY,
-                hint_style=ft.TextStyle(color=theme.TEXT_SECONDARY, size=12),
-                border_color=theme.BORDER,
-                focused_border_color=theme.PRIMARY,
+
+            # 关键字 chip 输入（复用文件关键字的 UI 模式）
+            kw_column, kw_get, kw_set = _create_keyword_input(
+                page, "", "输入关键字后回车添加",
             )
+            kw_set(entry.get("keywords", []))
+            _header_mapping_state[idx]["_kw_get"] = kw_get
+
             new_field = ft.TextField(
                 value=entry.get("new", ""),
-                hint_text="匹配列名",
+                hint_text="新列名",
                 expand=True,
                 text_size=13,
                 dense=True,
@@ -281,9 +278,6 @@ def _create_header_mapping_section(page: ft.Page, log):
                 val = e.control.value.strip()
                 _header_mapping_state[_idx]["index"] = int(val) if val else None
 
-            def _on_orig_change(e, _idx=idx):
-                _header_mapping_state[_idx]["original"] = e.control.value
-
             def _on_new_change(e, _idx=idx):
                 _header_mapping_state[_idx]["new"] = e.control.value
 
@@ -292,14 +286,13 @@ def _create_header_mapping_section(page: ft.Page, log):
                 _build_header_rows()
 
             index_field.on_change = _on_index_change
-            orig_field.on_change = _on_orig_change
             new_field.on_change = _on_new_change
             remove_btn.on_click = _on_remove
 
             row = ft.Row(
-                [index_field, orig_field, new_field, remove_btn],
+                [index_field, kw_column, new_field, remove_btn],
                 spacing=4,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                vertical_alignment=ft.CrossAxisAlignment.START,
             )
             controls.append(row)
 
@@ -310,7 +303,7 @@ def _create_header_mapping_section(page: ft.Page, log):
             pass
 
     def _add_header_row(e=None):
-        _header_mapping_state.append({"index": None, "original": "", "new": ""})
+        _header_mapping_state.append({"index": None, "keywords": [], "new": ""})
         _build_header_rows()
 
     def _reload_header_mapping():
@@ -324,15 +317,17 @@ def _create_header_mapping_section(page: ft.Page, log):
     def _save_header_mapping(e=None):
         # 收集并验证
         entries = []
-        indices_seen: dict[int, int] = {}  # index -> row number for error
-        originals_seen: dict[str, int] = {}  # original -> row number for error
+        indices_seen: dict[int, int] = {}
         has_error = False
 
         for i, pair in enumerate(_header_mapping_state):
-            row_num = i + 1  # 1-based for display
+            row_num = i + 1
             idx_raw = pair.get("index")
-            orig = (pair.get("original") or "").strip()
             new_name = (pair.get("new") or "").strip()
+
+            # 从 chip 组件获取最新关键字列表
+            kw_getter = pair.get("_kw_get")
+            keywords = kw_getter() if kw_getter else list(pair.get("keywords", []))
 
             # 解析行号
             idx_val = None
@@ -343,12 +338,12 @@ def _create_header_mapping_section(page: ft.Page, log):
                     idx_val = None
 
             # 跳过完全空行
-            if idx_val is None and not orig and not new_name:
+            if idx_val is None and not keywords and not new_name:
                 continue
 
-            # 匹配列名必填
+            # 新列名必填
             if not new_name:
-                header_status_text.value = f"第 {row_num} 行：匹配列名不能为空"
+                header_status_text.value = f"第 {row_num} 行：新列名不能为空"
                 header_status_text.color = theme.ERROR
                 has_error = True
                 break
@@ -364,18 +359,12 @@ def _create_header_mapping_section(page: ft.Page, log):
                     break
                 indices_seen[idx_val] = row_num
 
-            # 去重检查：原始列名
-            if orig:
-                if orig in originals_seen:
-                    header_status_text.value = (
-                        f"原始列名「{orig}」重复（第 {originals_seen[orig]} 行和第 {row_num} 行）"
-                    )
-                    header_status_text.color = theme.ERROR
-                    has_error = True
-                    break
-                originals_seen[orig] = row_num
-
-            entries.append({"index": idx_val, "original": orig, "new": new_name})
+            entry = {"new": new_name}
+            if idx_val is not None:
+                entry["index"] = idx_val
+            if keywords:
+                entry["keywords"] = keywords
+            entries.append(entry)
 
         if has_error:
             _log_message(log, header_status_text.value, level=logging.WARNING)
@@ -385,29 +374,24 @@ def _create_header_mapping_section(page: ft.Page, log):
                 pass
             return
 
-        mapping_config = {
-            "entries": entries,
-        }
+        mapping_config = {"mode": "position", "entries": entries}
         config_loader.save_worktime_header_mapping(mapping_config)
 
-        # 宽松提示：统计各条目适用模式
-        pos_only = sum(1 for e in entries if e["index"] is not None and not e["original"])
-        name_only = sum(1 for e in entries if e["index"] is None and e["original"])
-        both = sum(1 for e in entries if e["index"] is not None and e["original"])
+        # 统计提示
+        pos_count = sum(1 for e in entries if "index" in e)
+        kw_count = sum(1 for e in entries if e.get("keywords"))
         hints = []
-        if pos_only:
-            hints.append(f"{pos_only} 条仅按位置有效")
-        if name_only:
-            hints.append(f"{name_only} 条仅按列名有效")
-        if both:
-            hints.append(f"{both} 条两种模式均有效")
+        if pos_count:
+            hints.append(f"{pos_count} 条按位置匹配")
+        if kw_count:
+            hints.append(f"{kw_count} 条按关键字匹配")
 
         hint_text = "；".join(hints) if hints else ""
         status_msg = f"已保存 {len(entries)} 条表头映射"
         if hint_text:
             status_msg += f"（{hint_text}）"
         header_status_text.value = status_msg
-        header_status_text.color = theme.WARNING if (pos_only or name_only) and not both else theme.TEXT_SECONDARY
+        header_status_text.color = theme.TEXT_SECONDARY
         _log_message(log, f"已保存工作效率表头映射（{len(entries)} 条）")
         try:
             page.update()
@@ -415,10 +399,12 @@ def _create_header_mapping_section(page: ft.Page, log):
             pass
 
     def _reset_header_mapping(e=None):
-        config_loader.save_worktime_header_mapping({"entries": config_loader.DEFAULT_WORKTIME_HEADER_MAPPING.get("entries", [])})
+        # 从 config.json 读取默认配置
+        cfg = config_loader.load_config()
+        default_entries = cfg.get("worktime_header_mapping", {}).get("entries", [])
+        config_loader.save_worktime_header_mapping({"entries": default_entries})
         _header_mapping_state.clear()
-        # 重新加载默认值到状态
-        for entry in config_loader.DEFAULT_WORKTIME_HEADER_MAPPING.get("entries", []):
+        for entry in default_entries:
             _header_mapping_state.append(dict(entry))
         _build_header_rows()
         header_status_text.value = "已恢复默认配置"
@@ -451,7 +437,7 @@ def _create_header_mapping_section(page: ft.Page, log):
 
     header_mapping_card = theme.make_collapsible(
         title="工作效率表头映射配置",
-        subtitle="配置行号/原始列名到新列名的映射关系",
+        subtitle="配置列号（位置匹配）或关键字（名称匹配）到新列名的映射",
         icon=ft.Icons.TABLE_CHART,
         initially_expanded=False,
         content_controls=[
@@ -1362,10 +1348,26 @@ def _create_llm_config_section(page: ft.Page, log):
     llm_status = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
     llm_test_result = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
     llm_verify_result = ft.Text("", size=12)
+    _LLM_KEY_MASKED = "••••••••••"
+    _llm_key_saved = False
+
+    def _on_api_key_change(_e):
+        nonlocal _llm_key_saved
+        if llm_api_key.value != _LLM_KEY_MASKED:
+            _llm_key_saved = False
+
+    llm_api_key.on_change = _on_api_key_change
 
     def _apply_llm_to_ui(cfg: dict):
+        nonlocal _llm_key_saved
         llm_url.value = cfg.get("url", "")
-        llm_api_key.value = cfg.get("api_key", "")
+        raw_key = cfg.get("api_key", "")
+        if raw_key:
+            llm_api_key.value = _LLM_KEY_MASKED
+            _llm_key_saved = True
+        else:
+            llm_api_key.value = ""
+            _llm_key_saved = False
         llm_model.value = cfg.get("model", "") or None
         llm_format.value = cfg.get("format", "openai")
         llm_status.value = ""
@@ -1381,10 +1383,16 @@ def _create_llm_config_section(page: ft.Page, log):
         except (RuntimeError, AttributeError):
             pass
 
+    def _resolve_api_key() -> str:
+        val = (llm_api_key.value or "").strip()
+        if _llm_key_saved and val == _LLM_KEY_MASKED:
+            return ""  # 后端从持久化配置加载真实密钥
+        return val
+
     def _fetch_models(_e):
         cfg = {
             "url": (llm_url.value or "").strip(),
-            "api_key": (llm_api_key.value or "").strip(),
+            "api_key": _resolve_api_key(),
             "format": llm_format.value or "openai",
         }
         if not cfg["url"]:
@@ -1427,13 +1435,18 @@ def _create_llm_config_section(page: ft.Page, log):
         threading.Thread(target=_do_fetch, daemon=True).start()
 
     def _save_llm(_e):
+        api_key_val = llm_api_key.value or ""
+        if _llm_key_saved and api_key_val == _LLM_KEY_MASKED:
+            api_key_val = ""  # 未修改，后端跳过加密保留已有凭据
         updates = {
             "url": (llm_url.value or "").strip(),
-            "api_key": (llm_api_key.value or "").strip(),
+            "api_key": api_key_val.strip(),
             "model": llm_model.value or "",
             "format": llm_format.value or "openai",
         }
         config_loader.update_llm_config(updates)
+        # 重新加载以同步掩码状态
+        _reload_llm()
         llm_status.value = "LLM 配置已保存"
         _log_message(log, "已保存 LLM 标注配置")
         try:
@@ -1456,7 +1469,7 @@ def _create_llm_config_section(page: ft.Page, log):
     def _verify_connection(_e):
         cfg = {
             "url": (llm_url.value or "").strip(),
-            "api_key": (llm_api_key.value or "").strip(),
+            "api_key": _resolve_api_key(),
             "format": llm_format.value or "openai",
         }
         if not cfg["url"]:
