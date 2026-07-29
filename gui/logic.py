@@ -1170,6 +1170,9 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
                 wc.update()
             return
 
+        # 提取试运行预览文件路径
+        dry_run_file = results.pop("_dry_run_file", None) if isinstance(results, dict) else None
+
         total = {"success": 0, "skipped": 0, "failed": 0}
         for r in results.values():
             for k in total:
@@ -1183,9 +1186,14 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
             result_text.color = "#EF4444"
             _show_snackbar(page, f"同步完成（有 {total['failed']} 行失败）", is_error=True)
         elif dry_run:
-            result_text.value = f"[预览] {summary}"
+            preview_msg = f"[预览] {summary}"
+            if dry_run_file:
+                preview_msg += f"\n预览文件: {dry_run_file}"
+            result_text.value = preview_msg
             result_text.color = "#0891B2"
             _show_snackbar(page, "预览完成")
+            if dry_run_file:
+                _log_message(log, f"[数据同步] 预览文件已保存至: {dry_run_file}")
         else:
             result_text.value = summary
             result_text.color = "#10B981"

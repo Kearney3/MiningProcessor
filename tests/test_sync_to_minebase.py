@@ -1150,3 +1150,252 @@ class TestSyncApiValueFallback:
         result = sync_via_api("electrical", [{"date": "2025-01-01"}], {"日期": "date"}, client)
         assert len(result["warnings"]) == 1
         assert result["warnings"][0]["value"] == "99999"
+
+
+# ---------------------------------------------------------------------------
+# export_dry_run_to_excel
+# ---------------------------------------------------------------------------
+
+
+class TestExportDryRunToExcel:
+    """试运行预览导出功能测试。"""
+
+    def _make_column_mapping(self):
+        """构建模拟的列映射配置。"""
+        return {
+            "fuel": {
+                "日期": "date",
+                "班次": "shiftType",
+                "设备名称": "equipmentName",
+                "油品种类": "fuelName",
+                "油品消耗": "consumption",
+            },
+            "electrical": {
+                "日期": "date",
+                "设备名称": "equipmentName",
+                "电力消耗": "consumption",
+            },
+        }
+
+    def test_export_creates_multi_sheet_excel(self, tmp_path):
+        """多个数据类型应各自生成独立 sheet。"""
+        from func.sync.export import export_dry_run_to_excel
+
+        dry_run_rows = {
+            "fuel": [
+                {"date": "2025-06-01", "shiftType": "Day", "equipmentName": "CAT785D-01", "consumption": 150.5},
+                {"date": "2025-06-02", "shiftType": "Night", "equipmentName": "CAT785D-02", "consumption": 200.0},
+            ],
+            "electrical": [
+                {"date": "2025-06-01", "equipmentName": "EX-001", "consumption": 500.0},
+            ],
+        }
+        out_path = export_dry_run_to_excel(
+            dry_run_rows, column_mapping=self._make_column_mapping(), input_dir=tmp_path,
+        )
+        assert Path(out_path).exists()
+
+        # 读取 sheet 名称
+        xls = pd.ExcelFile(out_path)
+        assert "汇总" in xls.sheet_names
+        assert "油耗数据" in xls.sheet_names
+        assert "电耗数据" in xls.sheet_names
+
+    def test_export_summary_sheet_counts(self, tmp_path):
+        """汇总 sheet 应包含各数据类型的记录数。"""
+        from func.sync.export import export_dry_run_to_excel
+
+        dry_run_rows = {
+            "fuel": [{"date": "2025-06-01"}, {"date": "2025-06-02"}],
+            "production": [{"date": "2025-06-01"}],
+        }
+        out_path = export_dry_run_to_excel(dry_run_rows, input_dir=tmp_path)
+
+        df = pd.read_excel(out_path, sheet_name="汇总")
+        fuel_row = df[df["数据类型"] == "油耗数据"].iloc[0]
+        assert fuel_row["记录数"] == 2
+        prod_row = df[df["数据类型"] == "生产数据"].iloc[0]
+        assert prod_row["记录数"] == 1
+
+    def test_export_removes_internal_keys(self, tmp_path):
+        """导出时应剥离 _row_num 等内部元数据列。"""
+        from func.sync.export import export_dry_run_to_excel
+
+        dry_run_rows = {
+            "fuel": [
+                {"date": "2025-06-01", "equipmentName": "CAT785D", "_row_num": 2},
+            ],
+        }
+        out_path = export_dry_run_to_excel(dry_run_rows, input_dir=tmp_path)
+
+        # 用 openpyxl 读取，第二行是数据库字段名，第三行起是数据
+        from openpyxl import load_workbook
+        wb = load_workbook(out_path)
+        ws = wb["油耗数据"]
+        # 第一行：源列名，第二行：数据库字段名
+        row1 = [ws.cell(row=1, column=c).value for c in range(1, ws.max_column + 1)]
+        row2 = [ws.cell(row=2, column=c).value for c in range(1, ws.max_column + 1)]
+        assert "_row_num" not in row1
+        assert "_row_num" not in row2
+        wb.close()
+
+    def test_export_dual_headers_with_mapping(self, tmp_path):
+        """有列映射时应生成双重表头：第一行源列名，第二行字段名。"""
+        from func.sync.export import export_dry_run_to_excel
+        from openpyxl import load_workbook
+
+        dry_run_rows = {
+            "fuel": [
+                {"date": "2025-06-01", "shiftType": "Day", "equipmentName": "CAT785D-01", "consumption": 150.5},
+            ],
+        }
+        out_path = export_dry_run_to_excel(
+            dry_run_rows, column_mapping=self._make_column_mapping(), input_dir=tmp_path,
+        )
+
+        wb = load_workbook(out_path)
+        ws = wb["油耗数据"]
+        row1 = [ws.cell(row=1, column=c).value for c in range(1, ws.max_column + 1)]
+        row2 = [ws.cell(row=2, column=c).value for c in range(1, ws.max_column + 1)]
+        wb.close()
+
+        # 第一行是源列名（中文）
+        assert "日期" in row1
+        assert "班次" in row1
+        assert "设备名称" in row1
+        assert "油品消耗" in row1
+        # 第二行是数据库字段名（英文）
+        assert "date" in row2
+        assert "shiftType" in row2
+        assert "equipmentName" in row2
+        assert "consumption" in row2
+
+    def test_export_no_dual_headers_without_mapping(self, tmp_path):
+        """无列映射时不应插入第二行表头（只有一行字段名）。"""
+        from func.sync.export import export_dry_run_to_excel
+        from openpyxl import load_workbook
+
+        dry_run_rows = {
+            "fuel": [
+                {"date": "2025-06-01", "consumption": 150.5},
+            ],
+        }
+        out_path = export_dry_run_to_excel(dry_run_rows, input_dir=tmp_path)
+
+        wb = load_workbook(out_path)
+        ws = wb["油耗数据"]
+        assert ws.max_row == 2  # 1 header + 1 data row（无第二行表头）
+        row1 = [ws.cell(row=1, column=c).value for c in range(1, ws.max_column + 1)]
+        assert row1 == ["date", "consumption"]
+        wb.close()
+
+    def test_export_with_warnings(self, tmp_path):
+        """有警告时应额外生成异常行 sheet。"""
+        from func.sync.export import export_dry_run_to_excel
+
+        dry_run_rows = {"fuel": [{"date": "2025-06-01"}]}
+        warnings = [
+            ("fuel", {"row": 2, "field": "equipmentName", "value": "未知设备", "message": "未在台账中找到"}),
+        ]
+        out_path = export_dry_run_to_excel(dry_run_rows, warnings=warnings, input_dir=tmp_path)
+
+        xls = pd.ExcelFile(out_path)
+        assert "异常行" in xls.sheet_names
+        df = pd.read_excel(out_path, sheet_name="异常行")
+        assert len(df) == 1
+        assert df.iloc[0]["字段"] == "equipmentName"
+
+    def test_export_no_warnings_no_sheet(self, tmp_path):
+        """无警告时不应生成异常行 sheet。"""
+        from func.sync.export import export_dry_run_to_excel
+
+        dry_run_rows = {"fuel": [{"date": "2025-06-01"}]}
+        out_path = export_dry_run_to_excel(dry_run_rows, input_dir=tmp_path)
+
+        xls = pd.ExcelFile(out_path)
+        assert "异常行" not in xls.sheet_names
+
+    def test_export_empty_rows(self, tmp_path):
+        """空数据类型应生成空 sheet。"""
+        from func.sync.export import export_dry_run_to_excel
+
+        dry_run_rows = {"fuel": []}
+        out_path = export_dry_run_to_excel(dry_run_rows, input_dir=tmp_path)
+        assert Path(out_path).exists()
+
+        df = pd.read_excel(out_path, sheet_name="油耗数据")
+        assert len(df) == 0
+
+
+# ---------------------------------------------------------------------------
+# sync_engines dry_run returns rows
+# ---------------------------------------------------------------------------
+
+
+class TestDryRunEnginesReturnRows:
+    """sync_via_api / sync_via_db 在 dry_run 模式应返回 dry_run_rows。"""
+
+    def test_sync_via_api_dry_run_returns_rows(self):
+        """API 模式 dry_run 应返回 dry_run_rows 且不调用 API。"""
+        rows = [
+            {"date": "2025-06-01", "equipmentName": "CAT785D-01"},
+            {"date": "2025-06-02", "equipmentName": "CAT785D-02"},
+        ]
+        client = MagicMock()
+        result = sync_via_api("fuel", rows, {}, client, dry_run=True)
+
+        assert result["success"] == 0
+        assert "dry_run_rows" in result
+        assert len(result["dry_run_rows"]) == 2
+        client.login.assert_not_called()
+        client.create_session.assert_not_called()
+
+    def test_sync_via_api_normal_no_dry_run_rows(self):
+        """正常模式不应返回 dry_run_rows。"""
+        client = MagicMock()
+        client.create_session.return_value = "session-1"
+        client.send_batch.return_value = {"data": {"success": 1, "skipped": 0, "failed": 0}}
+        client.confirm_batch.return_value = {"data": {"inserted": 1, "updated": 0, "skipped": 0}}
+
+        result = sync_via_api("fuel", [{"date": "2025-06-01"}], {"日期": "date"}, client, dry_run=False)
+        assert "dry_run_rows" not in result
+
+
+# ---------------------------------------------------------------------------
+# core.sync dry_run integration
+# ---------------------------------------------------------------------------
+
+
+class TestDryRunIntegration:
+    """sync() dry_run 模式应生成预览 Excel。"""
+
+    @patch("func.sync_to_minebase.sync_via_api")
+    @patch("func.sync_to_minebase._process_fuel_file")
+    @patch("func.sync_to_minebase.discover_files")
+    def test_dry_run_generates_excel_file(self, mock_discover, mock_fuel_proc, mock_sync_api, tmp_path, sample_mapping):
+        """dry_run 应生成预览 Excel 并将路径写入 results['_dry_run_file']。"""
+        mapping_path, _ = sample_mapping
+        mock_discover.return_value = {"fuel": [tmp_path / "Fuel.xlsx"]}
+        mock_fuel_proc.return_value = [
+            {"date": "2025-06-01", "shiftType": "Day", "equipmentName": "CAT785D-01", "fuelName": "0#柴油", "consumption": 150.5},
+            {"date": "2025-06-02", "shiftType": "Night", "equipmentName": "CAT785D-02", "fuelName": "0#柴油", "consumption": 200.0},
+        ]
+        # sync_via_api 在 dry_run 模式下会被实际调用（未 mock 穿透），
+        # 但因为我们用了 @patch，返回值需要包含 dry_run_rows
+        mock_sync_api.return_value = {
+            "success": 0, "skipped": 0, "failed": 0, "warnings": [],
+            "dry_run_rows": [
+                {"date": "2025-06-01", "shiftType": "Day", "equipmentName": "CAT785D-01", "fuelName": "0#柴油", "consumption": 150.5},
+                {"date": "2025-06-02", "shiftType": "Night", "equipmentName": "CAT785D-02", "fuelName": "0#柴油", "consumption": 200.0},
+            ],
+        }
+
+        with patch("func.sync_to_minebase.MineBaseAPIClient") as mock_api_cls, \
+             patch("func.sync_to_minebase.get_minebase_api_config", return_value={"url": "http://test", "username": "u", "password": "p"}):
+            mock_api_cls.return_value = MagicMock()
+            results = sync(tmp_path, mode="api", data_types=["fuel"], dry_run=True, mapping_file=mapping_path)
+
+        assert "_dry_run_file" in results
+        assert Path(results["_dry_run_file"]).exists()
+        # 验证结果中不再包含 dry_run_rows
+        assert "dry_run_rows" not in results.get("fuel", {})
