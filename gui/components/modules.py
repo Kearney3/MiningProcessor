@@ -303,21 +303,6 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         tooltip="仅对规则仍判为'其他/待确认'的记录进行高置信度回填，不覆盖规则结果",
     )
 
-    # --- LLM Labeling ---
-    maint_llm_path = ft.TextField(
-        label="LLM 标注（维修明细文件）",
-        hint_text="选择已处理的维修明细 Excel...",
-        expand=2,
-        read_only=False,
-        color=theme.TEXT_PRIMARY,
-        suffix=ft.IconButton(
-            icon=ft.Icons.FOLDER_OPEN,
-            tooltip="浏览",
-        ),
-    )
-    maint_llm_btn = theme.primary_btn("LLM 标注", icon=ft.Icons.SMART_TOY, disabled=False)
-    maint_llm_status = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
-
     # --- FilePicker instances (must be added to page.overlay to work repeatedly) ---
     _fuel_picker = ft.FilePicker()
     _prod_file_picker = ft.FilePicker()
@@ -327,12 +312,10 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     _merge_picker = ft.FilePicker()
     _maint_file_picker = ft.FilePicker()
     _maint_folder_picker = ft.FilePicker()
-    _maint_llm_picker = ft.FilePicker()
     page.services.extend([
         _fuel_picker, _prod_file_picker, _prod_folder_picker,
         _elec_picker, _work_picker, _merge_picker,
         _maint_file_picker, _maint_folder_picker,
-        _maint_llm_picker,
     ])
 
     on_fuel_browse = make_browse_handler(
@@ -375,11 +358,6 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         mode="folder",
         log_fn=lambda msg: _log_message(page.logger.error, msg),
     )
-    on_maint_llm_pick = make_browse_handler(
-        _maint_llm_picker, maint_llm_path, maint_llm_btn, "选择维修明细文件",
-        extensions=["xlsx", "xls"],
-        log_fn=lambda msg: _log_message(page.logger.error, msg),
-    )
 
     # 绑定浏览按钮
     fuel_path.suffix.on_click = on_fuel_browse
@@ -390,7 +368,6 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     merge_path.suffix.on_click = on_merge_browse
     maint_file_btn.on_click = on_maint_pick_file
     maint_folder_btn.on_click = on_maint_pick_folder
-    maint_llm_path.suffix.on_click = on_maint_llm_pick
 
     # --- 台账匹配开关（设备 / 油品 独立控制） ---
     match_eq_toggle = ft.Checkbox(
@@ -611,10 +588,6 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
                 ]),
-                theme.module_card([
-                    ft.Row([maint_llm_path, maint_llm_btn], spacing=8),
-                    maint_llm_status,
-                ]),
                 anomaly_panel,
                 ft.Row([match_eq_toggle, match_oil_toggle, skip_hidden_rows_toggle, skip_hidden_cols_toggle], spacing=8),
             ],
@@ -659,11 +632,6 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
             "split_year": maint_split_year,
             "details_only": maint_details_only,
             "use_ml": maint_use_ml,
-        },
-        "maint_llm": {
-            "path": maint_llm_path,
-            "btn": maint_llm_btn,
-            "status": maint_llm_status,
         },
     }
     return container, module_refs

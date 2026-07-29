@@ -290,17 +290,6 @@ def _dispatch_module(module_type: str, path: str, cancel_event: threading.Event 
             details_only=kwargs.get("details_only", False),
             use_ml_fallback=kwargs.get("use_ml_fallback", True),
         )
-    elif module_type == "maint_llm":
-        from func.label_maintenance_with_llm import process_maintenance_llm
-        llm_config = config_loader.get_llm_config()
-        if not llm_config.get("url") or not llm_config.get("api_key"):
-            raise ValueError("请先在用户配置中填写 LLM 接口 URL 和 API Key")
-        if not llm_config.get("model"):
-            raise ValueError("请先在用户配置中选择 LLM 模型")
-        process_maintenance_llm(
-            path,
-            llm_config=llm_config,
-        )
     # batch 模块由 _execute_batch_task 单独处理
     return None
 
@@ -598,16 +587,6 @@ async def on_maint_process(page: ft.Page, maint_refs: dict, log, equipment_ledge
                          split_by_year=split_by_year, details_only=details_only,
                          use_ml_fallback=use_ml_fallback,
                          anomaly_config=anomaly_config)
-
-
-async def on_maint_llm_process(page: ft.Page, llm_refs: dict, log) -> None:
-    """LLM 标注按钮回调"""
-    btn = llm_refs["btn"]
-    path = llm_refs["path"].value
-    if not path:
-        _log_message(log, "请先选择维修明细 Excel 文件", level=logging.WARNING)
-        return
-    await _safe_run_task(page, btn, "LLM 标注", path, log, "maint_llm")
 
 
 def _set_controls_visible(controls: list, visible: bool):
@@ -1070,11 +1049,6 @@ def wire_processing_buttons(
     for key, callback in _MODULE_CALLBACKS:
         module_refs[key]["btn"].on_click = _make_module_handler(
             page, module_refs, key, log, ledger_refs, oil_ledger_refs, callback,
-        )
-
-    if "maint_llm" in module_refs:
-        module_refs["maint_llm"]["btn"].on_click = _make_module_handler(
-            page, module_refs, "maint_llm", log, {}, {}, on_maint_llm_process,
         )
 
     # Batch

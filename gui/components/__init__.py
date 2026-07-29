@@ -12,6 +12,7 @@ from .log_view import create_log_view
 from .user_config import create_user_config_section
 from .sync_minebase import create_sync_section
 from .maint_config import create_maint_config_section
+from .llm_labeling import create_llm_labeling_section
 
 __all__ = [
     "_log_message",
@@ -26,4 +27,5 @@ __all__ = [
     "create_batch_section",
     "create_sync_section",
     "create_maint_config_section",
+    "create_llm_labeling_section",
 ]

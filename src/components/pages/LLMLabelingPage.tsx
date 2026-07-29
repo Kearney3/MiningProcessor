@@ -138,9 +138,10 @@ export function LLMLabelingPage({ bridge }: { bridge: BridgeProp }) {
   // Step state
   const [step, setStep] = useState(1);
 
-  // Step 1: File
+  // Step 1: File & Sheet
   const [filePath, setFilePath] = useState("");
-  const [sheetName, setSheetName] = useState("维修明细");
+  const [sheets, setSheets] = useState<string[]>([]);
+  const [sheetName, setSheetName] = useState("");
   const [preview, setPreview] = useState<PreviewData | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
 
@@ -167,13 +168,14 @@ export function LLMLabelingPage({ bridge }: { bridge: BridgeProp }) {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // ── Load preview on file select ──
-  const loadPreview = useCallback(async (path: string) => {
+  // ── Load preview for selected sheet ──
+  const loadPreview = useCallback(async (path: string, sheet: string) => {
+    if (!path || !sheet) return;
     setLoadingPreview(true);
+    setPreview(null);
     try {
-      const data = await bridge.call<PreviewData>("preview_excel_columns", { path, sheet_name: sheetName });
+      const data = await bridge.call<PreviewData>("preview_excel_columns", { path, sheet_name: sheet });
       setPreview(data);
-      // Auto-detect columns
       if (data.columns.length > 0) {
         setContentCol(autoDetectColumn(data.columns, "content_column"));
         setCategoryCol(autoDetectColumn(data.columns, "category_column"));
@@ -186,10 +188,33 @@ export function LLMLabelingPage({ bridge }: { bridge: BridgeProp }) {
     } finally {
       setLoadingPreview(false);
     }
-  }, [bridge.call, sheetName, notify]);
+  }, [bridge.call, notify]);
 
-  const handleFileSelected = (path: string) => {
-    loadPreview(path);
+  // ── Fetch sheet list when file is selected ──
+  const handleFileSelected = useCallback(async (path: string) => {
+    setSheets([]);
+    setSheetName("");
+    setPreview(null);
+    try {
+      const res = await bridge.call<{ sheets: string[] }>("preview_excel_sheets", { path });
+      const list = res.sheets || [];
+      setSheets(list);
+      // Auto-select "维修明细" if present, otherwise first sheet
+      const defaultSheet = list.includes("维修明细") ? "维修明细" : (list[0] || "");
+      setSheetName(defaultSheet);
+      if (defaultSheet) {
+        loadPreview(path, defaultSheet);
+      }
+    } catch (e) {
+      notify(`读取 Sheet 列表失败: ${e}`, "error");
+    }
+  }, [bridge.call, loadPreview, notify]);
+
+  const handleSheetChange = (sheet: string) => {
+    setSheetName(sheet);
+    if (filePath && sheet) {
+      loadPreview(filePath, sheet);
+    }
   };
 
   // ── Collect unique values from status column for filter suggestions ──
@@ -208,6 +233,16 @@ export function LLMLabelingPage({ bridge }: { bridge: BridgeProp }) {
     setFilterValues((prev) => prev.filter((v) => v !== val));
   };
 
+  // ── Cancel labeling ──
+  const handleCancel = async () => {
+    try {
+      await bridge.call("cancel_llm_labeling", {});
+      notify("正在取消...", "info");
+    } catch {
+      // ignore
+    }
+  };
+
   // ── Execute labeling ──
   const handleExecute = async () => {
     setLoading(true);
@@ -221,6 +256,7 @@ export function LLMLabelingPage({ bridge }: { bridge: BridgeProp }) {
         skipped_rows: number;
         output: string;
         export_mode: string;
+        cancelled?: boolean;
       }>("process_maintenance_llm", {
         path: filePath,
         content_column: contentCol,
@@ -230,9 +266,13 @@ export function LLMLabelingPage({ bridge }: { bridge: BridgeProp }) {
         filter_values: filterValues.length > 0 ? filterValues : undefined,
         export_mode: exportMode,
       });
-      setResult(res);
-      setStep(4);
-      notify("LLM 标注完成", "success");
+      if (res.cancelled) {
+        setError(`已取消，已完成 ${res.llm_completed} 条（可断点续跑）`);
+      } else {
+        setResult(res);
+        setStep(4);
+        notify("LLM 标注完成", "success");
+      }
     } catch (e) {
       setError(String(e));
       notify(`LLM 标注失败: ${e}`, "error");
@@ -263,15 +303,24 @@ export function LLMLabelingPage({ bridge }: { bridge: BridgeProp }) {
         {filePath === "" && (
           <div className="mt-1.5 flex items-center gap-1 text-xs text-amber-600"><AlertTriangleIcon /> 请先选择输入文件</div>
         )}
-        <div className="mt-2 flex items-center gap-2">
-          <label className="text-xs text-slate-500">Sheet 名称</label>
-          <input type="text" value={sheetName} onChange={(e) => setSheetName(e.target.value)}
-            className={`${inputClass} w-40`} />
-          <button onClick={() => filePath && loadPreview(filePath)} disabled={!filePath || loadingPreview}
-            className={`${btnSecondaryClass} text-xs`}>
-            {loadingPreview ? "加载中..." : "刷新预览"}
-          </button>
-        </div>
+        {sheets.length > 0 && (
+          <div className="mt-3">
+            <label className="text-xs font-medium text-slate-500 mb-1.5 block">选择 Sheet</label>
+            <div className="flex gap-2 items-center">
+              <div className="relative flex-1 max-w-xs">
+                <select value={sheetName} onChange={(e) => handleSheetChange(e.target.value)}
+                  className={`${inputClass} appearance-none pr-8 w-full`}>
+                  {sheets.map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"><ChevronDownIcon /></div>
+              </div>
+              <button onClick={() => filePath && sheetName && loadPreview(filePath, sheetName)}
+                disabled={!filePath || !sheetName || loadingPreview} className={`${btnSecondaryClass} text-xs`}>
+                {loadingPreview ? "加载中..." : "刷新预览"}
+              </button>
+            </div>
+          </div>
+        )}
         {preview && (
           <div className="mt-3 text-xs text-slate-500">
             共 <span className="font-medium text-slate-700">{preview.rows}</span> 行，
@@ -427,6 +476,12 @@ export function LLMLabelingPage({ bridge }: { bridge: BridgeProp }) {
                 <><PlayIcon /> 开始标注</>
               )}
             </button>
+            {loading && (
+              <button onClick={handleCancel}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">
+                取消
+              </button>
+            )}
           </div>
         </div>
       )}
