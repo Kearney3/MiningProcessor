@@ -57,8 +57,6 @@
     "default_shift": "Night",
     "worktime_header_apply": true,
     "worktime_header_mapping": {
-        "mode": "position",
-        "fuzzy": false,
         "entries": [
             {
                 "index": 1,
