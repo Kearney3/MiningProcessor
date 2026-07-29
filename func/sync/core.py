@@ -69,6 +69,12 @@ def sync(
     skip_hidden_rows: bool = False,
     skip_hidden_cols: bool = False,
     anomaly_config=None,
+    filter_zero_engine_hours: bool = False,
+    filter_zero_work_hours: bool = False,
+    filter_zero_hours_meter: bool = False,
+    filter_zero_km_meter: bool = False,
+    filter_zero_run_hours: bool = False,
+    filter_zero_run_km: bool = False,
 ) -> dict[str, dict[str, int]]:
     """执行同步的主入口。
 
@@ -236,7 +242,9 @@ def sync(
                         rows = _process_fuel(file_path, year,
                                              skip_hidden_rows=skip_hidden_rows,
                                              skip_hidden_cols=skip_hidden_cols,
-                                             anomaly_config=anomaly_config)
+                                             anomaly_config=anomaly_config,
+                                             filter_zero_engine_hours=filter_zero_engine_hours,
+                                             filter_zero_work_hours=filter_zero_work_hours)
                     elif data_type == "electrical":
                         rows = _process_electrical(file_path, year,
                                                    skip_hidden_rows=skip_hidden_rows,
@@ -249,7 +257,11 @@ def sync(
                             result = _process_production(file_path,
                                                          skip_hidden_rows=skip_hidden_rows,
                                                          skip_hidden_cols=skip_hidden_cols,
-                                                         anomaly_config=anomaly_config)
+                                                         anomaly_config=anomaly_config,
+                                                         filter_zero_hours_meter=filter_zero_hours_meter,
+                                                         filter_zero_km_meter=filter_zero_km_meter,
+                                                         filter_zero_run_hours=filter_zero_run_hours,
+                                                         filter_zero_run_km=filter_zero_run_km)
                             if _production_cache is None:
                                 _production_cache = {}
                             _production_cache[cache_key] = result

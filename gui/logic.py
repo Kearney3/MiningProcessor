@@ -1067,7 +1067,10 @@ def wire_processing_buttons(
         module_refs["batch"]["btn"].on_click = handle_batch_click
 
 
-async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=None) -> None:
+async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=None,
+                          filter_zero_engine_hours=False, filter_zero_work_hours=False,
+                          filter_zero_hours_meter=False, filter_zero_km_meter=False,
+                          filter_zero_run_hours=False, filter_zero_run_km=False) -> None:
     """MineBase 同步按钮回调"""
     path = sync_refs["path"].value
     if not path:
@@ -1143,6 +1146,12 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
                 skip_hidden_rows=skip_hidden_rows,
                 skip_hidden_cols=skip_hidden_cols,
                 anomaly_config=anomaly_config,
+                filter_zero_engine_hours=filter_zero_engine_hours,
+                filter_zero_work_hours=filter_zero_work_hours,
+                filter_zero_hours_meter=filter_zero_hours_meter,
+                filter_zero_km_meter=filter_zero_km_meter,
+                filter_zero_run_hours=filter_zero_run_hours,
+                filter_zero_run_km=filter_zero_run_km,
             )
 
         results = await asyncio.to_thread(_do_sync)
@@ -1272,7 +1281,19 @@ def wire_sync_button(sync_refs: dict, page: ft.Page, log, module_refs: dict | No
         except ImportError:
             from gui.components.common import build_anomaly_config_from_refs
         anomaly_config = build_anomaly_config_from_refs(sync_refs)
-        await on_sync_process(page, sync_refs, log, anomaly_config=anomaly_config)
+
+        # 读取过滤开关
+        def _get_toggle(key):
+            ref = sync_refs.get(key)
+            return ref.value if ref else False
+
+        await on_sync_process(page, sync_refs, log, anomaly_config=anomaly_config,
+                              filter_zero_engine_hours=_get_toggle("_filter_zero_hours_toggle"),
+                              filter_zero_work_hours=_get_toggle("_filter_zero_work_hours_toggle"),
+                              filter_zero_hours_meter=_get_toggle("_filter_zero_hours_meter_toggle"),
+                              filter_zero_km_meter=_get_toggle("_filter_zero_km_meter_toggle"),
+                              filter_zero_run_hours=_get_toggle("_filter_zero_run_hours_toggle"),
+                              filter_zero_run_km=_get_toggle("_filter_zero_run_km_toggle"))
     sync_refs["btn"].on_click = handle_sync_click
 
 

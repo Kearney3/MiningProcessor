@@ -149,6 +149,8 @@ def _process_fuel_file(
     skip_hidden_rows: bool = False,
     skip_hidden_cols: bool = False,
     anomaly_config=None,
+    filter_zero_engine_hours: bool = False,
+    filter_zero_work_hours: bool = False,
 ) -> list[dict[str, Any]]:
     """通过柴油处理器解析文件，返回同步行列表。"""
     from func.excel_fuel import process_diesel_data
@@ -183,6 +185,8 @@ def _process_fuel_file(
         skip_hidden_rows=skip_hidden_rows,
         skip_hidden_cols=skip_hidden_cols,
         anomaly_config=anomaly_config,
+        filter_zero_engine_hours=filter_zero_engine_hours,
+        filter_zero_work_hours=filter_zero_work_hours,
     )
 
 
@@ -236,6 +240,10 @@ def _process_production_file(
     skip_hidden_rows: bool = False,
     skip_hidden_cols: bool = False,
     anomaly_config=None,
+    filter_zero_hours_meter: bool = False,
+    filter_zero_km_meter: bool = False,
+    filter_zero_run_hours: bool = False,
+    filter_zero_run_km: bool = False,
 ) -> dict[str, list[dict[str, Any]]]:
     """通过产量处理器解析文件，返回 {"production": [...], "operation": [...]}。"""
     from func.excel_production_enhanced import MiningDataProcessor
@@ -269,7 +277,11 @@ def _process_production_file(
         processor = MiningDataProcessor(skip_hidden=skip_hidden,
                                         skip_hidden_rows=skip_hidden_rows,
                                         skip_hidden_cols=skip_hidden_cols,
-                                        anomaly_config=anomaly_config)
+                                        anomaly_config=anomaly_config,
+                                        filter_zero_hours_meter=filter_zero_hours_meter,
+                                        filter_zero_km_meter=filter_zero_km_meter,
+                                        filter_zero_run_hours=filter_zero_run_hours,
+                                        filter_zero_run_km=filter_zero_run_km)
         return processor.process_single_file(path)
 
     def _extract(pair: tuple | None) -> tuple | None:

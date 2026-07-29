@@ -113,6 +113,12 @@ const DownloadIcon = () => (
   </svg>
 );
 
+const PlayIcon = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polygon points="5 3 19 12 5 21 5 3" />
+  </svg>
+);
+
 // ═══════════════════════════════════════
 // Constants
 // ═══════════════════════════════════════
@@ -187,6 +193,15 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const [skipHiddenCols, setSkipHiddenCols] = useState(false);
   const [anomaly, setAnomaly] = useState<AnomalyConfig>(DEFAULT_ANOMALY_CONFIG);
 
+  // 过滤开关
+  const [filterZeroEngineHours, setFilterZeroEngineHours] = useState(false);
+  const [filterZeroWorkHours, setFilterZeroWorkHours] = useState(false);
+  const [filterZeroHoursMeter, setFilterZeroHoursMeter] = useState(false);
+  const [filterZeroKmMeter, setFilterZeroKmMeter] = useState(false);
+  const [filterZeroRunHours, setFilterZeroRunHours] = useState(false);
+  const [filterZeroRunKm, setFilterZeroRunKm] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
   // 启动时从配置加载上次目录，不存在则清空
   useEffect(() => {
     bridge.call<{ path: string }>("get_last_directory", { key: "sync_last_input_dir" })
@@ -235,6 +250,12 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
         use_oil_ledger: useOilLedger,
         skip_hidden_rows: skipHiddenRows,
         skip_hidden_cols: skipHiddenCols,
+        filter_zero_engine_hours: filterZeroEngineHours,
+        filter_zero_work_hours: filterZeroWorkHours,
+        filter_zero_hours_meter: filterZeroHoursMeter,
+        filter_zero_km_meter: filterZeroKmMeter,
+        filter_zero_run_hours: filterZeroRunHours,
+        filter_zero_run_km: filterZeroRunKm,
         anomaly_enabled: anomaly.enabled,
         anomaly_report: anomaly.report,
         anomaly_mode: anomaly.mode,
@@ -339,7 +360,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
               全选
             </span>
           </div>
-          <div className="space-y-0.5">
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
             {ALL_TYPES.map((t) => (
               <DataTypeCheckbox
                 key={t.id}
@@ -455,122 +476,196 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
           </div>
         </div>
 
-        {/* Sync options — header mapping & ledger */}
+        {/* Sync options */}
         <div className="border-t border-slate-100 pt-4 space-y-3">
-          <div className="flex items-start gap-3">
-            <button
-              role="switch"
-              aria-checked={applyHeaderMapping}
-              onClick={() => setApplyHeaderMapping(!applyHeaderMapping)}
-              className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors shrink-0 mt-0.5 ${
-                applyHeaderMapping ? "bg-blue-600" : "bg-slate-200"
-              }`}
-            >
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                applyHeaderMapping ? "translate-x-4" : "translate-x-0.5"
-              }`} />
-            </button>
-            <div>
-              <div className="text-sm text-slate-700">应用工时表头映射</div>
-              <div className="text-xs text-slate-400 mt-0.5">对工作效率表应用列名映射配置</div>
+          <div>
+            <p className="text-xs text-slate-400 mb-2">表头映射</p>
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <button
+                role="switch"
+                aria-checked={applyHeaderMapping}
+                onClick={() => setApplyHeaderMapping(!applyHeaderMapping)}
+                className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors ${
+                  applyHeaderMapping ? "bg-blue-600" : "bg-slate-200"
+                }`}
+              >
+                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                  applyHeaderMapping ? "translate-x-4" : "translate-x-0.5"
+                }`} />
+              </button>
+              <span className="text-sm text-slate-700">应用工时表头映射</span>
+            </label>
+          </div>
+          <div className="border-t border-slate-100 pt-3">
+            <p className="text-xs text-slate-400 mb-2">台账匹配</p>
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <button
+                  role="switch"
+                  aria-checked={useEquipmentLedger}
+                  onClick={() => setUseEquipmentLedger(!useEquipmentLedger)}
+                  className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors ${
+                    useEquipmentLedger ? "bg-blue-600" : "bg-slate-200"
+                  }`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                    useEquipmentLedger ? "translate-x-4" : "translate-x-0.5"
+                  }`} />
+                </button>
+                <span className="text-sm text-slate-700">设备台账匹配</span>
+              </label>
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <button
+                  role="switch"
+                  aria-checked={useOilLedger}
+                  onClick={() => setUseOilLedger(!useOilLedger)}
+                  className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors ${
+                    useOilLedger ? "bg-blue-600" : "bg-slate-200"
+                  }`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                    useOilLedger ? "translate-x-4" : "translate-x-0.5"
+                  }`} />
+                </button>
+                <span className="text-sm text-slate-700">油品台账匹配</span>
+              </label>
             </div>
           </div>
-          <div className="flex items-start gap-3">
-            <button
-              role="switch"
-              aria-checked={useEquipmentLedger}
-              onClick={() => setUseEquipmentLedger(!useEquipmentLedger)}
-              className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors shrink-0 mt-0.5 ${
-                useEquipmentLedger ? "bg-blue-600" : "bg-slate-200"
-              }`}
-            >
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                useEquipmentLedger ? "translate-x-4" : "translate-x-0.5"
-              }`} />
-            </button>
-            <div>
-              <div className="text-sm text-slate-700">设备台账匹配</div>
-              <div className="text-xs text-slate-400 mt-0.5">使用设备台账标准化设备名称</div>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <button
-              role="switch"
-              aria-checked={useOilLedger}
-              onClick={() => setUseOilLedger(!useOilLedger)}
-              className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors shrink-0 mt-0.5 ${
-                useOilLedger ? "bg-blue-600" : "bg-slate-200"
-              }`}
-            >
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                useOilLedger ? "translate-x-4" : "translate-x-0.5"
-              }`} />
-            </button>
-            <div>
-              <div className="text-sm text-slate-700">油品台账匹配</div>
-              <div className="text-xs text-slate-400 mt-0.5">使用油品台账标准化油品名称</div>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <button
-              role="switch"
-              aria-checked={skipHiddenRows}
-              onClick={() => setSkipHiddenRows(!skipHiddenRows)}
-              className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors shrink-0 mt-0.5 ${
-                skipHiddenRows ? "bg-blue-600" : "bg-slate-200"
-              }`}
-            >
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                skipHiddenRows ? "translate-x-4" : "translate-x-0.5"
-              }`} />
-            </button>
-            <div>
-              <div className="text-sm text-slate-700">跳过隐藏行</div>
-              <div className="text-xs text-slate-400 mt-0.5">勾选后，Excel 中被隐藏的行将不会被读取</div>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <button
-              role="switch"
-              aria-checked={skipHiddenCols}
-              onClick={() => setSkipHiddenCols(!skipHiddenCols)}
-              className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors shrink-0 mt-0.5 ${
-                skipHiddenCols ? "bg-blue-600" : "bg-slate-200"
-              }`}
-            >
-              <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                skipHiddenCols ? "translate-x-4" : "translate-x-0.5"
-              }`} />
-            </button>
-            <div>
-              <div className="text-sm text-slate-700">跳过隐藏列</div>
-              <div className="text-xs text-slate-400 mt-0.5">勾选后，Excel 中被隐藏的列将不会被读取</div>
+          <div className="border-t border-slate-100 pt-3">
+            <p className="text-xs text-slate-400 mb-2">Excel 选项</p>
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <button
+                  role="switch"
+                  aria-checked={skipHiddenRows}
+                  onClick={() => setSkipHiddenRows(!skipHiddenRows)}
+                  className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors ${
+                    skipHiddenRows ? "bg-blue-600" : "bg-slate-200"
+                  }`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                    skipHiddenRows ? "translate-x-4" : "translate-x-0.5"
+                  }`} />
+                </button>
+                <span className="text-sm text-slate-700">跳过隐藏行</span>
+              </label>
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <button
+                  role="switch"
+                  aria-checked={skipHiddenCols}
+                  onClick={() => setSkipHiddenCols(!skipHiddenCols)}
+                  className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors ${
+                    skipHiddenCols ? "bg-blue-600" : "bg-slate-200"
+                  }`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                    skipHiddenCols ? "translate-x-4" : "translate-x-0.5"
+                  }`} />
+                </button>
+                <span className="text-sm text-slate-700">跳过隐藏列</span>
+              </label>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Anomaly detection */}
-      <AnomalyPanel
-        config={anomaly}
-        onChange={setAnomaly}
-      />
-
-      <button
-        onClick={handleSync}
-        disabled={!inputDir || loading || dataTypes.length === 0}
-        className={btnPrimaryClass}
-      >
-        {loading && (
-          <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+      {/* Advanced options — collapsible */}
+      <div className="bg-white rounded-lg border border-slate-200">
+        <button
+          type="button"
+          onClick={() => setAdvancedOpen(!advancedOpen)}
+          className="w-full flex items-center justify-between px-4 py-3 text-xs font-medium text-slate-500 hover:bg-slate-50 transition-colors"
+        >
+          <span>高级选项</span>
+          <svg
+            className={`w-3.5 h-3.5 transition-transform ${advancedOpen ? "rotate-90" : ""}`}
+            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-        )}
-        {loading ? "同步中..." : "开始同步"}
-      </button>
+        </button>
+        {advancedOpen && (
+          <div className="px-4 pb-4 space-y-4 border-t border-slate-100">
+            {/* Anomaly detection */}
+            <div className="pt-3">
+              <AnomalyPanel config={anomaly} onChange={setAnomaly} embedded />
+            </div>
 
-      {/* Summary bar */}
+            {/* Data filters */}
+            <div className="border-t border-slate-100 pt-3">
+              <p className="text-xs font-medium text-slate-500 mb-3">数据过滤</p>
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs text-slate-400 mb-2">油耗处理</p>
+                  <div className="flex flex-wrap gap-x-6 gap-y-2">
+                    {[
+                      { checked: filterZeroEngineHours, onChange: setFilterZeroEngineHours, label: "过滤零小时数" },
+                      { checked: filterZeroWorkHours, onChange: setFilterZeroWorkHours, label: "过滤零运行小时数" },
+                    ].map((t) => (
+                      <label key={t.label} className="flex items-center gap-2.5 cursor-pointer select-none">
+                        <button
+                          role="switch"
+                          aria-checked={t.checked}
+                          onClick={() => t.onChange(!t.checked)}
+                          className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors ${
+                            t.checked ? "bg-blue-600" : "bg-slate-200"
+                          }`}
+                        >
+                          <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                            t.checked ? "translate-x-4" : "translate-x-0.5"
+                          }`} />
+                        </button>
+                        <span className="text-sm text-slate-700">{t.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="border-t border-slate-100 pt-3">
+                  <p className="text-xs text-slate-400 mb-2">生产数据</p>
+                  <div className="flex flex-wrap gap-x-6 gap-y-2">
+                    {[
+                      { checked: filterZeroHoursMeter, onChange: setFilterZeroHoursMeter, label: "过滤零小时仪表" },
+                      { checked: filterZeroKmMeter, onChange: setFilterZeroKmMeter, label: "过滤零公里仪表" },
+                      { checked: filterZeroRunHours, onChange: setFilterZeroRunHours, label: "过滤零运行小时数" },
+                      { checked: filterZeroRunKm, onChange: setFilterZeroRunKm, label: "过滤零运行里程" },
+                    ].map((t) => (
+                      <label key={t.label} className="flex items-center gap-2.5 cursor-pointer select-none">
+                        <button
+                          role="switch"
+                          aria-checked={t.checked}
+                          onClick={() => t.onChange(!t.checked)}
+                          className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors ${
+                            t.checked ? "bg-blue-600" : "bg-slate-200"
+                          }`}
+                        >
+                          <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                            t.checked ? "translate-x-4" : "translate-x-0.5"
+                          }`} />
+                        </button>
+                        <span className="text-sm text-slate-700">{t.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-3">
+        <button
+          onClick={handleSync}
+          disabled={!inputDir || loading || dataTypes.length === 0}
+          className={`${btnPrimaryClass} flex items-center gap-2`}
+        >
+          {!loading && <PlayIcon />}
+          {loading ? "同步中..." : "开始同步"}
+        </button>
+      </div>
+
+      {/* Result / Error */}
       {result && (() => {
         const totals = Object.values(result.results).reduce(
           (acc, r) => ({
@@ -581,35 +676,16 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
           }),
           { success: 0, skipped: 0, failed: 0, warnings: 0 },
         );
+        const hasError = totals.failed > 0;
         return (
-          <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-2">
-            <h3 className="text-sm font-medium text-slate-700">同步汇总</h3>
-            <div className="flex items-center gap-4 text-xs">
-              {totals.success > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <CheckIcon className="w-3 h-3 text-emerald-600" />
-                  <span className="text-slate-600">成功 {totals.success}</span>
-                </div>
-              )}
-              {totals.skipped > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <MinusIcon />
-                  <span className="text-slate-600">跳过 {totals.skipped}</span>
-                </div>
-              )}
-              {totals.failed > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <XCircleIcon />
-                  <span className="text-red-600">失败 {totals.failed}</span>
-                </div>
-              )}
-              {totals.warnings > 0 && (
-                <div className="flex items-center gap-1.5">
-                  <AlertTriangleIcon />
-                  <span className="text-amber-600">异常 {totals.warnings}</span>
-                </div>
-              )}
-            </div>
+          <div className={`flex items-center gap-2 text-xs rounded-md px-2.5 py-1.5 ${
+            hasError ? "text-red-700 bg-red-50" : "text-emerald-700 bg-emerald-50"
+          }`}>
+            {hasError ? <XCircleIcon /> : <CheckCircleIcon />}
+            <span>成功 {totals.success}</span>
+            {totals.skipped > 0 && <span>· 跳过 {totals.skipped}</span>}
+            {totals.failed > 0 && <span>· 失败 {totals.failed}</span>}
+            {totals.warnings > 0 && <span>· 异常 {totals.warnings}</span>}
           </div>
         );
       })()}

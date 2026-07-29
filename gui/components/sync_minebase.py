@@ -142,6 +142,14 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         tooltip="勾选后，Excel 中被隐藏的列将不会被读取",
     )
 
+    # --- 过滤开关 ---
+    filter_zero_hours = ft.Checkbox(label="过滤零小时数", value=False, active_color=theme.PRIMARY)
+    filter_zero_work_hours = ft.Checkbox(label="过滤零运行小时数", value=False, active_color=theme.PRIMARY)
+    filter_zero_hours_meter = ft.Checkbox(label="过滤零小时仪表", value=False, active_color=theme.PRIMARY)
+    filter_zero_km_meter = ft.Checkbox(label="过滤零公里仪表", value=False, active_color=theme.PRIMARY)
+    filter_zero_run_hours = ft.Checkbox(label="过滤零运行小时数", value=False, active_color=theme.PRIMARY)
+    filter_zero_run_km = ft.Checkbox(label="过滤零运行里程", value=False, active_color=theme.PRIMARY)
+
     # --- 异常值检测 ---
     _anomaly = create_anomaly_controls()
 
@@ -386,6 +394,29 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
                     ),
                 ], label="处理选项"),
 
+                # ── 数据过滤 ──
+                theme.module_card([
+                    ft.Text("油耗处理", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                    ft.ResponsiveRow(
+                        [
+                            ft.Container(filter_zero_hours, col={"xs": 6}),
+                            ft.Container(filter_zero_work_hours, col={"xs": 6}),
+                        ],
+                        run_spacing=4,
+                    ),
+                    ft.Divider(height=1, color=theme.BORDER),
+                    ft.Text("生产数据", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                    ft.ResponsiveRow(
+                        [
+                            ft.Container(filter_zero_hours_meter, col={"xs": 6}),
+                            ft.Container(filter_zero_km_meter, col={"xs": 6}),
+                            ft.Container(filter_zero_run_hours, col={"xs": 6}),
+                            ft.Container(filter_zero_run_km, col={"xs": 6}),
+                        ],
+                        run_spacing=4,
+                    ),
+                ], label="数据过滤"),
+
                 # ── 异常值检测 ──
                 theme.module_card([
                     _anomaly["container"],
@@ -424,6 +455,12 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "skip_hidden": skip_hidden_rows_check,
         "skip_hidden_rows": skip_hidden_rows_check,
         "skip_hidden_cols": skip_hidden_cols_check,
+        "_filter_zero_hours_toggle": filter_zero_hours,
+        "_filter_zero_work_hours_toggle": filter_zero_work_hours,
+        "_filter_zero_hours_meter_toggle": filter_zero_hours_meter,
+        "_filter_zero_km_meter_toggle": filter_zero_km_meter,
+        "_filter_zero_run_hours_toggle": filter_zero_run_hours,
+        "_filter_zero_run_km_toggle": filter_zero_run_km,
         "_anomaly_enabled": _anomaly["_anomaly_enabled"],
         "_anomaly_report": _anomaly["_anomaly_report"],
         "_anomaly_mode": _anomaly["_anomaly_mode"],
