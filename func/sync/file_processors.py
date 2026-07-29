@@ -314,6 +314,7 @@ def _process_work_efficiency_file(
     year: int | None = None,
     month: int | None = None,
     apply_header_mapping: bool = True,
+    header_mode: str | None = None,
     skip_hidden: bool = False,
     skip_hidden_rows: bool = False,
     skip_hidden_cols: bool = False,
@@ -344,6 +345,8 @@ def _process_work_efficiency_file(
         from func.config_loader import get_worktime_header_mapping
         hdr = get_worktime_header_mapping()
         if hdr and hdr.get("entries"):
+            if header_mode:
+                hdr["mode"] = header_mode
             from func.excel_utils import apply_header_mapping as _apply_hdr_map
             return _apply_hdr_map(df, hdr)
         return df
@@ -358,6 +361,8 @@ def _process_work_efficiency_file(
             hdr_map = get_worktime_header_mapping()
             if hdr_map and not hdr_map.get("entries"):
                 hdr_map = None
+            elif hdr_map and header_mode:
+                hdr_map["mode"] = header_mode
 
         def _extractor(sheets):
             if not sheets:

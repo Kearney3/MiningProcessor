@@ -11,6 +11,7 @@ from .common import (
     _show_path_confirm,
     _update_last_directory,
     ChipToggle,
+    HeaderModeConfig,
     create_anomaly_controls,
     to_local_dt,
 )
@@ -112,10 +113,8 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     )
 
     # --- 工时表头映射 & 台账匹配 ---
-    header_mapping_check = ft.Checkbox(
+    _sync_hmc = HeaderModeConfig(
         label="应用工时表头映射",
-        value=True,
-        active_color=theme.PRIMARY,
         tooltip="对工作效率表应用列名映射配置",
     )
 
@@ -386,7 +385,8 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
                     ft.ResponsiveRow(
                         [
                             ft.Container(dry_run_check, col={"xs": 6}),
-                            ft.Container(header_mapping_check, col={"xs": 6}),
+                            ft.Container(_sync_hmc.toggle, col={"xs": 6}),
+                            ft.Container(_sync_hmc.mode.row, col={"xs": 12}),
                             ft.Container(equipment_ledger_check, col={"xs": 6}),
                             ft.Container(oil_ledger_check, col={"xs": 6}),
                             ft.Container(skip_hidden_rows_check, col={"xs": 6}),
@@ -451,7 +451,8 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "date_start": _date_start_val,
         "date_end": _date_end_val,
         "date_filter_toggle": date_filter_check,
-        "apply_header": header_mapping_check,
+        "apply_header": _sync_hmc.toggle,
+        "header_mode": _sync_hmc.mode,
         "use_equipment_ledger": equipment_ledger_check,
         "use_oil_ledger": oil_ledger_check,
         "skip_hidden": skip_hidden_rows_check,

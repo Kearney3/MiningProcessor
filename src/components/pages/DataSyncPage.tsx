@@ -163,6 +163,34 @@ function DataTypeCheckbox({
   );
 }
 
+function ChipToggle({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { label: string; value: string }[];
+}) {
+  return (
+    <div className="inline-flex rounded-md border border-slate-200 overflow-hidden">
+      {options.map((o, i) => (
+        <button
+          key={o.value}
+          onClick={() => onChange(o.value)}
+          className={`text-xs px-3 py-1.5 transition-colors ${
+            value === o.value
+              ? "bg-slate-900 text-white"
+              : "bg-white text-slate-600 hover:bg-slate-50"
+          } ${i > 0 ? "border-l border-slate-200" : ""}`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════
 // Main page component
 // ═══════════════════════════════════════
@@ -188,6 +216,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const [dateStart, setDateStart] = useState(yesterdayISO());
   const [dateEnd, setDateEnd] = useState(yesterdayISO());
   const [applyHeaderMapping, setApplyHeaderMapping] = useState(true);
+  const [headerMode, setHeaderMode] = useState("position");
   const [useEquipmentLedger, setUseEquipmentLedger] = useState(false);
   const [useOilLedger, setUseOilLedger] = useState(true);
   const [skipHiddenRows, setSkipHiddenRows] = useState(true);
@@ -247,6 +276,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
         date_start: dateStart || undefined,
         date_end: dateEnd || undefined,
         apply_header_mapping: applyHeaderMapping,
+        header_mode: applyHeaderMapping ? headerMode : undefined,
         use_equipment_ledger: useEquipmentLedger,
         use_oil_ledger: useOilLedger,
         skip_hidden_rows: skipHiddenRows,
@@ -496,6 +526,19 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
               </button>
               <span className="text-sm text-slate-700">应用工时表头映射</span>
             </label>
+            {applyHeaderMapping && (
+              <div className="flex items-center gap-2 pl-10 mt-1.5">
+                <span className="text-xs text-slate-500">映射模式</span>
+                <ChipToggle
+                  value={headerMode}
+                  onChange={setHeaderMode}
+                  options={[
+                    { label: "按位置", value: "position" },
+                    { label: "按列名", value: "name" },
+                  ]}
+                />
+              </div>
+            )}
           </div>
           <div className="border-t border-slate-100 pt-3">
             <p className="text-xs text-slate-400 mb-2">台账匹配</p>
