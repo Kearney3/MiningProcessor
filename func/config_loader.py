@@ -888,6 +888,10 @@ def test_llm_connection(config: dict[str, Any] | None = None) -> dict[str, Any]:
         config = get_llm_config()
     url = config.get("url", "").strip()
     api_key = config.get("api_key", "").strip()
+    # 当 api_key 为空（前端掩码）时，从持久化配置中加载真实密钥
+    if not api_key:
+        stored = get_llm_config()
+        api_key = stored.get("api_key", "").strip()
     fmt = config.get("format", "openai")
     if not url:
         return {"success": False, "models": [], "error": "未配置接口 URL"}
