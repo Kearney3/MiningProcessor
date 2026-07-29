@@ -1168,14 +1168,25 @@ def process_maintenance_llm(
     else:
         from func.building import build_sheets
         classified: list[dict] = []
+
+        def _safe_str(val: Any) -> str:
+            if val is None or (isinstance(val, float) and math.isnan(val)):
+                return ""
+            try:
+                if pd.isna(val):
+                    return ""
+            except (TypeError, ValueError):
+                pass
+            return str(val).strip()
+
         for _, row in df.iterrows():
-            content = str(row.get(content_column, "")).strip()
+            content = _safe_str(row.get(content_column, ""))
             if not content:
                 continue
-            major = str(row.get(category_column, "")).strip()
-            minor = str(row.get(minor_column, "")).strip()
-            method = str(row.get(status_column, "")).strip() if status_column in df.columns else ""
-            is_fault = major not in (None, "None", "", "计划保养与非故障作业")
+            major = _safe_str(row.get(category_column, ""))
+            minor = _safe_str(row.get(minor_column, ""))
+            method = _safe_str(row.get(status_column, "")) if status_column in df.columns else ""
+            is_fault = major not in ("", "计划保养与非故障作业")
             if method == "噪声过滤":
                 is_fault = False
             confidence = None
@@ -1187,11 +1198,11 @@ def process_maintenance_llm(
                     pass
             classified.append({
                 "日期": row.get("日期", ""),
-                "原始设备名称": str(row.get("原始设备名称", row.get("设备名称", ""))),
-                "标准设备名称": str(row.get("标准设备名称", row.get("原始设备名称", ""))),
-                "设备型号": str(row.get("设备型号", "")),
-                "原因": str(row.get("原因", "")),
-                "班次": str(row.get("班次", "")),
+                "原始设备名称": _safe_str(row.get("原始设备名称", row.get("设备名称", ""))),
+                "标准设备名称": _safe_str(row.get("标准设备名称", row.get("原始设备名称", ""))),
+                "设备型号": _safe_str(row.get("设备型号", "")),
+                "原因": _safe_str(row.get("原因", "")),
+                "班次": _safe_str(row.get("班次", "")),
                 "大类": major,
                 "小类": minor,
                 "分类方式": method if method else "规则",
