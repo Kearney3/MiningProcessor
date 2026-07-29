@@ -313,6 +313,79 @@ function StatusMessage({ message, kind }: { message: string; kind: "success" | "
 // Section 1: File Keywords
 // ---------------------------------------------------------------------------
 
+function KeywordChipInput({
+  label,
+  items,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  items: string[];
+  placeholder: string;
+  onChange: (items: string[]) => void;
+}) {
+  const [inputValue, setInputValue] = useState("");
+
+  const addItem = () => {
+    const val = inputValue.trim();
+    if (!val) return;
+    onChange([...items, val]);
+    setInputValue("");
+  };
+
+  const removeItem = (index: number) => {
+    onChange(items.filter((_, i) => i !== index));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addItem();
+    }
+  };
+
+  return (
+    <div>
+      <label className="text-xs font-medium text-slate-500 mb-1 block">{label}</label>
+      <div className="flex flex-wrap gap-1.5 mb-1.5 min-h-[24px]">
+        {items.map((kw, i) => (
+          <span
+            key={`${kw}-${i}`}
+            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-sky-50 text-sky-700 cursor-pointer hover:bg-sky-100 transition-colors"
+            onClick={() => removeItem(i)}
+            title="点击删除"
+          >
+            {kw}
+            <svg className="w-3 h-3 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-1.5">
+        <input
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          className="input flex-1"
+        />
+        <button
+          type="button"
+          onClick={addItem}
+          className="btn btn-ghost px-2 text-teal-600 hover:text-teal-700"
+          title="添加关键字"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function FileKeywordsSection({ bridge }: { bridge: BridgeProp }) {
   const { notify } = useToast();
   const [expanded, setExpanded] = useState(false);
@@ -342,12 +415,8 @@ function FileKeywordsSection({ bridge }: { bridge: BridgeProp }) {
 
   useEffect(() => { reload(); }, [reload]);
 
-  const join = (arr: string[]) => arr.join(",");
-  const split = (s: string) =>
-    s.split(",").map((v) => v.trim()).filter(Boolean);
-
-  const updateField = (key: keyof FileKeywords, text: string) => {
-    setKeywords((prev) => ({ ...prev, [key]: split(text) }));
+  const updateField = (key: keyof FileKeywords, items: string[]) => {
+    setKeywords((prev) => ({ ...prev, [key]: items }));
   };
 
   const save = async () => {
@@ -371,33 +440,30 @@ function FileKeywordsSection({ bridge }: { bridge: BridgeProp }) {
   };
 
   const fields: { key: keyof FileKeywords; label: string; hint: string }[] = [
-    { key: "fuel", label: "油耗关键字", hint: "例如: Fuel report, 设备柴油消耗" },
-    { key: "electrical", label: "电力关键字", hint: "例如: Electrical, Цахилгааны хэлтэс" },
-    { key: "production", label: "生产关键字", hint: "例如: 白班, 夜班" },
-    { key: "worktime", label: "工时关键字", hint: "例如: 工作效率表, 工时" },
-    { key: "maintenance", label: "维修关键字", hint: "例如: 设备出勤统计表" },
+    { key: "fuel", label: "油耗关键字", hint: "输入后按回车添加" },
+    { key: "electrical", label: "电力关键字", hint: "输入后按回车添加" },
+    { key: "production", label: "生产关键字", hint: "输入后按回车添加" },
+    { key: "worktime", label: "工时关键字", hint: "输入后按回车添加" },
+    { key: "maintenance", label: "维修关键字", hint: "输入后按回车添加" },
   ];
 
   return (
     <SectionCard
       title="文件关键字"
-      subtitle="批量处理时用于匹配文件名的关键字，多个关键字用英文逗号分隔"
+      subtitle="批量处理时用于匹配文件名的关键字，点击标签可删除"
       icon={<IconKeywords />}
       expanded={expanded}
       onToggle={() => setExpanded(!expanded)}
     >
       <div className="space-y-3">
         {fields.map(({ key, label, hint }) => (
-          <div key={key}>
-            <label className="text-xs font-medium text-slate-500 mb-1 block">{label}</label>
-            <input
-              type="text"
-              value={join(keywords[key])}
-              onChange={(e) => updateField(key, e.target.value)}
-              placeholder={hint}
-              className="input w-full"
-            />
-          </div>
+          <KeywordChipInput
+            key={key}
+            label={label}
+            items={keywords[key]}
+            placeholder={hint}
+            onChange={(items) => updateField(key, items)}
+          />
         ))}
       </div>
       <ActionButtons
@@ -640,6 +706,8 @@ function LLMConfigSection({ bridge }: { bridge: BridgeProp }) {
   const [models, setModels] = useState<string[]>([]);
   const [fetchingModels, setFetchingModels] = useState(false);
   const [fetchResult, setFetchResult] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const [verifyResult, setVerifyResult] = useState<{ msg: string; ok: boolean } | null>(null);
 
   const MASKED = "***";
 
@@ -729,6 +797,43 @@ function LLMConfigSection({ bridge }: { bridge: BridgeProp }) {
     }
   };
 
+  const verifyConnection = async () => {
+    if (!config.url.trim()) {
+      setVerifyResult({ msg: "请先填写接口 URL", ok: false });
+      return;
+    }
+    setVerifying(true);
+    setVerifyResult(null);
+    try {
+      const apiKey = apiKeySaved && config.api_key === MASKED ? "" : config.api_key;
+      const res = await bridge.call<{ success: boolean; models: string[]; error: string }>(
+        "test_llm_connection",
+        { url: config.url, api_key: apiKey, format: config.format },
+      );
+      if (res.success) {
+        const selectedModel = config.model.trim();
+        if (selectedModel && !res.models.includes(selectedModel)) {
+          setVerifyResult({
+            msg: `连接成功，但所选模型「${selectedModel}」不在可用列表中（共 ${res.models.length} 个模型）`,
+            ok: false,
+          });
+        } else {
+          const modelInfo = selectedModel ? `，模型「${selectedModel}」可用` : "";
+          setVerifyResult({
+            msg: `✓ 连接成功（${res.models.length} 个模型可用${modelInfo}）`,
+            ok: true,
+          });
+        }
+      } else {
+        setVerifyResult({ msg: `✗ 连接失败: ${res.error}`, ok: false });
+      }
+    } catch (e) {
+      setVerifyResult({ msg: `请求异常: ${String(e)}`, ok: false });
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   const passwordType = showPassword ? "text" : "password";
 
   return (
@@ -814,10 +919,24 @@ function LLMConfigSection({ bridge }: { bridge: BridgeProp }) {
             >
               {fetchingModels ? "获取中..." : "获取模型"}
             </button>
+            <button
+              onClick={verifyConnection}
+              disabled={verifying}
+              className={`inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors shrink-0 ${
+                verifying ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+            >
+              {verifying ? "验证中..." : "验证连接"}
+            </button>
           </div>
           {fetchResult && (
             <span className={`text-xs mt-1 block ${fetchResult.ok ? "text-emerald-600" : "text-red-600"}`}>
               {fetchResult.msg}
+            </span>
+          )}
+          {verifyResult && (
+            <span className={`text-xs mt-1 block ${verifyResult.ok ? "text-emerald-600" : "text-amber-600"}`}>
+              {verifyResult.msg}
             </span>
           )}
         </div>

@@ -208,6 +208,14 @@ impl PythonBridge {
     /// 设置取消标志，通知正在执行的 call 提前返回 (H1)
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::SeqCst);
+        // Write cancel signal file for Python-side detection.
+        if let Ok(home) = std::env::var("HOME") {
+            let cancel_path = std::path::PathBuf::from(home)
+                .join(".cache")
+                .join("mining_processor_cancel");
+            let _ = std::fs::create_dir_all(cancel_path.parent().unwrap());
+            let _ = std::fs::write(cancel_path, "cancel");
+        }
     }
 
     /// 获取子进程 PID（用于前端展示）

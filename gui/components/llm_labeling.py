@@ -104,6 +104,8 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
     )
     status_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
     result_text = ft.Text("", size=13, color=theme.TEXT_PRIMARY)
+    progress_bar = ft.ProgressBar(value=0, visible=False, height=6)
+    progress_text = ft.Text("", size=11, color=theme.TEXT_SECONDARY, visible=False)
 
     # ── 内部状态 ──
     sample_data: list[dict] = []
@@ -353,14 +355,31 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
         btn.text = "标注中..."
         cancel_btn.visible = True
         result_text.value = ""
+        progress_bar.value = 0
+        progress_bar.visible = True
+        progress_text.value = ""
+        progress_text.visible = True
         status_text.value = f"正在标注（Sheet: {sheet_name}）..."
-        safe_update(btn, cancel_btn, result_text, status_text)
+        safe_update(btn, cancel_btn, result_text, status_text, progress_bar, progress_text)
 
         nonlocal active_thread
 
         def _run():
             try:
                 from func.label_maintenance_with_llm import process_maintenance_llm
+
+                def _on_progress(text: str, data: dict):
+                    pct_val = data.get("percent", 0) / 100
+
+                    async def _update_ui():
+                        progress_bar.value = pct_val
+                        progress_text.value = text
+                        safe_update(progress_bar, progress_text)
+
+                    try:
+                        page.run_task(_update_ui)
+                    except (RuntimeError, AttributeError):
+                        pass
 
                 result = process_maintenance_llm(
                     path,
@@ -373,6 +392,7 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                     filter_values=filters,
                     export_mode=export_mode,
                     cancel_event=cancel_event,
+                    progress_fn=_on_progress,
                 )
 
                 if cancel_event.is_set():
@@ -385,7 +405,9 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                         btn.disabled = False
                         btn.text = "开始标注"
                         cancel_btn.visible = False
-                        safe_update(status_text, result_text, btn, cancel_btn)
+                        progress_bar.visible = False
+                        progress_text.visible = False
+                        safe_update(status_text, result_text, btn, cancel_btn, progress_bar, progress_text)
 
                     page.run_task(_cancelled)
                     return
@@ -406,7 +428,9 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                     btn.disabled = False
                     btn.text = "开始标注"
                     cancel_btn.visible = False
-                    safe_update(status_text, result_text, btn, cancel_btn)
+                    progress_bar.visible = False
+                    progress_text.visible = False
+                    safe_update(status_text, result_text, btn, cancel_btn, progress_bar, progress_text)
 
                 page.run_task(_ok)
             except Exception as exc:
@@ -421,7 +445,9 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                     btn.disabled = False
                     btn.text = "开始标注"
                     cancel_btn.visible = False
-                    safe_update(status_text, result_text, btn, cancel_btn)
+                    progress_bar.visible = False
+                    progress_text.visible = False
+                    safe_update(status_text, result_text, btn, cancel_btn, progress_bar, progress_text)
 
                 page.run_task(_fail)
             finally:
@@ -466,6 +492,8 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                 # Step 4: 执行
                 theme.module_card([
                     ft.Row([btn, cancel_btn], spacing=8),
+                    progress_bar,
+                    progress_text,
                     status_text,
                     result_text,
                 ]),

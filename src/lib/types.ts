@@ -74,6 +74,7 @@ export interface SyncWarning {
 /** 同步结果 */
 export interface SyncResult {
   results: Record<string, { success: number; skipped: number; failed: number; warnings?: SyncWarning[] }>;
+  dry_run_file?: string;
 }
 
 /** 台账数据 */

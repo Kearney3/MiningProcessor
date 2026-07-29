@@ -34,40 +34,114 @@ def _normalize_port_text(value: str | None) -> str:
 # 1. 文件关键字配置
 # ---------------------------------------------------------------------------
 
+def _create_keyword_input(page: ft.Page, label: str, hint_text: str):
+    """创建单个关键字 chip 输入组件，返回 (column, get_keywords, set_keywords)。"""
+    _items: list[str] = []
+    chips_row = ft.Row(spacing=4, wrap=True, run_spacing=4)
+    input_field = ft.TextField(
+        hint_text=hint_text,
+        expand=True,
+        dense=True,
+        text_size=13,
+        color=theme.TEXT_PRIMARY,
+        hint_style=ft.TextStyle(color=theme.TEXT_SECONDARY, size=12),
+        border_color=theme.BORDER,
+        focused_border_color=theme.PRIMARY,
+    )
+
+    def _rebuild_chips():
+        chips_row.controls.clear()
+        for i, kw in enumerate(_items):
+            idx = i
+
+            def _on_delete(e, _idx=idx):
+                _items.pop(_idx)
+                _rebuild_chips()
+                safe_update(chips_row)
+
+            chip = ft.Container(
+                content=ft.Row(
+                    [
+                        ft.Text(kw, size=12, color=ft.Colors.BLUE_700),
+                        ft.Icon(ft.Icons.CLOSE, size=14, color=ft.Colors.BLUE_400),
+                    ],
+                    spacing=2,
+                    tight=True,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
+                bgcolor=ft.Colors.BLUE_50,
+                border_radius=12,
+                padding=ft.Padding.symmetric(horizontal=8, vertical=4),
+                on_click=_on_delete,
+                tooltip="点击删除",
+            )
+            chips_row.controls.append(chip)
+        safe_update(chips_row)
+
+    def _on_add(e=None):
+        val = (input_field.value or "").strip()
+        if not val:
+            return
+        _items.append(val)
+        input_field.value = ""
+        _rebuild_chips()
+        safe_update(input_field)
+
+    input_field.on_submit = _on_add
+    add_btn = ft.IconButton(
+        icon=ft.Icons.ADD_CIRCLE_OUTLINE,
+        tooltip="添加关键字",
+        icon_size=22,
+        icon_color=theme.PRIMARY,
+        on_click=_on_add,
+    )
+
+    column = ft.Column(
+        [
+            ft.Text(label, size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+            chips_row,
+            ft.Row([input_field, add_btn], spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+        ],
+        spacing=4,
+    )
+
+    def get_keywords() -> list[str]:
+        return list(_items)
+
+    def set_keywords(items: list[str]):
+        _items.clear()
+        _items.extend(items)
+        _rebuild_chips()
+
+    return column, get_keywords, set_keywords
+
+
 def _create_keywords_section(page: ft.Page, log):
     """创建文件关键字配置卡片，返回 (card, refs_dict)。"""
 
-    kw_fuel = ft.TextField(label="燃油数据", hint_text="例如: 设备柴油消耗,Техник", expand=True, color=theme.TEXT_PRIMARY)
-    kw_electrical = ft.TextField(label="电力数据", hint_text="例如: Electrical", expand=True, color=theme.TEXT_PRIMARY)
-    kw_production = ft.TextField(label="生产数据", hint_text="例如: 白班,夜班", expand=True, color=theme.TEXT_PRIMARY)
-    kw_worktime = ft.TextField(label="工时数据", hint_text="例如: 工时", expand=True, color=theme.TEXT_PRIMARY)
-    kw_maintenance = ft.TextField(label="维修数据", hint_text="例如: 设备出勤统计表", expand=True, color=theme.TEXT_PRIMARY)
+    fuel_input, fuel_get, fuel_set = _create_keyword_input(page, "燃油数据", "输入关键字后按回车或点击添加")
+    elec_input, elec_get, elec_set = _create_keyword_input(page, "电力数据", "输入关键字后按回车或点击添加")
+    prod_input, prod_get, prod_set = _create_keyword_input(page, "生产数据", "输入关键字后按回车或点击添加")
+    work_input, work_get, work_set = _create_keyword_input(page, "工时数据", "输入关键字后按回车或点击添加")
+    maint_input, maint_get, maint_set = _create_keyword_input(page, "维修数据", "输入关键字后按回车或点击添加")
+
+    _kw_getters = {
+        "fuel": fuel_get, "electrical": elec_get,
+        "production": prod_get, "worktime": work_get, "maintenance": maint_get,
+    }
+    _kw_setters = {
+        "fuel": fuel_set, "electrical": elec_set,
+        "production": prod_set, "worktime": work_set, "maintenance": maint_set,
+    }
+
     kw_status_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
 
-    def _kw_defaults() -> dict[str, str]:
-        return {k: ",".join(v) for k, v in DEFAULT_FILE_KEYWORDS.items()}
-
     def _apply_kw_to_ui(kw: dict[str, list[str]]):
-        kw_fuel.value = ",".join(kw.get("fuel", []))
-        kw_electrical.value = ",".join(kw.get("electrical", []))
-        kw_production.value = ",".join(kw.get("production", []))
-        kw_worktime.value = ",".join(kw.get("worktime", []))
-        kw_maintenance.value = ",".join(kw.get("maintenance", []))
-        try:
-            page.update()
-        except (RuntimeError, AttributeError):
-            pass
+        for key, setter in _kw_setters.items():
+            setter(kw.get(key, []))
 
     def _collect_kw_from_ui() -> dict[str, list[str]]:
-        def _split(text: str) -> list[str]:
-            return [s.strip() for s in (text or "").split(",") if s.strip()]
-        return {
-            "fuel": _split(kw_fuel.value),
-            "electrical": _split(kw_electrical.value),
-            "production": _split(kw_production.value),
-            "worktime": _split(kw_worktime.value),
-            "maintenance": _split(kw_maintenance.value),
-        }
+        return {key: getter() for key, getter in _kw_getters.items()}
 
     def _reload_keywords():
         saved = config_loader.get_user_config("file_keywords", None)
@@ -114,15 +188,15 @@ def _create_keywords_section(page: ft.Page, log):
         initially_expanded=False,
         content_controls=[
             ft.Text(
-                "所有类型均按文件名关键字匹配，Sheet 级别识别由各处理器内部完成。多个关键字用英文逗号分隔。",
+                "所有类型均按文件名关键字匹配，Sheet 级别识别由各处理器内部完成。点击关键字标签可删除。",
                 size=12,
                 color=theme.TEXT_SECONDARY,
             ),
-            kw_fuel,
-            kw_electrical,
-            kw_production,
-            kw_worktime,
-            kw_maintenance,
+            fuel_input,
+            elec_input,
+            prod_input,
+            work_input,
+            maint_input,
             ft.Row(kw_action_buttons, spacing=8, wrap=True, alignment=ft.MainAxisAlignment.START),
             kw_status_text,
         ],
@@ -1287,6 +1361,7 @@ def _create_llm_config_section(page: ft.Page, log):
     )
     llm_status = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
     llm_test_result = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
+    llm_verify_result = ft.Text("", size=12)
 
     def _apply_llm_to_ui(cfg: dict):
         llm_url.value = cfg.get("url", "")
@@ -1377,6 +1452,59 @@ def _create_llm_config_section(page: ft.Page, log):
             pass
 
     fetch_btn = theme.secondary_btn("获取模型", icon=ft.Icons.REFRESH, on_click=_fetch_models)
+
+    def _verify_connection(_e):
+        cfg = {
+            "url": (llm_url.value or "").strip(),
+            "api_key": (llm_api_key.value or "").strip(),
+            "format": llm_format.value or "openai",
+        }
+        if not cfg["url"]:
+            llm_verify_result.value = "⚠ 请先填写接口 URL"
+            llm_verify_result.color = ft.Colors.AMBER
+            try:
+                page.update()
+            except (RuntimeError, AttributeError):
+                pass
+            return
+        llm_verify_result.value = "正在验证..."
+        llm_verify_result.color = theme.TEXT_SECONDARY
+        try:
+            page.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+        def _do_verify():
+            result = config_loader.test_llm_connection(cfg)
+            selected_model = (llm_model.value or "").strip()
+
+            def _update():
+                if result["success"]:
+                    models = result["models"]
+                    if selected_model and selected_model not in models:
+                        llm_verify_result.value = (
+                            f"⚠ 连接成功，但所选模型「{selected_model}」"
+                            f"不在可用列表中（共 {len(models)} 个模型）"
+                        )
+                        llm_verify_result.color = ft.Colors.AMBER
+                    else:
+                        model_info = f"，模型「{selected_model}」可用" if selected_model else ""
+                        llm_verify_result.value = f"✓ 连接成功（{len(models)} 个模型可用{model_info}）"
+                        llm_verify_result.color = ft.Colors.GREEN
+                else:
+                    llm_verify_result.value = f"✗ 连接失败: {result['error']}"
+                    llm_verify_result.color = ft.Colors.RED
+                try:
+                    page.update()
+                except (RuntimeError, AttributeError):
+                    pass
+
+            _update()
+
+        import threading
+        threading.Thread(target=_do_verify, daemon=True).start()
+
+    verify_btn = theme.secondary_btn("验证连接", icon=ft.Icons.CHECK_CIRCLE, on_click=_verify_connection)
     action_buttons = [
         theme.primary_btn("保存配置", icon=ft.Icons.SAVE, on_click=_save_llm),
         theme.secondary_btn("重新加载", icon=ft.Icons.REFRESH, on_click=lambda _: _reload_llm()),
@@ -1389,10 +1517,11 @@ def _create_llm_config_section(page: ft.Page, log):
         icon=ft.Icons.SMART_TOY,
         initially_expanded=False,
         content_controls=[
-            ft.Row([llm_format, fetch_btn], spacing=8, vertical_alignment=ft.CrossAxisAlignment.END),
+            ft.Row([llm_format, fetch_btn, verify_btn], spacing=8, vertical_alignment=ft.CrossAxisAlignment.END),
             llm_url,
             llm_api_key,
             llm_model,
+            llm_verify_result,
             llm_test_result,
             ft.Row(action_buttons, spacing=8, wrap=True, alignment=ft.MainAxisAlignment.START),
             llm_status,

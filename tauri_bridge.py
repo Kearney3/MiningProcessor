@@ -541,6 +541,7 @@ def _process_maintenance_llm(params: dict) -> dict:
     if not llm_config.get("model"):
         raise ValueError("请先在配置中选择 LLM 模型")
     _llm_cancel_event.clear()
+    _CANCEL_FILE.unlink(missing_ok=True)
     result = process_maintenance_llm(
         safe_path,
         llm_config=llm_config,
@@ -551,6 +552,8 @@ def _process_maintenance_llm(params: dict) -> dict:
         filter_values=params.get("filter_values"),
         export_mode=params.get("export_mode", "statistics"),
         cancel_event=_llm_cancel_event,
+        cancel_file=_CANCEL_FILE,
+        show_progress_bar=True,
     )
     result["cancelled"] = _llm_cancel_event.is_set()
     return result
@@ -558,6 +561,7 @@ def _process_maintenance_llm(params: dict) -> dict:
 
 # LLM 标注取消事件（全局，同一时间只允许一个标注任务）
 _llm_cancel_event = threading.Event()
+_CANCEL_FILE = Path.home() / ".cache" / "mining_processor_cancel"
 
 
 @_register("cancel_llm_labeling")
@@ -717,7 +721,11 @@ def _sync_minebase(params: dict) -> dict:
         filter_zero_run_hours=params.get("filter_zero_run_hours", False),
         filter_zero_run_km=params.get("filter_zero_run_km", False),
     )
-    return {"results": results}
+    dry_run_file = results.pop("_dry_run_file", None)
+    resp: dict = {"results": results}
+    if dry_run_file:
+        resp["dry_run_file"] = dry_run_file
+    return resp
 
 
 @_register("export_sync_warnings")

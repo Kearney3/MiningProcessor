@@ -94,7 +94,7 @@ function App() {
             <LedgerMatchPage bridge={bridge} />
           </div>
           <div style={{ display: currentPage === "llm-labeling" ? "block" : "none" }}>
-            <LLMLabelingPage bridge={bridge} />
+            <LLMLabelingPage bridge={bridge} progress={bridge.progress} setProgress={bridge.setProgress} />
           </div>
           <div style={{ display: currentPage === "equipment-ledger" ? "block" : "none" }}>
             <EquipmentLedgerPage bridge={bridge} />
