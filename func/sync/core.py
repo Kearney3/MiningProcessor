@@ -219,6 +219,9 @@ def sync(
     # 生产文件处理缓存（production 和 operation 可能指向同一文件）
     _production_cache: dict[str, dict[str, list[dict[str, Any]]]] | None = None
 
+    # 试运行数据收集
+    dry_run_data: dict[str, list[dict[str, Any]]] = {} if dry_run else {}
+
     # 逐类型同步（每个类型可能对应多个文件）
     results = {}
     try:
@@ -300,6 +303,10 @@ def sync(
             else:
                 results[data_type] = _sync_via_db(data_type, all_rows, mapping, db_client, dry_run, row_warnings=data_warnings)
 
+            # 收集试运行数据
+            if dry_run and "dry_run_rows" in results[data_type]:
+                dry_run_data[data_type] = results[data_type].pop("dry_run_rows")
+
     finally:
         if db_client:
             db_client.close()
@@ -318,6 +325,26 @@ def sync(
     logger.info("  合计: 成功=%d, 跳过=%d, 失败=%d, 异常=%d", total["success"], total["skipped"], total["failed"], total_warnings)
     if total_warnings:
         logger.warning("  ⚠️  共 %d 条异常记录，请在 GUI 或前端中查看详情", total_warnings)
+
+    # 试运行模式：导出预览 Excel
+    if dry_run and dry_run_data:
+        from func.sync.export import export_dry_run_to_excel
+        # 收集所有警告
+        all_warnings: list[tuple[str, dict]] = []
+        for dt, r in results.items():
+            for w in r.get("warnings", []):
+                all_warnings.append((dt, w))
+        try:
+            dry_run_file = export_dry_run_to_excel(
+                dry_run_data,
+                warnings=all_warnings,
+                column_mapping=column_mapping,
+                input_dir=input_path,
+            )
+            # 将文件路径附加到结果中，供 GUI / Tauri 使用
+            results["_dry_run_file"] = dry_run_file
+        except Exception as e:
+            logger.error("试运行预览导出失败: %s", e)
 
     return results
 

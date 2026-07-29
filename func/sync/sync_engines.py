@@ -48,11 +48,13 @@ def sync_via_api(
 
     if dry_run:
         logger.info("[DRY-RUN] %s: 将同步 %d 行到 %s", data_type, len(rows), table)
-        for row in rows[:3]:
-            logger.info("  示例: %s", row)
-        if len(rows) > 3:
-            logger.info("  ... 共 %d 行", len(rows))
-        return {"success": 0, "skipped": 0, "failed": 0, "warnings": collected_warnings}
+        return {
+            "success": 0,
+            "skipped": 0,
+            "failed": 0,
+            "warnings": collected_warnings,
+            "dry_run_rows": rows,
+        }
 
     field_mappings = _build_field_mappings(column_mapping, table)
     session_id = api_client.create_session(table)
@@ -205,11 +207,13 @@ def sync_via_db(
 
     if dry_run:
         logger.info("[DRY-RUN] %s: 将同步 %d 行到 %s", data_type, len(rows), table)
-        for row in rows[:3]:
-            logger.info("  示例: %s", row)
-        if len(rows) > 3:
-            logger.info("  ... 共 %d 行", len(rows))
-        return {"success": 0, "skipped": 0, "failed": 0, "warnings": collected_warnings}
+        return {
+            "success": 0,
+            "skipped": 0,
+            "failed": 0,
+            "warnings": collected_warnings,
+            "dry_run_rows": rows,
+        }
 
     total_success = 0
     total_skipped = 0

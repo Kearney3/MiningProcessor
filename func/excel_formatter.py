@@ -179,3 +179,129 @@ def write_formatted_excel(
 
     logger.info("格式化输出完成: %s", output_file)
     return output_file
+
+
+# ── 双重表头支持 ─────────────────────────────────────────────────────────
+
+
+# 第二行表头样式（浅灰底 + 深灰字，区分于主表头）
+_DUAL_HEADER_FILL = "D9E2F3"
+_DUAL_HEADER_FONT_COLOR = "44546A"
+
+
+def write_dual_header_sheet(
+    output_file: str,
+    sheets: dict[str, pd.DataFrame],
+    *,
+    second_headers: dict[str, list[str]],
+    header_fill: str = HEADER_FILL,
+    header_font_color: str = HEADER_FONT_COLOR,
+    date_format: str = DATE_NUM_FORMAT,
+    min_col_width: int = MIN_COL_WIDTH,
+    max_col_width: int = MAX_COL_WIDTH,
+) -> str:
+    """写入带双重表头的 Excel 文件。
+
+    第一行为源列名（蓝底白字），第二行为目标字段名（浅灰底深灰字），
+    第三行起为数据。仅对 sheets 中存在于 second_headers 的 sheet 应用双重表头，
+    其余 sheet 仍使用 write_formatted_excel 的单行表头格式。
+
+    Args:
+        output_file: 输出文件路径。
+        sheets: {sheet_name: DataFrame} 映射。
+        second_headers: {sheet_name: [第二行表头文本, ...]} 映射。
+                        列表长度需与对应 DataFrame 的列数一致。
+
+    Returns:
+        输出文件路径。
+    """
+    from openpyxl import load_workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    output_file = str(output_file)
+
+    # Step 1: 用 pandas 写入数据（第一行是 pandas 的列名，即源列名）
+    with pd.ExcelWriter(output_file, engine="openpyxl") as writer:
+        for sheet_name, df in sheets.items():
+            df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+    # Step 2: 用 openpyxl 格式化
+    wb = load_workbook(output_file)
+
+    header_font = Font(bold=True, color=header_font_color)
+    header_fill_style = PatternFill(start_color=header_fill, end_color=header_fill, fill_type="solid")
+    second_font = Font(color=_DUAL_HEADER_FONT_COLOR, size=9)
+    second_fill_style = PatternFill(
+        start_color=_DUAL_HEADER_FILL, end_color=_DUAL_HEADER_FILL, fill_type="solid",
+    )
+    center_align = Alignment(horizontal="center", vertical="center")
+
+    for sheet_name, df in sheets.items():
+        if sheet_name not in wb.sheetnames:
+            continue
+        ws = wb[sheet_name]
+        if ws.max_row is None or ws.max_row < 1:
+            continue
+
+        is_dual = sheet_name in second_headers
+
+        if is_dual:
+            # 插入第二行表头：先在第 2 行插入空行
+            ws.insert_rows(2)
+            row2_values = second_headers[sheet_name]
+            for col_idx, val in enumerate(row2_values, start=1):
+                cell = ws.cell(row=2, column=col_idx)
+                cell.value = val
+                cell.font = second_font
+                cell.fill = second_fill_style
+                cell.alignment = center_align
+
+            # 主表头样式（第 1 行）
+            for cell in ws[1]:
+                cell.font = header_font
+                cell.fill = header_fill_style
+                cell.alignment = center_align
+
+            # 数据起始行 = 3
+            data_start = 3
+            # 冻结前两行
+            ws.freeze_panes = "A3"
+        else:
+            # 单行表头
+            for cell in ws[1]:
+                cell.font = header_font
+                cell.fill = header_fill_style
+                cell.alignment = center_align
+            data_start = 2
+            ws.freeze_panes = "A2"
+
+        # 列宽自适应（同时考虑两行表头宽度）
+        col_widths = _auto_column_widths(df, min_col_width, max_col_width)
+        if is_dual:
+            for idx, hdr in enumerate(row2_values):
+                w = _display_width(str(hdr)) + WIDTH_PADDING
+                if idx < len(col_widths):
+                    col_widths[idx] = max(col_widths[idx], min(w, max_col_width))
+        for idx, width in enumerate(col_widths, start=1):
+            ws.column_dimensions[get_column_letter(idx)].width = width
+
+        # 日期列格式化
+        for col_idx, col_name in enumerate(df.columns):
+            if _is_date_column(df[col_name]):
+                excel_col = col_idx + 1
+                for row in range(data_start, ws.max_row + 1):
+                    cell = ws.cell(row=row, column=excel_col)
+                    if cell.value is not None:
+                        cell.number_format = date_format
+
+        # 自动筛选（覆盖表头+数据区域）
+        if ws.max_column:
+            last_col_letter = get_column_letter(ws.max_column)
+            ws.auto_filter.ref = f"A1:{last_col_letter}{ws.max_row}"
+
+    wb.save(output_file)
+    wb.close()
+
+    logger.info("格式化输出完成（含双重表头）: %s", output_file)
+    return output_file

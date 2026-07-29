@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { openPath } from "@tauri-apps/plugin-opener";
 import type { BridgeProp, SyncResult, SyncWarning } from "../../lib/types";
 import { useToast } from "../Toast";
 import { FolderIcon } from "../../lib/icons";
@@ -734,6 +735,31 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Dry run preview file card */}
+      {result?.dry_run_file && (
+        <div className="bg-white rounded-lg border border-cyan-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-cyan-100 bg-cyan-50 flex items-center justify-between">
+            <h3 className="text-sm font-medium text-cyan-700 flex items-center gap-2">
+              <CheckCircleIcon />
+              预览文件已生成
+            </h3>
+            <button
+              type="button"
+              onClick={() => openPath(result.dry_run_file!)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-cyan-700 bg-cyan-100 hover:bg-cyan-200 rounded-md transition-colors"
+              title="打开预览文件"
+            >
+              <DownloadIcon />
+              打开文件
+            </button>
+          </div>
+          <div className="px-4 py-3">
+            <p className="text-xs text-slate-500 font-mono break-all">{result.dry_run_file}</p>
+            <p className="text-xs text-slate-400 mt-2">各数据类型分别保存在独立 Sheet 中，可查看即将同步的所有记录。</p>
+          </div>
         </div>
       )}
 

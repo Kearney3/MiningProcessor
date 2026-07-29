@@ -21,6 +21,7 @@ from func.sync.core import (
     sync,
 )
 from func.sync.db_client import MineBaseDBClient
+from func.sync.export import export_dry_run_to_excel
 from func.sync.file_processors import (
     _apply_defaults,
     _apply_ledger_matching,
@@ -57,6 +58,7 @@ __all__ = [
     "MineBaseDBClient",
     # 核心流程
     "discover_files",
+    "export_dry_run_to_excel",
     "get_minebase_api_config",
     "load_column_mapping",
     "main",
