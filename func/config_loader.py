@@ -102,6 +102,7 @@ DEFAULT_LOAD_MAP_OLD = {
     "XDM100": 32, "XDE120": 40, "XDEM120": 40,
     "XDE130": 45, "XDM130": 45, "T-264": 80,
     "SANY SET150S": 52, "CAT773": 20, "KOMATSU 785": 37,
+    "KOMATSU 465": 20,
     "MT 4400": 80, "CAT 773D": 20,
 }
 
@@ -788,6 +789,132 @@ def save_anomaly_detection_config(config_data: dict[str, Any]) -> None:
     user_file["anomaly_detection"] = dict(config_data)
     _save_json(_USER_CONFIG_FILE, user_file)
     _invalidate_config_cache()
+
+
+# ---------------------------------------------------------------------------
+# LLM 标注配置
+# ---------------------------------------------------------------------------
+
+_DEFAULT_LLM_CONFIG: dict[str, Any] = {
+    "url": "",
+    "api_key": "",
+    "model": "",
+    "format": "openai",
+    "concurrency": 10,
+    "batch_size": 50,
+    "timeout": 120,
+    "max_retries": 3,
+}
+
+
+def get_llm_config() -> dict[str, Any]:
+    """获取 LLM 标注配置（默认值 + 用户配置合并）。
+
+    API Key 从 Keychain 解密；未存入 Keychain 时直接读取配置值。
+
+    Returns:
+        LLM 配置 dict，包含 url, api_key, model, format,
+        concurrency, batch_size, timeout, max_retries。
+    """
+    from .secret_store import load_minebase_secret
+
+    user_cfg = get_user_config("llm_labeling", {})
+    cfg = _deep_merge(_DEFAULT_LLM_CONFIG, user_cfg) if user_cfg else dict(_DEFAULT_LLM_CONFIG)
+    stored_key = cfg.get("api_key", "")
+    if stored_key:
+        try:
+            decrypted = load_minebase_secret("llm_api_key")
+            if decrypted:
+                cfg["api_key"] = decrypted
+        except Exception:
+            pass
+    return cfg
+
+
+def update_llm_config(updates: dict[str, Any]) -> dict[str, Any]:
+    """更新 LLM 标注配置（写入 config.user.json，API Key 存入 Keychain）。
+
+    Args:
+        updates: 要更新的字段。
+
+    Returns:
+        更新后的完整 LLM 配置。
+    """
+    from .secret_store import save_minebase_secrets
+
+    api_key = updates.pop("api_key", None)
+    current = get_user_config("llm_labeling", {})
+    if not isinstance(current, dict):
+        current = {}
+    current.update(updates)
+    update_user_config({"llm_labeling": current})
+    if api_key is not None:
+        try:
+            wrapper = {"api": {"password": api_key}}
+            save_minebase_secrets(wrapper)
+            user_file = _load_json(_USER_CONFIG_FILE)
+            llm_cfg = user_file.get(_USER_CONFIG_SECTION, {}).get("llm_labeling", {})
+            llm_cfg["api_key"] = "keychain"
+            user_file.setdefault(_USER_CONFIG_SECTION, {})["llm_labeling"] = llm_cfg
+            _save_json(_USER_CONFIG_FILE, user_file)
+            _invalidate_config_cache()
+        except Exception:
+            current["api_key"] = api_key
+            update_user_config({"llm_labeling": current})
+    return get_llm_config()
+
+
+def test_llm_connection(config: dict[str, Any] | None = None) -> dict[str, Any]:
+    """测试 LLM 接口连接，返回可用模型列表。
+
+    Args:
+        config: LLM 配置 dict，为 None 时从 get_llm_config() 读取。
+
+    Returns:
+        {"success": bool, "models": [...], "error": "..."}
+    """
+    import urllib.request
+    import urllib.error
+    import json as _json
+
+    if config is None:
+        config = get_llm_config()
+    url = config.get("url", "").strip()
+    api_key = config.get("api_key", "").strip()
+    fmt = config.get("format", "openai")
+    if not url:
+        return {"success": False, "models": [], "error": "未配置接口 URL"}
+    if fmt == "anthropic":
+        models_url = url.rstrip("/") + "/v1/models"
+    else:
+        base = url.rstrip("/")
+        if base.endswith("/chat/completions"):
+            base = base.rsplit("/chat/completions", 1)[0]
+        if not base.endswith("/v1"):
+            base = base + "/v1"
+        models_url = base + "/models"
+    headers: dict[str, str] = {"Accept": "application/json"}
+    if fmt == "anthropic":
+        if api_key:
+            headers["x-api-key"] = api_key
+            headers["anthropic-version"] = "2023-06-01"
+    else:
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+    try:
+        req = urllib.request.Request(models_url, headers=headers, method="GET")
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = _json.loads(resp.read().decode("utf-8"))
+        model_list = data.get("data", [])
+        if isinstance(model_list, list):
+            models = [
+                item.get("id", "") for item in model_list if isinstance(item, dict)
+            ]
+        else:
+            models = []
+        return {"success": True, "models": sorted(models), "error": ""}
+    except Exception as exc:
+        return {"success": False, "models": [], "error": str(exc)}
 
 
 # ---------------------------------------------------------------------------

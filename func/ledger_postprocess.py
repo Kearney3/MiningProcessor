@@ -18,12 +18,14 @@ logger = logging.getLogger(__name__)
 
 def _find_col(columns: set[str], candidates: list[str]) -> Optional[str]:
     """在列名集合中查找第一个匹配的候选列名（支持 strip 匹配）"""
+    # 统一列名为 str（防御 DataFrame 列名含 float/int 的情况）
+    str_columns = {str(c) if not isinstance(c, str) else c for c in columns}
     # 先尝试精确匹配
     for c in candidates:
-        if c in columns:
+        if c in str_columns:
             return c
     # 再尝试 strip 后匹配
-    stripped_map = {col.strip(): col for col in columns}
+    stripped_map = {col.strip(): col for col in str_columns}
     for c in candidates:
         if c in stripped_map:
             return stripped_map[c]

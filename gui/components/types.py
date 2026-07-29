@@ -67,6 +67,7 @@ class ModuleRefs(TypedDict):
     work: WorkRefs
     merge: MergeRefs
     maint: MaintRefs
+    maint_llm: dict
 
 
 class ConfigRefs(TypedDict):

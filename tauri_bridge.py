@@ -501,6 +501,67 @@ def _process_maintenance(params: dict) -> dict:
     return {"output_file": str(output_file)}
 
 
+@_register("get_llm_config")
+def _get_llm_config(params: dict) -> dict:
+    from func.config_loader import get_llm_config
+    cfg = get_llm_config()
+    cfg["api_key"] = "***" if cfg.get("api_key") else ""
+    return cfg
+
+
+@_register("update_llm_config")
+def _update_llm_config(params: dict) -> dict:
+    from func.config_loader import update_llm_config
+    updates = {k: v for k, v in params.items() if k in ("url", "api_key", "model", "format", "concurrency", "batch_size", "timeout", "max_retries")}
+    cfg = update_llm_config(updates)
+    cfg["api_key"] = "***" if cfg.get("api_key") else ""
+    return cfg
+
+
+@_register("test_llm_connection")
+def _test_llm_connection(params: dict) -> dict:
+    from func.config_loader import test_llm_connection
+    cfg = {
+        "url": params.get("url", ""),
+        "api_key": params.get("api_key", ""),
+        "format": params.get("format", "openai"),
+    }
+    return test_llm_connection(cfg)
+
+
+@_register("process_maintenance_llm")
+def _process_maintenance_llm(params: dict) -> dict:
+    from func.label_maintenance_with_llm import process_maintenance_llm
+    from func.config_loader import get_llm_config
+
+    safe_path = str(_sanitize_path(params["path"], must_exist=True))
+    llm_config = get_llm_config()
+    if not llm_config.get("url") or not llm_config.get("api_key"):
+        raise ValueError("请先在配置中填写 LLM 接口 URL 和 API Key")
+    if not llm_config.get("model"):
+        raise ValueError("请先在配置中选择 LLM 模型")
+    result = process_maintenance_llm(
+        safe_path,
+        llm_config=llm_config,
+        content_column=params.get("content_column", "维修内容"),
+        category_column=params.get("category_column", "大类"),
+        minor_column=params.get("minor_column", "小类"),
+        status_column=params.get("status_column", "分类方式"),
+        filter_values=params.get("filter_values"),
+        export_mode=params.get("export_mode", "statistics"),
+    )
+    return result
+
+
+@_register("preview_excel_columns")
+def _preview_excel_columns(params: dict) -> dict:
+    from func.label_maintenance_with_llm import preview_excel_columns
+
+    safe_path = str(_sanitize_path(params["path"], must_exist=True))
+    sheet_name = params.get("sheet_name", "维修明细")
+    return preview_excel_columns(safe_path, sheet_name=sheet_name)
+
+
 @_register("export_maintenance_template")
 def _export_maintenance_template(params: dict) -> dict:
     from func.config_loader import export_maintenance_classification_template

@@ -1267,6 +1267,146 @@ def _create_anomaly_config_section(page: ft.Page, log):
 
 
 # ---------------------------------------------------------------------------
+# 6. LLM 标注配置
+# ---------------------------------------------------------------------------
+
+def _create_llm_config_section(page: ft.Page, log):
+    """创建 LLM 标注配置卡片，返回 (card, refs_dict)。"""
+
+    llm_url = ft.TextField(label="接口 URL", hint_text="https://api.example.com/v1", expand=True, color=theme.TEXT_PRIMARY)
+    llm_api_key = ft.TextField(label="API Key", password=True, can_reveal_password=True, expand=True, color=theme.TEXT_PRIMARY)
+    llm_model = ft.Dropdown(label="模型", expand=True, options=[], hint_text="点击「获取模型」加载列表")
+    llm_format = ft.Dropdown(
+        label="接口格式",
+        width=160,
+        options=[
+            ft.dropdown.Option("openai", "OpenAI 兼容"),
+            ft.dropdown.Option("anthropic", "Anthropic"),
+        ],
+        value="openai",
+    )
+    llm_status = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
+    llm_test_result = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
+
+    def _apply_llm_to_ui(cfg: dict):
+        llm_url.value = cfg.get("url", "")
+        llm_api_key.value = cfg.get("api_key", "")
+        llm_model.value = cfg.get("model", "") or None
+        llm_format.value = cfg.get("format", "openai")
+        llm_status.value = ""
+        llm_test_result.value = ""
+
+    def _reload_llm():
+        cfg = config_loader.get_llm_config()
+        _apply_llm_to_ui(cfg)
+        if cfg.get("model") and not any(o.key == cfg["model"] for o in llm_model.options):
+            llm_model.options.append(ft.dropdown.Option(cfg["model"]))
+        try:
+            page.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    def _fetch_models(_e):
+        cfg = {
+            "url": (llm_url.value or "").strip(),
+            "api_key": (llm_api_key.value or "").strip(),
+            "format": llm_format.value or "openai",
+        }
+        if not cfg["url"]:
+            llm_test_result.value = "请先填写接口 URL"
+            llm_test_result.color = ft.Colors.RED
+            try:
+                page.update()
+            except (RuntimeError, AttributeError):
+                pass
+            return
+        llm_test_result.value = "正在获取模型列表..."
+        llm_test_result.color = theme.TEXT_SECONDARY
+        try:
+            page.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+        def _do_fetch():
+            result = config_loader.test_llm_connection(cfg)
+            def _update():
+                if result["success"]:
+                    models = result["models"]
+                    llm_model.options = [ft.dropdown.Option(m) for m in models]
+                    if models and not llm_model.value:
+                        llm_model.value = models[0]
+                    llm_test_result.value = f"获取到 {len(models)} 个模型"
+                    llm_test_result.color = theme.TEXT_PRIMARY
+                    _log_message(log, f"获取到 {len(models)} 个可用模型")
+                else:
+                    llm_test_result.value = f"连接失败: {result['error']}"
+                    llm_test_result.color = ft.Colors.RED
+                    _log_message(log.error, f"LLM 接口连接失败: {result['error']}")
+                try:
+                    page.update()
+                except (RuntimeError, AttributeError):
+                    pass
+            _update()
+
+        import threading
+        threading.Thread(target=_do_fetch, daemon=True).start()
+
+    def _save_llm(_e):
+        updates = {
+            "url": (llm_url.value or "").strip(),
+            "api_key": (llm_api_key.value or "").strip(),
+            "model": llm_model.value or "",
+            "format": llm_format.value or "openai",
+        }
+        config_loader.update_llm_config(updates)
+        llm_status.value = "LLM 配置已保存"
+        _log_message(log, "已保存 LLM 标注配置")
+        try:
+            page.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    def _reset_llm(_e):
+        config_loader.update_user_config({"llm_labeling": {}})
+        _reload_llm()
+        llm_status.value = "已恢复默认配置"
+        _log_message(log, "已重置 LLM 标注配置")
+        try:
+            page.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    fetch_btn = theme.secondary_btn("获取模型", icon=ft.Icons.REFRESH, on_click=_fetch_models)
+    action_buttons = [
+        theme.primary_btn("保存配置", icon=ft.Icons.SAVE, on_click=_save_llm),
+        theme.secondary_btn("重新加载", icon=ft.Icons.REFRESH, on_click=lambda _: _reload_llm()),
+        theme.secondary_btn("恢复默认", icon=ft.Icons.RESTART_ALT, on_click=_reset_llm),
+    ]
+
+    llm_card = theme.make_collapsible(
+        title="LLM 标注配置",
+        subtitle="配置大模型接口用于维修记录智能标注",
+        icon=ft.Icons.SMART_TOY,
+        initially_expanded=False,
+        content_controls=[
+            ft.Row([llm_format, fetch_btn], spacing=8, vertical_alignment=ft.CrossAxisAlignment.END),
+            llm_url,
+            llm_api_key,
+            llm_model,
+            llm_test_result,
+            ft.Row(action_buttons, spacing=8, wrap=True, alignment=ft.MainAxisAlignment.START),
+            llm_status,
+        ],
+    )
+
+    return llm_card, {
+        "reload": _reload_llm,
+        "save": _save_llm,
+        "reset": _reset_llm,
+    }
+
+
+# ---------------------------------------------------------------------------
 # 主组装函数
 # ---------------------------------------------------------------------------
 
@@ -1284,12 +1424,14 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
     minebase_card, mb_refs = _create_minebase_section(page, log)
     mapping_card, map_refs = _create_column_mapping_section(page, log)
     anomaly_card, anomaly_refs = _create_anomaly_config_section(page, log)
+    llm_card, llm_refs = _create_llm_config_section(page, log)
 
     container = ft.Container(
         content=ft.Column(
             [
                 theme.section_title("用户配置"),
                 section_hint,
+                llm_card,
                 minebase_card,
                 keywords_card,
                 header_mapping_card,
@@ -1327,8 +1469,10 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
         "reset_mb_config": mb_refs["reset"],
         "reload_keywords": kw_refs["reload"],
         "reload_header_mapping": hm_refs["reload"],
+        "reload_llm_config": llm_refs["reload"],
     }
 
+    llm_refs["reload"]()
     kw_refs["reload"]()
     hm_refs["reload"]()
     mb_refs["reload"]()

@@ -472,6 +472,9 @@ def clean_split_dataframe(
 
     result = df.copy()
 
+    # 列名统一转为 str（split_day_night_shifts 可能产生 float/int 列名）
+    result.columns = [str(c) if not isinstance(c, str) else c for c in result.columns]
+
     # 移除 NaN 列
     result = result.loc[:, result.columns.notna()]
 

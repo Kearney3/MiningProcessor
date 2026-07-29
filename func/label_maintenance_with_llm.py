@@ -448,6 +448,122 @@ class OpenAICompatibleLabelClient:
         raise RuntimeError(f"批量标注失败: {last_error}") from last_error
 
 
+class AnthropicLabelClient:
+    """Anthropic Messages API 标注客户端。"""
+
+    def __init__(
+        self,
+        *,
+        url: str,
+        api_key: str,
+        model: str,
+        timeout: float = 120,
+        max_retries: int = 3,
+    ):
+        self.url = url.rstrip("/")
+        self.api_key = api_key
+        self.model = model
+        self.timeout = timeout
+        self.max_retries = max_retries
+
+    def _messages_url(self) -> str:
+        base = self.url
+        if base.endswith("/v1"):
+            base = base[:-3]
+        return base + "/v1/messages"
+
+    def label_batch(
+        self,
+        records: list[dict],
+        *,
+        taxonomy: dict[str, list[str]],
+        system_prompt: str,
+        on_retry: "Callable[[int, Exception], None] | None" = None,
+        batch_id: str = "",
+    ) -> BatchResult:
+        if not records or len(records) > MAX_BATCH_SIZE:
+            raise ValueError(f"单批记录数必须为 1—{MAX_BATCH_SIZE}")
+        user_text = build_user_prompt(records)
+        json_instruction = (
+            "\n\n请只输出 JSON 对象，不要输出任何其他文字。"
+            "以 { 开头，以 } 结尾。"
+        )
+        payload = {
+            "model": self.model,
+            "max_tokens": 4096,
+            "system": system_prompt + json_instruction,
+            "messages": [{"role": "user", "content": user_text}],
+            "temperature": 0,
+        }
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        headers = {
+            "Content-Type": "application/json",
+            "x-api-key": self.api_key,
+            "anthropic-version": "2023-06-01",
+        }
+        expected_ids = [str(record["id"]) for record in records]
+        last_error: Exception | None = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                request = urllib.request.Request(
+                    self._messages_url(),
+                    data=body,
+                    headers=headers,
+                    method="POST",
+                )
+                with urllib.request.urlopen(request, timeout=self.timeout) as resp:
+                    response = json.loads(resp.read().decode("utf-8"))
+                content_blocks = response.get("content", [])
+                texts = [
+                    block.get("text", "")
+                    for block in content_blocks
+                    if isinstance(block, dict) and block.get("type") == "text"
+                ]
+                if not texts:
+                    raise ValueError("Anthropic 响应中未找到文本内容")
+                content = "".join(texts)
+                labels, skipped = parse_and_validate_labels(
+                    content, expected_ids, taxonomy,
+                )
+                return BatchResult(labels=labels, skipped_ids=skipped)
+            except (
+                urllib.error.HTTPError,
+                urllib.error.URLError,
+                OSError,
+                TimeoutError,
+                json.JSONDecodeError,
+                ValueError,
+            ) as exc:
+                last_error = exc
+                if attempt >= self.max_retries:
+                    break
+                delay = min(2**attempt, 8)
+                if on_retry is not None:
+                    on_retry(attempt + 1, exc)
+                prefix = f"批次 {batch_id}: " if batch_id else ""
+                logger.warning(
+                    "%s第 %d 次请求失败，%d 秒后重试: %s",
+                    prefix, attempt + 1, delay, exc,
+                )
+                time.sleep(delay)
+        raise RuntimeError(f"批量标注失败: {last_error}") from last_error
+
+
+def create_llm_client(config: dict) -> OpenAICompatibleLabelClient | AnthropicLabelClient:
+    """根据配置创建对应的 LLM 客户端实例。"""
+    fmt = config.get("format", "openai")
+    common = dict(
+        url=config["url"],
+        api_key=config["api_key"],
+        model=config["model"],
+        timeout=config.get("timeout", 120),
+        max_retries=config.get("max_retries", 3),
+    )
+    if fmt == "anthropic":
+        return AnthropicLabelClient(**common)
+    return OpenAICompatibleLabelClient(**common)
+
+
 def _read_input(path: Path, sheet_name: str) -> pd.DataFrame:
     suffix = path.suffix.lower()
     if suffix in {".xlsx", ".xls"}:
@@ -910,6 +1026,233 @@ def label_file(
         "skipped_rows": len(all_skipped_ids),
         "output": str(target),
         "checkpoint": str(checkpoint),
+    }
+
+
+def preview_excel_columns(input_path: str, sheet_name: str = "维修明细") -> dict:
+    """预览 Excel 文件的列名和行数，用于前端列映射。"""
+    df = _read_input(Path(input_path), sheet_name)
+    return {
+        "columns": list(df.columns),
+        "rows": len(df),
+        "sample": df.head(5).fillna("").to_dict(orient="records"),
+    }
+
+
+def process_maintenance_llm(
+    input_path: str,
+    *,
+    output_path: str | None = None,
+    llm_config: dict,
+    sheet_name: str = "维修明细",
+    content_column: str = "维修内容",
+    category_column: str = "大类",
+    minor_column: str = "小类",
+    status_column: str = "分类方式",
+    filter_values: list[str] | None = None,
+    export_mode: str = "statistics",
+    concurrency: int = 10,
+    batch_size: int = MAX_BATCH_SIZE,
+    checkpoint_path: str | None = None,
+    max_content_chars: int = 800,
+) -> dict:
+    """对本地已分类的维修明细进行 LLM 标注并导出结果。
+
+    Args:
+        input_path: 已分类的维修明细 Excel 路径。
+        output_path: 输出文件路径，None 时自动生成。
+        llm_config: LLM 配置 dict。
+        sheet_name: Sheet 名称。
+        content_column: 维修内容列名。
+        category_column: 大类列名。
+        minor_column: 小类列名。
+        status_column: 分类方式列名。
+        filter_values: 分类方式过滤值列表（如 ["待确认", "其他"]），
+            为 None 时标注所有记录。
+        export_mode: "details" 只导出标注后明细，
+            "statistics" 导出含统计 sheet 的完整报告。
+        concurrency: 并发数。
+        batch_size: 批次大小。
+        checkpoint_path: 断点文件路径。
+        max_content_chars: 发送给模型的最大字符数。
+
+    Returns:
+        处理结果 dict。
+    """
+    source = Path(input_path)
+    suffix = source.suffix.lower()
+    if export_mode == "details":
+        default_name = f"{source.stem}_LLM标注明细.xlsx"
+    else:
+        default_name = f"{source.stem}_LLM标注统计.xlsx"
+    if output_path is None:
+        output_path = str(source.with_name(default_name))
+
+    df = _read_input(source, sheet_name)
+    if content_column not in df.columns:
+        raise ValueError(f"输入文件缺少列: {content_column}")
+
+    client = create_llm_client(llm_config)
+    taxonomy = get_allowed_taxonomy()
+    system_prompt = build_system_prompt(taxonomy)
+
+    if filter_values and status_column in df.columns:
+        mask = df[status_column].fillna("").astype(str).isin(filter_values)
+        target_indexes = list(df.index[mask])
+    else:
+        target_indexes = list(df.index)
+
+    target_indexes = [
+        i for i in target_indexes
+        if str(df.at[i, content_column]).strip()
+    ]
+
+    if not target_indexes:
+        raise ValueError("没有符合条件的记录需要标注")
+
+    checkpoint = Path(
+        checkpoint_path or f"{output_path}.checkpoint.jsonl"
+    )
+    completed = _load_checkpoint(checkpoint)
+    pending_indexes = [
+        i for i in target_indexes
+        if _record_id(df, i) not in completed
+    ]
+
+    context_columns = []
+    batches = [
+        pending_indexes[offset:offset + batch_size]
+        for offset in range(0, len(pending_indexes), batch_size)
+    ]
+    total_batches = len(batches)
+    done_count = 0
+    lock = threading.Lock()
+    failed_errors: list[Exception] = []
+    all_skipped_ids: list[str] = []
+
+    progress = BatchProgressBar(
+        total_batches=total_batches,
+        total_records=len(pending_indexes),
+        completed_from_checkpoint=len(completed),
+        concurrency=min(concurrency, total_batches) if total_batches else 1,
+    )
+
+    def _process_batch(batch_indexes: list, prog: BatchProgressBar) -> list[str]:
+        nonlocal done_count
+        batch_num = batches.index(batch_indexes) + 1
+        prog.record_running(batch_num)
+        records = _build_records(
+            df, batch_indexes, content_column, context_columns, max_content_chars,
+        )
+        try:
+            result = client.label_batch(
+                records, taxonomy=taxonomy, system_prompt=system_prompt,
+                on_retry=lambda attempt, err, bn=batch_num: prog.record_retry(bn, attempt, err),
+                batch_id=f"#{batch_num}",
+            )
+        except Exception:
+            prog.record_failure(batch_num, sys.exc_info()[1])
+            raise
+        with lock:
+            _append_checkpoint(checkpoint, result.labels)
+            completed.update({l.record_id: l for l in result.labels})
+            all_skipped_ids.extend(result.skipped_ids)
+            done_count += 1
+            prog.record_success(batch_num, len(result.labels))
+        return result.skipped_ids
+
+    eff_concurrency = min(concurrency, total_batches) if total_batches else 1
+    progress.start()
+    try:
+        with ThreadPoolExecutor(max_workers=eff_concurrency) as executor:
+            futures = {
+                executor.submit(_process_batch, batch, progress): batch
+                for batch in batches
+            }
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as exc:
+                    failed_errors.append(exc)
+    finally:
+        progress.stop()
+
+    if failed_errors:
+        raise RuntimeError(
+            f"{len(failed_errors)}/{total_batches} 个批次失败，"
+            f"已完成 {len(completed)} 条可断点续跑"
+        ) from failed_errors[0]
+
+    for index in target_indexes:
+        label = completed.get(_record_id(df, index))
+        if label is None:
+            continue
+        df.at[index, category_column] = label.major
+        df.at[index, minor_column] = label.minor
+        if status_column in df.columns:
+            df.at[index, status_column] = "LLM标注"
+        for col_name in ("LLM大类", "LLM小类", "LLM置信度", "LLM理由", "LLM标注状态"):
+            if col_name not in df.columns:
+                df[col_name] = ""
+        df.at[index, "LLM大类"] = label.major
+        df.at[index, "LLM小类"] = label.minor
+        df.at[index, "LLM置信度"] = label.confidence
+        df.at[index, "LLM理由"] = label.reason
+        df.at[index, "LLM标注状态"] = "已完成"
+
+    target = Path(output_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    if export_mode == "details":
+        df.to_excel(target, index=False, sheet_name=sheet_name)
+    else:
+        from func.building import build_sheets
+        classified: list[dict] = []
+        for _, row in df.iterrows():
+            content = str(row.get(content_column, "")).strip()
+            if not content:
+                continue
+            major = str(row.get(category_column, "")).strip()
+            minor = str(row.get(minor_column, "")).strip()
+            method = str(row.get(status_column, "")).strip() if status_column in df.columns else ""
+            is_fault = major not in (None, "None", "", "计划保养与非故障作业")
+            if method == "噪声过滤":
+                is_fault = False
+            confidence = None
+            if "LLM置信度" in df.columns:
+                try:
+                    c = row.get("LLM置信度")
+                    confidence = float(c) if pd.notna(c) else None
+                except (TypeError, ValueError):
+                    pass
+            classified.append({
+                "日期": row.get("日期", ""),
+                "原始设备名称": str(row.get("原始设备名称", row.get("设备名称", ""))),
+                "标准设备名称": str(row.get("标准设备名称", row.get("原始设备名称", ""))),
+                "设备型号": str(row.get("设备型号", "")),
+                "原因": str(row.get("原因", "")),
+                "班次": str(row.get("班次", "")),
+                "大类": major,
+                "小类": minor,
+                "分类方式": method if method else "规则",
+                "分类置信度": confidence,
+                "是否故障": "是" if is_fault else "否",
+                "维修内容": content,
+                "工时_分钟": row.get("工时_分钟", row.get("工时", 0)),
+            })
+        fault_records = [r for r in classified if r["是否故障"] == "是" and r["大类"]]
+        sheets = build_sheets(classified, fault_records)
+        from func.writer import write_excel
+        write_excel(str(target), sheets)
+
+    return {
+        "input_rows": len(df),
+        "target_rows": len(target_indexes),
+        "llm_completed": len(completed),
+        "skipped_rows": len(all_skipped_ids),
+        "output": str(target),
+        "checkpoint": str(checkpoint),
+        "export_mode": export_mode,
     }
 
 
