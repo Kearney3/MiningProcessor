@@ -89,3 +89,7 @@ assets/fonts/
 
 # Vite
 dist/.coverage
+
+# LLM 标注 checkpoint / 合并文件
+*.checkpoint.jsonl
+llm_labels_*.jsonl

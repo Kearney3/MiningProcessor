@@ -540,6 +540,7 @@ def _process_maintenance_llm(params: dict) -> dict:
         raise ValueError("请先在配置中填写 LLM 接口 URL 和 API Key")
     if not llm_config.get("model"):
         raise ValueError("请先在配置中选择 LLM 模型")
+    _llm_cancel_event.clear()
     result = process_maintenance_llm(
         safe_path,
         llm_config=llm_config,
@@ -549,8 +550,30 @@ def _process_maintenance_llm(params: dict) -> dict:
         status_column=params.get("status_column", "分类方式"),
         filter_values=params.get("filter_values"),
         export_mode=params.get("export_mode", "statistics"),
+        cancel_event=_llm_cancel_event,
     )
+    result["cancelled"] = _llm_cancel_event.is_set()
     return result
+
+
+# LLM 标注取消事件（全局，同一时间只允许一个标注任务）
+_llm_cancel_event = threading.Event()
+
+
+@_register("cancel_llm_labeling")
+def _cancel_llm_labeling(params: dict) -> dict:
+    _llm_cancel_event.set()
+    return {"ok": True}
+
+
+@_register("preview_excel_sheets")
+def _preview_excel_sheets(params: dict) -> dict:
+    import openpyxl
+    safe_path = str(_sanitize_path(params["path"], must_exist=True))
+    wb = openpyxl.load_workbook(safe_path, read_only=True, data_only=True)
+    sheets = wb.sheetnames
+    wb.close()
+    return {"sheets": sheets}
 
 
 @_register("preview_excel_columns")

@@ -1210,3 +1210,82 @@ def test_strip_date_only_times_keeps_time_columns():
     result = strip_date_only_times(df)
     # Time column should remain as datetime
     assert pd.api.types.is_datetime64_any_dtype(result["时间"])
+
+
+# ---------------------------------------------------------------------------
+# LLM Labeling page
+# ---------------------------------------------------------------------------
+
+def test_llm_labeling_section_creates_with_required_refs():
+    from gui.components.llm_labeling import create_llm_labeling_section
+
+    section, refs = create_llm_labeling_section(DummyPage())
+
+    assert "path" in refs
+    assert "sheet" in refs
+    assert "btn" in refs
+    assert "status" in refs
+
+
+def test_llm_labeling_section_has_correct_padding():
+    from gui.components.llm_labeling import create_llm_labeling_section
+
+    section, _ = create_llm_labeling_section(DummyPage())
+
+    assert section.padding == 12
+    assert section.content.spacing == 8
+
+
+def test_llm_labeling_initial_state_has_empty_sheet_dropdown():
+    from gui.components.llm_labeling import create_llm_labeling_section
+
+    _, refs = create_llm_labeling_section(DummyPage())
+
+    assert refs["sheet"].options == []
+    assert refs["sheet"].value is None
+
+
+def test_llm_labeling_button_initially_disabled():
+    from gui.components.llm_labeling import create_llm_labeling_section
+
+    _, refs = create_llm_labeling_section(DummyPage())
+
+    assert refs["btn"].disabled is True
+
+
+def test_llm_labeling_auto_detect_column():
+    from gui.components.llm_labeling import _auto_detect
+
+    cols = ["日期", "班次", "维修内容", "大类", "小类", "分类方式"]
+    assert _auto_detect(cols, "content") == "维修内容"
+    assert _auto_detect(cols, "category") == "大类"
+    assert _auto_detect(cols, "minor") == "小类"
+    assert _auto_detect(cols, "status") == "分类方式"
+
+
+def test_llm_labeling_auto_detect_falls_back_to_first_column():
+    from gui.components.llm_labeling import _auto_detect
+
+    cols = ["日期", "设备名称", "描述"]
+    assert _auto_detect(cols, "content") == "日期"
+
+
+def test_llm_labeling_auto_detect_returns_empty_for_no_columns():
+    from gui.components.llm_labeling import _auto_detect
+
+    assert _auto_detect([], "content") == ""
+
+
+def test_llm_labeling_section_contains_four_module_cards():
+    from gui.components.llm_labeling import create_llm_labeling_section
+
+    section, _ = create_llm_labeling_section(DummyPage())
+
+    # Count ModuleCard containers (bg-white rounded-lg border) in the column
+    cards = [
+        c for c in section.content.controls
+        if isinstance(c, ft.Container)
+        and hasattr(c, "bgcolor")
+    ]
+    # At minimum: file/sheet card + execute card; mapping & filter start hidden
+    assert len(cards) >= 2

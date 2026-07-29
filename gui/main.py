@@ -122,6 +122,7 @@ def main(page: ft.Page):
     config_section, config_refs = cmp.create_config_section(page, log)
     user_config_section, user_config_refs = cmp.create_user_config_section(page, log)
     maint_config_section, maint_config_refs = cmp.create_maint_config_section(page, log)
+    llm_section, llm_refs = cmp.create_llm_labeling_section(page)
     modules_section, module_refs = cmp.create_modules_section(page)
     batch_section, batch_refs = cmp.create_batch_section(page)
     module_refs["batch"] = batch_refs
@@ -139,6 +140,7 @@ def main(page: ft.Page):
         ("工作区", [
             ("数据处理", ft.Icons.PLAY_ARROW, "modules"),
             ("批量处理", ft.Icons.BOLT, "batch"),
+            ("LLM 标注", ft.Icons.SMART_TOY, "llm"),
             ("数据同步", ft.Icons.CLOUD_SYNC, "sync"),
             ("台账匹配", ft.Icons.MANAGE_SEARCH, "ledger_match"),
         ]),
@@ -156,6 +158,7 @@ def main(page: ft.Page):
     pages = {
         "modules": ft.Column([modules_section], expand=True, spacing=8),
         "batch": ft.Column([batch_section], expand=True, spacing=8),
+        "llm": ft.Column([llm_section], expand=True, spacing=8),
         "sync": ft.Column([sync_section], expand=True, spacing=8),
         "ledger_match": ft.Column([ledger_match_section], expand=True, spacing=8),
         "ledger": ft.Column([ledger_section], expand=True, spacing=8),

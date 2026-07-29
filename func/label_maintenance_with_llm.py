@@ -25,6 +25,10 @@ from func.maintenance_classification import get_default_classifications
 
 
 logger = logging.getLogger(__name__)
+class _Cancelled(Exception):
+    """标注任务被用户取消。"""
+
+
 MAX_BATCH_SIZE = 50
 DEFAULT_API_KEY_ENV = "MAINTENANCE_LLM_API_KEY"
 DEFAULT_URL_ENV = "MAINTENANCE_LLM_URL"
@@ -1055,6 +1059,7 @@ def process_maintenance_llm(
     batch_size: int = MAX_BATCH_SIZE,
     checkpoint_path: str | None = None,
     max_content_chars: int = 800,
+    cancel_event: threading.Event | None = None,
 ) -> dict:
     """对本地已分类的维修明细进行 LLM 标注并导出结果。
 
@@ -1138,6 +1143,8 @@ def process_maintenance_llm(
     )
 
     def _process_batch(batch_indexes: list, prog: BatchProgressBar) -> list[str]:
+        if cancel_event is not None and cancel_event.is_set():
+            raise _Cancelled("标注已取消")
         nonlocal done_count
         batch_num = batches.index(batch_indexes) + 1
         prog.record_running(batch_num)
@@ -1162,6 +1169,7 @@ def process_maintenance_llm(
         return result.skipped_ids
 
     eff_concurrency = min(concurrency, total_batches) if total_batches else 1
+    cancelled = False
     progress.start()
     try:
         with ThreadPoolExecutor(max_workers=eff_concurrency) as executor:
@@ -1172,12 +1180,19 @@ def process_maintenance_llm(
             for future in as_completed(futures):
                 try:
                     future.result()
+                except _Cancelled:
+                    cancelled = True
+                    for f in futures:
+                        f.cancel()
+                    break
                 except Exception as exc:
                     failed_errors.append(exc)
     finally:
         progress.stop()
 
-    if failed_errors:
+    if cancelled:
+        logger.warning("标注已取消，已完成 %d 条", len(completed))
+    elif failed_errors:
         raise RuntimeError(
             f"{len(failed_errors)}/{total_batches} 个批次失败，"
             f"已完成 {len(completed)} 条可断点续跑"
@@ -1191,9 +1206,11 @@ def process_maintenance_llm(
         df.at[index, minor_column] = label.minor
         if status_column in df.columns:
             df.at[index, status_column] = "LLM标注"
-        for col_name in ("LLM大类", "LLM小类", "LLM置信度", "LLM理由", "LLM标注状态"):
+        for col_name in ("LLM大类", "LLM小类", "LLM理由", "LLM标注状态"):
             if col_name not in df.columns:
                 df[col_name] = ""
+        if "LLM置信度" not in df.columns:
+            df["LLM置信度"] = pd.NA
         df.at[index, "LLM大类"] = label.major
         df.at[index, "LLM小类"] = label.minor
         df.at[index, "LLM置信度"] = label.confidence

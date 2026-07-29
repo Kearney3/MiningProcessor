@@ -567,3 +567,117 @@ def test_parse_and_validate_resolves_multi_select_minor():
     assert labels[0].major == "其他/待确认"
     assert labels[0].minor == "信息不足"
     assert skipped == []
+
+
+# ---------------------------------------------------------------------------
+# process_maintenance_llm 取消测试
+# ---------------------------------------------------------------------------
+
+def _make_llm_excel(tmp_path, rows=100, sheet="维修明细"):
+    """创建一个测试用维修明细 Excel。"""
+    source = tmp_path / "input.xlsx"
+    pd.DataFrame({
+        "维修内容": [f"维修内容 {i}" for i in range(rows)],
+        "大类": ["其他/待确认"] * rows,
+        "小类": ["信息不足"] * rows,
+        "分类方式": ["待确认"] * rows,
+    }).to_excel(source, index=False, sheet_name=sheet)
+    return str(source)
+
+
+def test_process_maintenance_llm_cancel_before_start(tmp_path):
+    """取消事件在开始前已设置时应立即返回。"""
+    import threading
+    from func.label_maintenance_with_llm import process_maintenance_llm
+
+    source = _make_llm_excel(tmp_path, rows=10)
+    cancel = threading.Event()
+    cancel.set()
+
+    result = process_maintenance_llm(
+        source,
+        llm_config={"url": "http://fake", "api_key": "k", "model": "m", "format": "openai"},
+        cancel_event=cancel,
+    )
+    assert result["llm_completed"] == 0
+
+
+def test_process_maintenance_llm_cancel_midway(tmp_path):
+    """取消事件在处理中途设置时应返回部分结果。"""
+    import threading
+    from unittest.mock import patch
+    from func.label_maintenance_with_llm import process_maintenance_llm, BatchResult, LLMLabel
+
+    source = _make_llm_excel(tmp_path, rows=50)
+    cancel = threading.Event()
+    call_count = 0
+
+    def _slow_label(records, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        import time
+        time.sleep(0.05)
+        if call_count >= 1:
+            cancel.set()
+        return BatchResult(
+            labels=[
+                LLMLabel(record_id=r["id"], major="发动机系统", minor="性能/工况异常", confidence=0.9, reason="t")
+                for r in records
+            ],
+            skipped_ids=[],
+        )
+
+    class _SlowClient:
+        def __init__(self):
+            self.label_batch = _slow_label
+
+    with patch("func.label_maintenance_with_llm.create_llm_client", return_value=_SlowClient()):
+        result = process_maintenance_llm(
+            source,
+            llm_config={"url": "http://fake", "api_key": "k", "model": "m", "format": "openai"},
+            batch_size=10,
+            concurrency=1,
+            cancel_event=cancel,
+        )
+
+    assert result["llm_completed"] > 0
+    assert result["llm_completed"] < 50
+
+
+def test_process_maintenance_llm_no_cancel_completes_normally(tmp_path):
+    """无取消事件时应正常完成。"""
+    from unittest.mock import patch
+    from func.label_maintenance_with_llm import process_maintenance_llm, BatchResult, LLMLabel
+
+    source = _make_llm_excel(tmp_path, rows=10)
+
+    def _fast_label(records, **kwargs):
+        return BatchResult(
+            labels=[
+                LLMLabel(record_id=r["id"], major="发动机系统", minor="性能/工况异常", confidence=0.9, reason="t")
+                for r in records
+            ],
+            skipped_ids=[],
+        )
+
+    class _FastClient:
+        def __init__(self):
+            self.label_batch = _fast_label
+
+    with patch("func.label_maintenance_with_llm.create_llm_client", return_value=_FastClient()):
+        result = process_maintenance_llm(
+            source,
+            llm_config={"url": "http://fake", "api_key": "k", "model": "m", "format": "openai"},
+        )
+
+    assert result["llm_completed"] == 10
+    assert result.get("cancelled", False) is False
+
+
+def test_cancel_event_parameter_exists():
+    """process_maintenance_llm 应接受 cancel_event 参数。"""
+    import inspect
+    from func.label_maintenance_with_llm import process_maintenance_llm
+
+    sig = inspect.signature(process_maintenance_llm)
+    assert "cancel_event" in sig.parameters
