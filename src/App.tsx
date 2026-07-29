@@ -15,6 +15,7 @@ import { OilLedgerPage } from "./components/pages/OilLedgerPage";
 import { LoadConfigPage } from "./components/pages/LoadConfigPage";
 import { MaintConfigPage } from "./components/pages/MaintConfigPage";
 import { UserConfigPage } from "./components/pages/UserConfigPage";
+import { LLMLabelingPage } from "./components/pages/LLMLabelingPage";
 
 function App() {
   const [currentPage, setCurrentPage] = useState<PageId>("data-processing");
@@ -91,6 +92,9 @@ function App() {
           </div>
           <div style={{ display: currentPage === "ledger-match" ? "block" : "none" }}>
             <LedgerMatchPage bridge={bridge} />
+          </div>
+          <div style={{ display: currentPage === "llm-labeling" ? "block" : "none" }}>
+            <LLMLabelingPage bridge={bridge} />
           </div>
           <div style={{ display: currentPage === "equipment-ledger" ? "block" : "none" }}>
             <EquipmentLedgerPage bridge={bridge} />

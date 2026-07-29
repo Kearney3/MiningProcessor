@@ -1,0 +1,488 @@
+import { useState, useCallback } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
+import type { BridgeProp } from "../../lib/types";
+import { useToast } from "../Toast";
+import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
+import { useLastDirectory } from "../../hooks/useLastDirectory";
+import {
+  ChevronDownIcon, PlayIcon, FileIcon, CheckCircleIcon, XCircleIcon, AlertTriangleIcon,
+} from "../../lib/icons";
+
+// ── Icons ────────────────────────────────────────────────
+
+const IconColumns = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" />
+  </svg>
+);
+
+const IconFilter = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+  </svg>
+);
+
+const IconBot = () => (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+    <path d="M12 8V4H8" />
+    <rect width="16" height="12" x="4" y="8" rx="2" />
+    <path d="M2 14h2" />
+    <path d="M20 14h2" />
+    <path d="M15 13v2" />
+    <path d="M9 13v2" />
+  </svg>
+);
+
+// ── Shared UI ────────────────────────────────────────────
+
+function PathInput({
+  value, onChange, placeholder, defaultPath, onFileSelected,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  defaultPath?: string;
+  onFileSelected?: (path: string) => void;
+}) {
+  const browse = async () => {
+    const selected = await open({
+      directory: false, multiple: false, defaultPath,
+      filters: [{ name: "Excel", extensions: ["xlsx", "xls"] }],
+    });
+    if (selected) {
+      const p = selected as string;
+      onChange(p);
+      onFileSelected?.(p);
+    }
+  };
+  return (
+    <div className="flex gap-2">
+      <input type="text" value={value} onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={`${inputClass} flex-1 ${value === "" ? "border-amber-300 bg-amber-50/30" : ""}`} />
+      <button onClick={browse} className={btnSecondaryClass} title="选择文件"><FileIcon /></button>
+    </div>
+  );
+}
+
+function StyledSelect({ value, onChange, options, placeholder }: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { label: string; value: string }[];
+  placeholder?: string;
+}) {
+  return (
+    <div className="relative">
+      <select value={value} onChange={(e) => onChange(e.target.value)}
+        className={`${inputClass} appearance-none pr-8 w-full`}>
+        {placeholder && <option value="" disabled>{placeholder}</option>}
+        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"><ChevronDownIcon /></div>
+    </div>
+  );
+}
+
+function StepIndicator({ current, labels }: { current: number; labels: string[] }) {
+  return (
+    <div className="flex items-center gap-1 mb-6">
+      {labels.map((label, i) => {
+        const idx = i + 1;
+        const done = idx < current;
+        const active = idx === current;
+        return (
+          <div key={idx} className="flex items-center">
+            {i > 0 && <div className={`w-8 h-px mx-1 ${done ? "bg-blue-500" : "bg-slate-200"}`} />}
+            <div className="flex items-center gap-1.5">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                done ? "bg-blue-500 text-white" : active ? "bg-blue-100 text-blue-700 ring-2 ring-blue-300" : "bg-slate-100 text-slate-400"
+              }`}>{done ? "✓" : idx}</div>
+              <span className={`text-xs ${active ? "text-blue-700 font-medium" : done ? "text-slate-600" : "text-slate-400"}`}>{label}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Auto-detect column mapping ───────────────────────────
+
+const COLUMN_HINTS: Record<string, string[]> = {
+  content_column: ["维修内容", "维修描述", "故障描述", "内容", "维修记录"],
+  category_column: ["大类", "分类", "故障大类", "系统分类"],
+  minor_column: ["小类", "子分类", "故障小类", "详细分类"],
+  status_column: ["分类方式", "标注方式", "分类状态", "标注状态", "分类来源"],
+};
+
+function autoDetectColumn(columns: string[], field: string): string {
+  const hints = COLUMN_HINTS[field] || [];
+  for (const hint of hints) {
+    if (columns.includes(hint)) return hint;
+  }
+  return columns[0] || "";
+}
+
+// ── Page Component ───────────────────────────────────────
+
+interface PreviewData {
+  columns: string[];
+  rows: number;
+  sample: Record<string, unknown>[];
+}
+
+export function LLMLabelingPage({ bridge }: { bridge: BridgeProp }) {
+  const { notify } = useToast();
+  const { initialDir } = useLastDirectory(bridge);
+
+  // Step state
+  const [step, setStep] = useState(1);
+
+  // Step 1: File
+  const [filePath, setFilePath] = useState("");
+  const [sheetName, setSheetName] = useState("维修明细");
+  const [preview, setPreview] = useState<PreviewData | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+
+  // Step 2: Column mapping
+  const [contentCol, setContentCol] = useState("维修内容");
+  const [categoryCol, setCategoryCol] = useState("大类");
+  const [minorCol, setMinorCol] = useState("小类");
+  const [statusCol, setStatusCol] = useState("分类方式");
+
+  // Step 3: Filter & export
+  const [filterValues, setFilterValues] = useState<string[]>(["待确认"]);
+  const [filterInput, setFilterInput] = useState("待确认");
+  const [exportMode, setExportMode] = useState<"details" | "statistics">("statistics");
+
+  // Step 4: Execution
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{
+    input_rows: number;
+    target_rows: number;
+    llm_completed: number;
+    skipped_rows: number;
+    output: string;
+    export_mode: string;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // ── Load preview on file select ──
+  const loadPreview = useCallback(async (path: string) => {
+    setLoadingPreview(true);
+    try {
+      const data = await bridge.call<PreviewData>("preview_excel_columns", { path, sheet_name: sheetName });
+      setPreview(data);
+      // Auto-detect columns
+      if (data.columns.length > 0) {
+        setContentCol(autoDetectColumn(data.columns, "content_column"));
+        setCategoryCol(autoDetectColumn(data.columns, "category_column"));
+        setMinorCol(autoDetectColumn(data.columns, "minor_column"));
+        setStatusCol(autoDetectColumn(data.columns, "status_column"));
+      }
+    } catch (e) {
+      setPreview(null);
+      notify(`预览失败: ${e}`, "error");
+    } finally {
+      setLoadingPreview(false);
+    }
+  }, [bridge.call, sheetName, notify]);
+
+  const handleFileSelected = (path: string) => {
+    loadPreview(path);
+  };
+
+  // ── Collect unique values from status column for filter suggestions ──
+  const statusValues = preview?.sample
+    ? [...new Set(preview.sample.map((r) => String(r[statusCol] || "")).filter(Boolean))]
+    : [];
+
+  const handleAddFilter = () => {
+    const vals = filterInput.split(",").map((v) => v.trim()).filter(Boolean);
+    const newVals = [...new Set([...filterValues, ...vals])];
+    setFilterValues(newVals);
+    setFilterInput("");
+  };
+
+  const handleRemoveFilter = (val: string) => {
+    setFilterValues((prev) => prev.filter((v) => v !== val));
+  };
+
+  // ── Execute labeling ──
+  const handleExecute = async () => {
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await bridge.call<{
+        input_rows: number;
+        target_rows: number;
+        llm_completed: number;
+        skipped_rows: number;
+        output: string;
+        export_mode: string;
+      }>("process_maintenance_llm", {
+        path: filePath,
+        content_column: contentCol,
+        category_column: categoryCol,
+        minor_column: minorCol,
+        status_column: statusCol,
+        filter_values: filterValues.length > 0 ? filterValues : undefined,
+        export_mode: exportMode,
+      });
+      setResult(res);
+      setStep(4);
+      notify("LLM 标注完成", "success");
+    } catch (e) {
+      setError(String(e));
+      notify(`LLM 标注失败: ${e}`, "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Column selector helper ──
+  const colOptions = (preview?.columns || []).map((c) => ({ label: c, value: c }));
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-5">
+      <div>
+        <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+          <IconBot /> LLM 标注
+        </h2>
+        <p className="text-sm text-slate-500 mt-0.5">对维修明细进行大模型智能分类标注</p>
+      </div>
+
+      <StepIndicator current={step} labels={["选择文件", "列映射", "筛选与导出", "执行标注"]} />
+
+      {/* ── Step 1: File Selection ── */}
+      <div className={`bg-white rounded-lg border p-4 ${step === 1 ? "border-blue-200" : "border-slate-200"}`}>
+        <h3 className="text-sm font-medium text-slate-700 mb-3">1. 选择文件</h3>
+        <PathInput value={filePath} onChange={setFilePath} placeholder="选择维修明细 Excel 文件..."
+          defaultPath={initialDir} onFileSelected={handleFileSelected} />
+        {filePath === "" && (
+          <div className="mt-1.5 flex items-center gap-1 text-xs text-amber-600"><AlertTriangleIcon /> 请先选择输入文件</div>
+        )}
+        <div className="mt-2 flex items-center gap-2">
+          <label className="text-xs text-slate-500">Sheet 名称</label>
+          <input type="text" value={sheetName} onChange={(e) => setSheetName(e.target.value)}
+            className={`${inputClass} w-40`} />
+          <button onClick={() => filePath && loadPreview(filePath)} disabled={!filePath || loadingPreview}
+            className={`${btnSecondaryClass} text-xs`}>
+            {loadingPreview ? "加载中..." : "刷新预览"}
+          </button>
+        </div>
+        {preview && (
+          <div className="mt-3 text-xs text-slate-500">
+            共 <span className="font-medium text-slate-700">{preview.rows}</span> 行，
+            <span className="font-medium text-slate-700">{preview.columns.length}</span> 列：
+            {preview.columns.join(", ")}
+          </div>
+        )}
+        {preview && step === 1 && (
+          <button onClick={() => setStep(2)} className={`${btnPrimaryClass} mt-3`}>下一步：列映射</button>
+        )}
+      </div>
+
+      {/* ── Step 2: Column Mapping ── */}
+      {step >= 2 && (
+        <div className={`bg-white rounded-lg border p-4 ${step === 2 ? "border-blue-200" : "border-slate-200"}`}>
+          <h3 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
+            <IconColumns /> 2. 列映射
+          </h3>
+          <p className="text-xs text-slate-500 mb-3">指定各列的用途，系统已自动识别常见列名</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">维修内容列 *</label>
+              <StyledSelect value={contentCol} onChange={setContentCol} options={colOptions} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">大类列</label>
+              <StyledSelect value={categoryCol} onChange={setCategoryCol} options={colOptions} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">小类列</label>
+              <StyledSelect value={minorCol} onChange={setMinorCol} options={colOptions} />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">分类方式列</label>
+              <StyledSelect value={statusCol} onChange={setStatusCol} options={colOptions} />
+            </div>
+          </div>
+          {preview && preview.sample.length > 0 && (
+            <div className="mt-3 border border-slate-100 rounded-md overflow-auto max-h-40">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-slate-50">
+                    <th className="px-2 py-1.5 text-left text-slate-500 font-medium">{contentCol}</th>
+                    <th className="px-2 py-1.5 text-left text-slate-500 font-medium">{categoryCol}</th>
+                    <th className="px-2 py-1.5 text-left text-slate-500 font-medium">{minorCol}</th>
+                    <th className="px-2 py-1.5 text-left text-slate-500 font-medium">{statusCol}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.sample.map((row, i) => (
+                    <tr key={i} className="border-t border-slate-50">
+                      <td className="px-2 py-1 text-slate-700 max-w-[200px] truncate">{String(row[contentCol] || "")}</td>
+                      <td className="px-2 py-1 text-slate-600">{String(row[categoryCol] || "")}</td>
+                      <td className="px-2 py-1 text-slate-600">{String(row[minorCol] || "")}</td>
+                      <td className="px-2 py-1 text-slate-600">{String(row[statusCol] || "")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="mt-3 flex gap-2">
+            <button onClick={() => setStep(1)} className={btnSecondaryClass}>上一步</button>
+            <button onClick={() => setStep(3)} className={btnPrimaryClass}>下一步：筛选与导出</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 3: Filter & Export ── */}
+      {step >= 3 && (
+        <div className={`bg-white rounded-lg border p-4 ${step === 3 ? "border-blue-200" : "border-slate-200"}`}>
+          <h3 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
+            <IconFilter /> 3. 筛选与导出
+          </h3>
+
+          {/* Filter values */}
+          <div className="mb-4">
+            <label className="text-xs font-medium text-slate-500 mb-1.5 block">
+              用于 LLM 标注的「{statusCol}」值
+            </label>
+            <p className="text-xs text-slate-400 mb-2">只有分类方式匹配这些值的记录会被发送给 LLM 标注，留空则标注所有记录</p>
+            <div className="flex gap-2 mb-2">
+              <input type="text" value={filterInput} onChange={(e) => setFilterInput(e.target.value)}
+                placeholder='输入值，如"待确认"，多个用逗号分隔'
+                className={`${inputClass} flex-1`}
+                onKeyDown={(e) => e.key === "Enter" && handleAddFilter()} />
+              <button onClick={handleAddFilter} className={btnSecondaryClass}>添加</button>
+            </div>
+            {statusValues.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className="text-xs text-slate-400">检测到的值：</span>
+                {statusValues.map((v) => (
+                  <button key={v} onClick={() => {
+                    if (!filterValues.includes(v)) setFilterValues((prev) => [...prev, v]);
+                  }}
+                    className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                      filterValues.includes(v)
+                        ? "bg-blue-50 border-blue-200 text-blue-700"
+                        : "border-slate-200 text-slate-500 hover:border-blue-300 hover:text-blue-600"
+                    }`}>
+                    {v}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex flex-wrap gap-1.5">
+              {filterValues.map((v) => (
+                <span key={v} className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
+                  {v}
+                  <button onClick={() => handleRemoveFilter(v)} className="text-blue-400 hover:text-blue-600">&times;</button>
+                </span>
+              ))}
+              {filterValues.length === 0 && <span className="text-xs text-slate-400">将标注所有记录</span>}
+            </div>
+          </div>
+
+          {/* Export mode */}
+          <div>
+            <label className="text-xs font-medium text-slate-500 mb-1.5 block">导出方式</label>
+            <div className="space-y-2">
+              <label className="flex items-start gap-2.5 cursor-pointer p-2 rounded-md border border-slate-200 hover:border-blue-200 transition-colors">
+                <input type="radio" name="export" value="details" checked={exportMode === "details"}
+                  onChange={() => setExportMode("details")} className="mt-0.5" />
+                <div>
+                  <span className="text-sm text-slate-700 font-medium">导出标注明细</span>
+                  <p className="text-xs text-slate-500 mt-0.5">只输出标注后的维修明细 Excel（含 LLM 大类、小类、置信度、理由列）</p>
+                </div>
+              </label>
+              <label className="flex items-start gap-2.5 cursor-pointer p-2 rounded-md border border-slate-200 hover:border-blue-200 transition-colors">
+                <input type="radio" name="export" value="statistics" checked={exportMode === "statistics"}
+                  onChange={() => setExportMode("statistics")} className="mt-0.5" />
+                <div>
+                  <span className="text-sm text-slate-700 font-medium">导出汇总统计</span>
+                  <p className="text-xs text-slate-500 mt-0.5">输出包含维修明细 + 按大类/小类/设备/月份统计的完整报告</p>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div className="mt-4 flex gap-2">
+            <button onClick={() => setStep(2)} className={btnSecondaryClass}>上一步</button>
+            <button onClick={handleExecute} disabled={loading || !filePath}
+              className={`${btnPrimaryClass} flex items-center gap-2`}>
+              {loading ? (
+                <>
+                  <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  标注中...
+                </>
+              ) : (
+                <><PlayIcon /> 开始标注</>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 4: Results ── */}
+      {step >= 4 && (
+        <div className={`bg-white rounded-lg border p-4 ${result ? "border-emerald-200" : error ? "border-red-200" : "border-slate-200"}`}>
+          <h3 className="text-sm font-medium text-slate-700 mb-3">4. 标注结果</h3>
+          {result && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 rounded-md px-3 py-2">
+                <CheckCircleIcon />
+                标注完成
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="bg-slate-50 rounded-md px-3 py-2">
+                  <span className="text-slate-500">输入行数</span>
+                  <p className="text-slate-800 font-medium text-lg">{result.input_rows}</p>
+                </div>
+                <div className="bg-slate-50 rounded-md px-3 py-2">
+                  <span className="text-slate-500">符合条件</span>
+                  <p className="text-slate-800 font-medium text-lg">{result.target_rows}</p>
+                </div>
+                <div className="bg-blue-50 rounded-md px-3 py-2">
+                  <span className="text-blue-600">LLM 标注成功</span>
+                  <p className="text-blue-800 font-medium text-lg">{result.llm_completed}</p>
+                </div>
+                <div className="bg-amber-50 rounded-md px-3 py-2">
+                  <span className="text-amber-600">跳过</span>
+                  <p className="text-amber-800 font-medium text-lg">{result.skipped_rows}</p>
+                </div>
+              </div>
+              <div className="text-xs text-slate-500">
+                导出方式: <span className="font-medium text-slate-700">{result.export_mode === "details" ? "标注明细" : "汇总统计"}</span>
+              </div>
+              <div className="text-xs text-slate-500">
+                输出文件: <span className="font-medium text-slate-700 break-all">{result.output}</span>
+              </div>
+              <button onClick={() => { setStep(1); setResult(null); setFilePath(""); setPreview(null); }}
+                className={`${btnSecondaryClass} mt-2`}>
+                继续标注其他文件
+              </button>
+            </div>
+          )}
+          {error && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 rounded-md px-3 py-2">
+                <XCircleIcon /> {error}
+              </div>
+              <button onClick={() => { setError(null); setStep(3); }} className={btnSecondaryClass}>
+                返回修改
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

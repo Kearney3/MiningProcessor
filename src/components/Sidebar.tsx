@@ -104,6 +104,19 @@ function IconCategory() {
   );
 }
 
+function IconBot() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 8V4H8" />
+      <rect width="16" height="12" x="4" y="8" rx="2" />
+      <path d="M2 14h2" />
+      <path d="M20 14h2" />
+      <path d="M15 13v2" />
+      <path d="M9 13v2" />
+    </svg>
+  );
+}
+
 // --- Icon registry ---
 
 const ICONS: Record<string, () => JSX.Element> = {
@@ -111,6 +124,7 @@ const ICONS: Record<string, () => JSX.Element> = {
   "batch-processing": IconFolderOpen,
   "data-sync": IconRefreshCw,
   "ledger-match": IconLink,
+  "llm-labeling": IconBot,
   "equipment-ledger": IconTruck,
   "oil-ledger": IconDroplet,
   "load-config": IconSlidersHorizontal,
@@ -128,6 +142,7 @@ interface NavItem {
 const WORKSPACE_ITEMS: NavItem[] = [
   { id: "data-processing", label: "数据处理" },
   { id: "batch-processing", label: "批量处理" },
+  { id: "llm-labeling", label: "LLM 标注" },
   { id: "data-sync", label: "数据同步" },
   { id: "ledger-match", label: "台账匹配" },
 ];

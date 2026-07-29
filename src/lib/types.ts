@@ -106,6 +106,7 @@ export type PageId =
   | "batch-processing"
   | "data-sync"
   | "ledger-match"
+  | "llm-labeling"
   | "equipment-ledger"
   | "oil-ledger"
   | "load-config"
