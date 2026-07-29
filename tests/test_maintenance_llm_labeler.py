@@ -161,7 +161,7 @@ def test_label_file_batches_50_and_resumes(tmp_path):
         checkpoint_path=str(checkpoint),
         batch_size=MAX_BATCH_SIZE,
     )
-    assert client.batch_sizes == [50, 50, 20]
+    assert sorted(client.batch_sizes) == [20, 50, 50]
     assert result["completed_rows"] == 120
     labeled = pd.read_excel(output)
     assert set(labeled["LLM标注状态"]) == {"已完成"}
