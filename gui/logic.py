@@ -1105,6 +1105,8 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
     # 工时表头映射 & 台账匹配
     apply_header_val = sync_refs.get("apply_header")
     apply_header = apply_header_val.value if apply_header_val else True
+    header_mode_val = sync_refs.get("header_mode")
+    header_mode = header_mode_val.value if header_mode_val else None
     eq_ledger_val = sync_refs.get("use_equipment_ledger")
     oil_ledger_val = sync_refs.get("use_oil_ledger")
     use_equipment_ledger = eq_ledger_val.value if eq_ledger_val else False
@@ -1137,6 +1139,7 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
                 date_start=date_start,
                 date_end=date_end,
                 apply_header_mapping=apply_header,
+                header_mode=header_mode,
                 use_equipment_ledger=use_equipment_ledger,
                 use_oil_ledger=use_oil_ledger,
                 skip_hidden_rows=skip_hidden_rows,

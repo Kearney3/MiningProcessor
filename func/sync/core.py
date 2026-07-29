@@ -62,6 +62,7 @@ def sync(
     date_start: str | None = None,
     date_end: str | None = None,
     apply_header_mapping: bool = True,
+    header_mode: str | None = None,
     use_ledger: bool = False,
     use_equipment_ledger: bool = False,
     use_oil_ledger: bool = True,
@@ -272,6 +273,7 @@ def sync(
                     elif data_type == "work_efficiency":
                         rows = _process_work_eff(
                             file_path, year, month, apply_header_mapping,
+                            header_mode=header_mode,
                             skip_hidden_rows=skip_hidden_rows,
                             skip_hidden_cols=skip_hidden_cols,
                             anomaly_config=anomaly_config,
