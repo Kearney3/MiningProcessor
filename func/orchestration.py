@@ -167,6 +167,58 @@ def build_worktime_header_mapping(
 
 
 # ---------------------------------------------------------------------------
+# 输出路径计算（统一供 Flet 和 Tauri 使用）
+# ---------------------------------------------------------------------------
+
+
+def get_output_path(
+    module_type: str,
+    path: str,
+    *,
+    year: int | None = None,
+    month: int = 1,
+    keyword: str = "",
+) -> str | None:
+    """根据模块类型和输入路径，计算输出文件路径。
+
+    统一供 gui/logic.py::_get_output_file() 和 tauri_bridge.py 各 RPC 方法共用，
+    消除两端各自内联计算输出路径的重复代码。
+
+    Args:
+        module_type: 模块类型 (fuel/electrical/production/worktime/merge/maint/batch)
+        path: 输入文件或文件夹路径
+        year: 年份（fuel/electrical/worktime），默认当前年
+        month: 月份（worktime），默认 1
+        keyword: 合并关键字（merge）
+
+    Returns:
+        输出文件路径字符串；batch 返回 None（已在内部处理）；
+        维修记录返回 None（由 process_maintenance_data 自行返回路径）
+    """
+    from datetime import datetime
+
+    if module_type == "batch":
+        return None
+    if module_type == "maint":
+        return None
+    if module_type == "merge":
+        return os.path.join(path, f"{keyword}_合并.xlsx")
+
+    effective_year = year if year is not None else datetime.now().year
+
+    # 工时文件夹模式
+    if module_type == "worktime" and os.path.isdir(path):
+        return os.path.join(path, f"{effective_year}{month:02d}_多文件合并_工作效率表.xlsx")
+
+    filename = get_output_filename(module_type, year=effective_year, month=month)
+    if not filename:
+        return None
+
+    base = path if os.path.isdir(path) else os.path.dirname(path)
+    return os.path.join(base or ".", filename)
+
+
+# ---------------------------------------------------------------------------
 # 统一单报表处理入口
 # ---------------------------------------------------------------------------
 
@@ -184,6 +236,7 @@ def process_single(
     add_shift_column: bool = False,
     default_shift: str = "Day",
     header_mapping: dict | None = None,
+    tolerant_header: bool = False,
     skip_hidden: bool = False,
     skip_hidden_rows: bool = False,
     skip_hidden_cols: bool = False,
@@ -212,6 +265,7 @@ def process_single(
         add_shift_column: 是否新增班次列 (electrical)
         default_shift: 默认班次 (electrical)
         header_mapping: 工时表头映射 (worktime)
+        tolerant_header: 容错表头匹配 (merge)
         skip_hidden: 向后兼容，True 时等价于 skip_hidden_rows=True, skip_hidden_cols=True
         skip_hidden_rows: 是否跳过隐藏行
         skip_hidden_cols: 是否跳过隐藏列
@@ -295,17 +349,18 @@ def process_single(
             sort_configs=sort_configs,
             skip_hidden_rows=skip_hidden_rows,
             skip_hidden_cols=skip_hidden_cols,
-            tolerant_header=kwargs.get("tolerant_header", False),
+            tolerant_header=tolerant_header,
         )
 
     else:
         raise ValueError(f"不支持的模块类型: {module_type}")
 
     # ── 计算输出文件路径 ──
-    base = path if os.path.isdir(path) else os.path.dirname(path)
-    output_file = os.path.join(base or ".", get_output_filename(
-        module_type, year=effective_year, month=month,
-    ))
+    output_file = get_output_path(
+        module_type, path, year=effective_year, month=month, keyword=keyword,
+    )
+    if not output_file:
+        return None
 
     # ── 台账匹配后处理 ──
     if use_equipment_ledger or use_oil_ledger:

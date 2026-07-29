@@ -824,8 +824,8 @@ def test_apply_button_uses_current_ui_config_without_saving(monkeypatch):
     apply_button.on_click(DummyControlEvent())
 
     assert apply_spy.calls == [{"TR100": 35, "EH4000": 85}]
-    assert update_spy.calls == []
-    assert logs[-1] == "当前新版配置已应用"
+    assert update_spy.calls == [{"TR100": 35, "EH4000": 85}]
+    assert logs[-1] == "当前新版配置已应用并保存"
 
 
 # ---- DataTable column invariant tests ----

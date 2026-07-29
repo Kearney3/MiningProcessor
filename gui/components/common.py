@@ -570,10 +570,9 @@ def create_anomaly_controls() -> dict:
 def build_anomaly_config_from_refs(refs: dict):
     """从 refs dict 构建 AnomalyConfig 实例。
 
-    逐列检测开关从用户配置中读取（持久化设置），不再从 GUI 运行时控件合并。
+    逐列检测阈值从用户配置中读取（持久化设置），不再从 GUI 运行时控件合并。
     """
     from func.anomaly.rules import AnomalyConfig
-    from func import config_loader
 
     enabled_ref = refs.get("_anomaly_enabled")
     if not enabled_ref or not enabled_ref.value:
@@ -583,23 +582,10 @@ def build_anomaly_config_from_refs(refs: dict):
     mode_fn = refs.get("_anomaly_mode")
     mode = mode_fn() if callable(mode_fn) else "flag"
 
-    ad_config = config_loader.get_anomaly_detection_config()
-
-    return AnomalyConfig(
+    return AnomalyConfig.build_from_ui(
         enabled=True,
         generate_report=report_ref.value if report_ref else False,
-        flag_anomalies=(mode == "flag"),
-        filter_anomalies=(mode == "filter"),
-        handle_anomalies=(mode == "handle"),
-        use_threshold=ad_config.get("use_threshold", True),
-        use_sigma=ad_config.get("use_sigma", True),
-        use_percentile=ad_config.get("use_percentile", True),
-        sigma_n=ad_config.get("sigma_n", 3.0),
-        percentile_low=ad_config.get("percentile_low", 1.0),
-        percentile_high=ad_config.get("percentile_high", 99.0),
-        thresholds=ad_config.get("thresholds", {}),
-        statistical_columns=ad_config.get("statistical_columns", {}),
-        handling_rules=ad_config.get("handling_rules", {}),
+        mode=mode,
     )
 
 

@@ -258,31 +258,16 @@ def _load_equipment_ledger_from_cache():
 def _build_anomaly_config(params: dict):
     """从 RPC 参数构建 AnomalyConfig，未传入时返回 None（使用默认）。
 
-    逐列检测开关从用户配置中读取（持久化设置），无需前端传入。
+    逐列检测阈值从用户配置中读取（持久化设置），无需前端传入。
     """
     if not params.get("anomaly_enabled"):
         return None
     from func.anomaly.rules import AnomalyConfig
-    from func.config_loader import get_anomaly_detection_config
 
-    ad_config = get_anomaly_detection_config()
-    mode = params.get("anomaly_mode", "flag")
-
-    return AnomalyConfig(
+    return AnomalyConfig.build_from_ui(
         enabled=True,
         generate_report=params.get("anomaly_report", False),
-        flag_anomalies=(mode == "flag"),
-        filter_anomalies=(mode == "filter"),
-        handle_anomalies=(mode == "handle"),
-        use_threshold=ad_config.get("use_threshold", True),
-        use_sigma=ad_config.get("use_sigma", True),
-        use_percentile=ad_config.get("use_percentile", True),
-        sigma_n=ad_config.get("sigma_n", 3.0),
-        percentile_low=ad_config.get("percentile_low", 1.0),
-        percentile_high=ad_config.get("percentile_high", 99.0),
-        thresholds=ad_config.get("thresholds", {}),
-        statistical_columns=ad_config.get("statistical_columns", {}),
-        handling_rules=ad_config.get("handling_rules", {}),
+        mode=params.get("anomaly_mode", "flag"),
     )
 
 
@@ -339,6 +324,7 @@ def _process_fuel(params: dict) -> dict:
 def _process_production(params: dict) -> dict:
     from func.excel_production_enhanced import MiningDataProcessor
     from func.config_loader import get_device_load_map, get_load_map_version
+    from func.orchestration import get_output_path
 
     load_map_ver = get_load_map_version()
     load_map = get_device_load_map(load_map_ver)
@@ -354,13 +340,12 @@ def _process_production(params: dict) -> dict:
         filter_zero_run_km=params.get("filter_zero_run_km", False),
     )
     path = str(_sanitize_path(params["path"], must_exist=True))
-    p = Path(path)
-    if p.is_dir():
+    if os.path.isdir(path):
         processor.process_folder(path, cancel_event=_cancel_event)
-        output_file = str(p / "合并产量.xlsx")
     else:
-        output_file = str(p.parent / "合并产量.xlsx")
+        output_file = get_output_path("production", path)
         processor.process_single_file(path, output_file)
+    output_file = get_output_path("production", path)
     if output_file:
         _post_process_ledger(
             output_file,
@@ -377,6 +362,7 @@ def _process_production(params: dict) -> dict:
 @_register("process_electrical")
 def _process_electrical(params: dict) -> dict:
     from func.excel_electrical import parse_excel_data
+    from func.orchestration import get_output_path
 
     safe_path = str(_sanitize_path(params["path"], must_exist=True))
     parse_excel_data(
@@ -389,7 +375,7 @@ def _process_electrical(params: dict) -> dict:
         skip_hidden_cols=params.get("skip_hidden_cols", False),
         anomaly_config=_build_anomaly_config(params),
     )
-    output_file = str(Path(safe_path).parent / "电力消耗统计.xlsx")
+    output_file = get_output_path("electrical", safe_path, year=params.get("year"))
     _post_process_ledger(
         output_file,
         use_equipment_ledger=params.get("use_equipment_ledger", False),
@@ -401,7 +387,7 @@ def _process_electrical(params: dict) -> dict:
 @_register("process_worktime")
 def _process_worktime(params: dict) -> dict:
     from func.excel_worktime import process_excel_data
-    from func.orchestration import build_worktime_header_mapping
+    from func.orchestration import build_worktime_header_mapping, get_output_path
 
     header_mapping = None
     if params.get("use_header_mapping"):
@@ -411,10 +397,10 @@ def _process_worktime(params: dict) -> dict:
 
     year, month = params["year"], params["month"]
     safe_path = str(_sanitize_path(params["path"], must_exist=True))
+    output_file = get_output_path("worktime", safe_path, year=year, month=month)
 
     if os.path.isdir(safe_path):
         from func.excel_worktime_multifile import process_directory
-        output_file = str(Path(safe_path) / f"{year}{month:02d}_多文件合并_工作效率表.xlsx")
         process_directory(
             safe_path, year, month,
             output_file=output_file,
@@ -425,7 +411,6 @@ def _process_worktime(params: dict) -> dict:
             anomaly_config=_build_anomaly_config(params),
         )
     else:
-        output_file = str(Path(safe_path).parent / f"{year}{month:02d}_工作效率表.xlsx")
         process_excel_data(
             safe_path,
             year=year,
