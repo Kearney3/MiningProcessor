@@ -951,7 +951,7 @@ def label_file(
     if target.suffix.lower() == ".csv":
         df.to_csv(target, index=False)
     else:
-        df.to_excel(target, index=False, sheet_name=sheet_name)
+        df.to_excel(target, index=False, sheet_name=sheet_name, na_rep="")
     return {
         "input_rows": len(df),
         "candidate_rows": len(indexes),
@@ -1164,7 +1164,7 @@ def process_maintenance_llm(
     target.parent.mkdir(parents=True, exist_ok=True)
 
     if export_mode == "details":
-        df.to_excel(target, index=False, sheet_name=sheet_name)
+        df.to_excel(target, index=False, sheet_name=sheet_name, na_rep="")
     else:
         from func.building import build_sheets
         classified: list[dict] = []
