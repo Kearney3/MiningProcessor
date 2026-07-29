@@ -4,7 +4,13 @@ import type { BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
 import { inputClass, btnPrimaryClass, btnSecondaryClass } from "../../lib/ui-classes";
 import { useLastDirectory } from "../../hooks/useLastDirectory";
-import { FileIcon } from "../../lib/icons";
+import {
+  FileIcon, UploadCloudIcon, TagIcon, HashIcon, DropletIcon,
+  SearchIcon, LayersIcon, PlayIcon, DownloadIcon, TrashIcon,
+  ColumnsIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon,
+  ArrowUpIcon, ArrowDownIcon, ChevronsUpDownIcon, LoaderIcon,
+  AlertCircleIcon, InfoIcon, TableIcon,
+} from "../../lib/icons";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -21,151 +27,6 @@ interface SortState {
   column: string;
   direction: "asc" | "desc";
 }
-
-// ---------------------------------------------------------------------------
-// SVG Icons (Lucide-style, no emoji)
-// ---------------------------------------------------------------------------
-
-const IconUploadCloud = () => (
-  <svg className="w-6 h-6 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242" />
-    <path d="M12 12v9" />
-    <path d="m16 16-4-4-4 4" />
-  </svg>
-);
-
-const IconTag = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />
-    <circle cx="7.5" cy="7.5" r=".5" fill="currentColor" />
-  </svg>
-);
-
-const IconHash = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <line x1="4" x2="20" y1="9" y2="9" />
-    <line x1="4" x2="20" y1="15" y2="15" />
-    <line x1="10" x2="8" y1="3" y2="21" />
-    <line x1="16" x2="14" y1="3" y2="21" />
-  </svg>
-);
-
-const IconDroplet = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z" />
-  </svg>
-);
-
-const IconSearch = () => (
-  <svg className="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="11" cy="11" r="8" />
-    <path d="m21 21-4.3-4.3" />
-  </svg>
-);
-
-const IconLayers = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" />
-    <path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65" />
-    <path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65" />
-  </svg>
-);
-
-const IconPlay = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="6 3 20 12 6 21 6 3" />
-  </svg>
-);
-
-const IconDownload = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-    <polyline points="7 10 12 15 17 10" />
-    <line x1="12" x2="12" y1="15" y2="3" />
-  </svg>
-);
-
-const IconTrash = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 6h18" />
-    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-  </svg>
-);
-
-const IconColumns = () => (
-  <svg className="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
-    <line x1="12" x2="12" y1="3" y2="21" />
-  </svg>
-);
-
-const IconChevronDown = () => (
-  <svg className="w-3.5 h-3.5 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <path d="m6 9 6 6 6-6" />
-  </svg>
-);
-
-const IconChevronLeft = () => (
-  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <path d="m15 18-6-6 6-6" />
-  </svg>
-);
-
-const IconChevronRight = () => (
-  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <path d="m9 18 6-6-6-6" />
-  </svg>
-);
-
-const IconArrowUp = () => (
-  <svg className="w-3 h-3 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-    <path d="m5 12 7-7 7 7" />
-    <path d="M12 19V5" />
-  </svg>
-);
-
-const IconArrowDown = () => (
-  <svg className="w-3 h-3 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 5v14" />
-    <path d="m19 12-7 7-7-7" />
-  </svg>
-);
-
-const IconChevronsUpDown = () => (
-  <svg className="w-3 h-3 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-    <path d="m7 15 5 5 5-5" />
-    <path d="m7 9 5-5 5 5" />
-  </svg>
-);
-
-const IconLoader = () => (
-  <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-  </svg>
-);
-
-const IconAlertCircle = () => (
-  <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" />
-    <line x1="12" x2="12" y1="8" y2="12" />
-    <line x1="12" x2="12.01" y1="16" y2="16" />
-  </svg>
-);
-
-const IconInfo = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10" />
-    <path d="M12 16v-4" />
-    <path d="M12 8h.01" />
-  </svg>
-);
-
-const IconTable = () => (
-  <svg className="w-8 h-8 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-  </svg>
-);
 
 // ---------------------------------------------------------------------------
 // Toggle Switch (w-8 h-5, restrained style — no color flash)
@@ -513,7 +374,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
     <div className="flex flex-col h-full">
       {/* Title */}
       <div className="flex items-center gap-2 mb-4">
-        <span className="text-slate-500"><IconLayers /></span>
+        <span className="text-slate-500"><LayersIcon /></span>
         <h2 className="text-base font-semibold text-slate-800">台账匹配</h2>
         <span className="text-xs text-slate-400 ml-1">将 Excel 数据与设备台账进行模糊匹配</span>
       </div>
@@ -546,7 +407,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
             className="flex flex-col items-center justify-center py-2 cursor-pointer"
             onClick={browseFile}
           >
-            <IconUploadCloud />
+            <UploadCloudIcon />
             <p className="text-sm text-slate-500 mt-2">
               拖拽 Excel 文件到此处，或点击选择
             </p>
@@ -570,7 +431,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
               onClick={() => setShowClearDialog(true)}
               className="flex items-center gap-1.5 text-red-600 text-sm px-3 py-1.5 rounded-md hover:bg-red-50 transition-colors"
             >
-              <IconTrash />
+              <TrashIcon />
               清空
             </button>
           </div>
@@ -579,7 +440,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
         {/* Sheet selector tabs */}
         {availableSheets.length > 0 && (
           <div className="flex items-center gap-2">
-            <span className="shrink-0"><IconColumns /></span>
+            <span className="shrink-0"><ColumnsIcon /></span>
             <div className="flex gap-1 overflow-x-auto">
               {availableSheets.map((s) => (
                 <button
@@ -600,7 +461,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
               disabled={loading}
               className={`${btnPrimaryClass} ml-auto shrink-0`}
             >
-              {loading ? <><IconLoader /> 加载中</> : "加载"}
+              {loading ? <><LoaderIcon /> 加载中</> : "加载"}
             </button>
           </div>
         )}
@@ -610,7 +471,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
       {columns.length > 0 && (
         <div className="bg-white rounded-lg border border-slate-200 p-4 mb-4">
           <h3 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
-            <span className="text-slate-400"><IconSearch /></span>
+            <span className="text-slate-400"><SearchIcon /></span>
             匹配配置
           </h3>
 
@@ -623,7 +484,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 onChange={(v) => setNameToggle((p) => ({ ...p, enabled: v }))}
               />
               <span className={`text-sm ${nameToggle.enabled ? "text-slate-800 font-medium" : "text-slate-500"}`}>
-                <span className="inline-flex items-center gap-1"><IconTag /> 设备名称</span>
+                <span className="inline-flex items-center gap-1"><TagIcon /> 设备名称</span>
               </span>
               <select
                 value={nameToggle.column}
@@ -645,7 +506,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 onChange={(v) => setIdToggle((p) => ({ ...p, enabled: v }))}
               />
               <span className={`text-sm ${idToggle.enabled ? "text-slate-800 font-medium" : "text-slate-500"}`}>
-                <span className="inline-flex items-center gap-1"><IconHash /> 设备编号</span>
+                <span className="inline-flex items-center gap-1"><HashIcon /> 设备编号</span>
               </span>
               <select
                 value={idToggle.column}
@@ -667,7 +528,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 onChange={(v) => setOilToggle((p) => ({ ...p, enabled: v }))}
               />
               <span className={`text-sm ${oilToggle.enabled ? "text-slate-800 font-medium" : "text-slate-500"}`}>
-                <span className="inline-flex items-center gap-1"><IconDroplet /> 油品</span>
+                <span className="inline-flex items-center gap-1"><DropletIcon /> 油品</span>
               </span>
               <select
                 value={oilToggle.column}
@@ -687,7 +548,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
           {hasDualColumns && (
             <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-slate-400"><IconInfo /></span>
+                <span className="text-slate-400"><InfoIcon /></span>
                 <span className="text-xs font-medium text-slate-600">双列生产模式已检测</span>
               </div>
               <div className="flex gap-4 text-xs text-slate-500">
@@ -707,7 +568,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
               disabled={!anyToggleEnabled || matching}
               className={btnPrimaryClass}
             >
-              {matching ? <><IconLoader /> 匹配中</> : <><IconPlay /> 开始匹配</>}
+              {matching ? <><LoaderIcon /> 匹配中</> : <><PlayIcon /> 开始匹配</>}
             </button>
 
             {/* Inline stats — simple text, no card widgets */}
@@ -756,9 +617,9 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 onClick={() => setShowExportMenu((p) => !p)}
                 className={btnSecondaryClass}
               >
-                <IconDownload />
+                <DownloadIcon />
                 导出 Excel
-                <IconChevronDown />
+                <ChevronDownIcon />
               </button>
               {showExportMenu && (
                 <div className="absolute right-0 mt-1.5 w-48 bg-white border border-slate-200 rounded-md z-20 py-1">
@@ -787,7 +648,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
       {/* ── Error Banner ── */}
       {error && (
         <div className="mb-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-4 py-2.5 flex items-center gap-2">
-          <span className="text-red-500"><IconAlertCircle /></span>
+          <span className="text-red-500"><AlertCircleIcon /></span>
           <span>{error}</span>
           <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600 text-xs">dismiss</button>
         </div>
@@ -809,9 +670,9 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                       <span className="inline-flex items-center gap-1">
                         {col}
                         {sort?.column === col ? (
-                          sort.direction === "asc" ? <IconArrowUp /> : <IconArrowDown />
+                          sort.direction === "asc" ? <ArrowUpIcon /> : <ArrowDownIcon />
                         ) : (
-                          <IconChevronsUpDown />
+                          <ChevronsUpDownIcon />
                         )}
                       </span>
                     </th>
@@ -865,7 +726,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 onClick={() => setPage((p) => p - 1)}
                 className="text-xs text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-0.5"
               >
-                <IconChevronLeft />
+                <ChevronLeftIcon />
                 上一页
               </button>
               <span className="text-xs text-slate-500 min-w-[4rem] text-center tabular-nums">
@@ -877,7 +738,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 className="text-xs text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-0.5"
               >
                 下一页
-                <IconChevronRight />
+                <ChevronRightIcon />
               </button>
             </div>
           </div>
@@ -885,7 +746,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
       ) : (
         !loading && (
           <div className="bg-white rounded-lg border border-slate-200 p-16 text-center">
-            <span className="flex justify-center mb-4 text-slate-300"><IconTable /></span>
+            <span className="flex justify-center mb-4 text-slate-300"><TableIcon /></span>
             <p className="text-sm text-slate-500 mb-1">暂无数据</p>
             <p className="text-xs text-slate-400">请选择 Excel 文件并加载 Sheet，然后配置匹配参数</p>
           </div>

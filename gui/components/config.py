@@ -288,8 +288,10 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
 
     def apply_current_config(e: ft.ControlEvent):
         try:
-            config_loader.apply_device_load_map(build_device_load_map(), _current_version[0])
-            _log_message(log, f"当前{'旧版' if _current_version[0] == 'old' else '新版'}配置已应用")
+            device_load_map = build_device_load_map()
+            config_loader.apply_device_load_map(device_load_map, _current_version[0])
+            config_loader.update_device_load_map(device_load_map, _current_version[0])
+            _log_message(log, f"当前{'旧版' if _current_version[0] == 'old' else '新版'}配置已应用并保存")
         except Exception as ex:
             _log_message(log, f"应用当前配置失败: {ex}", level=logging.ERROR)
 

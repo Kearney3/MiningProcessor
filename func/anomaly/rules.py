@@ -82,6 +82,48 @@ class AnomalyConfig:
             handling_rules=ad.get("handling_rules", {}),
         )
 
+    @classmethod
+    def build_from_ui(
+        cls,
+        enabled: bool = False,
+        generate_report: bool = False,
+        mode: str = "flag",
+    ) -> "AnomalyConfig":
+        """从 UI 参数构建 AnomalyConfig，逐列检测阈值从 config.user.json 读取。
+
+        共享入口，供 Flet GUI 和 Tauri bridge 统一使用。
+
+        Args:
+            enabled: 是否启用异常检测
+            generate_report: 是否生成异常报告
+            mode: 处理模式 ("flag" | "filter" | "handle")
+
+        Returns:
+            AnomalyConfig 实例；enabled=False 时返回 disabled config
+        """
+        if not enabled:
+            return cls(enabled=False)
+
+        from func.config_loader import get_anomaly_detection_config
+        ad_config = get_anomaly_detection_config()
+
+        return cls(
+            enabled=True,
+            generate_report=generate_report,
+            flag_anomalies=(mode == "flag"),
+            filter_anomalies=(mode == "filter"),
+            handle_anomalies=(mode == "handle"),
+            use_threshold=ad_config.get("use_threshold", True),
+            use_sigma=ad_config.get("use_sigma", True),
+            use_percentile=ad_config.get("use_percentile", True),
+            sigma_n=ad_config.get("sigma_n", 3.0),
+            percentile_low=ad_config.get("percentile_low", 1.0),
+            percentile_high=ad_config.get("percentile_high", 99.0),
+            thresholds=ad_config.get("thresholds", {}),
+            statistical_columns=ad_config.get("statistical_columns", {}),
+            handling_rules=ad_config.get("handling_rules", {}),
+        )
+
 
 # ---------------------------------------------------------------------------
 # 规则与命中

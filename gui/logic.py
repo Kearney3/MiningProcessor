@@ -11,7 +11,6 @@ import flet as ft
 import os
 import pandas as pd
 from func import config_loader
-from func.excel_utils import get_output_filename
 from func.excel_fuel import process_diesel_data as process_fuel_data
 from func.excel_production_enhanced import MiningDataProcessor as ProdProcessor
 from func.excel_electrical import parse_excel_data as process_electrical_data
@@ -173,26 +172,17 @@ def _apply_ledger_matching(output_file: str, equipment_ledger=None, oil_ledger=N
 
 
 def _get_output_file(module_type: str, path: str, **kwargs) -> str | None:
-    """根据模块类型和输入路径，推断输出文件路径"""
-    if module_type == "batch":
-        return None  # 台账匹配已在 batch_process 内部处理
-    if module_type == "merge":
-        keyword = kwargs.get("keyword", "")
-        return os.path.join(path, f"{keyword}_合并.xlsx")
+    """根据模块类型和输入路径，推断输出文件路径。
 
-    year = kwargs.get("year", datetime.now().year)
-    month = kwargs.get("month", 1)
-
-    # 工时文件夹模式：输出文件名不同
-    if module_type == "worktime" and os.path.isdir(path):
-        return os.path.join(path, f"{year}{month:02d}_多文件合并_工作效率表.xlsx")
-
-    filename = get_output_filename(module_type, year=year, month=month)
-    if not filename:
-        return None
-
-    base = path if os.path.isdir(path) else os.path.dirname(path)
-    return os.path.join(base, filename)
+    委托给 func.orchestration.get_output_path() 统一计算。
+    """
+    from func.orchestration import get_output_path
+    return get_output_path(
+        module_type, path,
+        year=kwargs.get("year"),
+        month=kwargs.get("month", 1),
+        keyword=kwargs.get("keyword", ""),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -280,7 +270,7 @@ def _dispatch_module(module_type: str, path: str, cancel_event: threading.Event 
     elif module_type == "maint":
         eq_ledger = kwargs.get("equipment_ledger")
         classifications = config_loader.get_maintenance_classifications()
-        process_maintenance_data(
+        return process_maintenance_data(
             path,
             eq_ledger=eq_ledger,
             classifications=classifications,
@@ -331,13 +321,27 @@ def _execute_task(module_type: str, path: str, cancel_event: threading.Event | N
     if not (equipment_ledger or oil_ledger):
         return None, extra
 
-    output_file = _get_output_file(module_type, path, **kwargs)
-    if not output_file or not os.path.exists(output_file):
-        return None, extra
+    # 确定输出文件路径：优先使用 _dispatch_module 返回的实际路径
+    output_files = []
+    if module_type == "maint":
+        if isinstance(result, list):
+            output_files = [str(f) for f in result if f]
+        elif isinstance(result, str) and result:
+            output_files = [result]
+    elif module_type == "worktime":
+        sheets_data = worktime_sheets
+        output_file = _get_output_file(module_type, path, **kwargs)
+        if output_file and os.path.exists(output_file):
+            output_files = [output_file]
+    else:
+        output_file = _get_output_file(module_type, path, **kwargs)
+        if output_file and os.path.exists(output_file):
+            output_files = [output_file]
 
     sheets_data = worktime_sheets if module_type == "worktime" else None
-    _apply_ledger_matching(output_file, equipment_ledger, oil_ledger,
-                           preloaded_sheets=sheets_data)
+    for out in output_files:
+        _apply_ledger_matching(out, equipment_ledger, oil_ledger,
+                               preloaded_sheets=sheets_data)
     return None, extra
 
 
