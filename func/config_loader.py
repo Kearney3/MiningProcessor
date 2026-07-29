@@ -850,14 +850,16 @@ def update_llm_config(updates: dict[str, Any]) -> dict[str, Any]:
     update_user_config({"llm_labeling": current})
     if api_key is not None:
         try:
-            wrapper = {"api": {"password": api_key}}
-            encrypted = save_minebase_secrets(wrapper)
+            wrapper = {"llm_api_key": {"password": api_key}}
+            encrypted = save_minebase_secrets(
+                wrapper, secret_paths=[("minebase", "llm_api_key", "password")],
+            )
             user_file = _load_json(_USER_CONFIG_FILE)
-            # Merge encrypted minebase.api into config file
+            # Merge encrypted minebase.llm_api_key into config file
             minebase = user_file.get("minebase", {})
             if not isinstance(minebase, dict):
                 minebase = {}
-            minebase["api"] = encrypted["api"]
+            minebase["llm_api_key"] = encrypted["llm_api_key"]
             user_file["minebase"] = minebase
             # Mark llm api_key as keychain-referenced
             llm_cfg = user_file.get(_USER_CONFIG_SECTION, {}).get("llm_labeling", {})
