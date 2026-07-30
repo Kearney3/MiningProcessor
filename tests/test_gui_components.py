@@ -621,7 +621,7 @@ def test_gui_main_stops_log_consumer_on_disconnect(monkeypatch):
     assert isinstance(log_view, components.ft.Container)
     assert refs["log_list"].auto_scroll is False
     assert refs["log_list"].spacing == 4
-    assert refs["list_container"].height == 400
+    assert refs["list_container"].height == 350
     assert getattr(refs["export_button"], "tooltip", None) == "导出日志"
     assert refs["follow_status"].visible is False
 
@@ -799,7 +799,8 @@ def test_gui_main_resizes_log_view_with_drag(monkeypatch):
     gui_main.main(page)
 
     refs["resize_handle"].on_vertical_drag_update(DummyDragEvent(-80))
-    assert refs["list_container"].height == 280
+    # main() sets window.height=1050, so _recommended_log_height gives round(1050/3)=350
+    assert refs["list_container"].height == 350 + 80
 
     refs["resize_handle"].on_vertical_drag_update(DummyDragEvent(500))
     assert refs["list_container"].height == gui_main.MIN_LOG_HEIGHT
