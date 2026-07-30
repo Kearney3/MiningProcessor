@@ -122,8 +122,17 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
 
     final_df = pd.concat(all_data, axis=0, ignore_index=True)
 
-    # 合并后统一移除全 NaN 列（避免 per-sheet 移除导致 concat 列顺序错乱）
-    final_df = drop_all_nan_columns(final_df)
+    # 合并后统一移除全 NaN 列，但保留配置中已经映射到源表的目标列，
+    # 以确保工时输出字段结构稳定。
+    mapped_columns = {
+        clean_string(entry.get("new"))
+        for entry in (header_mapping or {}).get("entries", [])
+        if clean_string(entry.get("new"))
+    }
+    final_df = drop_all_nan_columns(
+        final_df,
+        preserve_columns=mapped_columns,
+    )
 
     # 5. 排序：按日期排序, 并将日期列转换为日期类型, 去除时间部分
     final_df = strip_date_column(final_df, date_format="%Y-%m-%d")

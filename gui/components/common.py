@@ -283,25 +283,16 @@ def _show_path_confirm(text_field: ft.TextField):
         suffix.icon = ft.Icons.CHECK_CIRCLE
         suffix.icon_color = theme.SUCCESS
         suffix.tooltip = "已选择"
-        try:
-            text_field.update()
-        except (RuntimeError, AttributeError):
-            pass
+        safe_update(text_field)
 
         def _restore():
             suffix.icon = _original_icon
             suffix.icon_color = None
             suffix.tooltip = _original_tooltip
-            try:
-                text_field.update()
-            except (RuntimeError, AttributeError):
-                pass
+            safe_update(text_field)
         threading.Timer(1.5, _restore).start()
     else:
-        try:
-            text_field.update()
-        except (RuntimeError, AttributeError):
-            pass
+        safe_update(text_field)
 
 
 class ChipToggle:
@@ -364,10 +355,7 @@ class ChipToggle:
             is_selected = val == self._value
             chip.bgcolor = theme.PRIMARY if is_selected else theme.SURFACE_HIGH
             chip.content.color = "#FFFFFF" if is_selected else theme.TEXT_SECONDARY
-        try:
-            self.row.update()
-        except (RuntimeError, AttributeError):
-            pass
+        safe_update(self.row)
 
     def update(self):
         """兼容外部直接调用 .update()。"""
@@ -489,50 +477,34 @@ def create_anomaly_controls() -> dict:
         anomaly_flag.value = (mode == "flag")
         anomaly_filter.value = (mode == "filter")
         anomaly_handle.value = (mode == "handle")
-        for c in (anomaly_flag, anomaly_filter, anomaly_handle):
-            try:
-                c.update()
-            except (RuntimeError, AttributeError):
-                pass
+        safe_update(anomaly_flag, anomaly_filter, anomaly_handle)
 
     def _on_enabled_change(e):
         enabled = anomaly_enabled.value
         for c in (anomaly_report, anomaly_flag, anomaly_filter, anomaly_handle):
             c.disabled = not enabled
-            try:
-                c.update()
-            except (RuntimeError, AttributeError):
-                pass
+        safe_update(anomaly_report, anomaly_flag, anomaly_filter, anomaly_handle)
 
     def _on_flag_change(e):
         if anomaly_flag.value:
             _set_mode("flag")
         elif _mode[0] == "flag":
             anomaly_flag.value = True
-            try:
-                anomaly_flag.update()
-            except (RuntimeError, AttributeError):
-                pass
+            safe_update(anomaly_flag)
 
     def _on_filter_change(e):
         if anomaly_filter.value:
             _set_mode("filter")
         elif _mode[0] == "filter":
             anomaly_filter.value = True
-            try:
-                anomaly_filter.update()
-            except (RuntimeError, AttributeError):
-                pass
+            safe_update(anomaly_filter)
 
     def _on_handle_change(e):
         if anomaly_handle.value:
             _set_mode("handle")
         elif _mode[0] == "handle":
             anomaly_handle.value = True
-            try:
-                anomaly_handle.update()
-            except (RuntimeError, AttributeError):
-                pass
+            safe_update(anomaly_handle)
 
     anomaly_enabled.on_change = _on_enabled_change
     anomaly_flag.on_change = _on_flag_change

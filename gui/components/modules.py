@@ -3,7 +3,7 @@ from datetime import datetime
 
 import flet as ft
 
-from .common import _last_directory, _update_last_directory, _log_message, _get_initial_directory, _show_path_confirm, ChipToggle, year_options, month_options, make_browse_handler, HeaderModeConfig, safe_update
+from .common import _last_directory, _update_last_directory, _log_message, _get_initial_directory, _show_path_confirm, ChipToggle, year_options, month_options, make_browse_handler, HeaderModeConfig, safe_update, create_anomaly_controls
 from .types import ModuleRefs
 
 try:
@@ -421,105 +421,9 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         tooltip="勾选后，运行里程为 0 或为空的记录将被过滤",
     )
 
-    # --- 异常值检测开关 ---
-    _anomaly_mode = "flag"  # 内部状态：flag | filter | handle
-
-    anomaly_enabled = ft.Checkbox(
-        label="启用异常值检测",
-        value=False,
-        tooltip="开启后对处理的数据进行异常值检测",
-    )
-    anomaly_report = ft.Checkbox(
-        label="输出异常报告",
-        value=False,
-        tooltip="生成异常报告 Excel 文件",
-    )
-    anomaly_flag = ft.Checkbox(
-        label="标记异常值",
-        value=True,
-        tooltip="在数据中标记异常值（不删除）",
-    )
-    anomaly_filter = ft.Checkbox(
-        label="过滤异常值",
-        value=False,
-        tooltip="移除异常行（与标记互斥）",
-    )
-    anomaly_handle = ft.Checkbox(
-        label="处理异常值",
-        value=False,
-        tooltip="按用户配置替换异常值（与标记互斥）",
-    )
-
-    def _set_anomaly_mode(mode: str):
-        """设置异常值处理模式，确保三选一互斥。"""
-        nonlocal _anomaly_mode
-        _anomaly_mode = mode
-        anomaly_flag.value = (mode == "flag")
-        anomaly_filter.value = (mode == "filter")
-        anomaly_handle.value = (mode == "handle")
-        safe_update(anomaly_flag)
-        safe_update(anomaly_filter)
-        safe_update(anomaly_handle)
-
-    def _on_anomaly_enabled_change(e):
-        enabled = anomaly_enabled.value
-        anomaly_report.disabled = not enabled
-        anomaly_flag.disabled = not enabled
-        anomaly_filter.disabled = not enabled
-        anomaly_handle.disabled = not enabled
-        safe_update(anomaly_report)
-        safe_update(anomaly_flag)
-        safe_update(anomaly_filter)
-        safe_update(anomaly_handle)
-
-    def _on_anomaly_flag_change(e):
-        if anomaly_flag.value:
-            _set_anomaly_mode("flag")
-        elif _anomaly_mode == "flag":
-            anomaly_flag.value = True
-            safe_update(anomaly_flag)
-
-    def _on_anomaly_filter_change(e):
-        if anomaly_filter.value:
-            _set_anomaly_mode("filter")
-        elif _anomaly_mode == "filter":
-            anomaly_filter.value = True
-            safe_update(anomaly_filter)
-
-    def _on_anomaly_handle_change(e):
-        if anomaly_handle.value:
-            _set_anomaly_mode("handle")
-        elif _anomaly_mode == "handle":
-            anomaly_handle.value = True
-            safe_update(anomaly_handle)
-
-    anomaly_enabled.on_change = _on_anomaly_enabled_change
-    anomaly_flag.on_change = _on_anomaly_flag_change
-    anomaly_filter.on_change = _on_anomaly_filter_change
-    anomaly_handle.on_change = _on_anomaly_handle_change
-
-    # 初始状态：子开关跟随总开关
-    anomaly_report.disabled = not anomaly_enabled.value
-    anomaly_flag.disabled = not anomaly_enabled.value
-    anomaly_filter.disabled = not anomaly_enabled.value
-    anomaly_handle.disabled = not anomaly_enabled.value
-
-    anomaly_panel = ft.Container(
-        content=ft.Column([
-            ft.Row([anomaly_enabled], spacing=8),
-            ft.Container(
-                content=ft.Column([
-                    ft.Row([anomaly_report], spacing=8),
-                    ft.Row([anomaly_flag, anomaly_filter, anomaly_handle], spacing=16),
-                ], spacing=4),
-                padding=ft.Padding.only(left=24),
-            ),
-        ], spacing=4),
-        padding=ft.Padding.symmetric(horizontal=8, vertical=6),
-        border=ft.Border.all(1, theme.BORDER),
-        border_radius=theme.RADIUS_SM,
-        bgcolor=theme.SURFACE_HIGH,
-    )
+    # --- 异常值检测开关（使用共享工厂） ---
+    anomaly_ctrls = create_anomaly_controls()
+    anomaly_panel = anomaly_ctrls["container"]
 
     header_hint = ft.Row(
         [
@@ -606,12 +510,9 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         "_match_oil_toggle": match_oil_toggle,
         "_skip_hidden_rows_toggle": skip_hidden_rows_toggle,
         "_skip_hidden_cols_toggle": skip_hidden_cols_toggle,
-        "_anomaly_enabled": anomaly_enabled,
-        "_anomaly_report": anomaly_report,
-        "_anomaly_flag": anomaly_flag,
-        "_anomaly_filter": anomaly_filter,
-        "_anomaly_handle": anomaly_handle,
-        "_anomaly_mode": lambda: _anomaly_mode,
+        "_anomaly_enabled": anomaly_ctrls["_anomaly_enabled"],
+        "_anomaly_report": anomaly_ctrls["_anomaly_report"],
+        "_anomaly_mode": anomaly_ctrls["_anomaly_mode"],
         "fuel": {"path": fuel_path, "year": fuel_year, "btn": fuel_btn, "_filter_zero_hours_toggle": filter_zero_hours_toggle, "_filter_zero_work_hours_toggle": filter_zero_work_hours_toggle},
         "prod": {"path": prod_path, "raw_start": prod_raw_start, "btn": prod_btn, "auto_detect": prod_auto_detect, "summary_container": prod_summary_container,
                  "_filter_zero_hours_meter_toggle": prod_filter_zero_hours_meter, "_filter_zero_km_meter_toggle": prod_filter_zero_km_meter,

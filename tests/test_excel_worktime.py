@@ -510,6 +510,43 @@ class TestEmptyFile:
 class TestHeaderMapping:
     """Verify header_mapping renames columns in the output."""
 
+    def test_preserves_mapped_column_when_all_values_are_empty(self, tmp_path):
+        """A configured source column remains in output even when its data is entirely empty."""
+        excel_path = str(tmp_path / "worktime.xlsx")
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "1"
+        ws.append(["Title"])
+        ws.append(["Equipment", "Hours", "Power planned"])
+        ws.append(["Truck", 8.0, None])
+        ws.append(["Truck 2", 8.0, None])
+        ws.append(["Equipment", "Hours", "Power planned"])
+        ws.append(["Loader", 6.0, None])
+        wb.save(excel_path)
+
+        mapping = {
+            "mode": "position",
+            "entries": [
+                {"index": 1, "new": "设备名称"},
+                {"index": 2, "new": "应运行小时数"},
+                {"index": 3, "new": "因电力原因停车/计划"},
+                {"index": 5, "new": "源表不存在的配置列"},
+            ],
+        }
+
+        result = process_excel_data(
+            file_path=excel_path,
+            year=2025,
+            month=1,
+            return_sheets=True,
+            header_mapping=mapping,
+        )
+
+        df = result["工时数据"]
+        assert "因电力原因停车/计划" in df.columns
+        assert df["因电力原因停车/计划"].isna().all()
+        assert "源表不存在的配置列" not in df.columns
+
     def test_header_mapping_position_mode(self, tmp_path):
         """Position-based header mapping renames raw data columns (before 日期/班次 insertion)."""
         excel_path = str(tmp_path / "worktime.xlsx")

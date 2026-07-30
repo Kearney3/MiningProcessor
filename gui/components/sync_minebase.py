@@ -14,6 +14,8 @@ from .common import (
     HeaderModeConfig,
     create_anomaly_controls,
     to_local_dt,
+    year_options,
+    month_options,
 )
 
 try:
@@ -25,10 +27,9 @@ except ImportError:
 # 数据类型定义（委托给共享常量模块）
 from func.data_types import SYNC_DATA_TYPES as DATA_TYPES
 
-# 年份范围：当前年 ± 30
-_CURRENT_YEAR = date.today().year
-_YEAR_OPTIONS = [str(y) for y in range(_CURRENT_YEAR - 30, _CURRENT_YEAR + 31)]
-_MONTH_OPTIONS = [str(m) for m in range(1, 13)]
+# 年份/月份选项（委托给共享工具函数）
+_YEAR_OPTIONS = year_options(-30, 30)
+_MONTH_OPTIONS = month_options()
 
 
 def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
@@ -151,15 +152,15 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     # --- 年份/月份 ---
     year_dropdown = ft.Dropdown(
         label="年份",
-        options=[ft.dropdown.Option(v) for v in _YEAR_OPTIONS],
-        value=str(_CURRENT_YEAR),
+        options=_YEAR_OPTIONS,
+        value=str(date.today().year),
         width=120,
         dense=True,
     )
 
     month_dropdown = ft.Dropdown(
         label="月份",
-        options=[ft.dropdown.Option(v) for v in _MONTH_OPTIONS],
+        options=_MONTH_OPTIONS,
         value=str(date.today().month),
         width=100,
         dense=True,

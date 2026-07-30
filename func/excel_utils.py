@@ -502,21 +502,30 @@ def clean_split_dataframe(
     return result
 
 
-def drop_all_nan_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """移除 DataFrame 中所有值均为 NaN 的列。
+def drop_all_nan_columns(
+    df: pd.DataFrame,
+    preserve_columns: set[str] | None = None,
+) -> pd.DataFrame:
+    """移除 DataFrame 中所有值均为 NaN 的列，可保留指定列。
 
     应在 pd.concat 合并多个 sheet 之后调用，而非在单个 sheet 处理阶段。
     这样可以避免因不同 sheet 的空列集合不同而导致 concat 时列顺序错乱。
 
     Args:
         df: 合并后的 DataFrame（返回新对象，不修改原 df）。
+        preserve_columns: 即使全为 NaN 也要保留的已有列名集合。
+            不会凭空创建 DataFrame 中不存在的列。
 
     Returns:
         移除全 NaN 列后的新 DataFrame。
     """
     if df.empty:
         return df
-    nan_cols = [c for c in df.columns if df[c].isna().all()]
+    preserve = preserve_columns or set()
+    nan_cols = [
+        c for c in df.columns
+        if c not in preserve and df[c].isna().all()
+    ]
     if nan_cols:
         return df.drop(columns=nan_cols)
     return df
