@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import os
@@ -148,6 +149,17 @@ def build_user_prompt(records: list[dict]) -> str:
 
 def _authorization_value(api_key: str, prefix: str) -> str:
     return f"{prefix.strip()} {api_key}".strip()
+
+
+def _wait_for_retry(
+    delay: float,
+    cancel_event: threading.Event | None,
+) -> None:
+    """等待重试；取消事件可打断退避等待。"""
+    if cancel_event is not None and cancel_event.wait(delay):
+        raise _Cancelled("标注已取消")
+    if cancel_event is None:
+        time.sleep(delay)
 
 
 def build_request_payload(
@@ -390,6 +402,7 @@ class OpenAICompatibleLabelClient:
         system_prompt: str,
         on_retry: "Callable[[int, Exception], None] | None" = None,
         batch_id: str = "",
+        cancel_event: threading.Event | None = None,
     ) -> BatchResult:
         if not records or len(records) > MAX_BATCH_SIZE:
             raise ValueError(f"单批记录数必须为 1—{MAX_BATCH_SIZE}")
@@ -410,6 +423,8 @@ class OpenAICompatibleLabelClient:
         expected_ids = [str(record["id"]) for record in records]
         last_error: Exception | None = None
         for attempt in range(self.max_retries + 1):
+            if cancel_event is not None and cancel_event.is_set():
+                raise _Cancelled("标注已取消")
             try:
                 request = urllib.request.Request(
                     self.url,
@@ -448,7 +463,7 @@ class OpenAICompatibleLabelClient:
                     delay,
                     exc,
                 )
-                time.sleep(delay)
+                _wait_for_retry(delay, cancel_event)
         raise RuntimeError(f"批量标注失败: {last_error}") from last_error
 
 
@@ -484,6 +499,7 @@ class AnthropicLabelClient:
         system_prompt: str,
         on_retry: "Callable[[int, Exception], None] | None" = None,
         batch_id: str = "",
+        cancel_event: threading.Event | None = None,
     ) -> BatchResult:
         if not records or len(records) > MAX_BATCH_SIZE:
             raise ValueError(f"单批记录数必须为 1—{MAX_BATCH_SIZE}")
@@ -508,6 +524,8 @@ class AnthropicLabelClient:
         expected_ids = [str(record["id"]) for record in records]
         last_error: Exception | None = None
         for attempt in range(self.max_retries + 1):
+            if cancel_event is not None and cancel_event.is_set():
+                raise _Cancelled("标注已取消")
             try:
                 request = urllib.request.Request(
                     self._messages_url(),
@@ -549,7 +567,7 @@ class AnthropicLabelClient:
                     "%s第 %d 次请求失败，%d 秒后重试: %s",
                     prefix, attempt + 1, delay, exc,
                 )
-                time.sleep(delay)
+                _wait_for_retry(delay, cancel_event)
         raise RuntimeError(f"批量标注失败: {last_error}") from last_error
 
 
@@ -597,6 +615,80 @@ def _append_checkpoint(path: Path, labels: Iterable[LLMLabel]) -> None:
         for label in labels:
             handle.write(json.dumps(asdict(label), ensure_ascii=False) + "\n")
         handle.flush()
+
+
+def _validate_column_mapping(
+    *,
+    content_column: str,
+    category_column: str,
+    minor_column: str,
+    status_column: str,
+) -> None:
+    """确保输入列与三个输出角色互不冲突。"""
+    mapping = {
+        "维修内容列": content_column,
+        "大类列": category_column,
+        "小类列": minor_column,
+        "分类方式列": status_column,
+    }
+    by_column: dict[str, list[str]] = {}
+    for role, column in mapping.items():
+        normalized = str(column or "").strip()
+        if not normalized:
+            raise ValueError(f"{role}不能为空")
+        by_column.setdefault(normalized, []).append(role)
+    conflicts = [
+        f"“{column}”同时用于{'、'.join(roles)}"
+        for column, roles in by_column.items()
+        if len(roles) > 1
+    ]
+    if conflicts:
+        raise ValueError("列映射冲突：" + "；".join(conflicts))
+
+
+def _checkpoint_scope_digest(
+    df: pd.DataFrame,
+    *,
+    source: Path,
+    sheet_name: str,
+    content_column: str,
+    model: str,
+    taxonomy: dict[str, list[str]],
+    record_id_column: str | None = None,
+) -> str:
+    """为 checkpoint 生成内容敏感作用域，防止行重排后错配。"""
+    metadata = {
+        "version": 1,
+        "source": str(source.resolve()),
+        "sheet": sheet_name,
+        "content_column": content_column,
+        "model": model,
+        "taxonomy": taxonomy,
+    }
+    digest = hashlib.sha256()
+
+    def _update(payload: dict) -> None:
+        digest.update(
+            json.dumps(
+                payload,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        )
+        digest.update(b"\n")
+
+    _update(metadata)
+    for index in df.index:
+        _update({
+            "id": _record_id(df, index, record_id_column),
+            "content": (
+                ""
+                if pd.isna(df.at[index, content_column])
+                else str(df.at[index, content_column])
+            ),
+        })
+    return digest.hexdigest()
 
 
 def _record_id(
@@ -674,13 +766,19 @@ class BatchProgressBar:
     ) -> None:
         self._total_batches = total_batches
         self._total_records = total_records
-        self._completed = completed_from_checkpoint
+        self._from_checkpoint = completed_from_checkpoint
+        self._processed = completed_from_checkpoint
+        self._succeeded = completed_from_checkpoint
+        self._skipped = 0
+        self._failed = 0
+        self._retried = 0
         self._done_batches = 0
-        self._batch_states = {}
+        self._running_batches: set[int] = set()
         self._lock = threading.Lock()
         self._start = time.monotonic()
         self._progress_fn = progress_fn
         self._show_progress_bar = show_progress_bar
+        self._state = "preparing"
         self._log = logging.getLogger(__name__)
 
     def _format_elapsed(self, seconds: float) -> str:
@@ -690,49 +788,71 @@ class BatchProgressBar:
     def _progress_prefix(self) -> str:
         done = self._done_batches
         total = self._total_batches
-        completed = self._completed
-        pct = done / total if total else 0
+        processed = self._processed
+        pct = processed / self._total_records if self._total_records else 1
         elapsed = time.monotonic() - self._start
-        rate = completed / elapsed if elapsed > 0 else 0
-        remaining = (total - done) / (done / elapsed) if done > 0 else 0
+        newly_processed = max(0, processed - self._from_checkpoint)
+        rate = newly_processed / elapsed if elapsed > 0 else 0
+        remaining_records = max(0, self._total_records - processed)
+        remaining = remaining_records / rate if rate > 0 else 0
         return (
             f"[{pct:>3.0%} {done}/{total}\u6279"
-            f" {completed}/{self._total_records}\u6761"
-            f" {rate:.1f}/s ETA {self._format_elapsed(remaining)}]"
+            f" {processed}/{self._total_records}\u6761"
+            f" {rate:.1f}/s \u5269\u4f59{self._format_elapsed(remaining)}]"
         )
 
     def _emit_progress(self) -> None:
         if not self._progress_fn and not self._show_progress_bar:
             return
-        now = time.monotonic()
-        done = self._done_batches
-        completed = self._completed
-        total = self._total_batches
+        with self._lock:
+            now = time.monotonic()
+            done = self._done_batches
+            processed = self._processed
+            total_batches = self._total_batches
+            total_records = self._total_records
+            succeeded = self._succeeded
+            skipped = self._skipped
+            failed = self._failed
+            retried = self._retried
+            from_checkpoint = self._from_checkpoint
+            state = self._state
+            n_running = len(self._running_batches)
         elapsed = now - self._start
-        pct = done / total if total else 0
-        rate = completed / elapsed if elapsed > 0 else 0
-        remaining = (total - done) / (done / elapsed) if done > 0 else 0
-        n_running = sum(
-            1 for v in self._batch_states.values() if v in ("running", "retrying")
-        )
-        n_retrying = sum(
-            1 for v in self._batch_states.values() if v == "retrying"
-        )
-        n_failed = sum(
-            1 for v in self._batch_states.values() if v == "failed"
-        )
+        newly_processed = max(0, processed - from_checkpoint)
+        rate = newly_processed / elapsed if elapsed > 0 else 0
+        remaining_records = max(0, total_records - processed)
+        remaining = remaining_records / rate if rate > 0 else 0
+        pct = processed / total_records if total_records else 1
         detail = (
-            f"{done}/{total}\u6279\u6b21 | {completed}/{self._total_records}\u6761"
+            f"\u5df2\u5904\u7406 {processed}/{total_records}\u6761"
+            + f" | \u6210\u529f {succeeded}\u6761"
+            + (f" | \u8df3\u8fc7 {skipped}\u6761" if skipped else "")
             + (f" | {n_running}\u5904\u7406\u4e2d" if n_running else "")
-            + (f" | {n_retrying}\u91cd\u8bd5" if n_retrying else "")
-            + (f" | {n_failed}\u5931\u8d25" if n_failed else "")
-            + f" | {rate:.1f}\u6761/s | ETA {self._format_elapsed(remaining)}"
+            + (f" | \u91cd\u8bd5 {retried}\u6b21" if retried else "")
+            + (f" | \u5931\u8d25 {failed}\u6761" if failed else "")
+            + f" | {rate:.1f}\u6761/\u79d2"
+            + (
+                f" | \u9884\u8ba1\u5269\u4f59 {self._format_elapsed(remaining)}"
+                if remaining_records and rate > 0
+                else ""
+            )
         )
         data = {
             "stage": "llm_labeling",
-            "percent": round(pct * 100),
-            "current": completed,
-            "total": self._total_records,
+            "state": state,
+            "percent": round(min(1.0, max(0.0, pct)) * 100),
+            "current": processed,
+            "total": total_records,
+            "succeeded": succeeded,
+            "skipped": skipped,
+            "failed": failed,
+            "retried": retried,
+            "running": n_running,
+            "from_checkpoint": from_checkpoint,
+            "rate": round(rate, 1),
+            "eta_seconds": round(remaining) if rate > 0 else None,
+            "completed_batches": done,
+            "total_batches": total_batches,
             "detail": detail,
         }
         if self._progress_fn:
@@ -747,44 +867,69 @@ class BatchProgressBar:
             sys.stderr.flush()
 
     def start(self) -> None:
-        pass
+        with self._lock:
+            self._state = "running"
+        self._emit_progress()
 
     def record_running(self, batch_num: int) -> None:
         with self._lock:
-            self._batch_states[batch_num] = "running"
+            self._running_batches.add(batch_num)
+            self._state = "running"
         self._emit_progress()
 
     def record_retry(self, batch_num: int, attempt: int, error: Exception) -> None:
         with self._lock:
-            self._batch_states[batch_num] = "retrying"
+            self._running_batches.add(batch_num)
+            self._retried += 1
         self._log.warning(
             "%s\u21bb \u6279\u6b21 #%d \u7b2c%d\u6b21\u91cd\u8bd5 (%s)",
             self._progress_prefix(), batch_num, attempt, error,
         )
         self._emit_progress()
 
-    def record_success(self, batch_num: int, records: int = 0) -> None:
+    def record_success(
+        self,
+        batch_num: int,
+        succeeded: int = 0,
+        skipped: int = 0,
+    ) -> None:
         with self._lock:
             self._done_batches += 1
-            self._completed += records
-            self._batch_states[batch_num] = "success"
+            self._processed += succeeded + skipped
+            self._succeeded += succeeded
+            self._skipped += skipped
+            self._running_batches.discard(batch_num)
         self._log.info(
-            "%s\u2713 \u6279\u6b21 #%d \u5b8c\u6210 (%d\u6761)",
-            self._progress_prefix(), batch_num, records,
+            "%s\u2713 \u6279\u6b21 #%d \u5b8c\u6210 (\u6210\u529f%d\u6761\uff0c\u8df3\u8fc7%d\u6761)",
+            self._progress_prefix(), batch_num, succeeded, skipped,
         )
         self._emit_progress()
 
-    def record_failure(self, batch_num: int, error: Exception) -> None:
+    def record_failure(
+        self,
+        batch_num: int,
+        error: Exception,
+        records: int = 0,
+    ) -> None:
         with self._lock:
             self._done_batches += 1
-            self._batch_states[batch_num] = "failed"
+            self._processed += records
+            self._failed += records
+            self._running_batches.discard(batch_num)
         self._log.error(
             "%s\u2717 \u6279\u6b21 #%d \u5931\u8d25 (%s)",
             self._progress_prefix(), batch_num, error,
         )
         self._emit_progress()
 
-    def stop(self) -> None:
+    def mark_cancelling(self) -> None:
+        with self._lock:
+            self._state = "cancelling"
+        self._emit_progress()
+
+    def stop(self, state: str = "completed") -> None:
+        with self._lock:
+            self._state = state
         self._emit_progress()
 def label_file(
     input_path: str,
@@ -828,9 +973,19 @@ def label_file(
     ]
     if len(record_ids) != len(set(record_ids)):
         raise ValueError(f"记录 ID 列“{record_id_column}”在候选记录中存在重复值")
+    taxonomy = get_allowed_taxonomy()
+    checkpoint_scope = _checkpoint_scope_digest(
+        df,
+        source=source,
+        sheet_name=sheet_name,
+        content_column=content_column,
+        model=str(getattr(client, "model", "")),
+        taxonomy=taxonomy,
+        record_id_column=record_id_column,
+    )
     checkpoint = Path(
         checkpoint_path
-        or f"{output_path}.checkpoint.jsonl"
+        or f"{output_path}.checkpoint.{checkpoint_scope[:12]}.jsonl"
     )
     completed = _load_checkpoint(checkpoint)
     pending_indexes = [
@@ -838,7 +993,6 @@ def label_file(
         for index in indexes
         if _record_id(df, index, record_id_column) not in completed
     ]
-    taxonomy = get_allowed_taxonomy()
     system_prompt = build_system_prompt(taxonomy)
     context_columns = [
         column
@@ -858,10 +1012,11 @@ def label_file(
     all_skipped_ids: list[str] = []
 
     def _process_batch(
-        batch_indexes: list, progress: BatchProgressBar
+        batch_num: int,
+        batch_indexes: list,
+        progress: BatchProgressBar,
     ) -> list[str]:
         nonlocal done_count
-        batch_num = batches.index(batch_indexes) + 1
         progress.record_running(batch_num)
         records = _build_records(
             df,
@@ -882,21 +1037,31 @@ def label_file(
                 batch_id=f"#{batch_num}",
             )
         except Exception:
-            progress.record_failure(batch_num, sys.exc_info()[1])
+            progress.record_failure(
+                batch_num,
+                sys.exc_info()[1],
+                len(batch_indexes),
+            )
             raise
         with lock:
             _append_checkpoint(checkpoint, result.labels)
             completed.update({label.record_id: label for label in result.labels})
             all_skipped_ids.extend(result.skipped_ids)
             done_count += 1
-            progress.record_success(batch_num, len(result.labels))
+            progress.record_success(
+                batch_num,
+                len(result.labels),
+                len(result.skipped_ids),
+            )
         return result.skipped_ids
 
     effective_concurrency = min(concurrency, total_batches) if total_batches else 1
     progress = BatchProgressBar(
         total_batches=total_batches,
-        total_records=len(pending_indexes),
-        completed_from_checkpoint=len(completed),
+        total_records=len(indexes),
+        completed_from_checkpoint=sum(
+            record_id in completed for record_id in record_ids
+        ),
         concurrency=effective_concurrency,
     )
     progress.start()
@@ -906,9 +1071,9 @@ def label_file(
         ) as executor:
             futures = {
                 executor.submit(
-                    _process_batch, batch, progress
+                    _process_batch, batch_num, batch, progress
                 ): batch
-                for batch in batches
+                for batch_num, batch in enumerate(batches, start=1)
             }
             for future in as_completed(futures):
                 try:
@@ -916,7 +1081,7 @@ def label_file(
                 except Exception as exc:
                     failed_errors.append(exc)
     finally:
-        progress.stop()
+        progress.stop("failed" if failed_errors else "completed")
 
     if failed_errors:
         raise RuntimeError(
@@ -968,10 +1133,34 @@ def label_file(
 def preview_excel_columns(input_path: str, sheet_name: str = "维修明细") -> dict:
     """预览 Excel 文件的列名和行数，用于前端列映射。"""
     df = _read_input(Path(input_path), sheet_name)
+    value_options: dict[str, list[dict[str, object]]] = {}
+    for column in df.columns:
+        values = df[column].dropna().astype(str).str.strip()
+        values = values[values.ne("")]
+        counts: dict[str, int] = {}
+        exceeded_limit = False
+        for value in values:
+            if value in counts:
+                counts[value] += 1
+            elif len(counts) < 50:
+                counts[value] = 1
+            else:
+                exceeded_limit = True
+                break
+        if counts and not exceeded_limit:
+            value_options[str(column)] = [
+                {"value": str(value), "count": int(count)}
+                for value, count in sorted(
+                    counts.items(),
+                    key=lambda item: item[1],
+                    reverse=True,
+                )
+            ]
     return {
         "columns": list(df.columns),
         "rows": len(df),
         "sample": df.head(5).fillna("").to_dict(orient="records"),
+        "value_options": value_options,
     }
 
 
@@ -1019,8 +1208,18 @@ def process_maintenance_llm(
     Returns:
         处理结果 dict。
     """
+    if not 1 <= batch_size <= MAX_BATCH_SIZE:
+        raise ValueError(f"batch_size 必须在 1—{MAX_BATCH_SIZE} 之间")
+    if concurrency < 1:
+        raise ValueError("concurrency 必须 >= 1")
+    _validate_column_mapping(
+        content_column=content_column,
+        category_column=category_column,
+        minor_column=minor_column,
+        status_column=status_column,
+    )
+
     source = Path(input_path)
-    suffix = source.suffix.lower()
     if export_mode == "details":
         default_name = f"{source.stem}_LLM标注明细.xlsx"
     else:
@@ -1031,6 +1230,11 @@ def process_maintenance_llm(
     df = _read_input(source, sheet_name)
     if content_column not in df.columns:
         raise ValueError(f"输入文件缺少列: {content_column}")
+    if filter_values and status_column not in df.columns:
+        raise ValueError(
+            f"筛选记录时输入文件必须存在列“{status_column}”；"
+            "请清空筛选条件，或选择实际的分类方式列"
+        )
 
     client = create_llm_client(llm_config)
     taxonomy = get_allowed_taxonomy()
@@ -1050,10 +1254,23 @@ def process_maintenance_llm(
     if not target_indexes:
         raise ValueError("没有符合条件的记录需要标注")
 
+    checkpoint_scope = _checkpoint_scope_digest(
+        df,
+        source=source,
+        sheet_name=sheet_name,
+        content_column=content_column,
+        model=str(llm_config.get("model", "")),
+        taxonomy=taxonomy,
+    )
     checkpoint = Path(
-        checkpoint_path or f"{output_path}.checkpoint.jsonl"
+        checkpoint_path
+        or f"{output_path}.checkpoint.{checkpoint_scope[:12]}.jsonl"
     )
     completed = _load_checkpoint(checkpoint)
+    target_ids = [_record_id(df, index) for index in target_indexes]
+    completed_target_ids = {
+        record_id for record_id in target_ids if record_id in completed
+    }
     pending_indexes = [
         i for i in target_indexes
         if _record_id(df, i) not in completed
@@ -1072,41 +1289,70 @@ def process_maintenance_llm(
 
     progress = BatchProgressBar(
         total_batches=total_batches,
-        total_records=len(pending_indexes),
-        completed_from_checkpoint=len(completed),
+        total_records=len(target_indexes),
+        completed_from_checkpoint=len(completed_target_ids),
         concurrency=min(concurrency, total_batches) if total_batches else 1,
         progress_fn=progress_fn,
         show_progress_bar=show_progress_bar,
     )
 
-    def _process_batch(batch_indexes: list, prog: BatchProgressBar) -> list[str]:
+    def _cancel_requested() -> bool:
         if cancel_event is not None and cancel_event.is_set():
-            raise _Cancelled("标注已取消")
+            return True
         if cancel_file is not None and cancel_file.exists():
             if cancel_event is not None:
                 cancel_event.set()
+            return True
+        return False
+
+    def _process_batch(
+        batch_num: int,
+        batch_indexes: list,
+        prog: BatchProgressBar,
+    ) -> list[str]:
+        if _cancel_requested():
             raise _Cancelled("标注已取消")
         nonlocal done_count
-        batch_num = batches.index(batch_indexes) + 1
         prog.record_running(batch_num)
         records = _build_records(
             df, batch_indexes, content_column, context_columns, max_content_chars,
         )
+
+        def _on_retry(attempt: int, error: Exception) -> None:
+            if _cancel_requested():
+                prog.mark_cancelling()
+                raise _Cancelled("标注已取消")
+            prog.record_retry(batch_num, attempt, error)
+
         try:
             result = client.label_batch(
                 records, taxonomy=taxonomy, system_prompt=system_prompt,
-                on_retry=lambda attempt, err, bn=batch_num: prog.record_retry(bn, attempt, err),
+                on_retry=_on_retry,
                 batch_id=f"#{batch_num}",
+                cancel_event=cancel_event,
             )
-        except Exception:
-            prog.record_failure(batch_num, sys.exc_info()[1])
+        except _Cancelled:
+            prog.mark_cancelling()
             raise
+        except Exception:
+            prog.record_failure(
+                batch_num,
+                sys.exc_info()[1],
+                len(batch_indexes),
+            )
+            raise
+        if _cancel_requested():
+            prog.mark_cancelling()
         with lock:
             _append_checkpoint(checkpoint, result.labels)
             completed.update({l.record_id: l for l in result.labels})
             all_skipped_ids.extend(result.skipped_ids)
             done_count += 1
-            prog.record_success(batch_num, len(result.labels))
+            prog.record_success(
+                batch_num,
+                len(result.labels),
+                len(result.skipped_ids),
+            )
         return result.skipped_ids
 
     eff_concurrency = min(concurrency, total_batches) if total_batches else 1
@@ -1115,26 +1361,46 @@ def process_maintenance_llm(
     try:
         with ThreadPoolExecutor(max_workers=eff_concurrency) as executor:
             futures = {
-                executor.submit(_process_batch, batch, progress): batch
-                for batch in batches
+                executor.submit(_process_batch, batch_num, batch, progress): batch
+                for batch_num, batch in enumerate(batches, start=1)
             }
             for future in as_completed(futures):
                 try:
                     future.result()
+                    if cancel_event is not None and cancel_event.is_set():
+                        cancelled = True
+                        progress.mark_cancelling()
+                        for pending in futures:
+                            pending.cancel()
+                        break
                 except _Cancelled:
                     cancelled = True
-                    for f in futures:
-                        f.cancel()
+                    progress.mark_cancelling()
+                    for pending in futures:
+                        pending.cancel()
                     break
                 except Exception as exc:
                     failed_errors.append(exc)
     finally:
-        progress.stop()
         if cancel_file is not None:
             cancel_file.unlink(missing_ok=True)
 
+    if cancel_event is not None and cancel_event.is_set():
+        cancelled = True
+    progress.stop(
+        "cancelled"
+        if cancelled
+        else "failed"
+        if failed_errors
+        else "completed"
+    )
+
     if cancelled:
-        logger.warning("标注已取消，已完成 %d 条", len(completed))
+        logger.warning(
+            "标注已取消，已完成 %d/%d 条",
+            sum(record_id in completed for record_id in target_ids),
+            len(target_ids),
+        )
     elif failed_errors:
         raise RuntimeError(
             f"{len(failed_errors)}/{total_batches} 个批次失败，"
@@ -1147,8 +1413,7 @@ def process_maintenance_llm(
             continue
         df.at[index, category_column] = label.major
         df.at[index, minor_column] = label.minor
-        if status_column in df.columns:
-            df.at[index, status_column] = "LLM标注"
+        df.at[index, status_column] = "LLM标注"
         for col_name in ("LLM大类", "LLM小类", "LLM理由", "LLM标注状态"):
             if col_name not in df.columns:
                 df[col_name] = ""
@@ -1216,11 +1481,18 @@ def process_maintenance_llm(
         from func.writer import write_excel
         write_excel(str(target), sheets)
 
+    completed_in_target = sum(
+        record_id in completed for record_id in target_ids
+    )
+    remaining_rows = len(target_ids) - completed_in_target
     return {
         "input_rows": len(df),
         "target_rows": len(target_indexes),
-        "llm_completed": len(completed),
+        "llm_completed": completed_in_target,
         "skipped_rows": len(all_skipped_ids),
+        "remaining_rows": remaining_rows,
+        "from_checkpoint": len(completed_target_ids),
+        "cancelled": cancelled,
         "output": str(target),
         "checkpoint": str(checkpoint),
         "export_mode": export_mode,

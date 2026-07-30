@@ -9,6 +9,7 @@ from func.label_maintenance_with_llm import (
     LLMLabel,
     BatchResult,
     MAX_BATCH_SIZE,
+    AnthropicLabelClient,
     OpenAICompatibleLabelClient,
     build_system_prompt,
     extract_response_content,
@@ -120,6 +121,53 @@ def test_client_rejects_more_than_50_without_request():
             taxonomy=get_allowed_taxonomy(),
             system_prompt="test",
         )
+
+
+@pytest.mark.parametrize(
+    "client_factory",
+    [
+        lambda: OpenAICompatibleLabelClient(
+            url="https://example.invalid/v1",
+            api_key="secret",
+            model="test-model",
+            max_retries=3,
+        ),
+        lambda: AnthropicLabelClient(
+            url="https://example.invalid",
+            api_key="secret",
+            model="test-model",
+            max_retries=3,
+        ),
+    ],
+)
+def test_client_cancel_during_retry_stops_before_next_request(
+    client_factory,
+    monkeypatch,
+):
+    import threading
+    import urllib.error
+    from func.label_maintenance_with_llm import _Cancelled
+
+    attempts = 0
+    cancel = threading.Event()
+
+    def _fail(*_args, **_kwargs):
+        nonlocal attempts
+        attempts += 1
+        raise urllib.error.URLError("temporary")
+
+    monkeypatch.setattr("urllib.request.urlopen", _fail)
+
+    with pytest.raises(_Cancelled, match="已取消"):
+        client_factory().label_batch(
+            [{"id": "row-1", "content": "test"}],
+            taxonomy=get_allowed_taxonomy(),
+            system_prompt="test",
+            cancel_event=cancel,
+            on_retry=lambda *_args: cancel.set(),
+        )
+
+    assert attempts == 1
 
 
 def test_label_file_batches_50_and_resumes(tmp_path):
@@ -681,3 +729,267 @@ def test_cancel_event_parameter_exists():
 
     sig = inspect.signature(process_maintenance_llm)
     assert "cancel_event" in sig.parameters
+
+
+def test_process_maintenance_llm_rejects_conflicting_column_mapping(tmp_path):
+    """输出角色不能映射到维修内容列，避免覆盖原始记录。"""
+    from func.label_maintenance_with_llm import process_maintenance_llm
+
+    source = _make_llm_excel(tmp_path, rows=3)
+
+    with pytest.raises(ValueError, match="列映射冲突"):
+        process_maintenance_llm(
+            source,
+            llm_config={
+                "url": "http://fake",
+                "api_key": "k",
+                "model": "m",
+                "format": "openai",
+            },
+            content_column="维修内容",
+            category_column="维修内容",
+        )
+
+
+def test_process_maintenance_llm_checkpoint_scope_changes_with_source_content(tmp_path):
+    """源内容变化后不能复用按旧行号保存的 checkpoint。"""
+    from unittest.mock import patch
+    from func.label_maintenance_with_llm import BatchResult, LLMLabel, process_maintenance_llm
+
+    source = _make_llm_excel(tmp_path, rows=2)
+
+    class _RecordingClient:
+        def __init__(self):
+            self.calls = 0
+
+        def label_batch(self, records, **kwargs):
+            self.calls += 1
+            return BatchResult(
+                labels=[
+                    LLMLabel(
+                        record_id=r["id"],
+                        major="发动机系统",
+                        minor="性能/工况异常",
+                        confidence=0.9,
+                        reason="t",
+                    )
+                    for r in records
+                ],
+                skipped_ids=[],
+            )
+
+    first_client = _RecordingClient()
+    with patch(
+        "func.label_maintenance_with_llm.create_llm_client",
+        return_value=first_client,
+    ):
+        first = process_maintenance_llm(
+            source,
+            llm_config={
+                "url": "http://fake",
+                "api_key": "k",
+                "model": "m",
+                "format": "openai",
+            },
+        )
+    assert first_client.calls == 1
+
+    changed = pd.read_excel(source)
+    changed.loc[0, "维修内容"] = "完全不同的维修内容"
+    changed.to_excel(source, index=False, sheet_name="维修明细")
+
+    second_client = _RecordingClient()
+    with patch(
+        "func.label_maintenance_with_llm.create_llm_client",
+        return_value=second_client,
+    ):
+        second = process_maintenance_llm(
+            source,
+            llm_config={
+                "url": "http://fake",
+                "api_key": "k",
+                "model": "m",
+                "format": "openai",
+            },
+        )
+
+    assert second_client.calls == 1
+    assert first["checkpoint"] != second["checkpoint"]
+
+
+def test_process_maintenance_llm_progress_has_consistent_record_breakdown(tmp_path):
+    """进度百分比和当前值使用同一目标记录口径。"""
+    from unittest.mock import patch
+    from func.label_maintenance_with_llm import BatchResult, LLMLabel, process_maintenance_llm
+
+    source = _make_llm_excel(tmp_path, rows=3)
+    events = []
+
+    class _PartiallySkippingClient:
+        def label_batch(self, records, **kwargs):
+            return BatchResult(
+                labels=[
+                    LLMLabel(
+                        record_id=records[0]["id"],
+                        major="发动机系统",
+                        minor="性能/工况异常",
+                        confidence=0.9,
+                        reason="t",
+                    ),
+                    LLMLabel(
+                        record_id=records[1]["id"],
+                        major="发动机系统",
+                        minor="性能/工况异常",
+                        confidence=0.9,
+                        reason="t",
+                    ),
+                ],
+                skipped_ids=[records[2]["id"]],
+            )
+
+    with patch(
+        "func.label_maintenance_with_llm.create_llm_client",
+        return_value=_PartiallySkippingClient(),
+    ):
+        result = process_maintenance_llm(
+            source,
+            llm_config={
+                "url": "http://fake",
+                "api_key": "k",
+                "model": "m",
+                "format": "openai",
+            },
+            progress_fn=lambda _text, data: events.append(data),
+        )
+
+    final = events[-1]
+    assert final["state"] == "completed"
+    assert final["percent"] == 100
+    assert final["current"] == final["total"] == 3
+    assert final["succeeded"] == 2
+    assert final["skipped"] == 1
+    assert final["failed"] == 0
+    assert result["llm_completed"] == 2
+    assert result["remaining_rows"] == 1
+
+
+def test_process_maintenance_llm_creates_missing_output_columns(tmp_path):
+    """仅有内容列时也应新建全部输出列，而不是静默遗漏分类方式。"""
+    from unittest.mock import patch
+    from func.label_maintenance_with_llm import BatchResult, LLMLabel, process_maintenance_llm
+
+    source = tmp_path / "content-only.xlsx"
+    output = tmp_path / "labeled.xlsx"
+    pd.DataFrame({"维修内容": ["更换发动机滤芯"]}).to_excel(
+        source,
+        index=False,
+        sheet_name="维修明细",
+    )
+
+    class _Client:
+        def label_batch(self, records, **kwargs):
+            return BatchResult(
+                labels=[
+                    LLMLabel(
+                        record_id=records[0]["id"],
+                        major="发动机系统",
+                        minor="滤清/进排气",
+                        confidence=0.9,
+                        reason="t",
+                    )
+                ],
+                skipped_ids=[],
+            )
+
+    with patch(
+        "func.label_maintenance_with_llm.create_llm_client",
+        return_value=_Client(),
+    ):
+        process_maintenance_llm(
+            str(source),
+            output_path=str(output),
+            export_mode="details",
+            llm_config={
+                "url": "http://fake",
+                "api_key": "k",
+                "model": "m",
+                "format": "openai",
+            },
+        )
+
+    labeled = pd.read_excel(output)
+    assert labeled.loc[0, "大类"] == "发动机系统"
+    assert labeled.loc[0, "小类"] == "滤清/进排气"
+    assert labeled.loc[0, "分类方式"] == "LLM标注"
+
+
+def test_preview_omits_high_cardinality_value_options(tmp_path):
+    from func.label_maintenance_with_llm import preview_excel_columns
+
+    source = tmp_path / "preview.xlsx"
+    pd.DataFrame({
+        "维修内容": [f"record-{index}" for index in range(100)],
+        "分类方式": ["待确认"] * 70 + ["规则"] * 30,
+    }).to_excel(source, index=False, sheet_name="维修明细")
+
+    preview = preview_excel_columns(str(source))
+
+    assert "维修内容" not in preview["value_options"]
+    assert preview["value_options"]["分类方式"] == [
+        {"value": "待确认", "count": 70},
+        {"value": "规则", "count": 30},
+    ]
+
+
+def test_label_file_default_checkpoint_changes_with_source(tmp_path):
+    """CLI 默认断点也必须绑定源内容；显式 checkpoint 仍由调用方管理。"""
+
+    class _Client:
+        model = "test-model"
+
+        def __init__(self):
+            self.calls = 0
+
+        def label_batch(self, records, **kwargs):
+            self.calls += 1
+            return BatchResult(
+                labels=[
+                    LLMLabel(
+                        record_id=record["id"],
+                        major="发动机系统",
+                        minor="性能/工况异常",
+                        confidence=0.9,
+                        reason="t",
+                    )
+                    for record in records
+                ],
+                skipped_ids=[],
+            )
+
+    source = tmp_path / "cli.xlsx"
+    output = tmp_path / "cli-output.xlsx"
+    pd.DataFrame({
+        "维修内容": ["发动机报警"],
+        "大类": ["其他/待确认"],
+    }).to_excel(source, index=False, sheet_name="维修明细")
+
+    first_client = _Client()
+    first = label_file(
+        str(source),
+        output_path=str(output),
+        client=first_client,
+    )
+
+    changed = pd.read_excel(source)
+    changed.loc[0, "维修内容"] = "液压报警"
+    changed.to_excel(source, index=False, sheet_name="维修明细")
+
+    second_client = _Client()
+    second = label_file(
+        str(source),
+        output_path=str(output),
+        client=second_client,
+    )
+
+    assert first_client.calls == second_client.calls == 1
+    assert first["checkpoint"] != second["checkpoint"]
