@@ -3,6 +3,10 @@
  *
  * 从各页面文件中提取的通用交互组件，统一维护。
  */
+import * as React from "react";
+import { open } from "@tauri-apps/plugin-dialog";
+import { FolderIcon, FileIcon, AlertTriangleIcon, ChevronDownIcon } from "./icons";
+import { inputClass, btnSecondaryClass, btnDangerClass } from "./ui-classes";
 
 // ═══════════════════════════════════════
 // ToggleSwitch — 通用开关控件
@@ -86,6 +90,163 @@ export function ChipToggle({
           {o.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════
+// PathInput — 文件/文件夹选择输入
+// ═══════════════════════════════════════
+
+export function PathInput({
+  value,
+  onChange,
+  placeholder,
+  directory = false,
+  defaultPath,
+  onFileSelected,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  directory?: boolean;
+  defaultPath?: string;
+  onFileSelected?: (path: string) => void;
+}) {
+  const browse = async () => {
+    const selected = await open({
+      directory,
+      multiple: false,
+      defaultPath,
+      filters: directory
+        ? undefined
+        : [{ name: "Excel", extensions: ["xlsx", "xls"] }],
+    });
+    if (selected) {
+      const p = selected as string;
+      onChange(p);
+      onFileSelected?.(p);
+    }
+  };
+
+  return (
+    <div className="flex gap-2">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={`${inputClass} flex-1 ${value === "" ? "border-amber-300 bg-amber-50/30" : ""}`}
+      />
+      <button onClick={browse} className={btnSecondaryClass} title={directory ? "选择文件夹" : "选择文件"}>
+        {directory ? <FolderIcon /> : <FileIcon />}
+      </button>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════
+// ConfirmDialog — 确认弹窗
+// ═══════════════════════════════════════
+
+export function ConfirmDialog({
+  title,
+  message,
+  details,
+  confirmLabel,
+  cancelLabel,
+  onConfirm,
+  onCancel,
+}: {
+  title: string;
+  message: string;
+  details?: string[];
+  confirmLabel?: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4 overflow-hidden">
+        <div className="px-6 pt-6 pb-2">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="shrink-0 w-9 h-9 rounded-md bg-amber-50 flex items-center justify-center">
+              <AlertTriangleIcon />
+            </div>
+            <h3 className="text-base font-semibold text-slate-800">{title}</h3>
+          </div>
+          <p className="text-sm text-slate-600 leading-relaxed">{message}</p>
+          {details && details.length > 0 && (
+            <ul className="mt-3 space-y-1">
+              {details.map((d, i) => (
+                <li key={i} className="flex items-center gap-2 text-xs text-slate-500">
+                  <span className="w-1 h-1 rounded-full bg-slate-400 shrink-0" />
+                  {d}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 px-6 py-4 bg-slate-50 border-t border-slate-100">
+          <button onClick={onCancel} className={btnSecondaryClass}>
+            {cancelLabel ?? "取消"}
+          </button>
+          <button onClick={onConfirm} className={btnDangerClass}>
+            {confirmLabel ?? "确定"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════
+// Collapsible — 可折叠区域
+// ═══════════════════════════════════════
+
+export function Collapsible({
+  title,
+  icon,
+  summary,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  icon?: React.ReactNode;
+  summary?: React.ReactNode;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = React.useState(defaultOpen);
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+      >
+        {icon && <span className="text-slate-400">{icon}</span>}
+        <span className="flex-1 text-left">{title}</span>
+        {!open && summary}
+        <ChevronDownIcon />
+      </button>
+      {open && <div className="px-4 pb-4 pt-1">{children}</div>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════
+// SectionDivider — 区域分隔线
+// ═══════════════════════════════════════
+
+export function SectionDivider({ label }: { label?: string }) {
+  return (
+    <div className="flex items-center gap-3 my-4">
+      <div className="flex-1 h-px bg-slate-200" />
+      {label && <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">{label}</span>}
+      <div className="flex-1 h-px bg-slate-200" />
     </div>
   );
 }

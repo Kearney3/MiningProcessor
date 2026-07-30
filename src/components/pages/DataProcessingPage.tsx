@@ -3,7 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import type { BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
 import { ChevronDownIcon, PlayIcon, FolderIcon, FileIcon, PlusIcon, TrashIcon, CheckCircleIcon, XCircleIcon, AlertTriangleIcon, FuelIcon, ProductionIcon, ElectricalIcon, WorktimeIcon, MergeIcon, MaintenanceIcon } from "../../lib/icons";
-import { StyledToggle, ChipToggle } from "../../lib/ui-components";
+import { PathInput, StyledToggle, ChipToggle } from "../../lib/ui-components";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { useLastDirectory } from "../../hooks/useLastDirectory";
 import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG } from "../AnomalyPanel";
@@ -28,54 +28,6 @@ function ModuleCard({
         <h3 className="text-sm font-medium text-slate-700">{title}</h3>
       </div>
       {children}
-    </div>
-  );
-}
-
-/** File / folder selection input */
-function PathInput({
-  value,
-  onChange,
-  placeholder,
-  directory = false,
-  defaultPath,
-  onFileSelected,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  directory?: boolean;
-  defaultPath?: string;
-  onFileSelected?: (path: string) => void;
-}) {
-  const browse = async () => {
-    const selected = await open({
-      directory,
-      multiple: false,
-      defaultPath,
-      filters: directory
-        ? undefined
-        : [{ name: "Excel", extensions: ["xlsx", "xls"] }],
-    });
-    if (selected) {
-      const p = selected as string;
-      onChange(p);
-      onFileSelected?.(p);
-    }
-  };
-
-  return (
-    <div className="flex gap-2">
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className={`${inputClass} flex-1 ${value === "" ? "border-amber-300 bg-amber-50/30" : ""}`}
-      />
-      <button onClick={browse} className={btnSecondaryClass} title={directory ? "选择文件夹" : "选择文件"}>
-        {directory ? <FolderIcon /> : <FileIcon />}
-      </button>
     </div>
   );
 }
