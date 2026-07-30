@@ -1221,6 +1221,13 @@ def _ping(params: dict) -> dict:
     return {"pong": True, "pid": __import__("os").getpid(), "version": "1.2.0"}
 
 
+@_register("get_sync_data_types")
+def _get_sync_data_types(params: dict) -> dict:
+    """返回 MineBase 同步支持的数据类型列表。"""
+    from func.data_types import SYNC_DATA_TYPES
+    return {"types": [{"id": t[0], "label": t[1]} for t in SYNC_DATA_TYPES]}
+
+
 @_register("write_text_file")
 def _write_text_file(params: dict) -> dict:
     """将文本内容写入指定路径（用于日志导出等）。"""
@@ -1240,8 +1247,8 @@ def _test_minebase_connection(params: dict) -> dict:
     """
     from func.config_loader import get_minebase_api_config, get_minebase_db_config
     from func.sync_to_minebase import test_api_connection, test_db_connection
+    from func.secret_store import KEYRING_SENTINEL
 
-    KEYRING_SENTINEL = "__keyring__"
     mode = params.get("mode", "api")
     password = params.get("password", "")
 

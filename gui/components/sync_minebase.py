@@ -22,14 +22,8 @@ except ImportError:
     import gui.theme as theme
 
 
-# 数据类型定义
-DATA_TYPES = [
-    ("fuel", "油耗数据"),
-    ("electrical", "电耗数据"),
-    ("operation", "设备运行"),
-    ("production", "生产数据"),
-    ("work_efficiency", "工作效率"),
-]
+# 数据类型定义（委托给共享常量模块）
+from func.data_types import SYNC_DATA_TYPES as DATA_TYPES
 
 # 年份范围：当前年 ± 30
 _CURRENT_YEAR = date.today().year
