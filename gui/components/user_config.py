@@ -700,7 +700,7 @@ def _create_minebase_section(page: ft.Page, log):
     mb_db_user = ft.TextField(label="用户名", expand=True, color=theme.TEXT_PRIMARY)
     mb_db_pass = ft.TextField(label="密码", password=True, can_reveal_password=True, expand=True)
 
-    _MASKED = "********"
+    from func.secret_store import MINEBASE_PASSWORD_MASK as _MASKED, LLM_KEY_MASK as _LLM_KEY_MASKED
     _api_pass_saved = False  # 是否已有保存的 API 密码
     _db_pass_saved = False   # 是否已有保存的 DB 密码
     _api_pass_raw = ""       # 原始加密密码值
@@ -1570,7 +1570,7 @@ def _create_llm_config_section(page: ft.Page, log):
     llm_status = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
     llm_test_result = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
     llm_verify_result = ft.Text("", size=12)
-    _LLM_KEY_MASKED = "••••••••••"
+    from func.secret_store import LLM_KEY_MASK as _LLM_KEY_MASKED
     _llm_key_saved = False
 
     def _on_api_key_change(_e):

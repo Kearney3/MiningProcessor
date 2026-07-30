@@ -1235,6 +1235,7 @@ async def on_test_db_connection(page: ft.Page, config_refs: dict, log):
     方便用户无需重新输入密码即可测试连接。加载的密码不会回填到界面。
     """
     from func.config_loader import get_minebase_db_config
+    from func.secret_store import MINEBASE_PASSWORD_MASK as _MASKED
 
     btn = config_refs["mb_test_btn"]
     result = config_refs["mb_test_result"]
@@ -1246,7 +1247,6 @@ async def on_test_db_connection(page: ft.Page, config_refs: dict, log):
     password = config_refs["mb_db_pass"].value or ""
 
     # 如果密码字段是掩码且有已保存的密码，从配置中加载真实密码
-    _MASKED = "********"
     if password == _MASKED:
         saved_cfg = get_minebase_db_config()
         password = saved_cfg.get("password", "")
@@ -1299,6 +1299,7 @@ async def on_test_api_connection(page: ft.Page, config_refs: dict, log):
     方便用户无需重新输入密码即可测试连接。加载的密码不会回填到界面。
     """
     from func.config_loader import get_minebase_api_config
+    from func.secret_store import MINEBASE_PASSWORD_MASK as _MASKED
 
     btn = config_refs["mb_api_test_btn"]
     result = config_refs["mb_api_test_result"]
@@ -1308,7 +1309,6 @@ async def on_test_api_connection(page: ft.Page, config_refs: dict, log):
     password = config_refs["mb_api_pass"].value or ""
 
     # 如果密码字段是掩码且有已保存的密码，从配置中加载真实密码
-    _MASKED = "********"
     if password == _MASKED:
         saved_cfg = get_minebase_api_config()
         password = saved_cfg.get("password", "")
