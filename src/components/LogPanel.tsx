@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback, useMemo } from "react";
+import { memo, useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import type { LogEntry } from "../lib/types";
@@ -21,6 +21,12 @@ const LEVEL_DOT: Record<string, string> = {
 const DEFAULT_DOT = "bg-slate-400";
 const MAX_RENDERED_LOGS = 1000;
 const SCROLL_BOTTOM_THRESHOLD = 48;
+const MIN_HEIGHT = 80;
+const MAX_HEIGHT = 500;
+
+function defaultPanelHeight() {
+  return Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, Math.round(window.innerHeight / 3)));
+}
 
 /** 数字越大级别越高，用于"选中级别及以上"筛选 */
 const LEVEL_ORDER: Record<string, number> = {
@@ -32,10 +38,37 @@ const LEVEL_ORDER: Record<string, number> = {
   STDERR: 40,
 };
 
+function formatTimestamp(value: string) {
+  if (!value) return "--:--:--";
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime()) && value.includes("T")) {
+    return parsed.toLocaleTimeString("zh-CN", { hour12: false });
+  }
+  return value;
+}
+
+const LogRow = memo(function LogRow({ entry }: { entry: LogEntry }) {
+  const dotColor = LEVEL_DOT[entry.level] || DEFAULT_DOT;
+  return (
+    <div className="py-0.5 flex items-baseline gap-3 hover:bg-slate-50 rounded px-1 -mx-1">
+      <span className="w-[68px] shrink-0 tabular-nums text-[11px] text-slate-400">
+        {formatTimestamp(entry.timestamp)}
+      </span>
+      <span
+        className={`inline-block shrink-0 w-[3px] h-[3px] rounded-full mt-[5px] ${dotColor}`}
+      />
+      <span className="w-12 shrink-0 text-[11px] font-medium text-slate-500">
+        {entry.level === "WARNING" ? "WARN" : entry.level}
+      </span>
+      <span className="break-all min-w-0">{entry.message}</span>
+    </div>
+  );
+});
 
 export function LogPanel({ logs, onClear }: LogPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState(280);
+  const [height, setHeight] = useState(defaultPanelHeight);
+  const [collapsed, setCollapsed] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [followTail, setFollowTail] = useState(true);
   const [filterLevel, setFilterLevel] = useState<string>("INFO");
@@ -84,7 +117,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
       e.preventDefault();
       window.getSelection()?.removeAllRanges();
       const newHeight = window.innerHeight - e.clientY;
-      setHeight(Math.max(80, Math.min(500, newHeight)));
+      setHeight(Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, newHeight)));
     };
 
     const onUp = () => setIsResizing(false);
@@ -163,15 +196,15 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
       className={`bg-white border-t border-slate-200 shrink-0 flex flex-col ${
         isResizing ? "transition-none select-none" : "transition-[height] duration-150 ease-out"
       }`}
-      style={{ height }}
+      style={{ height: collapsed ? 42 : height }}
     >
       {/* Drag handle */}
-      <div
+      {!collapsed && <div
         role="separator"
         aria-label="调整日志面板高度"
         aria-orientation="horizontal"
-        aria-valuemin={80}
-        aria-valuemax={500}
+        aria-valuemin={MIN_HEIGHT}
+        aria-valuemax={MAX_HEIGHT}
         aria-valuenow={height}
         tabIndex={0}
         className="h-3 cursor-row-resize flex items-center justify-center hover:bg-slate-100 focus:bg-blue-50 group select-none"
@@ -184,7 +217,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
           if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
           event.preventDefault();
           const delta = event.key === "ArrowUp" ? 20 : -20;
-          setHeight((current) => Math.max(80, Math.min(500, current + delta)));
+          setHeight((current) => Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, current + delta)));
         }}
       >
         <div className="flex items-center gap-1">
@@ -192,7 +225,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
           <span className="w-[3px] h-[3px] rounded-full bg-slate-300 group-hover:bg-slate-400 transition-colors" />
           <span className="w-[3px] h-[3px] rounded-full bg-slate-300 group-hover:bg-slate-400 transition-colors" />
         </div>
-      </div>
+      </div>}
 
       {/* Toolbar */}
       <div className="flex items-center px-3 py-1.5 border-b border-slate-100 shrink-0">
@@ -262,11 +295,29 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
           >
             <TrashIcon />
           </button>
+          <button
+            onClick={() => setCollapsed((value) => !value)}
+            title={collapsed ? "展开日志" : "折叠日志"}
+            aria-label={collapsed ? "展开日志" : "折叠日志"}
+            aria-expanded={!collapsed}
+            className="p-1.5 rounded text-slate-500 hover:text-slate-700 cursor-pointer transition-colors"
+          >
+            <svg
+              viewBox="0 0 20 20"
+              aria-hidden="true"
+              className={`w-4 h-4 transition-transform ${collapsed ? "rotate-180" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            >
+              <path d="m5 12 5-5 5 5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
         </div>
       </div>
 
       {/* Log entries */}
-      <div
+      {!collapsed && <div
         ref={scrollRef}
         role="region"
         aria-label="处理日志"
@@ -280,27 +331,9 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
         {filteredLogs.length === 0 ? (
           <div className="text-slate-500 text-center py-6 text-xs">等待日志...</div>
         ) : (
-          renderedLogs.map((entry) => {
-            const dotColor = LEVEL_DOT[entry.level] || DEFAULT_DOT;
-            return (
-              <div
-                key={entry.seq}
-                className="py-0.5 flex items-baseline gap-3 hover:bg-slate-50 rounded px-1 -mx-1"
-              >
-                <span
-                  className={`inline-block shrink-0 w-[3px] h-[3px] rounded-full mt-[5px] ${dotColor}`}
-                />
-                <span className="w-12 shrink-0 text-[11px] font-medium text-slate-500">
-                  {entry.level === "WARNING" ? "WARN" : entry.level}
-                </span>
-                <span className="break-all min-w-0">
-                  {entry.message}
-                </span>
-              </div>
-            );
-          })
+          renderedLogs.map((entry) => <LogRow key={entry.seq} entry={entry} />)
         )}
-      </div>
+      </div>}
     </div>
   );
 }

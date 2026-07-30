@@ -2,6 +2,7 @@
 import flet as ft
 
 from .types import LogViewRefs
+from .common import safe_update
 
 try:
     from . import theme
@@ -9,7 +10,10 @@ except ImportError:
     import gui.theme as theme
 
 
-def create_log_view(height: int = 400) -> tuple[ft.Container, "LogViewRefs"]:
+DEFAULT_LOG_HEIGHT = 350
+
+
+def create_log_view(height: int = DEFAULT_LOG_HEIGHT) -> tuple[ft.Container, LogViewRefs]:
     """创建适合实时追加的日志视图组件
 
     使用 ListView（逐行 Text 控件）：
@@ -57,6 +61,7 @@ def create_log_view(height: int = 400) -> tuple[ft.Container, "LogViewRefs"]:
         color=theme.WARNING,
         visible=False,
     )
+    count_text = ft.Text("0 条", size=12, color=theme.TEXT_SECONDARY)
     resize_handle = ft.GestureDetector(
         content=ft.Container(
             height=12,
@@ -80,8 +85,22 @@ def create_log_view(height: int = 400) -> tuple[ft.Container, "LogViewRefs"]:
         ),
         mouse_cursor=ft.MouseCursor.RESIZE_UP_DOWN,
     )
+    collapse_button = ft.IconButton(
+        icon=ft.Icons.KEYBOARD_ARROW_DOWN,
+        tooltip="折叠日志",
+        icon_size=18,
+    )
     toolbar = ft.Row(
-        [level_filter, export_button, clear_button, scroll_bottom_button, follow_status],
+        [
+            level_filter,
+            export_button,
+            clear_button,
+            scroll_bottom_button,
+            follow_status,
+            count_text,
+            ft.Container(expand=True),
+            collapse_button,
+        ],
         spacing=4,
         wrap=False,
         alignment=ft.MainAxisAlignment.START,
@@ -92,6 +111,7 @@ def create_log_view(height: int = 400) -> tuple[ft.Container, "LogViewRefs"]:
         height=height,
         padding=ft.Padding.only(left=10, right=10, top=8, bottom=10),
         bgcolor=theme.SURFACE,
+        data={"collapsed": False},
     )
     root = ft.Container(
         content=ft.Column(
@@ -99,6 +119,29 @@ def create_log_view(height: int = 400) -> tuple[ft.Container, "LogViewRefs"]:
             spacing=0,
         ),
     )
+
+    expanded_height = [height]
+
+    def _toggle_collapsed(_e=None):
+        collapsed = log_list.visible is False
+        if collapsed:
+            log_list.visible = True
+            resize_handle.visible = True
+            list_container.height = expanded_height[0]
+            collapse_button.icon = ft.Icons.KEYBOARD_ARROW_DOWN
+            collapse_button.tooltip = "折叠日志"
+            list_container.data["collapsed"] = False
+        else:
+            expanded_height[0] = int(list_container.height or height)
+            log_list.visible = False
+            resize_handle.visible = False
+            list_container.height = 52
+            collapse_button.icon = ft.Icons.KEYBOARD_ARROW_UP
+            collapse_button.tooltip = "展开日志"
+            list_container.data["collapsed"] = True
+        safe_update(root)
+
+    collapse_button.on_click = _toggle_collapsed
     refs = {
         "toolbar": toolbar,
         "follow_status": follow_status,
@@ -109,5 +152,7 @@ def create_log_view(height: int = 400) -> tuple[ft.Container, "LogViewRefs"]:
         "resize_handle": resize_handle,
         "list_container": list_container,
         "log_list": log_list,
+        "count_text": count_text,
+        "collapse_button": collapse_button,
     }
     return root, refs

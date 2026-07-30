@@ -25,6 +25,7 @@ MAX_LOG_RECORDS = 5000
 MAX_RENDERED_RECORDS = 1000
 MIN_LOG_HEIGHT = 140
 MAX_LOG_HEIGHT = 520
+DEFAULT_LOG_HEIGHT_RATIO = 1 / 3
 FLUSH_INTERVAL = 0.08
 SCROLL_BOTTOM_THRESHOLD = 48
 
@@ -59,6 +60,7 @@ class LogSystem:
         self._clear_button = log_refs["clear_button"]
         self._scroll_bottom_button = log_refs["scroll_bottom_button"]
         self._follow_status = log_refs["follow_status"]
+        self._count_text = log_refs.get("count_text")
 
         self._broker = get_log_broker()
         self._subscription: LogSubscription | None = None
@@ -68,8 +70,13 @@ class LogSystem:
         self._applied_clear_sequence = 0
         self._full_render_requested = False
         self._follow_tail = True
+        self._visible_count = 0
 
-        self._log_view_height = int(self._log_height_container.height or 400)
+        self._log_view_height = self._recommended_log_height(
+            int(self._log_height_container.height or 400)
+        )
+        self._log_height_container.height = self._log_view_height
+        self._log_height_user_set = False
         self._shutdown_event = threading.Event()
         self._schedule_lock = threading.Lock()
         self._flush_scheduled = False
@@ -195,11 +202,19 @@ class LogSystem:
                     visible = [entry for entry in self._log_records if self._passes_filter(entry)]
                     visible = visible[-MAX_RENDERED_RECORDS:]
                     self._log_list.controls = [self._make_text(entry) for entry in visible]
+                    self._visible_count = sum(
+                        1 for entry in self._log_records
+                        if self._passes_filter(entry)
+                    )
                 elif visible_new:
                     controls = [*self._log_list.controls, *(self._make_text(entry) for entry in visible_new)]
                     self._log_list.controls = controls[-MAX_RENDERED_RECORDS:]
+                    self._visible_count += len(visible_new)
 
                 if changed:
+                    if self._count_text is not None:
+                        self._count_text.value = f"{self._visible_count} 条"
+                        self._count_text.update()
                     self._log_list.update()
                     if self._follow_tail:
                         scroll_result = self._log_list.scroll_to(offset=-1)
@@ -239,7 +254,21 @@ class LogSystem:
                 self._request_flush()
 
     def _make_text(self, entry: LogEntry) -> ft.Text:
-        return ft.Text(self._display_message(entry), size=13, selectable=True)
+        timestamp = (
+            datetime.fromtimestamp(entry.created).strftime("%H:%M:%S")
+            if entry.created else "--:--:--"
+        )
+        level = "WARN" if entry.levelname == "WARNING" else entry.levelname
+        message = self._display_message(entry)
+        formatted_parts = message.split(" | ", 2)
+        if len(formatted_parts) == 3 and formatted_parts[0].startswith("["):
+            message = formatted_parts[2]
+        return ft.Text(
+            f"{timestamp}  {level:<5}  {message}",
+            size=13,
+            selectable=True,
+            font_family="monospace",
+        )
 
     async def _apply_filters(self, _e=None) -> None:
         self._selected_level = self._read_selected_level()
@@ -311,9 +340,20 @@ class LogSystem:
     def _clamp_log_height(self, next_height: int) -> int:
         return max(MIN_LOG_HEIGHT, min(MAX_LOG_HEIGHT, next_height))
 
+    def _recommended_log_height(self, fallback: int) -> int:
+        """按当前窗口高度计算默认日志高度，窗口尺寸不可用时保留组件值。"""
+
+        window_height = getattr(getattr(self._page, "window", None), "height", None)
+        page_height = getattr(self._page, "height", None)
+        available_height = page_height or window_height
+        if not isinstance(available_height, (int, float)) or available_height <= 0:
+            return self._clamp_log_height(fallback)
+        return self._clamp_log_height(round(available_height * DEFAULT_LOG_HEIGHT_RATIO))
+
     def _on_vertical_drag_update(self, e: ft.DragUpdateEvent) -> None:
         if self._shutdown_event.is_set():
             return
+        self._log_height_user_set = True
         self._log_view_height = self._clamp_log_height(self._log_view_height - int(e.primary_delta))
         self._log_height_container.height = self._log_view_height
         try:
@@ -322,7 +362,12 @@ class LogSystem:
             pass
 
     def _on_page_resize(self, _e) -> None:
-        self._log_view_height = self._clamp_log_height(self._log_view_height)
+        if (self._log_height_container.data or {}).get("collapsed"):
+            return
+        if self._log_height_user_set:
+            self._log_view_height = self._clamp_log_height(self._log_view_height)
+        else:
+            self._log_view_height = self._recommended_log_height(self._log_view_height)
         self._log_height_container.height = self._log_view_height
         try:
             self._log_height_container.update()

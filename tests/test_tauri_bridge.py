@@ -64,6 +64,56 @@ class TestStructuredStderrLogging:
         assert [event["data"]["seq"] for event in events] == [1, 2]
 
 
+def test_process_maintenance_llm_rpc_forwards_sheet_and_tuning(tmp_path):
+    """Tauri 选择的 Sheet、并发数和批次大小必须传到处理器。"""
+    source = tmp_path / "maintenance.xlsx"
+    source.touch()
+    captured = {}
+
+    def _fake_process(path, **kwargs):
+        captured["path"] = path
+        captured.update(kwargs)
+        return {"llm_completed": 0}
+
+    config = {
+        "url": "https://example.test/v1",
+        "api_key": "secret",
+        "model": "model-a",
+        "format": "openai",
+        "concurrency": 4,
+        "batch_size": 20,
+        "timeout": 30,
+        "max_retries": 2,
+    }
+
+    with patch(
+        "func.label_maintenance_with_llm.process_maintenance_llm",
+        side_effect=_fake_process,
+    ), patch(
+        "func.config_loader.get_llm_config",
+        return_value=config,
+    ), patch.object(
+        tauri_bridge,
+        "_CANCEL_FILE",
+        tmp_path / "cancel",
+    ):
+        result = tauri_bridge._process_maintenance_llm({
+            "path": str(source),
+            "sheet_name": "夜班维修",
+            "content_column": "内容",
+            "category_column": "大类",
+            "minor_column": "小类",
+            "status_column": "方式",
+            "filter_values": ["待确认"],
+            "export_mode": "details",
+        })
+
+    assert result["cancelled"] is False
+    assert captured["sheet_name"] == "夜班维修"
+    assert captured["concurrency"] == 4
+    assert captured["batch_size"] == 20
+
+
 # ---------------------------------------------------------------------------
 # postprocess_from_cache (formerly postprocess_from_cache)
 # ---------------------------------------------------------------------------

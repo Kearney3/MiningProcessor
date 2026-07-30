@@ -44,10 +44,21 @@ export interface LogEntry {
 /** 批处理进度事件 */
 export interface BatchProgress {
   stage: string;
+  state?: "preparing" | "running" | "cancelling" | "completed" | "cancelled" | "failed";
   percent: number;
   current: number;
   total: number;
   detail: string;
+  succeeded?: number;
+  skipped?: number;
+  failed?: number;
+  retried?: number;
+  running?: number;
+  from_checkpoint?: number;
+  rate?: number;
+  eta_seconds?: number | null;
+  completed_batches?: number;
+  total_batches?: number;
 }
 
 /** 扫描结果 */
