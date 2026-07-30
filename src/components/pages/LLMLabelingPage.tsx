@@ -7,32 +7,8 @@ import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-cla
 import { useLastDirectory } from "../../hooks/useLastDirectory";
 import {
   ChevronDownIcon, PlayIcon, FileIcon, CheckCircleIcon, XCircleIcon, AlertTriangleIcon,
+  ColumnsIcon, FilterIcon, BotIcon,
 } from "../../lib/icons";
-
-// ── Icons ────────────────────────────────────────────────
-
-const IconColumns = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" />
-  </svg>
-);
-
-const IconFilter = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-  </svg>
-);
-
-const IconBot = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-    <path d="M12 8V4H8" />
-    <rect width="16" height="12" x="4" y="8" rx="2" />
-    <path d="M2 14h2" />
-    <path d="M20 14h2" />
-    <path d="M15 13v2" />
-    <path d="M9 13v2" />
-  </svg>
-);
 
 // ── Shared UI ────────────────────────────────────────────
 
@@ -301,7 +277,7 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
     <div className="max-w-4xl mx-auto space-y-5">
       <div>
         <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-          <IconBot /> LLM 标注
+          <BotIcon /> LLM 标注
         </h2>
         <p className="text-sm text-slate-500 mt-0.5">对维修明细进行大模型智能分类标注</p>
       </div>
@@ -350,7 +326,7 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
       {step >= 2 && (
         <div className={`bg-white rounded-lg border p-4 ${step === 2 ? "border-blue-200" : "border-slate-200"}`}>
           <h3 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
-            <IconColumns /> 2. 列映射
+            <ColumnsIcon /> 2. 列映射
           </h3>
           <p className="text-xs text-slate-500 mb-3">指定各列的用途，系统已自动识别常见列名</p>
           <div className="grid grid-cols-2 gap-3">
@@ -406,7 +382,7 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
       {step >= 3 && (
         <div className={`bg-white rounded-lg border p-4 ${step === 3 ? "border-blue-200" : "border-slate-200"}`}>
           <h3 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
-            <IconFilter /> 3. 筛选与导出
+            <FilterIcon /> 3. 筛选与导出
           </h3>
 
           {/* Filter values */}

@@ -3,6 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import type { BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
 import { ChevronDownIcon, PlayIcon, FolderIcon, FileIcon, PlusIcon, TrashIcon, CheckCircleIcon, XCircleIcon, AlertTriangleIcon, FuelIcon, ProductionIcon, ElectricalIcon, WorktimeIcon, MergeIcon, MaintenanceIcon } from "../../lib/icons";
+import { StyledToggle, ChipToggle } from "../../lib/ui-components";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { useLastDirectory } from "../../hooks/useLastDirectory";
 import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG } from "../AnomalyPanel";
@@ -172,66 +173,6 @@ function StyledSelect({
       <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none">
         <ChevronDownIcon />
       </div>
-    </div>
-  );
-}
-
-/** Styled toggle switch — restrained design */
-function StyledToggle({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <label className="flex items-center gap-2.5 cursor-pointer select-none">
-      <button
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors ${
-          checked ? "bg-blue-600" : "bg-slate-200"
-        }`}
-      >
-        <span
-          className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-            checked ? "translate-x-4" : "translate-x-0.5"
-          }`}
-        />
-      </button>
-      <span className="text-sm text-slate-700">{label}</span>
-    </label>
-  );
-}
-
-/** Chip-style toggle with two options */
-function ChipToggle({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: { label: string; value: string }[];
-}) {
-  return (
-    <div className="inline-flex rounded-md border border-slate-200 overflow-hidden">
-      {options.map((o, i) => (
-        <button
-          key={o.value}
-          onClick={() => onChange(o.value)}
-          className={`text-xs px-3 py-1.5 transition-colors ${
-            value === o.value
-              ? "bg-slate-900 text-white"
-              : "bg-white text-slate-600 hover:bg-slate-50"
-          } ${i > 0 ? "border-l border-slate-200" : ""}`}
-        >
-          {o.label}
-        </button>
-      ))}
     </div>
   );
 }

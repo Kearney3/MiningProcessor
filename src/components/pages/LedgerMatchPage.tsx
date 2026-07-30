@@ -11,6 +11,7 @@ import {
   ArrowUpIcon, ArrowDownIcon, ChevronsUpDownIcon, LoaderIcon,
   AlertCircleIcon, InfoIcon, TableIcon,
 } from "../../lib/icons";
+import { ToggleSwitch } from "../../lib/ui-components";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -31,31 +32,6 @@ interface SortState {
 // ---------------------------------------------------------------------------
 // Toggle Switch (w-8 h-5, restrained style — no color flash)
 // ---------------------------------------------------------------------------
-
-function ToggleSwitch({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors ${
-        checked ? "bg-slate-900" : "bg-slate-200"
-      }`}
-    >
-      <span
-        className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-          checked ? "translate-x-[14px]" : "translate-x-[3px]"
-        }`}
-      />
-    </button>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Main Component

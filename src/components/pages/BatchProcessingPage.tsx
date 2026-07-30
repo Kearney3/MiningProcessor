@@ -9,6 +9,7 @@ import {
   FuelIcon, ProductionIcon, ElectricalIcon, WorktimeIcon, MergeIcon,
   QuestionIcon, FilterIcon,
 } from "../../lib/icons";
+import { ChipToggle, StyledToggle as Toggle } from "../../lib/ui-components";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { useLastDirectory } from "../../hooks/useLastDirectory";
 import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG } from "../AnomalyPanel";
@@ -114,67 +115,6 @@ function SectionDivider({ label }: { label?: string }) {
       {label && <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">{label}</span>}
       <div className="flex-1 h-px bg-slate-200" />
     </div>
-  );
-}
-
-/** Chip-style toggle for mutually exclusive options */
-function ChipToggle({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: { label: string; value: string; tip?: string }[];
-}) {
-  return (
-    <div className="inline-flex rounded-md border border-slate-200 overflow-hidden">
-      {options.map((o, i) => (
-        <button
-          key={o.value}
-          onClick={() => onChange(o.value)}
-          title={o.tip}
-          className={`text-xs px-3 py-1.5 transition-colors ${
-            value === o.value
-              ? "bg-slate-900 text-white"
-              : "bg-white text-slate-600 hover:bg-slate-50"
-          } ${i > 0 ? "border-l border-slate-200" : ""}`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/** Toggle switch — restrained design */
-function Toggle({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <label className="flex items-center gap-2.5 cursor-pointer select-none">
-      <button
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors ${
-          checked ? "bg-blue-600" : "bg-slate-200"
-        }`}
-      >
-        <span
-          className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-            checked ? "translate-x-4" : "translate-x-0.5"
-          }`}
-        />
-      </button>
-      <span className="text-sm text-slate-700">{label}</span>
-    </label>
   );
 }
 

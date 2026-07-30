@@ -1,93 +1,16 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import type { BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
+import {
+  ImportIcon, ExportIcon, RestoreIcon, RefreshIcon,
+  TrashIcon, SaveIcon, ApplyIcon, PlusIcon,
+  CheckIcon, AlertTriangleIcon, ChevronLeftIcon,
+  ChevronRightIcon, SettingsIcon,
+} from "../../lib/icons";
 
 type LoadMap = Record<string, number>;
 
 const PAGE_SIZE = 20;
-
-/* ------------------------------------------------------------------ */
-/*  SVG Icons (16x16)                                                  */
-/* ------------------------------------------------------------------ */
-
-const IconImport = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-  </svg>
-);
-
-const IconExport = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-  </svg>
-);
-
-const IconRestore = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a5 5 0 015 5v2M3 10l4-4M3 10l4 4" />
-  </svg>
-);
-
-const IconRefresh = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-  </svg>
-);
-
-const IconTrash = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-  </svg>
-);
-
-const IconSave = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-  </svg>
-);
-
-const IconApply = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-  </svg>
-);
-
-const IconPlus = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-  </svg>
-);
-
-const IconCheck = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-  </svg>
-);
-
-const IconWarning = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-  </svg>
-);
-
-const IconChevronLeft = () => (
-  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-  </svg>
-);
-
-const IconChevronRight = () => (
-  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-  </svg>
-);
-
-const IconSettings = () => (
-  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-    <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-  </svg>
-);
 
 /* ------------------------------------------------------------------ */
 /*  Confirm dialog                                                     */
@@ -501,7 +424,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
       {/* ---- header ----------------------------------------------- */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <IconSettings />
+          <SettingsIcon />
           <h2 className="text-base font-semibold text-slate-800">装载量配置</h2>
 
           {/* version toggle */}
@@ -532,12 +455,12 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
         {/* status badges */}
         {isDirty ? (
           <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-0.5">
-            <IconWarning />
+            <AlertTriangleIcon />
             已修改（未保存）
           </span>
         ) : (
           <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-md px-2.5 py-0.5">
-            <IconCheck />
+            <CheckIcon />
             已保存
           </span>
         )}
@@ -546,11 +469,11 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
       {/* ---- toolbar ---------------------------------------------- */}
       <div className="flex items-center gap-2 mb-4">
         <button onClick={handleImport} className="btn-secondary">
-          <IconImport />
+          <ImportIcon />
           导入
         </button>
         <button onClick={handleExport} className="btn-secondary">
-          <IconExport />
+          <ExportIcon />
           导出
         </button>
 
@@ -561,21 +484,21 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
               onClick={() => setConfirmDeleteDialog(true)}
               className="btn-danger"
             >
-              <IconTrash />
+              <TrashIcon />
               删除选中 ({selected.size})
             </button>
           </>
         )}
 
         <button onClick={() => setRestoreDialog(true)} className="btn-secondary">
-          <IconRestore />
+          <RestoreIcon />
           恢复默认
         </button>
 
         <div className="flex-1" />
 
         <button onClick={() => loadData()} className="btn-secondary">
-          <IconRefresh />
+          <RefreshIcon />
           重载
         </button>
         <button
@@ -583,7 +506,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
           disabled={applying || !isDirty}
           className={`btn-secondary ${applying || !isDirty ? "opacity-50 cursor-not-allowed" : ""}`}
         >
-          <IconApply />
+          <ApplyIcon />
           {applying ? "应用中..." : "应用"}
         </button>
         <button
@@ -591,7 +514,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
           disabled={saving || !isDirty}
           className={`btn-primary ${saving || !isDirty ? "opacity-50 cursor-not-allowed" : ""}`}
         >
-          <IconSave />
+          <SaveIcon />
           {saving ? "保存中..." : "保存"}
         </button>
       </div>
@@ -599,7 +522,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
       {/* ---- error ----------------------------------------------- */}
       {error && (
         <div className="mb-4 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-center gap-2">
-          <IconWarning />
+          <AlertTriangleIcon />
           {error}
         </div>
       )}
@@ -671,7 +594,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
                         onClick={() => handleDelete(name)}
                         className="inline-flex items-center gap-1 text-xs text-slate-600 hover:text-red-600 px-1.5 py-1 rounded hover:bg-red-50 transition-colors"
                       >
-                        <IconTrash />
+                        <TrashIcon />
                         删除
                       </button>
                     </td>
@@ -723,7 +646,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
                       onClick={handleAdd}
                       className="btn-primary"
                     >
-                      <IconPlus />
+                      <PlusIcon />
                       添加
                     </button>
                   </div>
@@ -744,7 +667,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
                 disabled={safePage === 0}
                 className="text-xs text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-0.5"
               >
-                <IconChevronLeft />
+                <ChevronLeftIcon />
                 上一页
               </button>
               <span className="text-xs text-slate-500 min-w-[4rem] text-center">
@@ -756,7 +679,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
                 className="text-xs text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-0.5"
               >
                 下一页
-                <IconChevronRight />
+                <ChevronRightIcon />
               </button>
             </div>
           )}
