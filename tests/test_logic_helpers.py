@@ -12,11 +12,10 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from func.ledger_postprocess import _find_col, match_sheets
+from func.orchestration import get_output_path, postprocess_with_ledgers
 from gui.logic import (
-    _apply_ledger_matching,
     _dispatch_module,
     _execute_task,
-    _get_output_file,
     _log_message,
 )
 
@@ -61,48 +60,48 @@ class TestFindCol:
 
 
 # ---------------------------------------------------------------------------
-# _get_output_file
+# get_output_path
 # ---------------------------------------------------------------------------
 class TestGetOutputFile:
     def test_fuel_type(self, tmp_path):
         input_file = str(tmp_path / "input.xlsx")
-        result = _get_output_file("fuel", input_file)
+        result = get_output_path("fuel", input_file)
         assert result.endswith("Fuel.xlsx")
         assert os.path.dirname(result) == str(tmp_path)
 
     def test_production_with_file(self, tmp_path):
         input_file = str(tmp_path / "data.xlsx")
-        result = _get_output_file("production", input_file)
+        result = get_output_path("production", input_file)
         assert "合并产量.xlsx" in result
         assert os.path.dirname(result) == str(tmp_path)
 
     def test_production_with_dir(self, tmp_path):
-        result = _get_output_file("production", str(tmp_path))
+        result = get_output_path("production", str(tmp_path))
         assert result == os.path.join(str(tmp_path), "合并产量.xlsx")
 
     def test_electrical_type(self, tmp_path):
         input_file = str(tmp_path / "elec.xlsx")
-        result = _get_output_file("electrical", input_file)
+        result = get_output_path("electrical", input_file)
         assert "电力消耗统计.xlsx" in result
 
     def test_worktime_with_defaults(self, tmp_path):
         from datetime import datetime
         input_file = str(tmp_path / "work.xlsx")
-        result = _get_output_file("worktime", input_file)
+        result = get_output_path("worktime", input_file)
         current_year = datetime.now().year
         assert f"{current_year}01_工作效率表.xlsx" in result
 
     def test_worktime_with_custom_year_month(self, tmp_path):
         input_file = str(tmp_path / "work.xlsx")
-        result = _get_output_file("worktime", input_file, year=2024, month=12)
+        result = get_output_path("worktime", input_file, year=2024, month=12)
         assert "202412_工作效率表.xlsx" in result
 
     def test_merge_type(self, tmp_path):
-        result = _get_output_file("merge", str(tmp_path), keyword="产量")
+        result = get_output_path("merge", str(tmp_path), keyword="产量")
         assert result == os.path.join(str(tmp_path), "产量_合并.xlsx")
 
     def test_unknown_type_returns_none(self, tmp_path):
-        result = _get_output_file("unknown", str(tmp_path))
+        result = get_output_path("unknown", str(tmp_path))
         assert result is None
 
 
@@ -110,7 +109,8 @@ def test_maintenance_dispatch_forwards_ml_switch(tmp_path):
     input_file = str(tmp_path / "maintenance.xlsx")
     pathlib.Path(input_file).touch()
 
-    with patch("gui.logic.process_maintenance_data") as process:
+    with patch("func.orchestration.process_single") as process:
+        process.return_value = {"output_file": None}
         _dispatch_module("maint", input_file, use_ml_fallback=False)
 
     assert process.call_args.kwargs["use_ml_fallback"] is False
@@ -147,7 +147,7 @@ class TestLogMessage:
 
 
 # ---------------------------------------------------------------------------
-# _apply_ledger_matching
+# postprocess_with_ledgers
 # ---------------------------------------------------------------------------
 class TestApplyLedgerMatching:
     def test_no_ledger_does_nothing(self, tmp_path):
@@ -156,7 +156,7 @@ class TestApplyLedgerMatching:
         out = str(tmp_path / "test.xlsx")
         df.to_excel(out, index=False)
 
-        _apply_ledger_matching(out, equipment_ledger=None, oil_ledger=None)
+        postprocess_with_ledgers(out, equipment_ledger=None, oil_ledger=None)
 
         result = pd.read_excel(out)
         assert "标准设备名称" not in result.columns
@@ -175,7 +175,7 @@ class TestApplyLedgerMatching:
                     "标准公司名称": "A公司",
                 }
 
-        _apply_ledger_matching(out, equipment_ledger=StubLedger())
+        postprocess_with_ledgers(out, equipment_ledger=StubLedger())
 
         result = pd.read_excel(out)
         assert "标准设备名称" in result.columns
@@ -192,7 +192,7 @@ class TestApplyLedgerMatching:
             def match(self, name):
                 return {"标准名称": "0号柴油", "原始名称": name, "匹配方式": "精确", "相似度": 100}
 
-        _apply_ledger_matching(out, oil_ledger=StubOilLedger())
+        postprocess_with_ledgers(out, oil_ledger=StubOilLedger())
 
         result = pd.read_excel(out)
         assert "标准油品名称" in result.columns
@@ -208,14 +208,14 @@ class TestApplyLedgerMatching:
             def match_device(self, name=None, device_id=None):
                 return {"标准设备名称": "X", "标准设备编号": "Y", "标准公司名称": "Z"}
 
-        _apply_ledger_matching(out, equipment_ledger=StubLedger())
+        postprocess_with_ledgers(out, equipment_ledger=StubLedger())
 
         result = pd.read_excel(out)
         assert "标准设备名称" not in result.columns
 
     def test_unreadable_file_graceful(self, tmp_path):
         """无法读取输出文件时不崩溃"""
-        _apply_ledger_matching(str(tmp_path / "nonexistent.xlsx"), equipment_ledger=object())
+        postprocess_with_ledgers(str(tmp_path / "nonexistent.xlsx"), equipment_ledger=object())
 
     def test_equipment_no_match_fills_empty(self, tmp_path):
         """设备匹配失败时写入空值（Excel 读回后为 NaN）"""
@@ -227,7 +227,7 @@ class TestApplyLedgerMatching:
             def match_device(self, name=None, device_id=None):
                 return None
 
-        _apply_ledger_matching(out, equipment_ledger=NoMatchLedger())
+        postprocess_with_ledgers(out, equipment_ledger=NoMatchLedger())
 
         result = pd.read_excel(out)
         assert "标准设备名称" in result.columns
@@ -265,7 +265,7 @@ class TestApplyLedgerMatchingProductionData:
                     }
                 return None
 
-        _apply_ledger_matching(out, equipment_ledger=StubLedger())
+        postprocess_with_ledgers(out, equipment_ledger=StubLedger())
 
         result = pd.read_excel(out)
         # 验证添加了带后缀的列
@@ -299,7 +299,7 @@ class TestApplyLedgerMatchingProductionData:
                     "标准公司名称": "A公司",
                 }
 
-        _apply_ledger_matching(out, equipment_ledger=StubLedger())
+        postprocess_with_ledgers(out, equipment_ledger=StubLedger())
 
         result = pd.read_excel(out)
         # 验证不添加带后缀的列
@@ -330,7 +330,7 @@ class TestApplyLedgerMatchingProductionData:
                     }
                 return None
 
-        _apply_ledger_matching(out, equipment_ledger=StubLedger())
+        postprocess_with_ledgers(out, equipment_ledger=StubLedger())
 
         result = pd.read_excel(out)
         # 矿卡匹配失败
@@ -398,7 +398,7 @@ class TestWorktimeLedgerMatching:
                 return None
 
         preloaded = {"工时数据": df.copy()}
-        _apply_ledger_matching(out, equipment_ledger=StubLedger(), preloaded_sheets=preloaded)
+        postprocess_with_ledgers(out, equipment_ledger=StubLedger(), preloaded_sheets=preloaded)
 
         result = pd.read_excel(out)
         assert "标准设备名称" in result.columns
@@ -428,7 +428,7 @@ class TestWorktimeLedgerMatching:
 
         # preloaded_sheets 包含已处理的 DataFrame
         preloaded = {"工时数据": df.copy()}
-        _apply_ledger_matching(out, equipment_ledger=StubLedger(), preloaded_sheets=preloaded)
+        postprocess_with_ledgers(out, equipment_ledger=StubLedger(), preloaded_sheets=preloaded)
 
         result = pd.read_excel(out)
         # Mongolian 列名不在 _find_col 的候选列表中，但 preloaded 避免了重新读取
@@ -450,7 +450,7 @@ class TestWorktimeLedgerMatching:
                     "标准公司名称": "A公司",
                 }
 
-        _apply_ledger_matching(out, equipment_ledger=StubLedger(), preloaded_sheets=None)
+        postprocess_with_ledgers(out, equipment_ledger=StubLedger(), preloaded_sheets=None)
 
         result = pd.read_excel(out)
         assert "标准设备名称" in result.columns
@@ -537,59 +537,49 @@ class TestMatchSheets:
 
 
 # ---------------------------------------------------------------------------
-# _execute_task worktime 落盘
+# _execute_task 返回值测试
 # ---------------------------------------------------------------------------
 from unittest.mock import patch
 
 
-class TestExecuteTaskWorktimeWrite:
-    """_execute_task 工时模块落盘逻辑测试。"""
+class TestExecuteTaskReturnValues:
+    """_execute_task 统一返回值测试（process_single dict 格式）。"""
 
-    def test_worktime_sheets_writes_file(self, tmp_path):
-        """worktime 返回 sheets 时应写入文件。"""
-        input_file = str(tmp_path / "worktime.xlsx")
-        # 创建一个假的输入文件让 _get_output_file 能算出目录
+    def test_dispatch_returns_dict_with_output_file(self, tmp_path):
+        """_dispatch_module 应返回包含 output_file 的 dict。"""
+        from gui.logic import _dispatch_module
+        input_file = str(tmp_path / "test.xlsx")
         pd.DataFrame().to_excel(input_file, index=False)
 
-        sheets = {"工时数据": pd.DataFrame({"日期": ["2025-01-01"], "班次": ["Day"], "设备": ["TR100"]})}
+        mock_result = {"output_file": str(tmp_path / "Fuel.xlsx")}
+        with patch("func.orchestration.process_single", return_value=mock_result):
+            result = _dispatch_module("fuel", input_file, year=2025)
+        assert isinstance(result, dict)
+        assert "output_file" in result
 
-        with patch("gui.logic._dispatch_module", return_value=sheets):
-            result, extra = _execute_task("worktime", input_file, year=2025, month=1)
+    def test_execute_task_returns_extra_for_production(self, tmp_path):
+        """production 模块的 summary 应作为 extra 返回。"""
+        input_file = str(tmp_path / "test.xlsx")
+        pd.DataFrame().to_excel(input_file, index=False)
+
+        mock_result = {"output_file": str(tmp_path / "合并产量.xlsx"), "summary": {"total_files": 1}}
+        with patch("gui.logic._dispatch_module", return_value=mock_result):
+            result, extra = _execute_task("production", input_file)
+
+        assert result is None
+        assert extra == {"total_files": 1}
+
+    def test_execute_task_returns_none_extra_for_fuel(self, tmp_path):
+        """非 production 模块 extra 为 None。"""
+        input_file = str(tmp_path / "test.xlsx")
+        pd.DataFrame().to_excel(input_file, index=False)
+
+        mock_result = {"output_file": str(tmp_path / "Fuel.xlsx")}
+        with patch("gui.logic._dispatch_module", return_value=mock_result):
+            result, extra = _execute_task("fuel", input_file)
 
         assert result is None
         assert extra is None
-        expected = str(tmp_path / "202501_工作效率表.xlsx")
-        assert os.path.exists(expected)
-        written = pd.read_excel(expected)
-        assert "设备" in written.columns
-
-    def test_worktime_no_sheets_skips_write(self, tmp_path):
-        """worktime 返回 None 时不写入文件。"""
-        input_file = str(tmp_path / "worktime.xlsx")
-        pd.DataFrame().to_excel(input_file, index=False)
-
-        with patch("gui.logic._dispatch_module", return_value=None):
-            result, extra = _execute_task("worktime", input_file, year=2025, month=1)
-
-        assert result is None
-        assert extra is None
-        expected = str(tmp_path / "202501_工作效率表.xlsx")
-        assert not os.path.exists(expected)
-
-    def test_non_worktime_module_skips_sheet_write(self, tmp_path):
-        """非 worktime 模块即使返回值也不触发 sheet 落盘。"""
-        input_file = str(tmp_path / "raw_data.xlsx")
-        pd.DataFrame().to_excel(input_file, index=False)
-
-        with patch("gui.logic._dispatch_module", return_value={"some": "data"}):
-            result, extra = _execute_task("fuel", input_file, year=2025)
-
-        assert result is None
-        # fuel 模块不返回 summary，extra 为 None
-        assert extra is None
-        # fuel 输出文件不应被 sheet-write 逻辑创建
-        expected = str(tmp_path / "Fuel.xlsx")
-        assert not os.path.exists(expected)
 
 
 # ---------------------------------------------------------------------------

@@ -6,22 +6,14 @@ import asyncio
 import logging
 import sys
 import threading
-from datetime import datetime
 import flet as ft
 import os
 import pandas as pd
 from func import config_loader
-from func.excel_fuel import process_diesel_data as process_fuel_data
-from func.excel_production_enhanced import MiningDataProcessor as ProdProcessor
-from func.excel_electrical import parse_excel_data as process_electrical_data
-from func.excel_worktime import process_excel_data as process_worktime_data
-from func.excel_merger import merge_excel_files
 from func.excel_batch import scan_files, process_files, MODULE_LABELS
-from func.excel_maintenance import process_maintenance_data
 from func.sync_to_minebase import sync as sync_to_minebase
 from func.sync_to_minebase import test_db_connection
 from func.sync_to_minebase import test_api_connection
-from func.ledger_postprocess import apply_ledger_matching
 
 
 from gui.utils import _log_message
@@ -162,126 +154,34 @@ def set_btn_state(btn: ft.Button, enabled: bool, label: str = "处理"):
 
 
 # ---------------------------------------------------------------------------
-# 台账匹配后处理（委托给 func/ledger_postprocess.py 共享模块）
-# ---------------------------------------------------------------------------
-
-
-def _apply_ledger_matching(output_file: str, equipment_ledger=None, oil_ledger=None, preloaded_sheets=None):
-    """对已写入的 Excel 文件进行台账匹配后处理。"""
-    apply_ledger_matching(output_file, equipment_ledger, oil_ledger, preloaded_sheets)
-
-
-def _get_output_file(module_type: str, path: str, **kwargs) -> str | None:
-    """根据模块类型和输入路径，推断输出文件路径。
-
-    委托给 func.orchestration.get_output_path() 统一计算。
-    """
-    from func.orchestration import get_output_path
-    return get_output_path(
-        module_type, path,
-        year=kwargs.get("year"),
-        month=kwargs.get("month", 1),
-        keyword=kwargs.get("keyword", ""),
-    )
-
-
-# ---------------------------------------------------------------------------
 # 任务执行
 # ---------------------------------------------------------------------------
-def _dispatch_module(module_type: str, path: str, cancel_event: threading.Event | None = None, **kwargs) -> object | None:
-    """Dispatch to the appropriate processor. Returns worktime_sheets or None.
+def _dispatch_module(module_type: str, path: str, cancel_event: threading.Event | None = None, **kwargs) -> dict:
+    """Dispatch to the appropriate processor via orchestration.process_single().
 
-    Args:
-        cancel_event: 可选的取消事件，用于在长时间处理中检查是否应终止。
+    Returns:
+        dict with "output_file" key; production adds "summary".
     """
-    # 处理前检查：如果已关闭或已取消则直接返回
     if _shutdown_event.is_set() or (cancel_event and cancel_event.is_set()):
-        return None
+        return {"output_file": None}
 
-    skip_hidden_rows = kwargs.get("skip_hidden_rows", False)
-    skip_hidden_cols = kwargs.get("skip_hidden_cols", False)
-    anomaly_config = kwargs.get("anomaly_config")
-    filter_zero_engine_hours = kwargs.get("filter_zero_engine_hours", False)
-    filter_zero_work_hours = kwargs.get("filter_zero_work_hours", False)
-    if module_type == "fuel":
-        process_fuel_data(path, kwargs.get("year"),
-                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
-                          anomaly_config=anomaly_config, filter_zero_engine_hours=filter_zero_engine_hours,
-                          filter_zero_work_hours=filter_zero_work_hours)
-    elif module_type == "production":
-        raw_start = kwargs.get("raw_start", -1)
-        load_map_ver = config_loader.get_load_map_version()
-        device_load_map = config_loader.get_device_load_map(load_map_ver)
-        processor = ProdProcessor(raw_start=raw_start, device_load_map=device_load_map,
-                                  skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
-                                  anomaly_config=anomaly_config,
-                                  filter_zero_hours_meter=kwargs.get("filter_zero_hours_meter", False),
-                                  filter_zero_km_meter=kwargs.get("filter_zero_km_meter", False),
-                                  filter_zero_run_hours=kwargs.get("filter_zero_run_hours", False),
-                                  filter_zero_run_km=kwargs.get("filter_zero_run_km", False))
-        logging.info(f"装载量参数：{device_load_map}")
-        if os.path.isdir(path):
-            output_file = os.path.join(path, "合并产量.xlsx")
-            processor.process_folder(path, output_file, cancel_event=cancel_event)
-        else:
-            output_file = os.path.join(os.path.dirname(path) or ".", "合并产量.xlsx")
-            processor.process_single_file(path, output_file)
-        # 提取处理摘要供调用方显示
-        summary = getattr(processor, "_processing_summary", None)
-        if summary:
-            for w in summary.get("warnings", []):
-                logger.warning(w)
-            logger.info(
-                "生产统计：共 %d 个文件，成功 %d，失败 %d",
-                summary.get("total_files", 0), summary.get("success_files", 0), summary.get("failed_files", 0),
-            )
-        return summary
-    elif module_type == "electrical":
-        process_electrical_data(path, kwargs.get("year"),
-                         add_shift_column=kwargs.get("add_shift_column", False),
-                         default_shift=kwargs.get("default_shift", "Day"),
-                         skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
-                         anomaly_config=anomaly_config)
-    elif module_type == "worktime":
-        year = kwargs.get("year", datetime.now().year)
-        month = kwargs.get("month", 1)
-        header_mapping = kwargs.get("header_mapping", None)
-        if os.path.isdir(path):
-            from func.excel_worktime_multifile import process_directory
-            output_file = os.path.join(path, f"{year}{month:02d}_多文件合并_工作效率表.xlsx")
-            return process_directory(path, year, month, output_file,
-                                    return_sheets=True, header_mapping=header_mapping,
-                                    skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
-                                    anomaly_config=anomaly_config)
-        else:
-            file_dir = os.path.dirname(path) or "."
-            output_file = os.path.join(file_dir, f"{year}{month:02d}_工作效率表.xlsx")
-            return process_worktime_data(path, year, month, output_file,
-                                      return_sheets=True, header_mapping=header_mapping,
-                                      skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
-                                      anomaly_config=anomaly_config)
-    elif module_type == "merge":
-        keyword = kwargs.get("keyword", "")
-        strip_time = kwargs.get("strip_time", False)
-        sort_configs = kwargs.get("sort_configs", None)
-        merge_excel_files(path, keyword, strip_time=strip_time, sort_configs=sort_configs,
-                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
-                          tolerant_header=kwargs.get("tolerant_header", False))
-    elif module_type == "maint":
-        eq_ledger = kwargs.get("equipment_ledger")
-        classifications = config_loader.get_maintenance_classifications()
-        return process_maintenance_data(
-            path,
-            eq_ledger=eq_ledger,
-            classifications=classifications,
-            skip_hidden_rows=skip_hidden_rows,
-            skip_hidden_cols=skip_hidden_cols,
-            split_by_year=kwargs.get("split_by_year", False),
-            details_only=kwargs.get("details_only", False),
-            use_ml_fallback=kwargs.get("use_ml_fallback", True),
-        )
-    # batch 模块由 _execute_batch_task 单独处理
-    return None
+    from func.orchestration import process_single
+
+    # 将 equipment_ledger/oil_ledger 实例转为 use_*_ledger 布尔值
+    eq_ledger = kwargs.pop("equipment_ledger", None)
+    oil_ledger = kwargs.pop("oil_ledger", None)
+    use_eq = eq_ledger is not None
+    use_oil = oil_ledger is not None
+
+    return process_single(
+        module_type, path,
+        cancel_event=cancel_event,
+        use_equipment_ledger=use_eq,
+        use_oil_ledger=use_oil,
+        equipment_ledger=eq_ledger,
+        oil_ledger=oil_ledger,
+        **kwargs,
+    )
 
 
 def _execute_task(module_type: str, path: str, cancel_event: threading.Event | None = None, **kwargs) -> tuple[str | None, dict | None]:
@@ -290,7 +190,6 @@ def _execute_task(module_type: str, path: str, cancel_event: threading.Event | N
     Args:
         cancel_event: 可选的取消事件，页面关闭或用户取消时置位。
     """
-    # 页面已关闭则直接跳过
     if _shutdown_event.is_set():
         logger.info("页面已关闭，跳过任务: module=%s", module_type)
         return "页面已关闭", None
@@ -298,50 +197,12 @@ def _execute_task(module_type: str, path: str, cancel_event: threading.Event | N
     extra = None
     try:
         result = _dispatch_module(module_type, path, cancel_event=cancel_event, **kwargs)
-        # production 模块返回 summary dict
         if module_type == "production" and isinstance(result, dict):
-            extra = result
+            extra = result.get("summary")
     except Exception:
         logger.exception("Task execution failed: module=%s path=%s", module_type, path)
         return str(sys.exc_info()[1]).strip() or sys.exc_info()[0].__name__, None
 
-    # dispatch 完成后才 pop，确保维护模块等内部需要台账的模块能正常读取
-    equipment_ledger = kwargs.pop("equipment_ledger", None)
-    oil_ledger = kwargs.pop("oil_ledger", None)
-
-    # 工时模块 return_sheets=True 时只返回 DataFrame，需要先落盘
-    worktime_sheets = result if module_type == "worktime" else None
-    if worktime_sheets and module_type == "worktime":
-        output_file = _get_output_file(module_type, path, **kwargs)
-        if output_file:
-            from func.excel_formatter import write_formatted_excel
-            write_formatted_excel(output_file, worktime_sheets)
-            logger.info("工时数据已写入: %s", output_file)
-
-    if not (equipment_ledger or oil_ledger):
-        return None, extra
-
-    # 确定输出文件路径：优先使用 _dispatch_module 返回的实际路径
-    output_files = []
-    if module_type == "maint":
-        if isinstance(result, list):
-            output_files = [str(f) for f in result if f]
-        elif isinstance(result, str) and result:
-            output_files = [result]
-    elif module_type == "worktime":
-        sheets_data = worktime_sheets
-        output_file = _get_output_file(module_type, path, **kwargs)
-        if output_file and os.path.exists(output_file):
-            output_files = [output_file]
-    else:
-        output_file = _get_output_file(module_type, path, **kwargs)
-        if output_file and os.path.exists(output_file):
-            output_files = [output_file]
-
-    sheets_data = worktime_sheets if module_type == "worktime" else None
-    for out in output_files:
-        _apply_ledger_matching(out, equipment_ledger, oil_ledger,
-                               preloaded_sheets=sheets_data)
     return None, extra
 
 
