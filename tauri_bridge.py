@@ -249,12 +249,6 @@ def _register(name: str):
 # ═══════════════════════════════════════════════════════════
 
 
-def _load_equipment_ledger_from_cache():
-    """从缓存加载设备台账实例，失败返回 None。"""
-    from func.orchestration import load_equipment_ledger_from_cache
-    return load_equipment_ledger_from_cache()
-
-
 def _build_anomaly_config(params: dict):
     """从 RPC 参数构建 AnomalyConfig，未传入时返回 disabled 实例。
 
@@ -275,6 +269,7 @@ def _extract_common_params(params: dict) -> dict:
 
     消除 6 个 @_register 方法中重复的参数提取代码。
     """
+    from func.orchestration import load_equipment_ledger_from_cache, load_oil_ledger_from_cache
     return {
         "skip_hidden": params.get("skip_hidden", False),
         "skip_hidden_rows": params.get("skip_hidden_rows", False),
@@ -283,12 +278,6 @@ def _extract_common_params(params: dict) -> dict:
         "use_equipment_ledger": params.get("use_equipment_ledger", False),
         "use_oil_ledger": params.get("use_oil_ledger", False),
     }
-
-
-def _load_oil_ledger_from_cache():
-    """从缓存加载油品台账实例，失败返回 None。"""
-    from func.orchestration import load_oil_ledger_from_cache
-    return load_oil_ledger_from_cache()
 
 
 # ═══════════════════════════════════════════════════════════
@@ -388,17 +377,19 @@ def _process_maintenance(params: dict) -> dict:
 @_register("get_llm_config")
 def _get_llm_config(params: dict) -> dict:
     from func.config_loader import get_llm_config
+    from func.secret_store import LLM_KEY_MASK
     cfg = get_llm_config()
-    cfg["api_key"] = "***" if cfg.get("api_key") else ""
+    cfg["api_key"] = LLM_KEY_MASK if cfg.get("api_key") else ""
     return cfg
 
 
 @_register("update_llm_config")
 def _update_llm_config(params: dict) -> dict:
     from func.config_loader import update_llm_config
+    from func.secret_store import LLM_KEY_MASK
     updates = {k: v for k, v in params.items() if k in ("url", "api_key", "model", "format", "concurrency", "batch_size", "timeout", "max_retries")}
     cfg = update_llm_config(updates)
-    cfg["api_key"] = "***" if cfg.get("api_key") else ""
+    cfg["api_key"] = LLM_KEY_MASK if cfg.get("api_key") else ""
     return cfg
 
 
@@ -789,7 +780,8 @@ def _reset_minebase_column_mapping(params: dict) -> dict:
 
 @_register("get_equipment_ledger_data")
 def _get_equipment_ledger_data(params: dict) -> dict:
-    ledger = _load_equipment_ledger_from_cache()
+    from func.orchestration import load_equipment_ledger_from_cache
+    ledger = load_equipment_ledger_from_cache()
     if not ledger:
         return {"rows": [], "columns": []}
     rows = _sanitize_rows(ledger.to_dict())
@@ -798,7 +790,8 @@ def _get_equipment_ledger_data(params: dict) -> dict:
 
 @_register("get_oil_ledger_data")
 def _get_oil_ledger_data(params: dict) -> dict:
-    ledger = _load_oil_ledger_from_cache()
+    from func.orchestration import load_oil_ledger_from_cache
+    ledger = load_oil_ledger_from_cache()
     if not ledger:
         return {"rows": [], "columns": []}
     rows = _sanitize_rows(ledger.to_dict())
@@ -807,8 +800,8 @@ def _get_oil_ledger_data(params: dict) -> dict:
 
 # ─── 台账文件操作方法 ───
 
-@_register("load_ledger_file_columns")
-def _load_ledger_file_columns(params: dict) -> dict:
+
+def _load_excel_columns(params: dict) -> dict:
     """读取 Excel 文件的列名和 sheet 列表（用于列映射）。"""
     import pandas as pd
     safe_path = str(_sanitize_path(params["file_path"], must_exist=True, allow_dir=False))
@@ -819,16 +812,16 @@ def _load_ledger_file_columns(params: dict) -> dict:
     return {"columns": [str(c) for c in df.columns], "sheets": sheet_names}
 
 
+@_register("load_ledger_file_columns")
+def _load_ledger_file_columns(params: dict) -> dict:
+    """读取 Excel 文件的列名和 sheet 列表（设备台账，用于列映射）。"""
+    return _load_excel_columns(params)
+
+
 @_register("load_oil_ledger_file_columns")
 def _load_oil_ledger_file_columns(params: dict) -> dict:
     """读取 Excel 文件的列名和 sheet 列表（油品台账，用于列映射）。"""
-    import pandas as pd
-    safe_path = str(_sanitize_path(params["file_path"], must_exist=True, allow_dir=False))
-    xl = pd.ExcelFile(safe_path)
-    sheet_names = xl.sheet_names
-    target_sheet = params.get("sheet_name", sheet_names[0] if sheet_names else 0)
-    df = pd.read_excel(safe_path, sheet_name=target_sheet, nrows=0)
-    return {"columns": [str(c) for c in df.columns], "sheets": sheet_names}
+    return _load_excel_columns(params)
 
 
 @_register("import_equipment_ledger")
@@ -1025,8 +1018,9 @@ def _ledger_match_preview(params: dict) -> dict:
         return f"{base}_{suffix}" if suffix else base
 
     # 加载台账
-    equipment_ledger = _load_equipment_ledger_from_cache()
-    oil_ledger = _load_oil_ledger_from_cache()
+    from func.orchestration import load_equipment_ledger_from_cache, load_oil_ledger_from_cache
+    equipment_ledger = load_equipment_ledger_from_cache()
+    oil_ledger = load_oil_ledger_from_cache()
 
     matched_count = 0
     for row in rows:

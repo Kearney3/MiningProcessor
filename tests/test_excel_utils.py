@@ -13,12 +13,41 @@ from func.excel_utils import (
     MODULE_OUTPUT_FILES,
     clean_split_dataframe,
     dedup_dataframe,
+    drop_all_nan_columns,
     get_output_filename,
     resolve_shift,
     sort_by_date_shift,
     split_day_night_shifts,
     strip_date_column,
 )
+
+
+# ---------------------------------------------------------------------------
+# drop_all_nan_columns
+# ---------------------------------------------------------------------------
+class TestDropAllNanColumns:
+    def test_drops_all_nan_columns_by_default(self):
+        df = pd.DataFrame({"有值": [1], "全空": [float("nan")]})
+
+        result = drop_all_nan_columns(df)
+
+        assert result.columns.tolist() == ["有值"]
+
+    def test_preserves_requested_existing_all_nan_column(self):
+        df = pd.DataFrame({
+            "有值": [1],
+            "映射空列": [float("nan")],
+            "普通空列": [float("nan")],
+        })
+
+        result = drop_all_nan_columns(
+            df,
+            preserve_columns={"映射空列", "不存在的配置列"},
+        )
+
+        assert result.columns.tolist() == ["有值", "映射空列"]
+        assert result["映射空列"].isna().all()
+        assert "不存在的配置列" not in result.columns
 
 
 # ---------------------------------------------------------------------------
