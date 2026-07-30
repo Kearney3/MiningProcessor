@@ -27,6 +27,7 @@ describe("LogPanel", () => {
     render(<LogPanel logs={logs} onClear={onClear} />);
     expect(screen.getByText("处理开始")).toBeInTheDocument();
     expect(screen.getByText("处理失败")).toBeInTheDocument();
+    expect(screen.getAllByText("10:00:00")).toHaveLength(2);
   });
 
   it("displays log count badge", () => {
@@ -172,11 +173,22 @@ describe("LogPanel", () => {
   it("allows keyboard resizing through the separator", () => {
     render(<LogPanel logs={[]} onClear={onClear} />);
     const handle = screen.getByRole("separator", { name: "调整日志面板高度" });
-    expect(handle).toHaveAttribute("aria-valuenow", "180");
+    const defaultHeight = Math.round(window.innerHeight / 3);
+    expect(handle).toHaveAttribute("aria-valuenow", String(defaultHeight));
 
     fireEvent.keyDown(handle, { key: "ArrowUp" });
 
-    expect(handle).toHaveAttribute("aria-valuenow", "200");
+    expect(handle).toHaveAttribute("aria-valuenow", String(defaultHeight + 20));
+  });
+
+  it("can collapse and restore the log panel", () => {
+    render(<LogPanel logs={[makeLog("INFO", "msg", 1)]} onClear={onClear} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "折叠日志" }));
+    expect(screen.queryByRole("region", { name: "处理日志" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "展开日志" }));
+    expect(screen.getByRole("region", { name: "处理日志" })).toBeInTheDocument();
   });
 
   it("container adds select-none class during resize", () => {
