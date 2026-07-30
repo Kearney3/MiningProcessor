@@ -1089,51 +1089,44 @@ def wire_sync_button(sync_refs: dict, page: ft.Page, log, module_refs: dict | No
     sync_refs["btn"].on_click = handle_sync_click
 
 
-async def on_test_db_connection(page: ft.Page, config_refs: dict, log):
-    """测试数据库连接
+async def _run_connection_test(
+    btn, result, password: str,
+    saved_config_loader, validate_fn, test_fn,
+    page: ft.Page, log, label: str,
+):
+    """连接测试的通用生命周期管理。
 
-    如果密码字段显示掩码（********），自动从已保存的配置中加载真实密码，
-    方便用户无需重新输入密码即可测试连接。加载的密码不会回填到界面。
+    处理掩码密码自动加载、输入校验、按钮状态、结果展示和异常处理。
+    调用方只需提供：校验函数、测试函数、refs 和标签。
     """
-    from func.config_loader import get_minebase_db_config
     from func.secret_store import MINEBASE_PASSWORD_MASK as _MASKED
 
-    btn = config_refs["mb_test_btn"]
-    result = config_refs["mb_test_result"]
-
-    host = (config_refs["mb_db_host"].value or "").strip()
-    port_str = (config_refs["mb_db_port"].value or "").strip()
-    database = (config_refs["mb_db_name"].value or "").strip()
-    user = (config_refs["mb_db_user"].value or "").strip()
-    password = config_refs["mb_db_pass"].value or ""
-
-    # 如果密码字段是掩码且有已保存的密码，从配置中加载真实密码
+    # 掩码密码自动加载
     if password == _MASKED:
-        saved_cfg = get_minebase_db_config()
+        saved_cfg = saved_config_loader()
         password = saved_cfg.get("password", "")
         if not password:
             _show_snackbar(page, "未找到已保存的密码，请先输入密码并保存", is_error=True)
             return
 
-    if not port_str.isdigit():
-        _show_snackbar(page, "端口必须是数字", is_error=True)
+    # 输入校验
+    error = validate_fn(password)
+    if error:
+        _show_snackbar(page, error, is_error=True)
         return
-    port = int(port_str)
 
     set_btn_state(btn, False, "测试中...")
     result.visible = False
     result.update()
 
     try:
-        success, msg = await asyncio.to_thread(
-            test_db_connection, host, port, database, user, password,
-        )
+        success, msg = await asyncio.to_thread(test_fn, password)
         result.value = msg
         result.color = "#10B981" if success else "#EF4444"
         result.visible = True
         result.update()
 
-        _log_message(log, f"数据库连接测试: {msg}", level=logging.INFO if success else logging.WARNING)
+        _log_message(log, f"{label}连接测试: {msg}", level=logging.INFO if success else logging.WARNING)
         _show_snackbar(page, "连接成功" if success else "连接失败", is_error=not success)
     except Exception as exc:
         result.value = str(exc)[:200]
@@ -1144,6 +1137,35 @@ async def on_test_db_connection(page: ft.Page, config_refs: dict, log):
     finally:
         if not _shutdown_event.is_set():
             set_btn_state(btn, True, "测试连接")
+
+
+async def on_test_db_connection(page: ft.Page, config_refs: dict, log):
+    """测试数据库连接
+
+    如果密码字段显示掩码（********），自动从已保存的配置中加载真实密码，
+    方便用户无需重新输入密码即可测试连接。加载的密码不会回填到界面。
+    """
+    from func.config_loader import get_minebase_db_config
+
+    host = (config_refs["mb_db_host"].value or "").strip()
+    port_str = (config_refs["mb_db_port"].value or "").strip()
+    database = (config_refs["mb_db_name"].value or "").strip()
+    user = (config_refs["mb_db_user"].value or "").strip()
+    password = config_refs["mb_db_pass"].value or ""
+
+    def _validate(pwd):
+        if not port_str.isdigit():
+            return "端口必须是数字"
+        return None
+
+    def _test(pwd):
+        return test_db_connection(host, int(port_str), database, user, pwd)
+
+    await _run_connection_test(
+        config_refs["mb_test_btn"], config_refs["mb_test_result"],
+        password, get_minebase_db_config, _validate, _test,
+        page, log, "数据库",
+    )
 
 
 def wire_test_db_button(config_refs: dict, page: ft.Page, log):
@@ -1160,51 +1182,24 @@ async def on_test_api_connection(page: ft.Page, config_refs: dict, log):
     方便用户无需重新输入密码即可测试连接。加载的密码不会回填到界面。
     """
     from func.config_loader import get_minebase_api_config
-    from func.secret_store import MINEBASE_PASSWORD_MASK as _MASKED
-
-    btn = config_refs["mb_api_test_btn"]
-    result = config_refs["mb_api_test_result"]
 
     url = (config_refs["mb_api_url"].value or "").strip()
     username = (config_refs["mb_api_user"].value or "").strip()
     password = config_refs["mb_api_pass"].value or ""
 
-    # 如果密码字段是掩码且有已保存的密码，从配置中加载真实密码
-    if password == _MASKED:
-        saved_cfg = get_minebase_api_config()
-        password = saved_cfg.get("password", "")
-        if not password:
-            _show_snackbar(page, "未找到已保存的密码，请先输入密码并保存", is_error=True)
-            return
+    def _validate(pwd):
+        if not url:
+            return "请填写 API 地址"
+        return None
 
-    if not url:
-        _show_snackbar(page, "请填写 API 地址", is_error=True)
-        return
+    def _test(pwd):
+        return test_api_connection(url, username, pwd)
 
-    set_btn_state(btn, False, "测试中...")
-    result.visible = False
-    result.update()
-
-    try:
-        success, msg = await asyncio.to_thread(
-            test_api_connection, url, username, password,
-        )
-        result.value = msg
-        result.color = "#10B981" if success else "#EF4444"
-        result.visible = True
-        result.update()
-
-        _log_message(log, f"API 连接测试: {msg}", level=logging.INFO if success else logging.WARNING)
-        _show_snackbar(page, "连接成功" if success else "连接失败", is_error=not success)
-    except Exception as exc:
-        result.value = str(exc)[:200]
-        result.color = "#EF4444"
-        result.visible = True
-        result.update()
-        _show_snackbar(page, "测试异常", is_error=True)
-    finally:
-        if not _shutdown_event.is_set():
-            set_btn_state(btn, True, "测试连接")
+    await _run_connection_test(
+        config_refs["mb_api_test_btn"], config_refs["mb_api_test_result"],
+        password, get_minebase_api_config, _validate, _test,
+        page, log, "API",
+    )
 
 
 def wire_test_api_button(config_refs: dict, page: ft.Page, log):

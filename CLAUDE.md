@@ -60,7 +60,7 @@ uv run pytest tests/test_gui_components.py
 uv run pytest tests/test_gui_components.py -k config
 ```
 
-测试覆盖 887 个用例，涵盖 GUI 组件、配置读写、日志分发、Excel 合并、设备台账、油品台账、Keychain 凭证存储、Tauri RPC、异常值检测等多个模块（详见 README.md 测试章节）。
+测试覆盖 1,054 个用例，涵盖 GUI 组件、配置读写、日志分发、Excel 合并、设备台账、油品台账、Keychain 凭证存储、Tauri RPC、异常值检测等多个模块（详见 README.md 测试章节）。
 
 ## 高层架构
 
@@ -78,7 +78,7 @@ uv run pytest tests/test_gui_components.py -k config
 GUI 采用明显的三段式拆分：
 
 - `gui/main.py`：组装页面、初始化全局日志、连接各分区。
-- `gui/components/`：按功能拆分为多个模块（`modules.py`、`config.py`、`batch.py`、`ledger.py`、`ledger_match.py`、`oil_ledger.py`、`user_config.py`、`log_view.py` 等），只创建控件和局部状态，返回 `refs` 供外部操作。
+- `gui/components/`：按功能拆分为多个模块（`modules.py`、`config.py`、`batch.py`、`ledger.py`、`ledger_match.py`、`oil_ledger.py`、`user_config/`（包，按子区域拆分为 8 个模块）、`log_view.py` 等），只创建控件和局部状态，返回 `refs` 供外部操作。
 - `gui/logic.py`：把按钮事件绑定到具体处理函数，并用 `asyncio.to_thread()` 把长耗时 Excel 处理放到后台线程执行。
 
 这个分层很关键：
@@ -102,21 +102,22 @@ GUI 侧在 `gui/main.py` 中额外挂载 `QueueHandler`，把后台线程里的�
 
 当前并不是一个统一的数据管道，而是多个相互独立的报表解析器：
 
-- `excel_fuel.py`：从“设备柴油消耗”类表提取发动机与油耗信息，输出 `Fuel.xlsx`。
-- `excel_electrical.py`：扫描包含 `Electrical` 的 sheet，按“日期”行定位列，再提取设备电耗。
+- `excel_fuel.py`：从”设备柴油消耗”类表提取发动机与油耗信息，输出 `Fuel.xlsx`。
+- `excel_electrical.py`：扫描包含 `Electrical` 的 sheet，按”日期”行定位列，再提取设备电耗。
 - `excel_worktime.py`：输出按年月命名的工作效率表。
 - `excel_worktime_multifile.py`：工时批量处理，支持多文件汇总输出。
 - `excel_production_enhanced.py`：解析白班/夜班生产报表，GUI 默认使用版本。
 - `excel_merger.py`：按文件名关键字批量合并同结构 Excel，并支持排序与日期格式化。
 - `excel_batch.py`：批量多报表综合处理，可一次性处理文件夹内的多种报表。
 
-这意味着改动某个处理器时，要先确认它是否被 GUI 调用：GUI 当前通过 `gui/logic.py` 使用的是：
+`func/orchestration.py` 是 Flet 和 Tauri 共享的统一调度层，提供：
 
-- `process_diesel_data`
-- `MiningDataProcessor`（来自 `excel_production_enhanced.py`）
-- `parse_excel_data`
-- `process_excel_data`
-- `merge_excel_files`
+- `process_single(module_type, path, **kwargs)` — 唯一调度入口，自动处理输出路径计算、台账后处理、异常值检测配置
+- `get_output_path(module_type, path, ...)` — 统一输出文件路径计算
+- `load_ledgers()` / `postprocess_with_ledgers()` — 台账加载与匹配后处理
+- `build_worktime_header_mapping()` — 工时表头映射构建
+
+Flet 通过 `gui/logic.py:_dispatch_module()` 调用 `process_single()`，Tauri 通过 `tauri_bridge.py` 的 `@_register` 方法调用 `process_single()`。修改处理器行为时，优先在 `process_single()` 中修改，而非分别修改两个前端的调用代码。
 
 ## 5. 配置分为两层文件 + 运行时临时值
 
@@ -167,7 +168,23 @@ GUI 侧 `gui/components/ledger.py`、`ledger_match.py`、`oil_ledger.py` 分别�
 
 如果后续要做综合统计报表，建议把新逻辑放在 `func/` 内新增独立模块，由 GUI/CLI 作为外层入口调用，而不是直接耦合进现有某个单一处理脚本。
 
-## 9. GUI 错误显示策略：只展示根因，完整 traceback 保留在后端日志
+## 9. Tauri 前端共享组件库
+
+Tauri（React + TypeScript）前端采用与 Flet 类似的分层：
+
+- `src/lib/`：共享基础设施
+  - `icons.tsx`：64 个 SVG 图标组件（全项目统一导入路径）
+  - `ui-components.tsx`：ToggleSwitch、StyledToggle、ChipToggle、PathInput、ConfirmDialog、Collapsible、SectionDivider
+  - `ui-classes.ts`：共享 CSS class 常量（inputClass、btnPrimaryClass 等）
+  - `types.ts`：共享 TypeScript 类型（BridgeProp、BatchProgress 等）
+- `src/components/`：共享业务组件（Toast、LogPanel、DatePicker、AnomalyPanel）
+- `src/hooks/`：共享 hooks（useLastDirectory、usePythonBridge）
+- `src/components/pages/`：页面组件（11 个），每个页面从 `lib/` 和 `components/` 导入共享模块
+- `src/components/user-config/`：用户配置页面的子组件（8 个），由 `UserConfigPage.tsx` 组装
+
+新增 Tauri UI 组件时，优先放到 `src/lib/ui-components.tsx`；新增图标放到 `src/lib/icons.tsx`。
+
+## 10. GUI 错误显示策略：只展示根因，完整 traceback 保留在后端日志
 
 GUI 日志台的目标是让用户**快速理解发生了什么**，而不是看到一段 Python traceback。因此在日志链路的**展示层**做了 trace剥离：
 
@@ -180,7 +197,7 @@ GUI 日志台的目标是让用户**快速理解发生了什么**，而不是看
 
 ## 测试与修改提示
 
-- 测试分布在 `tests/` 下 38 个文件中（747 个用例），核心文件包括：
+- 测试分布在 `tests/` 下 43 个文件中（1,054 个用例），核心文件包括：
   - `test_gui_components.py`：GUI 组件行为、布局、按钮交互
   - `test_config_loader.py`：配置读写落盘、默认值合并、运行时配置、MineBase 保存集成
   - `test_logic_helpers.py`：GUI 逻辑辅助函数

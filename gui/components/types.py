@@ -105,6 +105,8 @@ class LogViewRefs(TypedDict):
     resize_handle: ft.GestureDetector
     list_container: ft.Container
     log_list: ft.ListView
+    count_text: ft.Text
+    collapse_button: ft.IconButton
 
 
 class SyncRefs(TypedDict):
