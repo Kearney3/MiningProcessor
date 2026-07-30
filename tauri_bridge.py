@@ -271,6 +271,32 @@ def _build_anomaly_config(params: dict):
     )
 
 
+def _extract_common_params(params: dict) -> dict:
+    """从 RPC 参数中提取所有模块共用的处理参数。
+
+    消除 6 个 @_register 方法中重复的参数提取代码。
+    """
+    return {
+        "skip_hidden": params.get("skip_hidden", False),
+        "skip_hidden_rows": params.get("skip_hidden_rows", False),
+        "skip_hidden_cols": params.get("skip_hidden_cols", False),
+        "anomaly_config": _build_anomaly_config(params),
+        "use_equipment_ledger": params.get("use_equipment_ledger", False),
+        "use_oil_ledger": params.get("use_oil_ledger", False),
+    }
+
+
+def _postprocess_output(output_file: str | None, common: dict) -> None:
+    """对输出文件执行台账匹配后处理（如已启用）。"""
+    if not output_file:
+        return
+    _post_process_ledger(
+        output_file,
+        use_equipment_ledger=common.get("use_equipment_ledger", False),
+        use_oil_ledger=common.get("use_oil_ledger", False),
+    )
+
+
 def _load_oil_ledger_from_cache():
     """从缓存加载油品台账实例，失败返回 None。"""
     from func.orchestration import load_oil_ledger_from_cache
@@ -301,22 +327,18 @@ def _process_fuel(params: dict) -> dict:
     from func.excel_fuel import process_diesel_data
 
     safe_path = str(_sanitize_path(params["path"], must_exist=True))
+    common = _extract_common_params(params)
     result = process_diesel_data(
         safe_path, target_year=params.get("year"),
-        skip_hidden=params.get("skip_hidden", False),
-        skip_hidden_rows=params.get("skip_hidden_rows", False),
-        skip_hidden_cols=params.get("skip_hidden_cols", False),
-        anomaly_config=_build_anomaly_config(params),
+        skip_hidden=common["skip_hidden"],
+        skip_hidden_rows=common["skip_hidden_rows"],
+        skip_hidden_cols=common["skip_hidden_cols"],
+        anomaly_config=common["anomaly_config"],
         filter_zero_engine_hours=params.get("filter_zero_engine_hours", False),
         filter_zero_work_hours=params.get("filter_zero_work_hours", False),
     )
     output_file = str(result) if result else None
-    if output_file:
-        _post_process_ledger(
-            output_file,
-            use_equipment_ledger=params.get("use_equipment_ledger", False),
-            use_oil_ledger=params.get("use_oil_ledger", False),
-        )
+    _postprocess_output(output_file, common)
     return {"output_file": output_file}
 
 
@@ -326,14 +348,15 @@ def _process_production(params: dict) -> dict:
     from func.config_loader import get_device_load_map, get_load_map_version
     from func.orchestration import get_output_path
 
+    common = _extract_common_params(params)
     load_map_ver = get_load_map_version()
     load_map = get_device_load_map(load_map_ver)
     processor = MiningDataProcessor(
         raw_start=params.get("raw_start", -1), device_load_map=load_map,
-        skip_hidden=params.get("skip_hidden", False),
-        skip_hidden_rows=params.get("skip_hidden_rows", False),
-        skip_hidden_cols=params.get("skip_hidden_cols", False),
-        anomaly_config=_build_anomaly_config(params),
+        skip_hidden=common["skip_hidden"],
+        skip_hidden_rows=common["skip_hidden_rows"],
+        skip_hidden_cols=common["skip_hidden_cols"],
+        anomaly_config=common["anomaly_config"],
         filter_zero_hours_meter=params.get("filter_zero_hours_meter", False),
         filter_zero_km_meter=params.get("filter_zero_km_meter", False),
         filter_zero_run_hours=params.get("filter_zero_run_hours", False),
@@ -343,15 +366,9 @@ def _process_production(params: dict) -> dict:
     if os.path.isdir(path):
         processor.process_folder(path, cancel_event=_cancel_event)
     else:
-        output_file = get_output_path("production", path)
-        processor.process_single_file(path, output_file)
+        processor.process_single_file(path, get_output_path("production", path))
     output_file = get_output_path("production", path)
-    if output_file:
-        _post_process_ledger(
-            output_file,
-            use_equipment_ledger=params.get("use_equipment_ledger", False),
-            use_oil_ledger=params.get("use_oil_ledger", False),
-        )
+    _postprocess_output(output_file, common)
     result = {"output_file": output_file}
     summary = getattr(processor, "_processing_summary", None)
     if summary:
@@ -365,22 +382,19 @@ def _process_electrical(params: dict) -> dict:
     from func.orchestration import get_output_path
 
     safe_path = str(_sanitize_path(params["path"], must_exist=True))
+    common = _extract_common_params(params)
     parse_excel_data(
         safe_path,
         target_year=params.get("year"),
         add_shift_column=params.get("add_shift_column", False),
         default_shift=params.get("default_shift", "Day"),
-        skip_hidden=params.get("skip_hidden", False),
-        skip_hidden_rows=params.get("skip_hidden_rows", False),
-        skip_hidden_cols=params.get("skip_hidden_cols", False),
-        anomaly_config=_build_anomaly_config(params),
+        skip_hidden=common["skip_hidden"],
+        skip_hidden_rows=common["skip_hidden_rows"],
+        skip_hidden_cols=common["skip_hidden_cols"],
+        anomaly_config=common["anomaly_config"],
     )
     output_file = get_output_path("electrical", safe_path, year=params.get("year"))
-    _post_process_ledger(
-        output_file,
-        use_equipment_ledger=params.get("use_equipment_ledger", False),
-        use_oil_ledger=params.get("use_oil_ledger", False),
-    )
+    _postprocess_output(output_file, common)
     return {"output_file": output_file}
 
 
@@ -389,6 +403,7 @@ def _process_worktime(params: dict) -> dict:
     from func.excel_worktime import process_excel_data
     from func.orchestration import build_worktime_header_mapping, get_output_path
 
+    common = _extract_common_params(params)
     header_mapping = None
     if params.get("use_header_mapping"):
         header_mapping = build_worktime_header_mapping(
@@ -405,10 +420,10 @@ def _process_worktime(params: dict) -> dict:
             safe_path, year, month,
             output_file=output_file,
             header_mapping=header_mapping,
-            skip_hidden=params.get("skip_hidden", False),
-            skip_hidden_rows=params.get("skip_hidden_rows", False),
-            skip_hidden_cols=params.get("skip_hidden_cols", False),
-            anomaly_config=_build_anomaly_config(params),
+            skip_hidden=common["skip_hidden"],
+            skip_hidden_rows=common["skip_hidden_rows"],
+            skip_hidden_cols=common["skip_hidden_cols"],
+            anomaly_config=common["anomaly_config"],
         )
     else:
         process_excel_data(
@@ -416,18 +431,13 @@ def _process_worktime(params: dict) -> dict:
             year=year,
             month=month,
             output_file=output_file,
-            return_sheets=False,
             header_mapping=header_mapping,
-            skip_hidden=params.get("skip_hidden", False),
-            skip_hidden_rows=params.get("skip_hidden_rows", False),
-            skip_hidden_cols=params.get("skip_hidden_cols", False),
-            anomaly_config=_build_anomaly_config(params),
+            skip_hidden=common["skip_hidden"],
+            skip_hidden_rows=common["skip_hidden_rows"],
+            skip_hidden_cols=common["skip_hidden_cols"],
+            anomaly_config=common["anomaly_config"],
         )
-    _post_process_ledger(
-        output_file,
-        use_equipment_ledger=params.get("use_equipment_ledger", False),
-        use_oil_ledger=params.get("use_oil_ledger", False),
-    )
+    _postprocess_output(output_file, common)
     return {"output_file": output_file}
 
 
@@ -436,22 +446,18 @@ def _process_merge(params: dict) -> dict:
     from func.excel_merger import merge_excel_files
 
     safe_folder = str(_sanitize_path(params["folder_path"], must_exist=True, allow_file=False))
+    common = _extract_common_params(params)
     output = merge_excel_files(
         safe_folder,
         params["keyword"],
         strip_time=params.get("strip_time", False),
         sort_configs=params.get("sort_configs"),
-        skip_hidden=params.get("skip_hidden", False),
-        skip_hidden_rows=params.get("skip_hidden_rows", False),
-        skip_hidden_cols=params.get("skip_hidden_cols", False),
+        skip_hidden=common["skip_hidden"],
+        skip_hidden_rows=common["skip_hidden_rows"],
+        skip_hidden_cols=common["skip_hidden_cols"],
         tolerant_header=params.get("tolerant_header", False),
     )
-    if output:
-        _post_process_ledger(
-            output,
-            use_equipment_ledger=params.get("use_equipment_ledger", False),
-            use_oil_ledger=params.get("use_oil_ledger", False),
-        )
+    _postprocess_output(output, common)
     return {"output_file": output}
 
 
@@ -461,10 +467,10 @@ def _process_maintenance(params: dict) -> dict:
     from func.config_loader import get_maintenance_classifications
 
     safe_path = str(_sanitize_path(params["path"], must_exist=True))
+    common = _extract_common_params(params)
 
-    # 加载台账
     eq_ledger = None
-    if params.get("use_equipment_ledger", False):
+    if common["use_equipment_ledger"]:
         eq_ledger = _load_equipment_ledger_from_cache()
 
     classifications = get_maintenance_classifications()
@@ -472,15 +478,17 @@ def _process_maintenance(params: dict) -> dict:
         safe_path,
         eq_ledger=eq_ledger,
         classifications=classifications,
-        skip_hidden_rows=params.get("skip_hidden_rows", False),
-        skip_hidden_cols=params.get("skip_hidden_cols", False),
+        skip_hidden_rows=common["skip_hidden_rows"],
+        skip_hidden_cols=common["skip_hidden_cols"],
         split_by_year=params.get("split_by_year", False),
         details_only=params.get("details_only", False),
         use_ml_fallback=params.get("use_ml_fallback", True),
     )
-    # split_by_year 时返回列表
     if isinstance(output_file, list):
+        for f in output_file:
+            _postprocess_output(str(f), common)
         return {"output_files": [str(f) for f in output_file], "output_file": output_file[-1] if output_file else None}
+    _postprocess_output(str(output_file), common)
     return {"output_file": str(output_file)}
 
 

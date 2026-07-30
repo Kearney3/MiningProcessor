@@ -799,43 +799,7 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
             )
 
         # ── 第三阶段：执行处理 ──
-        # 跳过隐藏行/列
-        skip_hidden_rows = False
-        skip_hidden_cols = False
-        _sh_rows_toggle = batch_refs.get("_skip_hidden_rows_toggle")
-        _sh_cols_toggle = batch_refs.get("_skip_hidden_cols_toggle")
-        if _sh_rows_toggle:
-            skip_hidden_rows = _sh_rows_toggle.value
-        if _sh_cols_toggle:
-            skip_hidden_cols = _sh_cols_toggle.value
-
-        filter_zero_engine_hours = False
-        _fzh_toggle = batch_refs.get("_filter_zero_hours_toggle")
-        if _fzh_toggle:
-            filter_zero_engine_hours = _fzh_toggle.value
-
-        filter_zero_work_hours = False
-        _fzw_toggle = batch_refs.get("_filter_zero_work_hours_toggle")
-        if _fzw_toggle:
-            filter_zero_work_hours = _fzw_toggle.value
-
-        # 生产模块过滤开关
-        filter_zero_hours_meter = False
-        filter_zero_km_meter = False
-        filter_zero_run_hours = False
-        filter_zero_run_km = False
-        _fzm = batch_refs.get("_filter_zero_hours_meter_toggle")
-        if _fzm:
-            filter_zero_hours_meter = _fzm.value
-        _fkm = batch_refs.get("_filter_zero_km_meter_toggle")
-        if _fkm:
-            filter_zero_km_meter = _fkm.value
-        _frh = batch_refs.get("_filter_zero_run_hours_toggle")
-        if _frh:
-            filter_zero_run_hours = _frh.value
-        _frk = batch_refs.get("_filter_zero_run_km_toggle")
-        if _frk:
-            filter_zero_run_km = _frk.value
+        params = collect_processing_params(batch_refs)
 
         set_btn_state(btn, False, "处理中...")
         done_flag = asyncio.Event()
@@ -853,15 +817,7 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
                         table_merge_config,
                         progress_cb=progress_queue.put_nowait,
                         cancel_event=cancel_event,
-                        skip_hidden_rows=skip_hidden_rows,
-                        skip_hidden_cols=skip_hidden_cols,
-                        anomaly_config=anomaly_config,
-                        filter_zero_engine_hours=filter_zero_engine_hours,
-                        filter_zero_work_hours=filter_zero_work_hours,
-                        filter_zero_hours_meter=filter_zero_hours_meter,
-                        filter_zero_km_meter=filter_zero_km_meter,
-                        filter_zero_run_hours=filter_zero_run_hours,
-                        filter_zero_run_km=filter_zero_run_km,
+                        **params,
                     )
                     thread_result["value"] = results
                     thread_result["summary"] = summary
@@ -913,6 +869,30 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
 # ---------------------------------------------------------------------------
 # 初始化 & 绑定
 # ---------------------------------------------------------------------------
+def _get_toggle_value(refs: dict, key: str, default=False):
+    """从 refs 中安全读取 toggle/checkbox 值。"""
+    ref = refs.get(key)
+    return ref.value if ref else default
+
+
+def collect_processing_params(refs: dict) -> dict:
+    """从 GUI refs 中提取所有模块共用的处理参数。
+
+    消除 _make_module_handler 和 on_batch_process 中重复的参数提取代码。
+    """
+    return {
+        "skip_hidden_rows": _get_toggle_value(refs, "_skip_hidden_rows_toggle"),
+        "skip_hidden_cols": _get_toggle_value(refs, "_skip_hidden_cols_toggle"),
+        "anomaly_config": _build_anomaly_config(refs),
+        "filter_zero_engine_hours": _get_toggle_value(refs, "_filter_zero_hours_toggle"),
+        "filter_zero_work_hours": _get_toggle_value(refs, "_filter_zero_work_hours_toggle"),
+        "filter_zero_hours_meter": _get_toggle_value(refs, "_filter_zero_hours_meter_toggle"),
+        "filter_zero_km_meter": _get_toggle_value(refs, "_filter_zero_km_meter_toggle"),
+        "filter_zero_run_hours": _get_toggle_value(refs, "_filter_zero_run_hours_toggle"),
+        "filter_zero_run_km": _get_toggle_value(refs, "_filter_zero_run_km_toggle"),
+    }
+
+
 def _get_ledgers_from_refs(
     module_refs: dict,
     ledger_refs: dict,
@@ -950,60 +930,20 @@ def _make_module_handler(
 
     async def handler(e: ft.ControlEvent) -> None:
         eq, oil = _get_ledgers_from_refs(module_refs, ledger_refs, oil_ledger_refs)
-        skip_hidden_rows = False
-        skip_hidden_cols = False
-        _sh_rows = module_refs.get("_skip_hidden_rows_toggle")
-        _sh_cols = module_refs.get("_skip_hidden_cols_toggle")
-        if _sh_rows:
-            skip_hidden_rows = _sh_rows.value
-        if _sh_cols:
-            skip_hidden_cols = _sh_cols.value
 
-        filter_zero_hours = False
-        filter_zero_work_hours = False
-        _fuel_refs = module_refs.get(module_key, {})
-        _fzh = _fuel_refs.get("_filter_zero_hours_toggle")
-        if _fzh:
-            filter_zero_hours = _fzh.value
-        _fzw = _fuel_refs.get("_filter_zero_work_hours_toggle")
-        if _fzw:
-            filter_zero_work_hours = _fzw.value
+        # 从公共 refs 和模块 refs 中提取处理参数
+        params = collect_processing_params(module_refs)
+        module_refs_inner = module_refs.get(module_key, {})
+        module_params = collect_processing_params(module_refs_inner)
 
-        # 生产模块专属过滤开关
-        filter_zero_hours_meter = False
-        filter_zero_km_meter = False
-        filter_zero_run_hours = False
-        filter_zero_run_km = False
-        _fzm = _fuel_refs.get("_filter_zero_hours_meter_toggle")
-        if _fzm:
-            filter_zero_hours_meter = _fzm.value
-        _fkm = _fuel_refs.get("_filter_zero_km_meter_toggle")
-        if _fkm:
-            filter_zero_km_meter = _fkm.value
-        _frh = _fuel_refs.get("_filter_zero_run_hours_toggle")
-        if _frh:
-            filter_zero_run_hours = _frh.value
-        _frk = _fuel_refs.get("_filter_zero_run_km_toggle")
-        if _frk:
-            filter_zero_run_km = _frk.value
-
-        # 构建异常检测配置
-        anomaly_config = _build_anomaly_config(module_refs)
-
-        extra_kwargs = {}
-        if module_key == "fuel":
-            extra_kwargs["filter_zero_engine_hours"] = filter_zero_hours
-            extra_kwargs["filter_zero_work_hours"] = filter_zero_work_hours
-        elif module_key == "prod":
-            extra_kwargs["filter_zero_hours_meter"] = filter_zero_hours_meter
-            extra_kwargs["filter_zero_km_meter"] = filter_zero_km_meter
-            extra_kwargs["filter_zero_run_hours"] = filter_zero_run_hours
-            extra_kwargs["filter_zero_run_km"] = filter_zero_run_km
+        # 模块级 refs 覆盖公共 refs
+        for key in module_params:
+            if module_params[key]:
+                params[key] = module_params[key]
 
         await callback(page, module_refs[module_key], log,
                        equipment_ledger=eq, oil_ledger=oil,
-                       skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
-                       anomaly_config=anomaly_config, **extra_kwargs)
+                       **params)
 
     return handler
 
@@ -1058,11 +998,7 @@ def wire_processing_buttons(
             oil_toggle = module_refs["batch"].get("match_oil_toggle")
             eq = ledger_refs.get("get_ledger", lambda: None)() if eq_toggle and eq_toggle.value else None
             oil = oil_ledger_refs.get("get_oil", lambda: None)() if oil_toggle and oil_toggle.value else None
-            try:
-                from .components.common import build_anomaly_config_from_refs
-            except ImportError:
-                from gui.components.common import build_anomaly_config_from_refs
-            anomaly_config = build_anomaly_config_from_refs(module_refs["batch"])
+            anomaly_config = _build_anomaly_config(module_refs["batch"])
             await on_batch_process(page, module_refs["batch"], log, equipment_ledger=eq, oil_ledger=oil, anomaly_config=anomaly_config)
         module_refs["batch"]["btn"].on_click = handle_batch_click
 
@@ -1287,24 +1223,8 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
 def wire_sync_button(sync_refs: dict, page: ft.Page, log, module_refs: dict | None = None):
     """绑定 MineBase 同步按钮"""
     async def handle_sync_click(e: ft.ControlEvent):
-        try:
-            from .components.common import build_anomaly_config_from_refs
-        except ImportError:
-            from gui.components.common import build_anomaly_config_from_refs
-        anomaly_config = build_anomaly_config_from_refs(sync_refs)
-
-        # 读取过滤开关
-        def _get_toggle(key):
-            ref = sync_refs.get(key)
-            return ref.value if ref else False
-
-        await on_sync_process(page, sync_refs, log, anomaly_config=anomaly_config,
-                              filter_zero_engine_hours=_get_toggle("_filter_zero_hours_toggle"),
-                              filter_zero_work_hours=_get_toggle("_filter_zero_work_hours_toggle"),
-                              filter_zero_hours_meter=_get_toggle("_filter_zero_hours_meter_toggle"),
-                              filter_zero_km_meter=_get_toggle("_filter_zero_km_meter_toggle"),
-                              filter_zero_run_hours=_get_toggle("_filter_zero_run_hours_toggle"),
-                              filter_zero_run_km=_get_toggle("_filter_zero_run_km_toggle"))
+        params = collect_processing_params(sync_refs)
+        await on_sync_process(page, sync_refs, log, **params)
     sync_refs["btn"].on_click = handle_sync_click
 
 
