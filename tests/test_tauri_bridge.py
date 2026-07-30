@@ -8,6 +8,8 @@ import sys
 from datetime import date
 from unittest.mock import MagicMock, patch
 
+from func.orchestration import postprocess_from_cache
+
 import pandas as pd
 import pytest
 
@@ -63,12 +65,12 @@ class TestStructuredStderrLogging:
 
 
 # ---------------------------------------------------------------------------
-# _post_process_ledger
+# postprocess_from_cache (formerly postprocess_from_cache)
 # ---------------------------------------------------------------------------
 
 
 class TestPostProcessLedger:
-    """台账匹配后处理测试。"""
+    """台账匹配后处理测试（委托 func.orchestration.postprocess_from_cache）。"""
 
     def _write_excel(self, tmp_path, sheets: dict[str, pd.DataFrame]) -> str:
         path = str(tmp_path / "output.xlsx")
@@ -80,7 +82,7 @@ class TestPostProcessLedger:
     def test_skip_when_both_false(self, tmp_path):
         """两个开关都为 False 时不执行任何操作。"""
         path = self._write_excel(tmp_path, {"s": pd.DataFrame({"a": [1]})})
-        tauri_bridge._post_process_ledger(path, use_equipment_ledger=False, use_oil_ledger=False)
+        postprocess_from_cache(path, use_equipment_ledger=False, use_oil_ledger=False)
         df = pd.read_excel(path)
         assert list(df.columns) == ["a"]
 
@@ -91,7 +93,7 @@ class TestPostProcessLedger:
         })
         with patch("func.config_loader.has_equipment_ledger_cache", return_value=False), \
              patch("func.config_loader.has_oil_ledger_cache", return_value=False):
-            tauri_bridge._post_process_ledger(path, use_equipment_ledger=True, use_oil_ledger=True)
+            postprocess_from_cache(path, use_equipment_ledger=True, use_oil_ledger=True)
         df = pd.read_excel(path)
         assert "标准设备名称" not in df.columns
 
@@ -108,7 +110,7 @@ class TestPostProcessLedger:
         with patch("func.config_loader.has_equipment_ledger_cache", return_value=True), \
              patch("func.config_loader.load_equipment_ledger_cache", return_value=mock_ledger_data), \
              patch("func.config_loader.has_oil_ledger_cache", return_value=False):
-            tauri_bridge._post_process_ledger(path, use_equipment_ledger=True, use_oil_ledger=False)
+            postprocess_from_cache(path, use_equipment_ledger=True, use_oil_ledger=False)
         df = pd.read_excel(path)
         assert "标准设备名称" in df.columns
         assert df["标准设备名称"].iloc[0] == "NTE240"
@@ -130,7 +132,7 @@ class TestPostProcessLedger:
              patch("func.config_loader.load_equipment_ledger_cache", return_value=mock_eq_data), \
              patch("func.config_loader.has_oil_ledger_cache", return_value=True), \
              patch("func.config_loader.load_oil_ledger_cache", return_value=mock_oil_data):
-            tauri_bridge._post_process_ledger(path, use_equipment_ledger=True, use_oil_ledger=True)
+            postprocess_from_cache(path, use_equipment_ledger=True, use_oil_ledger=True)
         df = pd.read_excel(path)
         assert "标准油品名称" in df.columns
 
@@ -152,7 +154,7 @@ class TestPostProcessLedger:
         with patch("func.config_loader.has_equipment_ledger_cache", return_value=True), \
              patch("func.config_loader.load_equipment_ledger_cache", return_value=mock_eq_data), \
              patch("func.config_loader.has_oil_ledger_cache", return_value=False):
-            tauri_bridge._post_process_ledger(path, use_equipment_ledger=True, use_oil_ledger=False)
+            postprocess_from_cache(path, use_equipment_ledger=True, use_oil_ledger=False)
         df = pd.read_excel(path)
         assert "标准设备名称（矿卡）" in df.columns
         assert "标准设备名称（挖机）" in df.columns
@@ -173,7 +175,7 @@ class TestPostProcessLedger:
         ]
         with patch("func.config_loader.has_equipment_ledger_cache", return_value=True), \
              patch("func.config_loader.load_equipment_ledger_cache", return_value=mock_eq_data):
-            tauri_bridge._post_process_ledger(path, use_equipment_ledger=True, use_oil_ledger=False)
+            postprocess_from_cache(path, use_equipment_ledger=True, use_oil_ledger=False)
         df = pd.read_excel(path)
         assert "标准设备名称" in df.columns
         assert "标准油品名称" not in df.columns
@@ -190,7 +192,7 @@ class TestPostProcessLedger:
         mock_oil_data = [{"油品名称": "0号柴油", "标准油品名称": "柴油"}]
         with patch("func.config_loader.has_oil_ledger_cache", return_value=True), \
              patch("func.config_loader.load_oil_ledger_cache", return_value=mock_oil_data):
-            tauri_bridge._post_process_ledger(path, use_equipment_ledger=False, use_oil_ledger=True)
+            postprocess_from_cache(path, use_equipment_ledger=False, use_oil_ledger=True)
         df = pd.read_excel(path)
         assert "标准油品名称" in df.columns
         assert "标准设备名称" not in df.columns
@@ -211,7 +213,7 @@ class TestProcessFuelRPC:
 
         expected_output = str(tmp_path / "Fuel.xlsx")
         with patch("func.excel_fuel.process_diesel_data", return_value=expected_output), \
-             patch.object(tauri_bridge, "_post_process_ledger") as mock_post:
+             patch("func.orchestration.postprocess_from_cache") as mock_post:
             result = tauri_bridge._process_fuel({
                 "path": input_file,
                 "use_equipment_ledger": True,
@@ -225,35 +227,30 @@ class TestProcessFuelRPC:
         )
 
     def test_no_post_process_when_ledger_disabled(self, tmp_path):
-        """台账匹配禁用时 _post_process_ledger 收到 False 参数（内部早返回）。"""
+        """台账匹配禁用时不调用 postprocess_from_cache。"""
         input_file = str(tmp_path / "fuel_input.xlsx")
         pd.DataFrame({"a": [1]}).to_excel(input_file, index=False)
 
         expected_output = str(tmp_path / "Fuel.xlsx")
         with patch("func.excel_fuel.process_diesel_data", return_value=expected_output), \
-             patch.object(tauri_bridge, "_post_process_ledger") as mock_post:
+             patch("func.orchestration.postprocess_from_cache") as mock_post:
             result = tauri_bridge._process_fuel({
                 "path": input_file,
                 "use_equipment_ledger": False,
                 "use_oil_ledger": False,
             })
         assert result["output_file"] == expected_output
-        mock_post.assert_called_once_with(
-            expected_output,
-            use_equipment_ledger=False,
-            use_oil_ledger=False,
-        )
+        mock_post.assert_not_called()
 
-    def test_returns_none_when_processing_fails(self, tmp_path):
-        """处理失败时 output_file 为 None，不调用台账匹配。"""
+    def test_returns_output_path_even_when_processing_fails(self, tmp_path):
+        """处理失败时 output_file 仍为计算的路径（process_single 独立计算）。"""
         input_file = str(tmp_path / "bad.xlsx")
         pd.DataFrame({"a": [1]}).to_excel(input_file, index=False)
 
-        with patch("func.excel_fuel.process_diesel_data", return_value=None), \
-             patch.object(tauri_bridge, "_post_process_ledger") as mock_post:
+        with patch("func.excel_fuel.process_diesel_data", return_value=None):
             result = tauri_bridge._process_fuel({"path": input_file})
-        assert result["output_file"] is None
-        mock_post.assert_not_called()
+        # process_single 使用 get_output_path 独立计算输出路径
+        assert result["output_file"] == str(tmp_path / "Fuel.xlsx")
 
 
 # ---------------------------------------------------------------------------
@@ -449,7 +446,7 @@ class TestProcessProductionRPC:
         expected_output = str(tmp_path / "合并产量.xlsx")
         with patch("func.excel_production_enhanced.MiningDataProcessor.process_single_file") as mock_proc, \
              patch("func.excel_production_enhanced.MiningDataProcessor.__init__", return_value=None), \
-             patch.object(tauri_bridge, "_post_process_ledger") as mock_post:
+             patch("func.orchestration.postprocess_from_cache") as mock_post:
             result = tauri_bridge._process_production({
                 "path": input_file,
                 "use_equipment_ledger": True,
@@ -467,7 +464,7 @@ class TestProcessProductionRPC:
         """文件夹处理必须返回输出文件路径。"""
         with patch("func.excel_production_enhanced.MiningDataProcessor.process_folder") as mock_proc, \
              patch("func.excel_production_enhanced.MiningDataProcessor.__init__", return_value=None), \
-             patch.object(tauri_bridge, "_post_process_ledger") as mock_post:
+             patch("func.orchestration.postprocess_from_cache") as mock_post:
             result = tauri_bridge._process_production({
                 "path": str(tmp_path),
                 "use_equipment_ledger": False,

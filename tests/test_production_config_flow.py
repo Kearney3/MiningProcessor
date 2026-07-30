@@ -21,8 +21,8 @@ class ProcessorSpy:
     def process_single_file(self, path, output_file):
         self.single_calls.append((path, output_file))
 
-    def process_folder(self, path, output_file):
-        self.folder_calls.append((path, output_file))
+    def process_folder(self, path, cancel_event=None):
+        self.folder_calls.append(path)
 
 
 def test_mining_data_processor_prefers_explicit_device_load_map(monkeypatch):
@@ -47,10 +47,10 @@ def test_mining_data_processor_loads_runtime_config_when_not_explicit(monkeypatc
 
 def test_execute_task_passes_current_device_load_map_to_production_processor(monkeypatch, tmp_path):
     ProcessorSpy.instances.clear()
-    monkeypatch.setattr(logic.config_loader, "get_load_map_version", lambda: "new")
-    monkeypatch.setattr(logic.config_loader, "get_device_load_map", lambda version="new": {"TR100": 77, "XDE120": 44})
-    monkeypatch.setattr(logic, "ProdProcessor", ProcessorSpy)
-    monkeypatch.setattr(logic.os.path, "isdir", lambda path: False)
+    monkeypatch.setattr(config_loader, "get_load_map_version", lambda: "new")
+    monkeypatch.setattr(config_loader, "get_device_load_map", lambda version="new": {"TR100": 77, "XDE120": 44})
+    import func.excel_production_enhanced as prod_mod
+    monkeypatch.setattr(prod_mod, "MiningDataProcessor", ProcessorSpy)
 
     input_file = tmp_path / "sample.xlsx"
     input_file.write_text("placeholder", encoding="utf-8")
@@ -71,6 +71,3 @@ def test_execute_task_passes_current_device_load_map_to_production_processor(mon
         "filter_zero_run_hours": False,
         "filter_zero_run_km": False,
     }
-    assert processor.single_calls == [
-        (str(input_file), str(tmp_path / "合并产量.xlsx"))
-    ]

@@ -258,55 +258,26 @@ def process_single(
     # fuel 专属过滤
     filter_zero_engine_hours: bool = False,
     filter_zero_work_hours: bool = False,
-) -> str | None:
+) -> dict:
     """统一单报表处理入口，供 Flet GUI 和 Tauri bridge 共用。
 
     按 module_type 分发到对应的 func/ 处理函数，计算输出文件路径，
-    可选执行台账匹配后处理。
+    自动执行台账匹配后处理。
 
     外部可通过 equipment_ledger / oil_ledger 直接传入台账实例（Flet GUI 场景）；
     未传入时根据 use_*_ledger 开关从缓存自动加载（Tauri bridge 场景）。
 
-    Args:
-        module_type: 模块类型 (fuel/production/electrical/worktime/merge/maint)
-        path: 输入文件或文件夹路径（必须已由调用方校验）
-        year: 覆盖日期年份 (fuel/electrical)，或目标年份 (worktime)
-        month: 目标月份 (worktime)
-        raw_start: 生产报表起始行 (production)
-        keyword: 合并关键字 (merge)
-        strip_time: 是否去除时间 (merge)
-        sort_configs: 排序配置 (merge)
-        add_shift_column: 是否新增班次列 (electrical)
-        default_shift: 默认班次 (electrical)
-        header_mapping: 工时表头映射 (worktime)
-        tolerant_header: 容错表头匹配 (merge)
-        skip_hidden: 向后兼容，True 时等价于 skip_hidden_rows=True, skip_hidden_cols=True
-        skip_hidden_rows: 是否跳过隐藏行
-        skip_hidden_cols: 是否跳过隐藏列
-        use_equipment_ledger: 是否使用设备台账
-        use_oil_ledger: 是否使用油品台账
-        equipment_ledger: 设备台账实例（None 时从缓存加载）
-        oil_ledger: 油品台账实例（None 时从缓存加载）
-        anomaly_config: AnomalyConfig 实例（可选）
-        cancel_event: 取消事件（production 长时间处理用）
-        split_by_year: 按年份拆分输出 (maint)
-        details_only: 只输出明细 (maint)
-        use_ml_fallback: ML 二次识别 (maint)
-        filter_zero_hours_meter: 过滤零工时 (production)
-        filter_zero_km_meter: 过滤零里程 (production)
-        filter_zero_run_hours: 过滤零运行时间 (production)
-        filter_zero_run_km: 过滤零运行里程 (production)
-        filter_zero_engine_hours: 过滤零发动机工时 (fuel)
-        filter_zero_work_hours: 过滤零工作工时 (fuel)
-
     Returns:
-        输出文件路径；worktime/maint（split_by_year）返回路径但不走通用后处理；
-        merge 无输出时返回 None
+        dict，始终包含 "output_file" 键（str | None）；
+        production 额外包含 "summary"；
+        maint（split_by_year）额外包含 "output_files"。
 
     Raises:
         ValueError: module_type 不支持
     """
     from datetime import datetime
+
+    result: dict = {}
 
     # 向后兼容
     if skip_hidden:
@@ -345,6 +316,7 @@ def process_single(
         else:
             output = get_output_path("production", path)
             processor.process_single_file(path, output)
+        result["summary"] = getattr(processor, "_processing_summary", None)
 
     elif module_type == "electrical":
         from func.excel_electrical import parse_excel_data
@@ -413,10 +385,13 @@ def process_single(
             for f in maint_result:
                 if use_oil_ledger:
                     postprocess_from_cache(str(f), use_equipment_ledger=False, use_oil_ledger=True)
-            return maint_result[-1] if maint_result else None
+            result["output_file"] = str(maint_result[-1]) if maint_result else None
+            result["output_files"] = [str(f) for f in maint_result]
+            return result
         if use_oil_ledger and maint_result:
             postprocess_from_cache(str(maint_result), use_equipment_ledger=False, use_oil_ledger=True)
-        return str(maint_result) if maint_result else None
+        result["output_file"] = str(maint_result) if maint_result else None
+        return result
 
     else:
         raise ValueError(f"不支持的模块类型: {module_type}")
@@ -426,7 +401,8 @@ def process_single(
         module_type, path, year=effective_year, month=month, keyword=keyword,
     )
     if not output_file:
-        return None
+        result["output_file"] = None
+        return result
 
     # ── 台账匹配后处理 ──
     if use_equipment_ledger or use_oil_ledger:
@@ -439,4 +415,5 @@ def process_single(
         else:
             postprocess_with_ledgers(output_file, equipment_ledger, oil_ledger)
 
-    return output_file
+    result["output_file"] = output_file
+    return result
