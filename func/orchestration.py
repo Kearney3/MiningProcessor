@@ -244,6 +244,20 @@ def process_single(
     use_oil_ledger: bool = False,
     equipment_ledger=None,
     oil_ledger=None,
+    anomaly_config=None,
+    cancel_event=None,
+    # maintenance 专属
+    split_by_year: bool = False,
+    details_only: bool = False,
+    use_ml_fallback: bool = True,
+    # production 专属过滤
+    filter_zero_hours_meter: bool = False,
+    filter_zero_km_meter: bool = False,
+    filter_zero_run_hours: bool = False,
+    filter_zero_run_km: bool = False,
+    # fuel 专属过滤
+    filter_zero_engine_hours: bool = False,
+    filter_zero_work_hours: bool = False,
 ) -> str | None:
     """统一单报表处理入口，供 Flet GUI 和 Tauri bridge 共用。
 
@@ -254,7 +268,7 @@ def process_single(
     未传入时根据 use_*_ledger 开关从缓存自动加载（Tauri bridge 场景）。
 
     Args:
-        module_type: 模块类型 (fuel/production/electrical/worktime/merge)
+        module_type: 模块类型 (fuel/production/electrical/worktime/merge/maint)
         path: 输入文件或文件夹路径（必须已由调用方校验）
         year: 覆盖日期年份 (fuel/electrical)，或目标年份 (worktime)
         month: 目标月份 (worktime)
@@ -273,9 +287,21 @@ def process_single(
         use_oil_ledger: 是否使用油品台账
         equipment_ledger: 设备台账实例（None 时从缓存加载）
         oil_ledger: 油品台账实例（None 时从缓存加载）
+        anomaly_config: AnomalyConfig 实例（可选）
+        cancel_event: 取消事件（production 长时间处理用）
+        split_by_year: 按年份拆分输出 (maint)
+        details_only: 只输出明细 (maint)
+        use_ml_fallback: ML 二次识别 (maint)
+        filter_zero_hours_meter: 过滤零工时 (production)
+        filter_zero_km_meter: 过滤零里程 (production)
+        filter_zero_run_hours: 过滤零运行时间 (production)
+        filter_zero_run_km: 过滤零运行里程 (production)
+        filter_zero_engine_hours: 过滤零发动机工时 (fuel)
+        filter_zero_work_hours: 过滤零工作工时 (fuel)
 
     Returns:
-        输出文件路径，merge 无匹配时返回 None
+        输出文件路径；worktime/maint（split_by_year）返回路径但不走通用后处理；
+        merge 无输出时返回 None
 
     Raises:
         ValueError: module_type 不支持
@@ -294,21 +320,30 @@ def process_single(
         from func.excel_fuel import process_diesel_data
         process_diesel_data(path, target_year=year,
                             skip_hidden_rows=skip_hidden_rows,
-                            skip_hidden_cols=skip_hidden_cols)
+                            skip_hidden_cols=skip_hidden_cols,
+                            anomaly_config=anomaly_config,
+                            filter_zero_engine_hours=filter_zero_engine_hours,
+                            filter_zero_work_hours=filter_zero_work_hours)
 
     elif module_type == "production":
         from func.excel_production_enhanced import MiningDataProcessor
-        from func.config_loader import get_device_load_map
-        load_map = get_device_load_map()
+        from func.config_loader import get_device_load_map, get_load_map_version
+        load_map_ver = get_load_map_version()
+        load_map = get_device_load_map(load_map_ver)
         processor = MiningDataProcessor(
             raw_start=raw_start, device_load_map=load_map,
             skip_hidden_rows=skip_hidden_rows,
             skip_hidden_cols=skip_hidden_cols,
+            anomaly_config=anomaly_config,
+            filter_zero_hours_meter=filter_zero_hours_meter,
+            filter_zero_km_meter=filter_zero_km_meter,
+            filter_zero_run_hours=filter_zero_run_hours,
+            filter_zero_run_km=filter_zero_run_km,
         )
         if os.path.isdir(path):
-            processor.process_folder(path)
+            processor.process_folder(path, cancel_event=cancel_event)
         else:
-            output = os.path.join(os.path.dirname(path) or ".", "合并产量.xlsx")
+            output = get_output_path("production", path)
             processor.process_single_file(path, output)
 
     elif module_type == "electrical":
@@ -319,31 +354,35 @@ def process_single(
             default_shift=default_shift,
             skip_hidden_rows=skip_hidden_rows,
             skip_hidden_cols=skip_hidden_cols,
+            anomaly_config=anomaly_config,
         )
 
     elif module_type == "worktime":
+        out = get_output_path("worktime", path, year=effective_year, month=month)
         if os.path.isdir(path):
             from func.excel_worktime_multifile import process_directory
-            return process_directory(
+            process_directory(
                 path, effective_year, month,
-                return_sheets=True,
+                output_file=out,
                 header_mapping=header_mapping,
                 skip_hidden_rows=skip_hidden_rows,
                 skip_hidden_cols=skip_hidden_cols,
+                anomaly_config=anomaly_config,
             )
         else:
             from func.excel_worktime import process_excel_data
-            return process_excel_data(
+            process_excel_data(
                 path, effective_year, month,
-                return_sheets=True,
+                output_file=out,
                 header_mapping=header_mapping,
                 skip_hidden_rows=skip_hidden_rows,
                 skip_hidden_cols=skip_hidden_cols,
+                anomaly_config=anomaly_config,
             )
 
     elif module_type == "merge":
         from func.excel_merger import merge_excel_files
-        return merge_excel_files(
+        merge_excel_files(
             path, keyword,
             strip_time=strip_time,
             sort_configs=sort_configs,
@@ -352,10 +391,37 @@ def process_single(
             tolerant_header=tolerant_header,
         )
 
+    elif module_type == "maint":
+        from func.excel_maintenance import process_maintenance_data
+        from func.config_loader import get_maintenance_classifications
+        eq_ledger = equipment_ledger
+        if eq_ledger is None and use_equipment_ledger:
+            eq_ledger = load_equipment_ledger_from_cache()
+        classifications = get_maintenance_classifications()
+        maint_result = process_maintenance_data(
+            path,
+            eq_ledger=eq_ledger,
+            classifications=classifications,
+            skip_hidden_rows=skip_hidden_rows,
+            skip_hidden_cols=skip_hidden_cols,
+            split_by_year=split_by_year,
+            details_only=details_only,
+            use_ml_fallback=use_ml_fallback,
+        )
+        # maintenance 自带台账匹配，但仍需外部后处理（oil_ledger 等）
+        if isinstance(maint_result, list):
+            for f in maint_result:
+                if use_oil_ledger:
+                    postprocess_from_cache(str(f), use_equipment_ledger=False, use_oil_ledger=True)
+            return maint_result[-1] if maint_result else None
+        if use_oil_ledger and maint_result:
+            postprocess_from_cache(str(maint_result), use_equipment_ledger=False, use_oil_ledger=True)
+        return str(maint_result) if maint_result else None
+
     else:
         raise ValueError(f"不支持的模块类型: {module_type}")
 
-    # ── 计算输出文件路径 ──
+    # ── 计算输出文件路径（fuel/production/electrical/worktime/merge）──
     output_file = get_output_path(
         module_type, path, year=effective_year, month=month, keyword=keyword,
     )
