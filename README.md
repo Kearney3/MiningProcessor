@@ -3,13 +3,13 @@
 > 矿山运营 Excel 报表批量处理工具
 
 <p>
-  <img src="https://img.shields.io/badge/version-v2.0.3-blue?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-v2.1.0-blue?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/Python-≥3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="python" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square" alt="license" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="platform" />
   <img src="https://img.shields.io/badge/Tauri-v2-FFC131?style=flat-square&logo=tauri&logoColor=black" alt="tauri" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="react" />
-  <img src="https://img.shields.io/badge/tests-996%20passed-brightgreen?style=flat-square" alt="tests" />
+  <img src="https://img.shields.io/badge/tests-1054%20passed-brightgreen?style=flat-square" alt="tests" />
 </p>
 
 <p>
@@ -430,6 +430,29 @@ uv run scripts/bump_version.py --bump minor --dry-run
 ---
 
 ## 📋 更新日志
+
+### v2.1.0 · 2026-07-30
+
+- 🏗️ **架构重构：Flet / Tauri 双前端统一调度层**
+  - `process_single()` 成为 Flet 和 Tauri 的唯一调度入口（调用率从 0% → 100%），消除 ~260 行重复调度代码
+  - `get_output_path()` 统一 6 种模块的输出路径计算，修复 Flet 侧硬编码 `'合并产量.xlsx'` 的不一致问题
+  - `AnomalyConfig.build_from_ui()` 统一异常值检测配置构建，修复 Tauri 侧返回 `None` 而非 `AnomalyConfig(enabled=False)` 的类型不一致
+- 🏗️ **前端共享组件库**（Tauri `src/lib/`）
+  - `ui-components.tsx`：提取 ToggleSwitch、StyledToggle、ChipToggle、PathInput、ConfirmDialog、Collapsible、SectionDivider 7 个共享组件
+  - `icons.tsx`：64 个 SVG 图标集中管理，消除 10+ 文件中的内联 SVG 副本
+- 🏗️ **大文件拆分**
+  - `gui/components/user_config.py`（1,846 行）→ `user_config/` 包（8 个子模块，最大 477 行）
+  - `UserConfigPage.tsx`（1,999 行）→ `user-config/` 目录（8 个子组件，最大 433 行）
+- 🐛 **Bug 修复**
+  - 设备装载量配置"应用"按钮现在同时写入磁盘（之前只更新运行时内存）
+  - `tauri_bridge.py` 中 LLM API key 掩码从硬编码 `"***"` 改用 `LLM_KEY_MASK` 常量
+  - `tauri_bridge.py` 中 `load_ledger_file_columns` / `load_oil_ledger_file_columns` 100% 重复代码合并为 `_load_excel_columns`
+- 🔧 **代码质量**
+  - `gui/logic.py` 中 `on_test_db_connection` / `on_test_api_connection` 提取 `_run_connection_test` 共享助手
+  - `modules.py` 98 行内联异常值检测控件替换为 `create_anomaly_controls()` 共享工厂
+  - `sync_minebase.py` 本地年/月选项生成改用共享 `year_options()` / `month_options()`
+  - `common.py` 中 6 处 inline `try/except` 统一为 `safe_update()`
+- 📊 测试用例从 996 增加到 1,054 个，测试文件从 38 增加到 43 个
 
 ### v2.0.3 · 2026-07-28
 
