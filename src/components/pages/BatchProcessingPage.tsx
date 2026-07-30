@@ -9,7 +9,7 @@ import {
   FuelIcon, ProductionIcon, ElectricalIcon, WorktimeIcon, MergeIcon,
   QuestionIcon, FilterIcon,
 } from "../../lib/icons";
-import { ChipToggle, StyledToggle as Toggle } from "../../lib/ui-components";
+import { ChipToggle, StyledToggle as Toggle, ConfirmDialog, Collapsible, SectionDivider } from "../../lib/ui-components";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { useLastDirectory } from "../../hooks/useLastDirectory";
 import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG } from "../AnomalyPanel";
@@ -56,125 +56,6 @@ function shiftDate(dateStr: string, days: number): string {
   const d = new Date(dateStr + "T00:00:00");
   d.setDate(d.getDate() + days);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-// ═══════════════════════════════════════
-// Small reusable UI components
-// ═══════════════════════════════════════
-
-/** Collapsible section with chevron icon */
-function Collapsible({
-  title,
-  icon,
-  summary,
-  defaultOpen = false,
-  children,
-}: {
-  title: string;
-  icon?: React.ReactNode;
-  summary?: React.ReactNode;
-  defaultOpen?: boolean;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-        className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
-      >
-        {icon && <span className="text-slate-400">{icon}</span>}
-        <span className="flex-1 text-left">{title}</span>
-        {!open && summary}
-        <svg
-          className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-      {open && (
-        <div className="px-4 border-t border-slate-100">{children}</div>
-      )}
-    </div>
-  );
-}
-
-/** Section divider with optional label */
-function SectionDivider({ label }: { label?: string }) {
-  return (
-    <div className="flex items-center gap-3 my-4">
-      <div className="flex-1 h-px bg-slate-200" />
-      {label && <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">{label}</span>}
-      <div className="flex-1 h-px bg-slate-200" />
-    </div>
-  );
-}
-
-/** Confirmation dialog overlay */
-function ConfirmDialog({
-  title,
-  message,
-  details,
-  confirmLabel,
-  cancelLabel,
-  onConfirm,
-  onCancel,
-}: {
-  title: string;
-  message: string;
-  details?: string[];
-  confirmLabel?: string;
-  cancelLabel?: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4 overflow-hidden">
-        <div className="px-6 pt-6 pb-2">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="shrink-0 w-9 h-9 rounded-md bg-amber-50 flex items-center justify-center">
-              <AlertTriangleIcon />
-            </div>
-            <h3 className="text-base font-semibold text-slate-800">{title}</h3>
-          </div>
-          <p className="text-sm text-slate-600 leading-relaxed">{message}</p>
-          {details && details.length > 0 && (
-            <ul className="mt-3 space-y-1">
-              {details.map((d, i) => (
-                <li key={i} className="flex items-center gap-2 text-xs text-slate-500">
-                  <span className="w-1 h-1 rounded-full bg-slate-400 shrink-0" />
-                  {d}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div className="flex gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100">
-          <button
-            onClick={onCancel}
-            className="flex-1 text-sm font-medium px-4 py-1.5 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100 transition-colors"
-          >
-            {cancelLabel ?? "取消"}
-          </button>
-          <button
-            onClick={onConfirm}
-            className="flex-1 text-sm font-medium px-4 py-1.5 rounded-md bg-slate-900 hover:bg-slate-800 text-white transition-colors"
-          >
-            {confirmLabel ?? "继续处理"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ═══════════════════════════════════════

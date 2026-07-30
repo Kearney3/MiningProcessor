@@ -1,46 +1,17 @@
 import { useState, useCallback, useEffect } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import type { BridgeProp, BatchProgress } from "../../lib/types";
 import { useToast } from "../Toast";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { useLastDirectory } from "../../hooks/useLastDirectory";
 import {
-  ChevronDownIcon, PlayIcon, FileIcon, CheckCircleIcon, XCircleIcon, AlertTriangleIcon,
+  ChevronDownIcon, PlayIcon, CheckCircleIcon, XCircleIcon, AlertTriangleIcon,
   ColumnsIcon, FilterIcon, BotIcon,
 } from "../../lib/icons";
 
-// ── Shared UI ────────────────────────────────────────────
+import { PathInput } from "../../lib/ui-components";
 
-function PathInput({
-  value, onChange, placeholder, defaultPath, onFileSelected,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-  defaultPath?: string;
-  onFileSelected?: (path: string) => void;
-}) {
-  const browse = async () => {
-    const selected = await open({
-      directory: false, multiple: false, defaultPath,
-      filters: [{ name: "Excel", extensions: ["xlsx", "xls"] }],
-    });
-    if (selected) {
-      const p = selected as string;
-      onChange(p);
-      onFileSelected?.(p);
-    }
-  };
-  return (
-    <div className="flex gap-2">
-      <input type="text" value={value} onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className={`${inputClass} flex-1 ${value === "" ? "border-amber-300 bg-amber-50/30" : ""}`} />
-      <button onClick={browse} className={btnSecondaryClass} title="选择文件"><FileIcon /></button>
-    </div>
-  );
-}
+// ── Shared UI ────────────────────────────────────────────
 
 function StyledSelect({ value, onChange, options, placeholder }: {
   value: string;
