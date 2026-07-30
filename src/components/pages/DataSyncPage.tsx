@@ -8,6 +8,7 @@ import {
   OperationIcon, GlobeIcon, DatabaseIcon, CheckIcon, MinusIcon,
   CheckCircleIcon, XCircleIcon, AlertTriangleIcon, DownloadIcon, PlayIcon,
 } from "../../lib/icons";
+import { ChipToggle } from "../../lib/ui-components";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { DatePicker } from "../DatePicker";
 import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG } from "../AnomalyPanel";
@@ -62,34 +63,6 @@ function DataTypeCheckbox({
       <span className="text-slate-500">{icon}</span>
       <span className="text-sm text-slate-700">{label}</span>
     </label>
-  );
-}
-
-function ChipToggle({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: { label: string; value: string }[];
-}) {
-  return (
-    <div className="inline-flex rounded-md border border-slate-200 overflow-hidden">
-      {options.map((o, i) => (
-        <button
-          key={o.value}
-          onClick={() => onChange(o.value)}
-          className={`text-xs px-3 py-1.5 transition-colors ${
-            value === o.value
-              ? "bg-slate-900 text-white"
-              : "bg-white text-slate-600 hover:bg-slate-50"
-          } ${i > 0 ? "border-l border-slate-200" : ""}`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
   );
 }
 

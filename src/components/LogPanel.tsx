@@ -2,6 +2,7 @@ import { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import type { LogEntry } from "../lib/types";
+import { ClipboardIcon, CheckIcon, TrashIcon, DownloadIcon } from "../lib/icons";
 
 interface LogPanelProps {
   logs: LogEntry[];
@@ -31,43 +32,6 @@ const LEVEL_ORDER: Record<string, number> = {
   STDERR: 40,
 };
 
-// --- Toolbar SVG icons ---
-
-function IconClipboard() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="9" y="9" width="13" height="13" rx="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-    </svg>
-  );
-}
-
-function IconCheck() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-}
-
-function IconTrash() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="3 6 5 6 21 6" />
-      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-    </svg>
-  );
-}
-
-function IconDownload() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="7 10 12 15 17 10" />
-      <line x1="12" y1="15" x2="12" y2="3" />
-    </svg>
-  );
-}
 
 export function LogPanel({ logs, onClear }: LogPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -278,7 +242,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
             disabled={filteredLogs.length === 0}
             className="p-1.5 rounded text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed cursor-pointer transition-colors"
           >
-            {copied ? <IconCheck /> : <IconClipboard />}
+            {copied ? <CheckIcon /> : <ClipboardIcon />}
           </button>
           <button
             onClick={handleExport}
@@ -287,7 +251,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
             disabled={filteredLogs.length === 0}
             className="p-1.5 rounded text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed cursor-pointer transition-colors"
           >
-            <IconDownload />
+            <DownloadIcon />
           </button>
           <button
             onClick={onClear}
@@ -296,7 +260,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
             disabled={logs.length === 0}
             className="p-1.5 rounded text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed cursor-pointer transition-colors"
           >
-            <IconTrash />
+            <TrashIcon />
           </button>
         </div>
       </div>
