@@ -3,7 +3,7 @@
 > 矿山运营 Excel 报表批量处理工具
 
 <p>
-  <img src="https://img.shields.io/badge/version-v2.1.0-blue?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-v2.1.1-blue?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/Python-≥3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="python" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square" alt="license" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="platform" />
@@ -430,6 +430,16 @@ uv run scripts/bump_version.py --bump minor --dry-run
 ---
 
 ## 📋 更新日志
+
+### v2.1.1 · 2026-07-31
+
+- ⚡ **工时处理空行过滤优化**
+  - 新增 `drop_empty_device_name()` 共享函数（`excel_utils.py`），过滤设备名称为空（NaN / 纯空白）的行
+  - `split_day_night_shifts()` 前移除全空行（`dropna(how="all")`），避免干扰白班/夜班分界检测
+  - 表头映射后、插入日期列前，尽早过滤设备名称为空的行，防止垃圾数据进入后续流程
+  - `pd.concat()` 后二次兜底过滤，拦截合并时可能混入的空设备名行
+- ✅ **测试覆盖**
+  - 新增 9 个 `drop_empty_device_name` 单元测试，覆盖 NaN、空白字符串、列不存在、不可变性、索引重置等场景
 
 ### v2.1.0 · 2026-07-30
 

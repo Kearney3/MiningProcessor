@@ -25,6 +25,7 @@ from func.excel_utils import (
     clean_split_dataframe,
     dedup_dataframe,
     drop_all_nan_columns,
+    drop_empty_device_name,
     filter_hidden_from_df,
     get_hidden_indices,
     open_workbook,
@@ -192,6 +193,9 @@ def _extract_one_day(
     if len(df_raw) < 2:
         return None
 
+    # 在分割班次前移除全空行，避免干扰 split 点检测
+    df_raw = df_raw.dropna(how="all")
+
     date_str = f"{year}-{month:02d}-{day:02d}"
 
     # 隐藏行偏移修正
@@ -216,6 +220,9 @@ def _extract_one_day(
             combined, header_mapping,
             mode_filter="position" if mode == "position" else "name",
         )
+
+    # 表头映射后、插入日期列前，过滤设备名称为空的行
+    combined = drop_empty_device_name(combined)
 
     combined.insert(0, "日期", date_str)
     combined = clean_split_dataframe(combined)
@@ -257,6 +264,9 @@ def _finalize(
         final_df,
         preserve_columns=mapped_columns,
     )
+
+    # 过滤设备名称为空的行
+    final_df = drop_empty_device_name(final_df)
 
     # 排序与列格式化
     final_df = strip_date_column(final_df, date_format="%Y-%m-%d")

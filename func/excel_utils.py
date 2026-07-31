@@ -531,6 +531,33 @@ def drop_all_nan_columns(
     return df
 
 
+def drop_empty_device_name(
+    df: pd.DataFrame,
+    device_column: str = "设备名称",
+) -> pd.DataFrame:
+    """移除设备名称为空（NaN 或纯空白）的行。
+
+    应在 pd.concat + drop_all_nan_columns 之后、排序之前调用。
+
+    当指定列不存在时直接返回原 DataFrame，不做任何过滤。
+
+    Args:
+        df: 待过滤的 DataFrame（返回新对象，不修改原 df）。
+        device_column: 设备名称列名，默认 "设备名称"。
+
+    Returns:
+        过滤后的新 DataFrame。
+    """
+    if df.empty or device_column not in df.columns:
+        return df
+    mask = df[device_column].isna() | (df[device_column].astype(str).str.strip() == "")
+    removed = mask.sum()
+    if removed > 0:
+        logger.info(f"过滤了 {removed} 行设备名称为空的数据")
+        return df[~mask].reset_index(drop=True)
+    return df
+
+
 def dedup_dataframe(
     df: pd.DataFrame,
     label: str = "",
