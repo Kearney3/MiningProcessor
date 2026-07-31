@@ -63,12 +63,13 @@ def _find_fuel_brand_row(header_rows):
     """在 header_rows 中查找油品品牌行（含 НИК/IC IC/Primary 的行），返回行位置或 -1。"""
     for row_idx in range(header_rows.shape[0]):
         row_vals = [clean_string(header_rows.iloc[row_idx, c]) for c in range(min(9, header_rows.shape[1]))]
-        if row_vals[6:9] and any(v in _FUEL_BRAND_KEYWORDS for v in row_vals[6:9]):
+        if row_vals[6:9] and any(any(kw in v for kw in _FUEL_BRAND_KEYWORDS) for v in row_vals[6:9] if v):
             return row_idx
     # 后备：在所有行中搜索品牌关键字
     for row_idx in range(header_rows.shape[0]):
         for col_idx in range(header_rows.shape[1]):
-            if clean_string(header_rows.iloc[row_idx, col_idx]) in _FUEL_BRAND_KEYWORDS:
+            cv = clean_string(header_rows.iloc[row_idx, col_idx])
+            if cv and any(kw in cv for kw in _FUEL_BRAND_KEYWORDS):
                 return row_idx
     return -1
 
