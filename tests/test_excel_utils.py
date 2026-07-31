@@ -14,6 +14,7 @@ from func.excel_utils import (
     clean_split_dataframe,
     dedup_dataframe,
     drop_all_nan_columns,
+    drop_empty_device_name,
     get_output_filename,
     resolve_shift,
     sort_by_date_shift,
@@ -355,3 +356,84 @@ class TestDedupDataframe:
             dedup_dataframe(df, label="test")
         assert "test" in caplog.text
         assert "去重" in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# drop_empty_device_name
+# ---------------------------------------------------------------------------
+class TestDropEmptyDeviceName:
+    def test_drops_rows_with_nan_device_name(self):
+        df = pd.DataFrame({
+            "日期": ["2025-01-01", "2025-01-01", "2025-01-01"],
+            "设备名称": ["挖掘机", None, "装载机"],
+            "数量": [1, 2, 3],
+        })
+        result = drop_empty_device_name(df)
+        assert len(result) == 2
+        assert list(result["设备名称"]) == ["挖掘机", "装载机"]
+
+    def test_drops_rows_with_empty_string_device_name(self):
+        df = pd.DataFrame({
+            "日期": ["2025-01-01", "2025-01-01"],
+            "设备名称": ["挖掘机", "  "],
+            "数量": [1, 2],
+        })
+        result = drop_empty_device_name(df)
+        assert len(result) == 1
+        assert result.iloc[0]["设备名称"] == "挖掘机"
+
+    def test_returns_original_when_no_empty_names(self):
+        df = pd.DataFrame({
+            "日期": ["2025-01-01", "2025-01-01"],
+            "设备名称": ["挖掘机", "装载机"],
+            "数量": [1, 2],
+        })
+        result = drop_empty_device_name(df)
+        assert len(result) == 2
+
+    def test_returns_original_when_device_column_missing(self):
+        df = pd.DataFrame({
+            "日期": ["2025-01-01"],
+            "数量": [1],
+        })
+        result = drop_empty_device_name(df)
+        assert len(result) == 1
+
+    def test_empty_dataframe(self):
+        df = pd.DataFrame()
+        result = drop_empty_device_name(df)
+        assert result.empty
+
+    def test_does_not_mutate_input(self):
+        df = pd.DataFrame({
+            "设备名称": ["挖掘机", None],
+            "数量": [1, 2],
+        })
+        original_len = len(df)
+        drop_empty_device_name(df)
+        assert len(df) == original_len
+
+    def test_returns_new_object(self):
+        df = pd.DataFrame({
+            "设备名称": [None],
+            "数量": [1],
+        })
+        result = drop_empty_device_name(df)
+        assert result is not df
+
+    def test_custom_device_column(self):
+        df = pd.DataFrame({
+            "日期": ["2025-01-01"],
+            "Equipment": [None],
+        })
+        result = drop_empty_device_name(df, device_column="Equipment")
+        assert len(result) == 0
+
+    def test_resets_index_after_drop(self):
+        df = pd.DataFrame({
+            "设备名称": [None, "挖掘机", None],
+            "数量": [1, 2, 3],
+        })
+        result = drop_empty_device_name(df)
+        assert list(result.index) == [0]
+

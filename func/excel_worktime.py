@@ -5,7 +5,7 @@ import argparse
 # 假设 func.logger 已经正确配置
 from func.logger import get_logger
 from func.string_utils import clean_string
-from func.excel_utils import apply_header_mapping, split_day_night_shifts, clean_split_dataframe, strip_date_column, sort_by_date_shift, dedup_dataframe, drop_all_nan_columns, get_hidden_indices, filter_hidden_from_df, adjust_index_for_hidden, open_workbook
+from func.excel_utils import apply_header_mapping, split_day_night_shifts, clean_split_dataframe, strip_date_column, sort_by_date_shift, dedup_dataframe, drop_all_nan_columns, drop_empty_device_name, get_hidden_indices, filter_hidden_from_df, adjust_index_for_hidden, open_workbook
 from func.anomaly import detect_and_filter
 from func.anomaly.rules import AnomalyConfig
 from func import config_loader
@@ -73,6 +73,9 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
                 else:
                     h_rows = set()
 
+                # 在分割班次前移除全空行，避免干扰 split 点检测
+                df_raw = df_raw.dropna(how="all")
+
                 # 1. 确定日期字符串 (YYYY-MM-DD)
                 day = int(clean_string(sheet_name))
                 date_str = f"{year}-{month:02d}-{day:02d}"
@@ -98,6 +101,9 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
                         combined_day_df, header_mapping,
                         mode_filter="position" if mode == "position" else "name",
                     )
+
+                # 表头映射后、插入日期列前，过滤设备名称为空的行
+                combined_day_df = drop_empty_device_name(combined_day_df)
 
                 # 插入日期列到第一列
                 combined_day_df.insert(0, '日期', date_str)
@@ -133,6 +139,9 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
         final_df,
         preserve_columns=mapped_columns,
     )
+
+    # 过滤设备名称为空的行
+    final_df = drop_empty_device_name(final_df)
 
     # 5. 排序：按日期排序, 并将日期列转换为日期类型, 去除时间部分
     final_df = strip_date_column(final_df, date_format="%Y-%m-%d")
