@@ -7,6 +7,11 @@ import sys
 from typing import Any
 
 from func.logger import get_logger
+from func.sync.api_client import (
+    MineBaseAPIError,
+    SessionExpiredError,
+    SessionLimitReachedError,
+)
 from func.sync.constants import BATCH_SIZE, DATA_TYPE_REGISTRY, DEDUP_FIELDS_MAP
 from func.sync.file_processors import (
     _build_field_mappings,
@@ -18,7 +23,7 @@ logger = get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# API 同步模式
+# API 同步模式 (contractVersion 2, 窗口化 confirm)
 # ---------------------------------------------------------------------------
 
 
@@ -30,7 +35,10 @@ def sync_via_api(
     dry_run: bool = False,
     row_warnings: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """通过 API 模式同步数据。
+    """通过 API 模式同步数据 (contractVersion 2)。
+
+    流程: create_session → send_batch × N → confirm (窗口化循环)。
+    confirm 可能需要多次调用直到 done=true。
 
     Args:
         row_warnings: 可选警告收集列表（来自台账匹配阶段），
@@ -57,7 +65,34 @@ def sync_via_api(
         }
 
     field_mappings = _build_field_mappings(column_mapping, table)
-    session_id = api_client.create_session(table)
+
+    # 计算批次数
+    total_batches = max(1, (len(rows) + BATCH_SIZE - 1) // BATCH_SIZE)
+
+    # 创建会话 (contractVersion 2)
+    try:
+        session_resp = api_client.create_session(
+            table,
+            expected_batches=total_batches,
+            total_rows=len(rows),
+            conflict_policy="SKIP",
+        )
+    except SessionLimitReachedError as e:
+        logger.error("[%s] 并发导入会话数已达上限: %s", data_type, e)
+        return {"success": 0, "skipped": 0, "failed": len(rows), "warnings": collected_warnings}
+    except MineBaseAPIError as e:
+        logger.error("[%s] 创建会话失败: %s", data_type, e)
+        return {"success": 0, "skipped": 0, "failed": len(rows), "warnings": collected_warnings}
+
+    # 提取 session id 和 version
+    session_data = session_resp.get("data", {})
+    session_obj = session_data.get("session", {})
+    session_id = session_data.get("sessionId") or session_obj.get("id", "")
+    if not session_id:
+        logger.error("[%s] 创建会话响应缺少 sessionId: %s", data_type, session_resp)
+        return {"success": 0, "skipped": 0, "failed": len(rows), "warnings": collected_warnings}
+
+    expected_version = session_obj.get("version", 0)
 
     # 剥离内部元数据字段，不发送到 API
     _META_KEYS = {"_row_num"}
@@ -72,20 +107,36 @@ def sync_via_api(
         total_batches = len(batches)
 
         for idx, batch in enumerate(batches):
-            resp = api_client.send_batch(table, session_id, batch, field_mappings, idx, total_batches)
+            row_offset = idx * BATCH_SIZE
+            resp = api_client.send_batch(
+                table, session_id, batch, field_mappings,
+                idx, total_batches,
+                expected_version=expected_version,
+                row_offset=row_offset,
+            )
             data = resp.get("data", {})
-            s = data.get("success", 0)
-            sk = data.get("skipped", 0)
-            f = data.get("failed", 0)
+            # v2 响应: receipt.result 包含校验结果
+            receipt = data.get("receipt", {})
+            result = receipt.get("result", data)
+            s = result.get("success", 0)
+            sk = result.get("skipped", 0)
+            f = result.get("failed", 0)
             total_success += s
             total_skipped += sk
             total_failed += f
 
-            if data.get("warnings"):
-                for w in data["warnings"]:
+            # 更新 version（服务端可能在 session snapshot 中返回新版本）
+            new_version = data.get("session", {}).get("version")
+            if new_version is not None:
+                expected_version = new_version
+
+            # 收集 warnings
+            if result.get("warnings"):
+                for w in result["warnings"]:
                     val = w.get("value")
                     if not val and val != 0:
-                        val = w.get("rawValue") or w.get("raw_value") or w.get("originalValue") or w.get("original_value")
+                        val = (w.get("rawValue") or w.get("raw_value")
+                               or w.get("originalValue") or w.get("original_value"))
                     val_str = str(val) if val is not None and str(val).strip() != "" else "（空）"
                     warning_item = {
                         "row": w.get("row", "?"),
@@ -95,11 +146,12 @@ def sync_via_api(
                     }
                     collected_warnings.append(warning_item)
                     logger.warning("  [%s] 行%s: %s", data_type, warning_item["row"], warning_item["message"])
-            if data.get("errors"):
-                for e in data["errors"]:
+            if result.get("errors"):
+                for e in result["errors"]:
                     val = e.get("value")
                     if not val and val != 0:
-                        val = e.get("rawValue") or e.get("raw_value") or e.get("originalValue") or e.get("original_value")
+                        val = (e.get("rawValue") or e.get("raw_value")
+                               or e.get("originalValue") or e.get("original_value"))
                     val_str = str(val) if val is not None and str(val).strip() != "" else "（空）"
                     error_item = {
                         "row": e.get("row", "?"),
@@ -110,30 +162,74 @@ def sync_via_api(
                     collected_warnings.append(error_item)
                     logger.error("  [%s] 行%s: %s", data_type, error_item["row"], error_item["message"])
 
-        # 确认导入（batchIndex=0 处理所有 staging 数据）
-        confirm_resp = api_client.confirm_batch(table, session_id, batch_index=0)
-        confirm_data = confirm_resp.get("data", {})
-        inserted = confirm_data.get("inserted", 0)
-        updated = confirm_data.get("updated", 0)
-        confirmed_skipped = confirm_data.get("skipped", 0)
-        logger.info(
-            "[%s] API 同步完成: 插入=%d, 更新=%d, 跳过=%d",
-            data_type,
-            inserted,
-            updated,
-            confirmed_skipped,
-        )
-        # 以 confirm 返回值为最终统计（批处理阶段的计数可能包含被去重的记录）
-        total_success = inserted + updated
-        total_skipped = confirmed_skipped
+        # 窗口化 confirm：循环调用直到 done=true
+        total_inserted = 0
+        total_updated = 0
+        total_confirmed_skipped = 0
+        total_rejected = 0
+        confirm_rounds = 0
 
+        while True:
+            try:
+                confirm_resp = api_client.confirm_batch(table, session_id, expected_version=expected_version)
+            except SessionExpiredError as e:
+                logger.error("[%s] 导入会话已过期: %s", data_type, e)
+                # staging 数据未提交，批量阶段的 success 不算最终成功
+                total_success = 0
+                total_failed = len(rows) - total_skipped
+                try:
+                    api_client.cancel_import(table, session_id, expected_version=expected_version)
+                except Exception:
+                    pass
+                break
+
+            confirm_data = confirm_resp.get("data", {})
+            done = confirm_data.get("done", False)
+
+            # 更新 version
+            new_version = confirm_data.get("session", {}).get("version")
+            if new_version is not None:
+                expected_version = new_version
+
+            # 累加窗口统计
+            total_inserted += confirm_data.get("inserted", 0)
+            total_updated += confirm_data.get("updated", 0)
+            total_confirmed_skipped += confirm_data.get("skipped", 0)
+            total_rejected += confirm_data.get("rejected", 0)
+            confirm_rounds += 1
+
+            if done:
+                break
+
+        if confirm_rounds:
+            logger.info(
+                "[%s] API 同步完成 (v2): 插入=%d, 更新=%d, 跳过=%d, 拒绝=%d, confirm轮次=%d",
+                data_type, total_inserted, total_updated,
+                total_confirmed_skipped, total_rejected, confirm_rounds,
+            )
+            # 以 confirm 最终统计为准
+            total_success = total_inserted + total_updated
+            total_skipped = total_confirmed_skipped
+
+    except SessionExpiredError as e:
+        logger.error("[%s] 导入会话已过期: %s", data_type, e)
+        # 会话过期意味着 staging 数据未提交，所有未跳过的行视为失败
+        total_success = 0
+        total_failed = len(rows) - total_skipped
+        try:
+            api_client.cancel_import(table, session_id, expected_version=expected_version)
+        except Exception as cancel_err:
+            logger.warning("[%s] 取消导入会话失败: %s", data_type, cancel_err)
+    except SessionLimitReachedError as e:
+        logger.error("[%s] 并发导入会话数已达上限: %s", data_type, e)
+        total_failed = len(rows) - total_success - total_skipped
     except Exception as e:
         logger.error("[%s] API 同步失败: %s", data_type, e)
         try:
-            api_client.cancel_import(table, session_id)
+            api_client.cancel_import(table, session_id, expected_version=expected_version)
         except Exception as cancel_err:
             logger.warning("[%s] 取消导入会话失败: %s", data_type, cancel_err)
-        total_failed += len(rows) - total_success - total_skipped
+        total_failed = len(rows) - total_success - total_skipped
 
     return {"success": total_success, "skipped": total_skipped, "failed": total_failed, "warnings": collected_warnings}
 
@@ -177,7 +273,7 @@ def test_db_connection(
 
 
 # ---------------------------------------------------------------------------
-# 直连数据库同步模式
+# 直连数据库同步模式（不变）
 # ---------------------------------------------------------------------------
 
 
@@ -259,6 +355,6 @@ def sync_via_db(
     except Exception as e:
         logger.error("[%s] DB 同步失败，已回滚: %s", data_type, e)
         db_client.rollback()
-        total_failed += len(rows) - total_success - total_skipped
+        total_failed = len(rows) - total_success - total_skipped
 
     return {"success": total_success, "skipped": total_skipped, "failed": total_failed, "warnings": collected_warnings}

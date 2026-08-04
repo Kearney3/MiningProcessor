@@ -42,6 +42,9 @@ DATA_TYPE_REGISTRY: dict[str, dict[str, Any]] = {
     },
 }
 
+# MineBase 导入 API 合约版本
+CONTRACT_VERSION = 2
+
 # 每批发送的行数
 BATCH_SIZE = 100
 
