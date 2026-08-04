@@ -256,7 +256,7 @@ async def _safe_run_task(
 # ---------------------------------------------------------------------------
 # 各模块按钮回调
 # ---------------------------------------------------------------------------
-async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None, filter_zero_engine_hours=False, filter_zero_work_hours=False) -> None:
+async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None, filter_zero_engine_hours=True, filter_zero_work_hours=False) -> None:
     """燃油处理按钮回调"""
     btn = fuel_refs["btn"]
     path = fuel_refs["path"].value
@@ -314,7 +314,7 @@ def _update_prod_summary(container: ft.Column, summary: dict | None) -> None:
         container.update()
 
 
-async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None, filter_zero_hours_meter=False, filter_zero_km_meter=False, filter_zero_run_hours=False, filter_zero_run_km=False) -> None:
+async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None, filter_zero_hours_meter=True, filter_zero_km_meter=True, filter_zero_run_hours=False, filter_zero_run_km=False) -> None:
     """生产处理按钮回调"""
     btn = prod_refs["btn"]
     path = prod_refs["path"].value
@@ -865,8 +865,8 @@ def wire_processing_buttons(
 
 
 async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=None,
-                          filter_zero_engine_hours=False, filter_zero_work_hours=False,
-                          filter_zero_hours_meter=False, filter_zero_km_meter=False,
+                          filter_zero_engine_hours=True, filter_zero_work_hours=False,
+                          filter_zero_hours_meter=True, filter_zero_km_meter=True,
                           filter_zero_run_hours=False, filter_zero_run_km=False) -> None:
     """MineBase 同步按钮回调"""
     path = sync_refs["path"].value

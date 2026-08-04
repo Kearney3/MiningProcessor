@@ -139,10 +139,10 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     )
 
     # --- 过滤开关 ---
-    filter_zero_hours = ft.Checkbox(label="过滤零小时数", value=False, active_color=theme.PRIMARY)
+    filter_zero_hours = ft.Checkbox(label="过滤零小时数", value=True, active_color=theme.PRIMARY)
     filter_zero_work_hours = ft.Checkbox(label="过滤零运行小时数", value=False, active_color=theme.PRIMARY)
-    filter_zero_hours_meter = ft.Checkbox(label="过滤零小时仪表", value=False, active_color=theme.PRIMARY)
-    filter_zero_km_meter = ft.Checkbox(label="过滤零公里仪表", value=False, active_color=theme.PRIMARY)
+    filter_zero_hours_meter = ft.Checkbox(label="过滤零小时仪表", value=True, active_color=theme.PRIMARY)
+    filter_zero_km_meter = ft.Checkbox(label="过滤零公里仪表", value=True, active_color=theme.PRIMARY)
     filter_zero_run_hours = ft.Checkbox(label="过滤零运行小时数", value=False, active_color=theme.PRIMARY)
     filter_zero_run_km = ft.Checkbox(label="过滤零运行里程", value=False, active_color=theme.PRIMARY)
 
