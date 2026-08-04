@@ -70,10 +70,10 @@ def sync(
     skip_hidden_rows: bool = False,
     skip_hidden_cols: bool = False,
     anomaly_config=None,
-    filter_zero_engine_hours: bool = False,
+    filter_zero_engine_hours: bool = True,
     filter_zero_work_hours: bool = False,
-    filter_zero_hours_meter: bool = False,
-    filter_zero_km_meter: bool = False,
+    filter_zero_hours_meter: bool = True,
+    filter_zero_km_meter: bool = True,
     filter_zero_run_hours: bool = False,
     filter_zero_run_km: bool = False,
 ) -> dict[str, dict[str, int]]:

@@ -228,7 +228,7 @@ function FuelCard({
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [filterZeroEngineHours, setFilterZeroEngineHours] = useState(false);
+  const [filterZeroEngineHours, setFilterZeroEngineHours] = useState(true);
   const [filterZeroWorkHours, setFilterZeroWorkHours] = useState(false);
 
   const handleProcess = async () => {
@@ -328,8 +328,8 @@ function ProductionCard({
     failed_files: number;
     warnings: string[];
   } | null>(null);
-  const [filterZeroHoursMeter, setFilterZeroHoursMeter] = useState(false);
-  const [filterZeroKmMeter, setFilterZeroKmMeter] = useState(false);
+  const [filterZeroHoursMeter, setFilterZeroHoursMeter] = useState(true);
+  const [filterZeroKmMeter, setFilterZeroKmMeter] = useState(true);
   const [filterZeroRunHours, setFilterZeroRunHours] = useState(false);
   const [filterZeroRunKm, setFilterZeroRunKm] = useState(false);
 
