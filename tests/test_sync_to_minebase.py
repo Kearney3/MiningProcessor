@@ -506,6 +506,197 @@ class TestMineBaseAPIClient:
 
 
 # ---------------------------------------------------------------------------
+# MineBaseAPIClient contract v2 错误处理
+# ---------------------------------------------------------------------------
+
+
+class TestAPIClientV2Errors:
+    """测试 contractVersion 2 错误码映射。"""
+
+    def test_409_session_limit_raises_session_limit_error(self):
+        """HTTP 409 + IMPORT_SESSION_LIMIT_REACHED 应抛出 SessionLimitReachedError。"""
+        from func.sync.api_client import SessionLimitReachedError
+
+        client = MineBaseAPIClient("http://localhost:3000", "admin", "pass")
+        client.token = "fake-token"
+
+        import urllib.error
+        from io import BytesIO
+
+        error_body = json.dumps({"errorCode": "IMPORT_SESSION_LIMIT_REACHED", "message": "Too many sessions"}).encode()
+        resp = urllib.error.HTTPError(url="", code=409, msg="", hdrs=None, fp=BytesIO(error_body))
+        resp.read = BytesIO(error_body).read
+
+        with patch("urllib.request.urlopen", side_effect=resp):
+            with pytest.raises(SessionLimitReachedError) as exc_info:
+                client.create_session("fuel_consumption", expected_batches=1, total_rows=10)
+            assert exc_info.value.status_code == 409
+            assert exc_info.value.error_code == "IMPORT_SESSION_LIMIT_REACHED"
+
+    def test_410_session_expired_raises_expired_error(self):
+        """HTTP 410 应抛出 SessionExpiredError。"""
+        from func.sync.api_client import SessionExpiredError
+
+        client = MineBaseAPIClient("http://localhost:3000", "admin", "pass")
+        client.token = "fake-token"
+
+        import urllib.error
+        from io import BytesIO
+
+        error_body = json.dumps({"errorCode": "SESSION_EXPIRED", "message": "Session expired"}).encode()
+        resp = urllib.error.HTTPError(url="", code=410, msg="", hdrs=None, fp=BytesIO(error_body))
+        resp.read = BytesIO(error_body).read
+
+        with patch("urllib.request.urlopen", side_effect=resp):
+            with pytest.raises(SessionExpiredError) as exc_info:
+                client.confirm_batch("fuel_consumption", "session-1")
+            assert exc_info.value.status_code == 410
+
+    def test_generic_409_raises_api_error(self):
+        """HTTP 409 (非限制/过期) 应抛出 MineBaseAPIError。"""
+        from func.sync.api_client import MineBaseAPIError
+
+        client = MineBaseAPIClient("http://localhost:3000", "admin", "pass")
+        client.token = "fake-token"
+
+        import urllib.error
+        from io import BytesIO
+
+        error_body = json.dumps({"errorCode": "SESSION_STATE_CONFLICT", "message": "Bad state"}).encode()
+        resp = urllib.error.HTTPError(url="", code=409, msg="", hdrs=None, fp=BytesIO(error_body))
+        resp.read = BytesIO(error_body).read
+
+        with patch("urllib.request.urlopen", side_effect=resp):
+            with pytest.raises(MineBaseAPIError) as exc_info:
+                client.send_batch("fuel_consumption", "session-1", [], [], 0, 1)
+            assert exc_info.value.status_code == 409
+            assert exc_info.value.error_code == "SESSION_STATE_CONFLICT"
+
+
+# ---------------------------------------------------------------------------
+# sync_via_api contract v2 流程测试
+# ---------------------------------------------------------------------------
+
+
+class TestSyncViaApiV2:
+    """测试 sync_via_api 的 contractVersion 2 完整流程。"""
+
+    def _make_v2_client(self, inserted=1, updated=0, skipped=0, rejected=0):
+        """创建符合 v2 合约的 mock 客户端。"""
+        client = MagicMock()
+        client.create_session.return_value = {
+            "data": {"session": {"id": "session-v2", "version": 1}},
+        }
+        client.send_batch.return_value = {
+            "data": {
+                "receipt": {"result": {"success": 1, "skipped": 0, "failed": 0}},
+                "session": {"version": 1},
+            },
+        }
+        client.confirm_batch.return_value = {
+            "data": {
+                "done": True,
+                "inserted": inserted,
+                "updated": updated,
+                "skipped": skipped,
+                "rejected": rejected,
+                "session": {"version": 2},
+            },
+        }
+        return client
+
+    def test_create_session_sends_contract_v2(self):
+        """create_session 应发送 contractVersion=2 和必需参数。"""
+        client = self._make_v2_client()
+        rows = [{"date": "2025-06-01", "shiftType": "Day"}]
+        sync_via_api("fuel", rows, {"日期": "date"}, client)
+
+        client.create_session.assert_called_once()
+        call_args = client.create_session.call_args
+        assert call_args[0][0] == "fuel_consumption"  # table
+        assert call_args[1]["expected_batches"] == 1
+        assert call_args[1]["total_rows"] == 1
+        assert call_args[1]["conflict_policy"] == "SKIP"
+
+    def test_send_batch_sends_contract_v2(self):
+        """send_batch 应发送 contractVersion=2、expectedVersion 和 rowOffset。"""
+        client = self._make_v2_client()
+        rows = [{"date": "2025-06-01", "shiftType": "Day"}]
+        sync_via_api("fuel", rows, {"日期": "date"}, client)
+
+        client.send_batch.assert_called_once()
+        call_args = client.send_batch.call_args
+        assert call_args[1]["expected_version"] == 1
+        assert call_args[1]["row_offset"] == 0
+
+    def test_confirm_batch_sends_contract_v2(self):
+        """confirm_batch 应发送 contractVersion=2 和 expectedVersion。"""
+        client = self._make_v2_client()
+        rows = [{"date": "2025-06-01", "shiftType": "Day"}]
+        sync_via_api("fuel", rows, {"日期": "date"}, client)
+
+        client.confirm_batch.assert_called_once()
+        call_args = client.confirm_batch.call_args
+        assert call_args[0][0] == "fuel_consumption"  # table
+        assert call_args[1]["expected_version"] == 1
+
+    def test_windowed_confirm_loops_until_done(self):
+        """窗口化 confirm 应循环调用直到 done=true。"""
+        client = self._make_v2_client()
+        # 第一次 confirm: done=false, 第二次: done=true
+        client.confirm_batch.side_effect = [
+            {"data": {"done": False, "inserted": 5, "updated": 0, "skipped": 0, "rejected": 0, "session": {"version": 2}}},
+            {"data": {"done": True, "inserted": 5, "updated": 0, "skipped": 0, "rejected": 0, "session": {"version": 3}}},
+        ]
+
+        rows = [{"date": f"2025-06-{i:02d}"} for i in range(1, 11)]
+        result = sync_via_api("fuel", rows, {"日期": "date"}, client)
+
+        assert client.confirm_batch.call_count == 2
+        assert result["success"] == 10  # 5 + 5
+        assert result["skipped"] == 0
+
+    def test_session_limit_returns_all_failed(self):
+        """SessionLimitReachedError 应返回全部行失败。"""
+        from func.sync.api_client import SessionLimitReachedError
+
+        client = MagicMock()
+        client.create_session.side_effect = SessionLimitReachedError(
+            "Too many", status_code=409, error_code="IMPORT_SESSION_LIMIT_REACHED",
+        )
+
+        rows = [{"date": "2025-06-01"}, {"date": "2025-06-02"}]
+        result = sync_via_api("fuel", rows, {"日期": "date"}, client)
+
+        assert result["success"] == 0
+        assert result["failed"] == 2
+
+    def test_session_expired_returns_failed(self):
+        """SessionExpiredError during confirm 应返回失败。"""
+        from func.sync.api_client import SessionExpiredError
+
+        client = MagicMock()
+        client.create_session.return_value = {
+            "data": {"session": {"id": "session-1", "version": 1}},
+        }
+        client.send_batch.return_value = {
+            "data": {
+                "receipt": {"result": {"success": 1, "skipped": 0, "failed": 0}},
+                "session": {"version": 1},
+            },
+        }
+        client.confirm_batch.side_effect = SessionExpiredError(
+            "Expired", status_code=410, error_code="SESSION_EXPIRED",
+        )
+
+        rows = [{"date": "2025-06-01"}]
+        result = sync_via_api("fuel", rows, {"日期": "date"}, client)
+
+        assert result["failed"] == 1
+        client.cancel_import.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
 # sync (integration with mocks)
 # ---------------------------------------------------------------------------
 
@@ -1085,16 +1276,32 @@ class TestSyncApiValueFallback:
     """sync_via_api 应正确解析 API 返回中的 value 字段，空值显示为 '（空）'。"""
 
     def _make_api_client(self, warnings=None, errors=None):
-        """创建 mock API 客户端，模拟 send_batch 返回 warnings/errors。"""
+        """创建 mock API 客户端，模拟 contractVersion 2 的 send_batch/confirm 响应。"""
         client = MagicMock()
-        client.create_session.return_value = "session-1"
-        resp_data = {"success": 1, "skipped": 0, "failed": 0}
+        client.create_session.return_value = {
+            "data": {"session": {"id": "session-1", "version": 1}},
+        }
+        batch_result = {"success": 1, "skipped": 0, "failed": 0}
         if warnings:
-            resp_data["warnings"] = warnings
+            batch_result["warnings"] = warnings
         if errors:
-            resp_data["errors"] = errors
-        client.send_batch.return_value = {"data": resp_data}
-        client.confirm_batch.return_value = {"data": {"inserted": 1, "updated": 0, "skipped": 0}}
+            batch_result["errors"] = errors
+        client.send_batch.return_value = {
+            "data": {
+                "receipt": {"result": batch_result},
+                "session": {"version": 1},
+            },
+        }
+        client.confirm_batch.return_value = {
+            "data": {
+                "done": True,
+                "inserted": 1,
+                "updated": 0,
+                "skipped": 0,
+                "rejected": 0,
+                "session": {"version": 2},
+            },
+        }
         return client
 
     def test_api_warning_value_from_standard_key(self):
@@ -1353,9 +1560,25 @@ class TestDryRunEnginesReturnRows:
     def test_sync_via_api_normal_no_dry_run_rows(self):
         """正常模式不应返回 dry_run_rows。"""
         client = MagicMock()
-        client.create_session.return_value = "session-1"
-        client.send_batch.return_value = {"data": {"success": 1, "skipped": 0, "failed": 0}}
-        client.confirm_batch.return_value = {"data": {"inserted": 1, "updated": 0, "skipped": 0}}
+        client.create_session.return_value = {
+            "data": {"session": {"id": "session-1", "version": 1}},
+        }
+        client.send_batch.return_value = {
+            "data": {
+                "receipt": {"result": {"success": 1, "skipped": 0, "failed": 0}},
+                "session": {"version": 1},
+            },
+        }
+        client.confirm_batch.return_value = {
+            "data": {
+                "done": True,
+                "inserted": 1,
+                "updated": 0,
+                "skipped": 0,
+                "rejected": 0,
+                "session": {"version": 2},
+            },
+        }
 
         result = sync_via_api("fuel", [{"date": "2025-06-01"}], {"日期": "date"}, client, dry_run=False)
         assert "dry_run_rows" not in result

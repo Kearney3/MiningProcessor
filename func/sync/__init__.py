@@ -7,9 +7,15 @@ MineBase 数据同步包
 - 直连模式：通过 psycopg2 直接写入 PostgreSQL
 """
 from func.config_loader import get_minebase_api_config
-from func.sync.api_client import MineBaseAPIClient
+from func.sync.api_client import (
+    MineBaseAPIClient,
+    MineBaseAPIError,
+    SessionExpiredError,
+    SessionLimitReachedError,
+)
 from func.sync.constants import (
     BATCH_SIZE,
+    CONTRACT_VERSION,
     DATA_TYPE_REGISTRY,
     DEDUP_FIELDS_MAP,
     FIELD_TO_COLUMN_MAP,
@@ -49,12 +55,16 @@ from func.sync.sync_engines import (
 __all__ = [
     # 常量
     "BATCH_SIZE",
+    "CONTRACT_VERSION",
     "DATA_TYPE_REGISTRY",
     "DEDUP_FIELDS_MAP",
     "FIELD_TO_COLUMN_MAP",
     "VALID_TABLES",
     # 客户端
     "MineBaseAPIClient",
+    "MineBaseAPIError",
+    "SessionExpiredError",
+    "SessionLimitReachedError",
     "MineBaseDBClient",
     # 核心流程
     "discover_files",
