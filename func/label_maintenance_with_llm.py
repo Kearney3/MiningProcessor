@@ -449,6 +449,8 @@ class OpenAICompatibleLabelClient:
                     request, timeout=self.timeout, context=_create_ssl_context()
                 ) as resp:
                     response = json.loads(resp.read().decode("utf-8"))
+                if cancel_event is not None and cancel_event.is_set():
+                    raise _Cancelled("标注已取消")
                 content = extract_response_content(response)
                 labels, skipped = parse_and_validate_labels(
                     content,
@@ -552,6 +554,8 @@ class AnthropicLabelClient:
                     request, timeout=self.timeout, context=_create_ssl_context()
                 ) as resp:
                     response = json.loads(resp.read().decode("utf-8"))
+                if cancel_event is not None and cancel_event.is_set():
+                    raise _Cancelled("标注已取消")
                 content_blocks = response.get("content", [])
                 texts = [
                     block.get("text", "")
@@ -1375,30 +1379,32 @@ def process_maintenance_llm(
     eff_concurrency = min(concurrency, total_batches) if total_batches else 1
     cancelled = False
     progress.start()
+    executor = ThreadPoolExecutor(max_workers=eff_concurrency)
     try:
-        with ThreadPoolExecutor(max_workers=eff_concurrency) as executor:
-            futures = {
-                executor.submit(_process_batch, batch_num, batch, progress): batch
-                for batch_num, batch in enumerate(batches, start=1)
-            }
-            for future in as_completed(futures):
-                try:
-                    future.result()
-                    if cancel_event is not None and cancel_event.is_set():
-                        cancelled = True
-                        progress.mark_cancelling()
-                        for pending in futures:
-                            pending.cancel()
-                        break
-                except _Cancelled:
+        futures = {
+            executor.submit(_process_batch, batch_num, batch, progress): batch
+            for batch_num, batch in enumerate(batches, start=1)
+        }
+        for future in as_completed(futures):
+            try:
+                future.result()
+                if cancel_event is not None and cancel_event.is_set():
                     cancelled = True
                     progress.mark_cancelling()
                     for pending in futures:
                         pending.cancel()
                     break
-                except Exception as exc:
-                    failed_errors.append(exc)
+            except _Cancelled:
+                cancelled = True
+                progress.mark_cancelling()
+                for pending in futures:
+                    pending.cancel()
+                break
+            except Exception as exc:
+                failed_errors.append(exc)
     finally:
+        # 不等待正在运行的批次完成，立即关闭
+        executor.shutdown(wait=False)
         if cancel_file is not None:
             cancel_file.unlink(missing_ok=True)
 
