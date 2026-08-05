@@ -49,6 +49,7 @@ class MineBaseAPIClient:
 
     def _request(self, method: str, path: str, data: dict | None = None) -> dict:
         """发送 HTTP 请求，对 409/410 抛出特定异常。"""
+        import ssl
         import urllib.request
         import urllib.error
 
@@ -61,7 +62,14 @@ class MineBaseAPIClient:
         req = urllib.request.Request(url, data=body, headers=headers, method=method)
 
         try:
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            # 创建 SSL 上下文以解决 macOS 证书验证失败问题
+            try:
+                import certifi
+                ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+            except ImportError:
+                ssl_ctx = ssl.create_default_context()
+
+            with urllib.request.urlopen(req, timeout=30, context=ssl_ctx) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             error_body = e.read().decode("utf-8", errors="replace")[:500]
