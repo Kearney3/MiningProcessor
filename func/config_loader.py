@@ -852,6 +852,7 @@ def test_llm_connection(config: dict[str, Any] | None = None) -> dict[str, Any]:
     Returns:
         {"success": bool, "models": [...], "error": "..."}
     """
+    import ssl
     import urllib.request
     import urllib.error
     import json as _json
@@ -885,8 +886,15 @@ def test_llm_connection(config: dict[str, Any] | None = None) -> dict[str, Any]:
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
     try:
+        # 创建 SSL 上下文以解决 macOS 证书验证失败问题
+        try:
+            import certifi
+            ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        except ImportError:
+            ssl_ctx = ssl.create_default_context()
+
         req = urllib.request.Request(models_url, headers=headers, method="GET")
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=15, context=ssl_ctx) as resp:
             data = _json.loads(resp.read().decode("utf-8"))
         model_list = data.get("data", [])
         if isinstance(model_list, list):

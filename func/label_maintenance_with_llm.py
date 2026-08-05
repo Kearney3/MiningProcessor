@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import re
+import ssl
 import sys
 import threading
 import time
@@ -26,6 +27,18 @@ from func.maintenance_classification import get_default_classifications
 
 
 logger = logging.getLogger(__name__)
+
+
+def _create_ssl_context() -> ssl.SSLContext:
+    """创建包含系统 CA 证书的 SSL 上下文，解决 macOS 证书验证失败问题。"""
+    try:
+        import certifi
+        ctx = ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        ctx = ssl.create_default_context()
+    return ctx
+
+
 class _Cancelled(Exception):
     """标注任务被用户取消。"""
 
@@ -432,7 +445,9 @@ class OpenAICompatibleLabelClient:
                     headers=headers,
                     method="POST",
                 )
-                with urllib.request.urlopen(request, timeout=self.timeout) as resp:
+                with urllib.request.urlopen(
+                    request, timeout=self.timeout, context=_create_ssl_context()
+                ) as resp:
                     response = json.loads(resp.read().decode("utf-8"))
                 content = extract_response_content(response)
                 labels, skipped = parse_and_validate_labels(
@@ -533,7 +548,9 @@ class AnthropicLabelClient:
                     headers=headers,
                     method="POST",
                 )
-                with urllib.request.urlopen(request, timeout=self.timeout) as resp:
+                with urllib.request.urlopen(
+                    request, timeout=self.timeout, context=_create_ssl_context()
+                ) as resp:
                     response = json.loads(resp.read().decode("utf-8"))
                 content_blocks = response.get("content", [])
                 texts = [
