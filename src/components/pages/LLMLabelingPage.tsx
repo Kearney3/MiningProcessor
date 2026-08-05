@@ -233,8 +233,14 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
         notify("LLM 标注完成", "success");
       }
     } catch (e) {
-      setError(String(e));
-      notify(`LLM 标注失败: ${e}`, "error");
+      const msg = String(e);
+      if (msg.includes("Task cancelled") || msg.includes("cancel")) {
+        setError("已取消（可断点续跑）");
+        notify("已取消标注任务", "info");
+      } else {
+        setError(msg);
+        notify(`LLM 标注失败: ${msg}`, "error");
+      }
     } finally {
       setLoading(false);
       setProgress(null);
