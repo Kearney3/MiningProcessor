@@ -1,23 +1,75 @@
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
+use std::sync::mpsc::{self, Receiver};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+/// 从 reader 线程发送到 call() 的消息
+enum BridgeMsg {
+    /// 带 id 的 RPC 响应
+    Response(serde_json::Value),
+    /// 不带 id 的异步事件
+    Event(serde_json::Value),
+}
 
 /// Python 子进程桥接
 ///
 /// 通过 stdin/stdout JSON 行协议与 Python 通信。
+/// stdout 由独立 reader 线程读取，通过 channel 转发给 call()，
+/// 使得 cancel() 可以立即中断正在进行的 call()。
 /// stderr 用于日志流，由外部线程读取。
 pub struct PythonBridge {
     child: Mutex<Option<Child>>,
     stdin: Mutex<ChildStdin>,
-    stdout: Mutex<BufReader<ChildStdout>>,
+    rx: Mutex<Receiver<BridgeMsg>>,
     stderr: Mutex<Option<ChildStderr>>,
     next_id: Mutex<u64>,
-    /// 整个 call 往返的锁，序列化 stdin 写入 + stdout 读取，
+    /// 整个 call 往返的锁，序列化 stdin 写入 + 响应匹配，
     /// 防止并发 RPC 调用响应错配 (H3)
     call_lock: Mutex<()>,
-    /// 取消标志，cancel_task 设置后 invoke_python 在读取循环中检查 (H1)
-    cancelled: AtomicBool,
+    /// 取消标志，cancel_task 设置后 call() 在超时循环中检查 (H1)
+    cancelled: Arc<AtomicBool>,
+    /// 上一次 call 中因取消而未消费的响应，供下次 call 复用
+    pending: Mutex<HashMap<u64, serde_json::Value>>,
+}
+
+/// 启动 reader 线程：持续从 stdout 读取 JSON 行，通过 channel 转发
+fn spawn_reader(stdout: ChildStdout, cancelled: Arc<AtomicBool>) -> Receiver<BridgeMsg> {
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        let mut reader = BufReader::new(stdout);
+        loop {
+            if cancelled.load(Ordering::SeqCst) {
+                break;
+            }
+            let mut line = String::new();
+            match reader.read_line(&mut line) {
+                Ok(0) => break, // EOF: Python 进程已退出
+                Ok(_) => {}
+                Err(_) => break,
+            }
+            let trimmed = line.trim().to_string();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let parsed: serde_json::Value = match serde_json::from_str(&trimmed) {
+                Ok(v) => v,
+                Err(_) => continue,
+            };
+            let msg = if parsed.get("event").is_some() {
+                BridgeMsg::Event(parsed)
+            } else {
+                BridgeMsg::Response(parsed)
+            };
+            if tx.send(msg).is_err() {
+                break; // 接收端已关闭
+            }
+        }
+    });
+    // reader 线程独立运行，handle 被丢弃后线程在后台继续工作
+    rx
 }
 
 impl PythonBridge {
@@ -43,15 +95,19 @@ impl PythonBridge {
         let stdin = child.stdin.take().ok_or("Failed to open stdin")?;
         let stdout = child.stdout.take().ok_or("Failed to open stdout")?;
         let stderr = child.stderr.take();
+        let cancelled = Arc::new(AtomicBool::new(false));
+
+        let rx = spawn_reader(stdout, Arc::clone(&cancelled));
 
         Ok(Self {
             child: Mutex::new(Some(child)),
             stdin: Mutex::new(stdin),
-            stdout: Mutex::new(BufReader::new(stdout)),
+            rx: Mutex::new(rx),
             stderr: Mutex::new(stderr),
             next_id: Mutex::new(1),
             call_lock: Mutex::new(()),
-            cancelled: AtomicBool::new(false),
+            cancelled,
+            pending: Mutex::new(HashMap::new()),
         })
     }
 
@@ -80,15 +136,19 @@ impl PythonBridge {
         let stdin = child.stdin.take().ok_or("Failed to open stdin")?;
         let stdout = child.stdout.take().ok_or("Failed to open stdout")?;
         let stderr = child.stderr.take();
+        let cancelled = Arc::new(AtomicBool::new(false));
+
+        let rx = spawn_reader(stdout, Arc::clone(&cancelled));
 
         Ok(Self {
             child: Mutex::new(Some(child)),
             stdin: Mutex::new(stdin),
-            stdout: Mutex::new(BufReader::new(stdout)),
+            rx: Mutex::new(rx),
             stderr: Mutex::new(stderr),
             next_id: Mutex::new(1),
             call_lock: Mutex::new(()),
-            cancelled: AtomicBool::new(false),
+            cancelled,
+            pending: Mutex::new(HashMap::new()),
         })
     }
 
@@ -117,6 +177,11 @@ impl PythonBridge {
         // 重置取消标志
         self.cancelled.store(false, Ordering::SeqCst);
 
+        // 清除上次取消残留的响应
+        if let Ok(mut p) = self.pending.lock() {
+            p.clear();
+        }
+
         let id = {
             let mut id = self.next_id.lock().map_err(|e| e.to_string())?;
             let current = *id;
@@ -143,65 +208,52 @@ impl PythonBridge {
                 .map_err(|e| format!("Flush stdin failed: {}", e))?;
         }
 
-        // 读取 stdout 响应（跳过异步事件，匹配请求 ID）
+        // 从 channel 接收响应（每 500ms 检查一次取消标志）
+        let rx = self.rx.lock().map_err(|e| e.to_string())?;
         loop {
-            // 检查取消标志 (H1)
             if self.cancelled.load(Ordering::SeqCst) {
                 return Err("Task cancelled".into());
             }
 
-            let mut line = String::new();
-            {
-                let mut stdout = self.stdout.lock().map_err(|e| e.to_string())?;
-                let bytes_read = stdout
-                    .read_line(&mut line)
-                    .map_err(|e| format!("Read from stdout failed: {}", e))?;
-                if bytes_read == 0 {
+            let msg = match rx.recv_timeout(Duration::from_millis(500)) {
+                Ok(msg) => msg,
+                Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
                     return Err("Python process exited unexpectedly".into());
                 }
-            }
+            };
 
-            let trimmed = line.trim();
-            if trimmed.is_empty() {
-                continue;
-            }
+            match msg {
+                BridgeMsg::Event(ref event) => {
+                    on_event(event);
+                }
+                BridgeMsg::Response(ref response) => {
+                    // 检查响应 ID 是否匹配当前请求 (H3)
+                    if let Some(resp_id) = response.get("id").and_then(|v| v.as_u64()) {
+                        if resp_id != id {
+                            // 存储非当前请求的响应（供后续 call 复用）
+                            if let Ok(mut p) = self.pending.lock() {
+                                p.insert(resp_id, response.clone());
+                            }
+                            continue;
+                        }
+                    }
 
-            let response: serde_json::Value = serde_json::from_str(trimmed).map_err(|e| {
-                let preview = if trimmed.len() > 200 {
-                    format!("{}... ({} bytes total)", &trimmed[..200], trimmed.len())
-                } else {
-                    trimmed.to_string()
-                };
-                format!("JSON parse error: {} (line: {})", e, preview)
-            })?;
+                    // 错误响应
+                    if let Some(error) = response.get("error") {
+                        let fallback = error.to_string();
+                        let msg = error.as_str().unwrap_or(&fallback);
+                        return Err(msg.to_string());
+                    }
 
-            // 异步事件（无 id）→ 转发给 Tauri，再继续读取响应
-            if response.get("event").is_some() {
-                on_event(&response);
-                continue;
-            }
+                    // 成功响应
+                    if let Some(result) = response.get("result") {
+                        return Ok(result.clone());
+                    }
 
-            // 检查响应 ID 是否匹配当前请求 (H3)
-            if let Some(resp_id) = response.get("id").and_then(|v| v.as_u64()) {
-                if resp_id != id {
-                    // 响应不属于当前请求，跳过
-                    continue;
+                    return Err(format!("Unexpected response: {}", response));
                 }
             }
-
-            // 错误响应
-            if let Some(error) = response.get("error") {
-                let fallback = error.to_string();
-                let msg = error.as_str().unwrap_or(&fallback);
-                return Err(msg.to_string());
-            }
-
-            // 成功响应
-            if let Some(result) = response.get("result") {
-                return Ok(result.clone());
-            }
-
-            return Err(format!("Unexpected response: {}", response));
         }
     }
 
