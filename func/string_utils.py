@@ -5,6 +5,8 @@
 - 去除两端空格
 - 去除内部换行（\\n、\\r）
 - 去除内部制表符（\\t）
+- 去除零宽字符（ZWSP/ZWNJ/ZWJ/Word Joiner/BOM）
+- 不换行空格替换为普通空格
 - 合并连续空格为单个空格
 """
 
@@ -12,6 +14,8 @@ import re
 import pandas as pd
 
 _MULTI_SPACE = re.compile(r' {2,}')
+# 零宽字符（删除）：ZWSP, ZWNJ, ZWJ, Word Joiner, Mongolian Vowel Separator, BOM
+_ZERO_WIDTH = re.compile(r'[​‌‍⁠᠎﻿]')
 
 
 def clean_string(val) -> str:
@@ -23,14 +27,16 @@ def clean_string(val) -> str:
     2. pd.Series → 取第一个元素后递归处理
     3. 去除两端空白
     4. 内部 \\n、\\r、\\t 替换为空格
-    5. 合并连续空格为单个空格
-    6. 最终再去两端空白
+    5. 不换行空格（\\u00a0）替换为普通空格
+    6. 删除零宽字符（ZWSP/ZWNJ/ZWJ/Word Joiner/BOM）
+    7. 合并连续空格为单个空格
+    8. 最终再去两端空白
 
     Args:
         val: 任意类型的输入值
 
     Returns:
-        清理后的字符串（保证无内部换行/Tab，两端无空格）
+        清理后的字符串（保证无内部换行/Tab/零宽字符，两端无空格）
     """
     # Fast path for numeric values - skip all string processing
     if isinstance(val, (int, float)) and not pd.isna(val):
@@ -58,9 +64,12 @@ def clean_string(val) -> str:
         return ""
     # 内部换行和制表符替换为空格
     s = s.replace("\n", " ").replace("\r", " ").replace("\t", " ")
+    # 不换行空格替换为普通空格
+    s = s.replace(" ", " ")
+    # 删除零宽字符
+    s = _ZERO_WIDTH.sub("", s)
     # 合并连续空格
     s = _MULTI_SPACE.sub(" ", s)
     # 最终再去两端
     s = s.strip()
     return s
-

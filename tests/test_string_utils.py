@@ -127,3 +127,58 @@ class TestCleanString:
     def test_mongolian_with_newline(self):
         assert clean_string("Мото цагийн\nзаалт") == "Мото цагийн заалт"
 
+    # --- 零宽字符 ---
+
+    def test_zwsp_removed(self):
+        """零宽空格 U+200B 应被删除"""
+        assert clean_string("EX​#001") == "EX#001"
+
+    def test_zwnj_removed(self):
+        """零宽非连接符 U+200C 应被删除"""
+        assert clean_string("EX‌#001") == "EX#001"
+
+    def test_zwj_removed(self):
+        """零宽连接符 U+200D 应被删除"""
+        assert clean_string("EX‍#001") == "EX#001"
+
+    def test_word_joiner_removed(self):
+        """Word Joiner U+2060 应被删除"""
+        assert clean_string("EX⁠#001") == "EX#001"
+
+    def test_bom_removed(self):
+        """BOM U+FEFF 应被删除"""
+        assert clean_string("﻿EX#001") == "EX#001"
+
+    def test_multiple_zero_width_removed(self):
+        """多种零宽字符混合应全部删除"""
+        assert clean_string("EX​‌‍#001") == "EX#001"
+
+    def test_zero_width_with_surrounding_spaces(self):
+        """零宽字符与空格组合"""
+        assert clean_string("  EX ​ #001  ") == "EX #001"
+
+    # --- 不换行空格 ---
+
+    def test_nbsp_replaced_with_space(self):
+        """不换行空格 U+00A0 应替换为普通空格"""
+        assert clean_string("EX #001") == "EX #001"
+
+    def test_nbsp_and_zero_width_combined(self):
+        """NBSP + 零宽字符组合"""
+        assert clean_string("EX ​#001") == "EX #001"
+
+    def test_nbsp_at_boundaries(self):
+        """两端的 NBSP 应被 trim"""
+        assert clean_string(" hello ") == "hello"
+
+    # --- 组合场景 ---
+
+    def test_real_world_pdf_copy(self):
+        """模拟从 PDF 复制到 Excel 的脏数据"""
+        assert clean_string(" NTE240 ​#1101\n ") == "NTE240 #1101"
+
+    def test_real_world_web_copy(self):
+        """模拟从网页复制的带 ZWSP 设备名"""
+        assert clean_string("HITACHI​EX5600​EX#0123") == "HITACHIEX5600EX#0123"
+
+
