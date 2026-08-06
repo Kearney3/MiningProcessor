@@ -190,5 +190,5 @@ def extract_device_model(std_name: str) -> str:
     Returns:
         设备型号字符串。无法提取时返回原始名称。
     """
-    m = re.match(r'^(.+?)\s+[A-Z]{2}#\d{4}$', str(std_name).strip())
+    m = re.match(r'^(.+?)\s+[A-Za-z]{2}#\d{4}$', str(std_name).strip())
     return m.group(1) if m else str(std_name)

@@ -176,10 +176,10 @@ class TestEmptyCellHandling:
         ledger.load(path)
         # "nan" 不应出现在搜索缓存中
         assert "nan" not in ledger._search_cache
-        # 有效记录应存在
-        assert "卡车A" in ledger._search_cache
-        assert "标准卡车A" in ledger._search_cache
-        assert "标准卡车B" in ledger._search_cache
+        # 有效记录应存在（key 已小写化）
+        assert "卡车a" in ledger._search_cache
+        assert "标准卡车a" in ledger._search_cache
+        assert "标准卡车b" in ledger._search_cache
 
     def test_match_skips_nan_rows(self, tmp_path):
         """match() 不应匹配到 nan 关键词"""
@@ -273,3 +273,109 @@ class TestMatchDevice:
     def test_match_device_both_none(self, std_ledger):
         result = std_ledger.match_device(name=None, device_id=None)
         assert result is None
+
+
+@pytest.fixture
+def case_sensitive_ledger(tmp_path):
+    """创建包含英文设备编号的台账，用于测试大小写不敏感匹配"""
+    df = pd.DataFrame({
+        "设备名称": ["NTE240 #1101", "EX5600 EX#0123"],
+        "设备编号": ["HT#1101", "EX#0123"],
+        "公司": ["A公司", "B公司"],
+        "标准设备名称": ["NTE240 HT#1101", "HITACHI EX5600 EX#0123"],
+        "标准设备编号": ["HT#1101", "EX#0123"],
+        "标准公司名称": ["A公司", "B公司"],
+    })
+    path = str(tmp_path / "case_ledger.xlsx")
+    df.to_excel(path, index=False)
+    ledger = EquipmentLedger()
+    ledger.load(path)
+    return ledger
+
+
+class TestCaseInsensitiveMatch:
+    """测试大小写不敏感匹配"""
+
+    def test_name_match_upper_vs_lower(self, case_sensitive_ledger):
+        """台账有 'NTE240 #1101'，查询 'nte240 #1101' 应命中"""
+        result = case_sensitive_ledger.match("nte240 #1101")
+        assert result is not None
+        assert result["标准名称"] == "NTE240 HT#1101"
+
+    def test_name_match_lower_vs_upper(self, case_sensitive_ledger):
+        """台账有 'NTE240 #1101'，查询 'NTE240 #1101' 应命中"""
+        result = case_sensitive_ledger.match("NTE240 #1101")
+        assert result is not None
+        assert result["标准名称"] == "NTE240 HT#1101"
+
+    def test_name_match_mixed_case(self, case_sensitive_ledger):
+        """台账有 'EX5600 EX#0123'，查询 'ex5600 ex#0123' 应命中"""
+        result = case_sensitive_ledger.match("ex5600 ex#0123")
+        assert result is not None
+        assert result["标准名称"] == "HITACHI EX5600 EX#0123"
+
+    def test_id_match_upper_vs_lower(self, case_sensitive_ledger):
+        """台账有 'HT#1101'，查询 'ht#1101' 应命中"""
+        result = case_sensitive_ledger.match_by_id("ht#1101")
+        assert result is not None
+        assert result["标准设备名称"] == "NTE240 HT#1101"
+
+    def test_id_match_lower_vs_upper(self, case_sensitive_ledger):
+        """台账有 'EX#0123'，查询 'EX#0123' 应命中"""
+        result = case_sensitive_ledger.match_by_id("EX#0123")
+        assert result is not None
+        assert result["标准设备名称"] == "HITACHI EX5600 EX#0123"
+
+    def test_id_match_mixed_case(self, case_sensitive_ledger):
+        """台账有 'EX#0123'，查询 'Ex#0123' 应命中"""
+        result = case_sensitive_ledger.match_by_id("Ex#0123")
+        assert result is not None
+        assert result["标准设备名称"] == "HITACHI EX5600 EX#0123"
+
+    def test_device_match_id_case_insensitive(self, case_sensitive_ledger):
+        """match_device 编号大小写混合应命中"""
+        result = case_sensitive_ledger.match_device(name=None, device_id="ht#1101")
+        assert result is not None
+        assert result["标准设备名称"] == "NTE240 HT#1101"
+
+    def test_device_match_name_case_insensitive(self, case_sensitive_ledger):
+        """match_device 名称大小写混合应命中"""
+        result = case_sensitive_ledger.match_device(name="nte240 #1101", device_id=None)
+        assert result is not None
+        assert result["标准设备名称"] == "NTE240 HT#1101"
+
+    def test_device_match_fallback_name_case_insensitive(self, case_sensitive_ledger):
+        """match_device 编号未命中时回退到名称匹配，名称大小写不敏感"""
+        result = case_sensitive_ledger.match_device(
+            name="ex5600 ex#0123", device_id="nonexistent"
+        )
+        assert result is not None
+        assert result["标准设备名称"] == "HITACHI EX5600 EX#0123"
+
+    def test_std_name_lookup_case_insensitive(self, case_sensitive_ledger):
+        """match_device 通过名称匹配后，_name_to_info 反查应大小写不敏感"""
+        # 通过名称匹配，内部需要从标准名称反查完整信息
+        result = case_sensitive_ledger.match_device(name="ex5600 ex#0123")
+        assert result is not None
+        assert result["标准设备编号"] == "EX#0123"
+        assert result["标准公司名称"] == "B公司"
+
+
+class TestExtractDeviceModelCaseInsensitive:
+    """测试 extract_device_model 大小写不敏感"""
+
+    def test_uppercase_prefix(self):
+        from func.maintenance_utils import extract_device_model
+        assert extract_device_model("HITACHI EX5600 EX#0123") == "HITACHI EX5600"
+
+    def test_lowercase_prefix(self):
+        from func.maintenance_utils import extract_device_model
+        assert extract_device_model("HITACHI EX5600 ex#0123") == "HITACHI EX5600"
+
+    def test_mixed_case_prefix(self):
+        from func.maintenance_utils import extract_device_model
+        assert extract_device_model("CAT D8T Dz#0168") == "CAT D8T"
+
+    def test_no_match_returns_original(self):
+        from func.maintenance_utils import extract_device_model
+        assert extract_device_model("无编号设备") == "无编号设备"
