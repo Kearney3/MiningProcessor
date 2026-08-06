@@ -36,7 +36,7 @@ describe("DataSyncPage - Export Warnings", () => {
               fuel: {
                 success: 1, skipped: 0, failed: 0,
                 warnings: [
-                  { row: 2, field: "equipmentName", value: "旧设备", message: "未匹配" },
+                  { row: 2, field: "sourceEquipmentName", value: "旧设备", message: "未匹配" },
                 ],
               },
             },
@@ -73,7 +73,7 @@ describe("DataSyncPage - Export Warnings", () => {
             fuel: {
               success: 1, skipped: 0, failed: 0,
               warnings: [
-                { row: 2, field: "equipmentName", value: "旧设备", message: "未匹配" },
+                { row: 2, field: "sourceEquipmentName", value: "旧设备", message: "未匹配" },
               ],
             },
           },
@@ -124,7 +124,7 @@ describe("DataSyncPage - Export Warnings", () => {
             fuel: {
               success: 1, skipped: 0, failed: 0,
               warnings: [
-                { row: 2, field: "equipmentName", value: "旧设备", message: "未匹配" },
+                { row: 2, field: "sourceEquipmentName", value: "旧设备", message: "未匹配" },
               ],
             },
           },
@@ -161,8 +161,8 @@ describe("DataSyncPage - Export Warnings", () => {
               fuel: {
                 success: 0, skipped: 0, failed: 0,
                 warnings: [
-                  { row: 1, field: "truckName", value: "", message: "缺少矿卡" },
-                  { row: 2, field: "equipmentName", value: null, message: "缺少设备" },
+                  { row: 1, field: "sourceTruckName", value: "", message: "缺少矿卡" },
+                  { row: 2, field: "sourceEquipmentName", value: null, message: "缺少设备" },
                 ],
               },
             },

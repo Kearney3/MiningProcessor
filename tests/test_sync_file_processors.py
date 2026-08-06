@@ -353,13 +353,13 @@ class TestProcessWorkEfficiencyFile:
         self, mock_config, mock_mapper_fn, mock_read
     ):
         """无 year/month 时回退到直接读取 Excel。"""
-        mock_config.return_value = {"work_efficiency": {"设备名称": "equipmentName"}}
+        mock_config.return_value = {"work_efficiency": {"设备名称": "sourceEquipmentName"}}
         df = pd.DataFrame({"设备名称": ["Excavator-01"]})
         mock_read.return_value = df
-        mock_mapper_fn.return_value = lambda d, m: [{"equipmentName": "Excavator-01"}]
+        mock_mapper_fn.return_value = lambda d, m: [{"sourceEquipmentName": "Excavator-01"}]
         fp = Path("/tmp/work.xlsx")
 
         result = _process_work_efficiency_file(fp, apply_header_mapping=False)
 
-        assert result == [{"equipmentName": "Excavator-01"}]
+        assert result == [{"sourceEquipmentName": "Excavator-01"}]
         mock_read.assert_called_once_with(fp, sheet_name=0)

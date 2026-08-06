@@ -52,22 +52,34 @@ BATCH_SIZE = 100
 VALID_TABLES: frozenset[str] = frozenset(r["table"] for r in DATA_TYPE_REGISTRY.values())
 
 # 各表的 dedup 字段定义（PostgreSQL 列名）
-# 与 MineBase UNIQUE 约束保持一致
+# 与 MineBase UNIQUE 约束保持一致（使用 FK resolved 字段）
 DEDUP_FIELDS_MAP: dict[str, list[str]] = {
-    "fuel_consumption": ["date", "shift_type", "equipment_name", "equipment_code", "fuel_name"],
-    "electricity_consumption": ["date", "shift_type", "equipment_name", "equipment_code"],
-    "work_efficiency": ["date", "shift_type", "equipment_name", "equipment_code", "company"],
-    "equipment_operation": ["date", "shift_type", "equipment_name", "equipment_code"],
-    "production_record": ["date", "shift_type", "truck_name", "excavator_name", "material_type_name"],
+    "fuel_consumption": ["date", "shift_type", "equipment_id", "fuel_name"],
+    "electricity_consumption": ["date", "shift_type", "equipment_id"],
+    "work_efficiency": ["date", "shift_type", "equipment_id"],
+    "equipment_operation": ["date", "shift_type", "equipment_id"],
+    "production_record": ["date", "shift_type", "truck_id", "excavator_id", "material_type_id"],
 }
 
 # API 字段名 → PostgreSQL 列名映射
+# 与 MineBase field-definitions.ts 保持一致
 FIELD_TO_COLUMN_MAP: dict[str, str] = {
     "date": "date",
     "shiftType": "shift_type",
-    "equipmentName": "equipment_name",
-    "equipmentCode": "equipment_code",
+    # 新字段名（source* 前缀）
+    "sourceEquipmentName": "source_equipment_name",
+    "sourceEquipmentCode": "source_equipment_code",
+    "sourceTruckName": "source_truck_name",
+    "sourceTruckCode": "source_truck_code",
+    "sourceExcavatorName": "source_excavator_name",
+    "sourceExcavatorCode": "source_excavator_code",
+    "sourceMaterialTypeName": "source_material_type_name",
+    # FK resolved 字段
     "equipmentId": "equipment_id",
+    "truckId": "truck_id",
+    "excavatorId": "excavator_id",
+    "materialTypeId": "material_type_id",
+    # 业务字段
     "fuelName": "fuel_name",
     "consumption": "consumption",
     "company": "company",
@@ -98,11 +110,11 @@ FIELD_TO_COLUMN_MAP: dict[str, str] = {
     "milemeterEnd": "milemeter_end",
     "mileage": "mileage",
     "tripCount": "trip_count",
-    "truckName": "truck_name",
-    "truckId": "truck_id",
-    "excavatorName": "excavator_name",
-    "excavatorId": "excavator_id",
-    "materialTypeName": "material_type_name",
-    "materialTypeId": "material_type_id",
     "production": "production",
+    # 向后兼容旧字段名（DB 直连模式仍可能遇到）
+    "equipmentName": "source_equipment_name",
+    "equipmentCode": "source_equipment_code",
+    "truckName": "source_truck_name",
+    "excavatorName": "source_excavator_name",
+    "materialTypeName": "source_material_type_name",
 }
