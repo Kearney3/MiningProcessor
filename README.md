@@ -3,7 +3,7 @@
 > 矿山运营 Excel 报表批量处理工具
 
 <p>
-  <img src="https://img.shields.io/badge/version-v2.1.2-blue?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-v2.3.0-blue?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/Python-≥3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="python" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square" alt="license" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="platform" />
@@ -430,6 +430,31 @@ uv run scripts/bump_version.py --bump minor --dry-run
 ---
 
 ## 📋 更新日志
+
+### v2.3.0 · 2026-08-06
+
+- ⚡ **Excel 格式化性能优化**
+  - `excel_formatter` 从 openpyxl 两遍模式迁移至 xlsxwriter 单遍流式写入，大文件提速 3-5 倍
+  - `excel_merger` 新增 calamine 引擎支持（Rust 实现，读取速度提升 5-10 倍）
+  - 新增依赖 `python-calamine`
+- 🔄 **同步模块适配 MineBase 新架构**
+  - 设备/矿卡/挖机/物料字段名统一加 `source*` 前缀（`equipmentName` → `sourceEquipmentName` 等），与 MineBase `field-definitions.ts` 对齐
+  - `DEDUP_FIELDS_MAP` 从 name/code 列改为 FK resolved 列（`equipment_id`、`truck_id` 等），与 MineBase `uq_*_dedup` UNIQUE 约束一致
+  - `FIELD_TO_COLUMN_MAP` 新增 `source*` 字段映射，保留旧字段名向后兼容
+  - `materialType` FK `matchField` 保持为 `code`
+- 🛡️ **LLM 标注取消机制重构**
+  - `label_maintenance_with_llm` 改用 `wait(FIRST_COMPLETED)` + 0.1s 轮询，确保取消事件被及时检查
+  - `gui/components/llm_labeling` 引入 `_LLMRunState` 数据类隔离相邻任务状态，防止回调污染新任务 UI
+  - Tauri `LLMLabelingPage` 取消按钮增加 `cancelling` 状态即时反馈，补传 `sheet_name` 参数
+- 🐛 **Bug 修复**
+  - 台账匹配大小写不敏感 — 设备名称、编号、油品名称统一小写化后匹配
+  - 设备台账匹配逻辑调整 — 编号+名称必须一致，名称歧义视为未命中
+  - `clean_string` 新增零宽字符删除和不换行空格替换
+  - 修复 macOS SSL 证书验证失败问题
+  - 修复 Tauri LLM 标注取消按钮无响应问题
+- 🏗️ **Tauri Python Bridge 改进**
+  - reader 线程移除冗余 `cancelled` 参数
+  - 新增取消场景集成测试
 
 ### v2.1.1 · 2026-07-31
 
