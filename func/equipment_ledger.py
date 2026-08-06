@@ -108,9 +108,9 @@ class EquipmentLedger(LedgerBase):
     def match_device(self, name: Optional[str] = None, device_id: Optional[str] = None) -> Optional[dict]:
         """
         组合匹配：按以下优先级尝试，命中即返回。
-        1. 同时有编号和名称 → 先编号，未命中再名称
+        1. 同时有编号和名称 → 两者都匹配且结果一致才命中
         2. 只有编号 → 编号匹配
-        3. 只有名称 → 名称匹配
+        3. 只有名称 → 名称匹配（多条不一致视为未命中）
         4. 都没有 → None
 
         未匹配的记录会输出 warning 日志。
@@ -125,26 +125,44 @@ class EquipmentLedger(LedgerBase):
 
         result = None
 
-        if cleaned_id:
-            # 编号匹配（优先级最高）
-            result = self.match_by_id(cleaned_id)
-
-        if not result and cleaned_name:
-            # 名称匹配（编号未命中或无编号时）
+        if cleaned_id and cleaned_name:
+            # 编号和名称同时存在：两者都匹配且结果一致才命中
+            id_result = self.match_by_id(cleaned_id)
             name_result = self.match(cleaned_name)
-            if name_result:
-                std_name = name_result["标准名称"]
-                info = self._name_to_info.get(std_name.lower())
-                if info:
-                    result = info
+            if id_result and name_result:
+                id_std = id_result.get("标准设备名称", "")
+                name_std = name_result.get("标准名称", "")
+                if id_std == name_std:
+                    result = id_result
                 else:
-                    result = {
-                        "标准设备名称": std_name,
-                        "标准设备编号": "",
-                        "标准公司名称": "",
-                    }
+                    logger.debug(
+                        "编号与名称匹配不一致: 编号=%r→%r, 名称=%r→%r",
+                        cleaned_id, id_std, cleaned_name, name_std,
+                    )
+            # 一致匹配失败，回退到名称匹配
+            if not result:
+                result = self._match_by_name(cleaned_name)
+        elif cleaned_id:
+            result = self.match_by_id(cleaned_id)
+        elif cleaned_name:
+            result = self._match_by_name(cleaned_name)
 
         if not result:
             logger.warning(f"设备台账未匹配: 名称={name!r}, 编号={device_id!r}")
 
         return result
+
+    def _match_by_name(self, cleaned_name: str) -> Optional[dict]:
+        """通过名称匹配，返回完整标准信息。多条不一致视为未命中。"""
+        name_result = self.match(cleaned_name)
+        if not name_result:
+            return None
+        std_name = name_result["标准名称"]
+        info = self._name_to_info.get(std_name.lower())
+        if info:
+            return info
+        return {
+            "标准设备名称": std_name,
+            "标准设备编号": "",
+            "标准公司名称": "",
+        }
