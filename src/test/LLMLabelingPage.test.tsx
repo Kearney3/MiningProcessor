@@ -1,9 +1,12 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+import { invoke } from "@tauri-apps/api/core";
 import { ToastProvider } from "../components/Toast";
 import type { BridgeProp } from "../lib/types";
 import { autoDetectColumn, validateColumnMapping } from "../lib/llm-labeling";
 import { LLMLabelingPage } from "../components/pages/LLMLabelingPage";
+
+const mockInvoke = vi.mocked(invoke);
 
 vi.mock("../lib/ui-components", () => ({
   PathInput: ({
@@ -83,5 +86,53 @@ describe("LLMLabelingPage", () => {
     expect((await screen.findAllByText(/接口暂时不可用/)).length).toBeGreaterThan(0);
     expect(processParams).toMatchObject({ sheet_name: "夜班维修" });
     await waitFor(() => expect(screen.getByText("返回修改")).toBeInTheDocument());
+  });
+
+  it("sends the native cancel command and gives immediate feedback", async () => {
+    let finishProcess!: (result: Record<string, unknown>) => void;
+    const processPending = new Promise<Record<string, unknown>>((resolve) => {
+      finishProcess = resolve;
+    });
+    const call: BridgeProp["call"] = async <T,>(method: string): Promise<T> => {
+      if (method === "get_last_directory") return { path: "" } as T;
+      if (method === "preview_excel_sheets") return { sheets: ["维修明细"] } as T;
+      if (method === "preview_excel_columns") {
+        return {
+          columns: ["维修内容", "大类", "小类", "分类方式"],
+          rows: 1,
+          sample: [],
+        } as T;
+      }
+      if (method === "process_maintenance_llm") return processPending as T;
+      throw new Error(`unexpected method: ${method}`);
+    };
+
+    render(
+      <ToastProvider>
+        <LLMLabelingPage bridge={{ call }} progress={null} setProgress={vi.fn()} />
+      </ToastProvider>,
+    );
+
+    fireEvent.click(screen.getByText("选择测试文件"));
+    fireEvent.click(await screen.findByText("下一步：列映射"));
+    fireEvent.click(screen.getByText("下一步：筛选与导出"));
+    fireEvent.click(screen.getByText("开始标注"));
+
+    const cancelButton = await screen.findByRole("button", { name: "取消" });
+    fireEvent.click(cancelButton);
+
+    expect(mockInvoke).toHaveBeenCalledWith("cancel_task");
+    expect(screen.getByRole("button", { name: "取消中..." })).toBeDisabled();
+
+    finishProcess({
+      cancelled: true,
+      input_rows: 1,
+      target_rows: 1,
+      llm_completed: 0,
+      skipped_rows: 0,
+      output: "",
+      export_mode: "statistics",
+    });
+    await waitFor(() => expect(screen.getByText(/已取消/)).toBeInTheDocument());
   });
 });

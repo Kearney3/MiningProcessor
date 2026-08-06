@@ -4,6 +4,7 @@
 支持页面关闭时自动取消后台任务。
 """
 import asyncio
+from dataclasses import dataclass, field
 import logging
 import threading
 
@@ -71,6 +72,14 @@ def _result_presentation(result: dict) -> dict:
             + (f" · {remaining} 条待重试" if remaining else " · 100%")
         ),
     }
+
+
+@dataclass
+class _LLMRunState:
+    """单次 LLM 任务的可取消状态，避免相邻任务共享 Event。"""
+
+    cancel_event: threading.Event = field(default_factory=threading.Event)
+    finished: bool = False
 
 
 # ── 组件 ──────────────────────────────────────────────────
@@ -156,10 +165,21 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
     # ── 内部状态 ──
     sample_data: list[dict] = []
     value_options: dict[str, list[tuple[str, int]]] = {}
-    cancel_event = threading.Event()
-    active_thread: threading.Thread | None = None
+    run_state_lock = threading.Lock()
+    current_run: _LLMRunState | None = None
     progress_lock = threading.Lock()
-    progress_delivery: dict = {"latest": None, "scheduled": False}
+
+    def _is_current_run(run_state: _LLMRunState) -> bool:
+        with run_state_lock:
+            return current_run is run_state
+
+    def _is_active_run(run_state: _LLMRunState) -> bool:
+        with run_state_lock:
+            return current_run is run_state and not run_state.finished
+
+    def _mark_run_finished(run_state: _LLMRunState) -> None:
+        with run_state_lock:
+            run_state.finished = True
 
     # ── FilePicker ──
     file_picker = ft.FilePicker()
@@ -434,9 +454,15 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
             _log_message(page.logger.error, "请先在用户配置中选择 LLM 模型")
             return
 
-        cancel_event.clear()
+        nonlocal current_run
+        with run_state_lock:
+            if current_run is not None and not current_run.finished:
+                return
+            run_state = _LLMRunState()
+            current_run = run_state
+
         from gui.logic import register_cancel_event
-        register_cancel_event(cancel_event)
+        register_cancel_event(run_state.cancel_event)
 
         sheet_name = sheet_dropdown.value or "维修明细"
         content_col = col_content.value or "维修内容"
@@ -465,13 +491,15 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
             progress_text, progress_summary, progress_metrics, task_panel,
         )
 
-        nonlocal active_thread
-
         def _run():
+            progress_delivery: dict = {"latest": None, "scheduled": False}
+
             try:
                 from func.label_maintenance_with_llm import process_maintenance_llm
 
                 def _on_progress(text: str, data: dict):
+                    if not _is_active_run(run_state):
+                        return
                     with progress_lock:
                         progress_delivery["latest"] = (text, data)
                         if progress_delivery["scheduled"]:
@@ -480,6 +508,8 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
                     async def _flush_progress():
                         await asyncio.sleep(0.1)
+                        if not _is_active_run(run_state):
+                            return
                         with progress_lock:
                             latest = progress_delivery["latest"]
                             progress_delivery["scheduled"] = False
@@ -529,17 +559,20 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                     status_column=status_col,
                     filter_values=filters,
                     export_mode=export_mode,
-                    cancel_event=cancel_event,
+                    cancel_event=run_state.cancel_event,
                     progress_fn=_on_progress,
                     concurrency=int(llm_config.get("concurrency", 10)),
                     batch_size=int(llm_config.get("batch_size", 50)),
                 )
+                _mark_run_finished(run_state)
 
-                if cancel_event.is_set() or result.get("cancelled"):
+                if run_state.cancel_event.is_set() or result.get("cancelled"):
                     partial = result.get("llm_completed", 0)
                     remaining = result.get("remaining_rows", 0)
 
                     async def _cancelled():
+                        if not _is_current_run(run_state):
+                            return
                         status_text.value = "任务已取消，当前进度已保留"
                         result_text.value = (
                             f"已完成 {partial} 条，剩余 {remaining} 条；"
@@ -567,6 +600,8 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                 mode_label = "汇总统计" if result.get("export_mode") == "statistics" else "标注明细"
 
                 async def _ok():
+                    if not _is_current_run(run_state):
+                        return
                     status_text.value = (
                         "部分完成，当前进度已保留"
                         if presentation["is_partial"] else "标注完成"
@@ -596,10 +631,13 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
                 page.run_task(_ok)
             except Exception as exc:
+                _mark_run_finished(run_state)
                 err_msg = str(exc)
 
                 async def _fail():
-                    if cancel_event.is_set():
+                    if not _is_current_run(run_state):
+                        return
+                    if run_state.cancel_event.is_set():
                         status_text.value = "任务已取消，当前进度已保留"
                         result_text.value = "再次开始可从断点继续未完成记录。"
                         result_text.color = ft.Colors.AMBER
@@ -619,14 +657,17 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                 page.run_task(_fail)
             finally:
                 from gui.logic import unregister_cancel_event
-                unregister_cancel_event(cancel_event)
-                active_thread = None
+                _mark_run_finished(run_state)
+                unregister_cancel_event(run_state.cancel_event)
 
-        active_thread = threading.Thread(target=_run, daemon=True)
-        active_thread.start()
+        threading.Thread(target=_run, daemon=True).start()
 
     async def _on_cancel(_e):
-        cancel_event.set()
+        with run_state_lock:
+            run_state = current_run
+        if run_state is None:
+            return
+        run_state.cancel_event.set()
         status_text.value = "正在停止新批次，等待已发出的请求完成…"
         cancel_btn.visible = False
         safe_update(status_text, cancel_btn)

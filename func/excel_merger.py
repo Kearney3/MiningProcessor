@@ -11,6 +11,14 @@ from func.excel_utils import dedup_dataframe, sanitize_filename, get_hidden_indi
 
 logger = get_logger(__name__)
 
+# 优先使用 calamine 读取引擎（Rust 实现，比 openpyxl 快 5-10 倍）
+_READ_ENGINE: str | None = None
+try:
+    import python_calamine  # noqa: F401
+    _READ_ENGINE = "calamine"
+except ImportError:
+    pass
+
 
 def find_first_datetime_column(df: pd.DataFrame) -> str | None:
     """找到 DataFrame 中第一个可解析为日期时间的列，返回列名或 None"""
@@ -96,7 +104,7 @@ def merge_excel_files(
     xl_cache: dict[str, pd.ExcelFile] = {}  # 缓存 ExcelFile 避免重复打开
 
     for fpath in matched_files:
-        xl = pd.ExcelFile(fpath)
+        xl = pd.ExcelFile(fpath, engine=_READ_ENGINE)
         xl_cache[fpath] = xl
         header_dict[os.path.basename(fpath)] = {}
         file_sheet_names[fpath] = []

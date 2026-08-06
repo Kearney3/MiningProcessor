@@ -36,14 +36,11 @@ pub struct PythonBridge {
 }
 
 /// 启动 reader 线程：持续从 stdout 读取 JSON 行，通过 channel 转发
-fn spawn_reader(stdout: ChildStdout, cancelled: Arc<AtomicBool>) -> Receiver<BridgeMsg> {
+fn spawn_reader(stdout: ChildStdout) -> Receiver<BridgeMsg> {
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
         let mut reader = BufReader::new(stdout);
         loop {
-            if cancelled.load(Ordering::SeqCst) {
-                break;
-            }
             let mut line = String::new();
             match reader.read_line(&mut line) {
                 Ok(0) => break, // EOF: Python 进程已退出
@@ -97,7 +94,7 @@ impl PythonBridge {
         let stderr = child.stderr.take();
         let cancelled = Arc::new(AtomicBool::new(false));
 
-        let rx = spawn_reader(stdout, Arc::clone(&cancelled));
+        let rx = spawn_reader(stdout);
 
         Ok(Self {
             child: Mutex::new(Some(child)),
@@ -138,7 +135,7 @@ impl PythonBridge {
         let stderr = child.stderr.take();
         let cancelled = Arc::new(AtomicBool::new(false));
 
-        let rx = spawn_reader(stdout, Arc::clone(&cancelled));
+        let rx = spawn_reader(stdout);
 
         Ok(Self {
             child: Mutex::new(Some(child)),
@@ -295,6 +292,74 @@ impl Drop for PythonBridge {
                 let _ = c.kill();
                 let _ = c.wait();
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PythonBridge;
+    use std::path::PathBuf;
+    use std::sync::Arc;
+    use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn cancel_interrupts_a_call_waiting_for_python() {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock must be after the Unix epoch")
+            .as_nanos();
+        let script_path = std::env::temp_dir().join(format!(
+            "mining_processor_python_bridge_cancel_{}_{}.py",
+            std::process::id(),
+            stamp,
+        ));
+        std::fs::write(
+            &script_path,
+            r#"
+import json
+import sys
+import time
+
+for line in sys.stdin:
+    request = json.loads(line)
+    time.sleep(1 if request["method"] == "long_running" else 0)
+    print(json.dumps({"id": request["id"], "result": {"ok": True}}), flush=True)
+"#,
+        )
+        .expect("test Python script must be writable");
+
+        let python = if cfg!(windows) { "python" } else { "python3" };
+        let bridge = Arc::new(
+            PythonBridge::new(python, script_path.to_str().expect("UTF-8 temp path"))
+                .expect("Python bridge must start"),
+        );
+        let call_bridge = Arc::clone(&bridge);
+        let call = std::thread::spawn(move || {
+            call_bridge.call("long_running", &serde_json::json!({}), |_| {})
+        });
+
+        std::thread::sleep(Duration::from_millis(100));
+        let cancelled_at = Instant::now();
+        bridge.cancel();
+        let result = call.join().expect("call thread must finish");
+
+        assert_eq!(result, Err("Task cancelled".to_string()));
+        assert!(
+            cancelled_at.elapsed() < Duration::from_secs(2),
+            "cancelled call should return promptly"
+        );
+
+        let next_result = bridge.call("ping", &serde_json::json!({}), |_| {});
+        assert_eq!(next_result, Ok(serde_json::json!({"ok": true})));
+
+        drop(bridge);
+        let _ = std::fs::remove_file(&script_path);
+        if let Ok(home) = std::env::var("HOME") {
+            let cancel_path = PathBuf::from(home)
+                .join(".cache")
+                .join("mining_processor_cancel");
+            let _ = std::fs::remove_file(cancel_path);
         }
     }
 }

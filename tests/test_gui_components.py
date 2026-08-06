@@ -1290,3 +1290,116 @@ def test_llm_labeling_section_contains_four_module_cards():
     ]
     # At minimum: file/sheet card + execute card; mapping & filter start hidden
     assert len(cards) >= 2
+
+
+def test_llm_cancel_does_not_leak_stale_progress_into_next_run(tmp_path):
+    """取消后立即重启时，上一轮的请求和进度不得影响新一轮。"""
+    import threading
+    from unittest.mock import patch
+
+    from gui.components.llm_labeling import create_llm_labeling_section
+
+    page = PageSpy()
+    _, refs = create_llm_labeling_section(page)
+    refs["path"].value = str(tmp_path / "input.xlsx")
+    refs["sheet"].value = "维修明细"
+
+    def _walk(control, seen=None):
+        seen = seen or set()
+        if id(control) in seen:
+            return
+        seen.add(id(control))
+        yield control
+        content = getattr(control, "content", None)
+        if content is not None:
+            yield from _walk(content, seen)
+        for child in getattr(control, "controls", None) or []:
+            yield from _walk(child, seen)
+
+    cancel_btn = next(
+        control
+        for control in _walk(_)
+        if isinstance(control, ft.Button)
+        and str(getattr(control, "content", None)) == "取消"
+    )
+
+    first_started = threading.Event()
+    second_started = threading.Event()
+    second_release = threading.Event()
+    stale_progress_done = threading.Event()
+    run_events = []
+
+    def _fake_process(*_args, **kwargs):
+        cancel_event = kwargs["cancel_event"]
+        progress_fn = kwargs["progress_fn"]
+        run_events.append(cancel_event)
+        if len(run_events) == 1:
+            first_started.set()
+            assert cancel_event.wait(1)
+
+            def _emit_stale_progress():
+                if second_started.wait(1):
+                    progress_fn(
+                        "旧任务进度",
+                        {
+                            "percent": 99,
+                            "current": 99,
+                            "total": 100,
+                            "succeeded": 99,
+                            "skipped": 0,
+                            "failed": 0,
+                            "retried": 0,
+                            "rate": 1,
+                        },
+                    )
+                stale_progress_done.set()
+
+            threading.Thread(target=_emit_stale_progress, daemon=True).start()
+            return {"cancelled": True, "llm_completed": 0, "remaining_rows": 1}
+
+        second_started.set()
+        second_release.wait(1)
+        return {"cancelled": True, "llm_completed": 0, "remaining_rows": 1}
+
+    def _wait_until(predicate, timeout=2):
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if predicate():
+                return True
+            time.sleep(0.01)
+        return predicate()
+
+    with (
+        patch(
+            "func.config_loader.get_llm_config",
+            return_value={
+                "url": "http://fake",
+                "api_key": "k",
+                "model": "m",
+                "concurrency": 1,
+                "batch_size": 1,
+            },
+        ),
+        patch(
+            "func.label_maintenance_with_llm.process_maintenance_llm",
+            side_effect=_fake_process,
+        ),
+    ):
+        try:
+            _invoke(refs["btn"].on_click, None)
+            assert first_started.wait(1)
+
+            _invoke(cancel_btn.on_click, None)
+            assert _wait_until(lambda: not refs["btn"].disabled)
+
+            _invoke(refs["btn"].on_click, None)
+            assert second_started.wait(1)
+            assert len(run_events) == 2
+            assert run_events[0] is not run_events[1]
+            assert run_events[0].is_set()
+
+            assert stale_progress_done.wait(1)
+            assert refs["progress_summary"].value == "准备发送标注任务…"
+        finally:
+            second_release.set()
+            assert _wait_until(lambda: not refs["btn"].disabled)
