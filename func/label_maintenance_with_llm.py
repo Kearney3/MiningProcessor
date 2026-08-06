@@ -16,7 +16,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, as_completed, wait
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Callable, Iterable
@@ -1385,26 +1385,48 @@ def process_maintenance_llm(
             executor.submit(_process_batch, batch_num, batch, progress): batch
             for batch_num, batch in enumerate(batches, start=1)
         }
-        for future in as_completed(futures):
-            try:
-                future.result()
-                if cancel_event is not None and cancel_event.is_set():
-                    cancelled = True
-                    progress.mark_cancelling()
-                    for pending in futures:
-                        pending.cancel()
-                    break
-            except _Cancelled:
+        pending_futures = set(futures)
+        while pending_futures:
+            # as_completed() only wakes when a future completes.  A network
+            # request can remain in flight for the whole API timeout after
+            # the user has cancelled, so poll cancellation independently.
+            if _cancel_requested():
                 cancelled = True
                 progress.mark_cancelling()
-                for pending in futures:
+                for pending in pending_futures:
                     pending.cancel()
                 break
-            except Exception as exc:
-                failed_errors.append(exc)
+
+            done_futures, pending_futures = wait(
+                pending_futures,
+                timeout=0.1,
+                return_when=FIRST_COMPLETED,
+            )
+            if not done_futures:
+                continue
+
+            for future in done_futures:
+                try:
+                    future.result()
+                except _Cancelled:
+                    cancelled = True
+                    progress.mark_cancelling()
+                    for pending in pending_futures:
+                        pending.cancel()
+                    break
+                except Exception as exc:
+                    failed_errors.append(exc)
+                if _cancel_requested():
+                    cancelled = True
+                    progress.mark_cancelling()
+                    for pending in pending_futures:
+                        pending.cancel()
+                    break
+            if cancelled:
+                break
     finally:
         # 不等待正在运行的批次完成，立即关闭
-        executor.shutdown(wait=False)
+        executor.shutdown(wait=False, cancel_futures=True)
         if cancel_file is not None:
             cancel_file.unlink(missing_ok=True)
 

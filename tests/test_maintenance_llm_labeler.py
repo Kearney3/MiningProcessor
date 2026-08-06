@@ -692,6 +692,85 @@ def test_process_maintenance_llm_cancel_midway(tmp_path):
     assert result["llm_completed"] < 50
 
 
+def test_process_maintenance_llm_cancel_returns_while_batches_are_in_flight(tmp_path):
+    """取消后不应等待已经提交但尚未返回的请求。"""
+    import threading
+    from unittest.mock import patch
+
+    from func.label_maintenance_with_llm import process_maintenance_llm
+
+    source = _make_llm_excel(tmp_path, rows=20)
+    cancel = threading.Event()
+    cancel_file = tmp_path / "cancel"
+    started = threading.Event()
+    release_requests = threading.Event()
+    finished = threading.Event()
+    calls = 0
+    calls_lock = threading.Lock()
+    result_holder = {}
+
+    def _blocking_label(records, **kwargs):
+        nonlocal calls
+        with calls_lock:
+            calls += 1
+            if calls == 2:
+                started.set()
+        release_requests.wait()
+        return BatchResult(
+            labels=[
+                LLMLabel(
+                    record_id=record["id"],
+                    major="发动机系统",
+                    minor="性能/工况异常",
+                    confidence=0.9,
+                    reason="t",
+                )
+                for record in records
+            ],
+            skipped_ids=[],
+        )
+
+    class _BlockingClient:
+        label_batch = staticmethod(_blocking_label)
+
+    def _run():
+        try:
+            result_holder["result"] = process_maintenance_llm(
+                source,
+                llm_config={
+                    "url": "http://fake",
+                    "api_key": "k",
+                    "model": "m",
+                    "format": "openai",
+                },
+                batch_size=10,
+                concurrency=2,
+                cancel_event=cancel,
+                cancel_file=cancel_file,
+            )
+        except BaseException as exc:  # surface worker failures in the assertion below
+            result_holder["error"] = exc
+        finally:
+            finished.set()
+
+    with patch(
+        "func.label_maintenance_with_llm.create_llm_client",
+        return_value=_BlockingClient(),
+    ):
+        worker = threading.Thread(target=_run)
+        worker.start()
+        try:
+            assert started.wait(1), "both requests should be in flight"
+            cancel_file.write_text("cancel", encoding="utf-8")
+            assert finished.wait(1), "cancelling must not wait for in-flight requests"
+        finally:
+            release_requests.set()
+            worker.join(2)
+
+    assert "error" not in result_holder
+    assert result_holder["result"]["cancelled"] is True
+
+
 def test_process_maintenance_llm_no_cancel_completes_normally(tmp_path):
     """无取消事件时应正常完成。"""
     from unittest.mock import patch

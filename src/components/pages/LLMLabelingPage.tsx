@@ -192,18 +192,25 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
   };
 
   // ── Cancel labeling ──
+  const [cancelling, setCancelling] = useState(false);
+
   const handleCancel = async () => {
+    if (!loading || cancelling) return;
+    setCancelling(true);
+    // Give immediate feedback even if the native command is slow to resolve.
+    notify("正在取消...", "info");
     try {
       await invoke("cancel_task");
-      notify("正在取消...", "info");
-    } catch {
-      // ignore
+    } catch (e) {
+      setCancelling(false);
+      notify(`取消失败: ${String(e)}`, "error");
     }
   };
 
   // ── Execute labeling ──
   const handleExecute = async () => {
     setLoading(true);
+    setCancelling(false);
     setError(null);
     setResult(null);
     setProgress(null);
@@ -218,6 +225,7 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
         cancelled?: boolean;
       }>("process_maintenance_llm", {
         path: filePath,
+        sheet_name: sheetName,
         content_column: contentCol,
         category_column: categoryCol,
         minor_column: minorCol,
@@ -227,6 +235,7 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
       });
       if (res.cancelled) {
         setError(`已取消，已完成 ${res.llm_completed} 条（可断点续跑）`);
+        setStep(4);
       } else {
         setResult(res);
         setStep(4);
@@ -236,13 +245,16 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
       const msg = String(e);
       if (msg.includes("Task cancelled") || msg.includes("cancel")) {
         setError("已取消（可断点续跑）");
+        setStep(4);
         notify("已取消标注任务", "info");
       } else {
         setError(msg);
+        setStep(4);
         notify(`LLM 标注失败: ${msg}`, "error");
       }
     } finally {
       setLoading(false);
+      setCancelling(false);
       setProgress(null);
     }
   };
@@ -443,9 +455,9 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
               )}
             </button>
             {loading && (
-              <button onClick={handleCancel}
+              <button onClick={handleCancel} disabled={cancelling} aria-busy={cancelling}
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">
-                取消
+                {cancelling ? "取消中..." : "取消"}
               </button>
             )}
           </div>

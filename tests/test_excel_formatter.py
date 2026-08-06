@@ -164,7 +164,8 @@ class TestWriteFormattedExcel:
         wb = load_workbook(str(out))
         cell = wb["S"].cell(row=1, column=1)
         assert cell.font.bold is True
-        assert cell.font.color.rgb == "00FFFFFF"
+        # xlsxwriter 写入的颜色，openpyxl 读回为 ARGB 格式（FF 前缀）
+        assert cell.font.color.rgb == "FFFFFFFF"
         wb.close()
 
     def test_header_has_fill(self, tmp_path):
@@ -178,7 +179,8 @@ class TestWriteFormattedExcel:
 
         wb = load_workbook(str(out))
         cell = wb["S"].cell(row=1, column=1)
-        assert cell.fill.start_color.rgb == "004472C4"
+        # xlsxwriter 写入的颜色，openpyxl 读回为 ARGB 格式（FF 前缀）
+        assert cell.fill.start_color.rgb == "FF4472C4"
         wb.close()
 
     def test_freeze_panes_set(self, tmp_path):
@@ -303,8 +305,8 @@ class TestWriteFormattedExcel:
 
         wb = load_workbook(str(out))
         cell = wb["S"].cell(row=1, column=1)
-        # openpyxl returns 8-char ARGB (alpha prefix + 6-digit hex)
-        assert cell.font.color.rgb == "00000000"
+        # xlsxwriter ARGB 格式：FF alpha 前缀 + 6位颜色
+        assert cell.font.color.rgb == "FF000000"
         wb.close()
 
     def test_nan_values_written(self, tmp_path):
