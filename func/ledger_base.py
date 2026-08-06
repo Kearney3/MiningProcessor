@@ -77,7 +77,7 @@ class LedgerBase:
         return self._df
 
     def _build_search_cache(self) -> None:
-        """构建搜索缓存，索引原始名称和标准名称"""
+        """构建搜索缓存，索引原始名称和标准名称（大小写不敏感）"""
         self._search_cache = {}
         if self._df is None:
             return
@@ -85,17 +85,17 @@ class LedgerBase:
         for _, row in self._df.iterrows():
             std_raw = row.get(self._std_name_column)
             raw_raw = row.get(self._name_column)
-            standard_name = clean_string(std_raw)
-            raw_name = clean_string(raw_raw)
+            standard_name = clean_string(std_raw).lower()
+            raw_name = clean_string(raw_raw).lower()
 
             # 跳过标准名称和原始名称都为空的行
             if not standard_name and not raw_name:
                 continue
 
             # 使用标准名称作为主匹配键，若为空则用原始名称
-            primary = standard_name if standard_name else raw_name
+            primary = clean_string(std_raw) if clean_string(std_raw) else clean_string(raw_raw)
 
-            # 收集匹配关键词
+            # 收集匹配关键词（小写化后作为 key）
             keywords = []
             if raw_name:
                 keywords.append(raw_name)
@@ -122,7 +122,7 @@ class LedgerBase:
 
     def match(self, raw_name: str) -> Optional[dict]:
         """
-        精确匹配名称
+        精确匹配名称（大小写不敏感）
         返回: {"标准名称": str, "原始名称": str, "匹配方式": str, "相似度": int} 或 None
         """
         if self._df is None or not raw_name:
@@ -132,8 +132,8 @@ class LedgerBase:
         if not raw_name:
             return None
 
-        # O(1) 字典精确查找
-        matched_standards = self._search_cache.get(raw_name)
+        # O(1) 字典精确查找（小写化后查询，与缓存 key 一致）
+        matched_standards = self._search_cache.get(raw_name.lower())
         if matched_standards:
             return {
                 "标准名称": matched_standards[0],

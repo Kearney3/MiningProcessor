@@ -56,7 +56,7 @@ class EquipmentLedger(LedgerBase):
         )
 
     def _build_search_cache(self) -> None:
-        """构建搜索缓存，索引设备名称和标准设备名称，以及设备编号"""
+        """构建搜索缓存，索引设备名称和标准设备名称，以及设备编号（大小写不敏感）"""
         # 先调用基类构建 _search_cache
         super()._build_search_cache()
 
@@ -68,11 +68,11 @@ class EquipmentLedger(LedgerBase):
             std_raw = row.get("标准设备名称")
             standard_name = clean_string(std_raw)
 
-            # 构建设备编号缓存
+            # 构建设备编号缓存（key 小写化）
             id_raw = row.get("设备编号")
             std_id_raw = row.get("标准设备编号")
             company_raw = row.get("标准公司名称")
-            device_id = clean_string(id_raw)
+            device_id = clean_string(id_raw).lower()
             std_info = {
                 "标准设备名称": standard_name,
                 "标准设备编号": clean_string(std_id_raw),
@@ -81,16 +81,16 @@ class EquipmentLedger(LedgerBase):
             if device_id and device_id not in self._id_cache:
                 self._id_cache[device_id] = std_info
 
-        # 构建标准设备名称 -> 完整信息的反向索引 (H7)
+        # 构建标准设备名称 -> 完整信息的反向索引 (H7)（key 小写化）
         self._name_to_info = {}
         for _, info in self._id_cache.items():
-            self._name_to_info[info["标准设备名称"]] = info
+            self._name_to_info[info["标准设备名称"].lower()] = info
 
     def match_by_id(self, device_id: str) -> Optional[dict]:
-        """按设备编号精确匹配，返回标准信息 dict 或 None"""
+        """按设备编号精确匹配（大小写不敏感），返回标准信息 dict 或 None"""
         if not device_id:
             return None
-        device_id = clean_string(device_id)
+        device_id = clean_string(device_id).lower()
         if not device_id:
             return None
         # 直接匹配
@@ -134,7 +134,7 @@ class EquipmentLedger(LedgerBase):
             name_result = self.match(cleaned_name)
             if name_result:
                 std_name = name_result["标准名称"]
-                info = self._name_to_info.get(std_name)
+                info = self._name_to_info.get(std_name.lower())
                 if info:
                     result = info
                 else:
