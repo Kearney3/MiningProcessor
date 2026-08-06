@@ -122,7 +122,8 @@ class LedgerBase:
 
     def match(self, raw_name: str) -> Optional[dict]:
         """
-        精确匹配名称（大小写不敏感）
+        精确匹配名称（大小写不敏感）。
+        当同一名称映射到多条标准记录时，只有所有记录一致才返回结果。
         返回: {"标准名称": str, "原始名称": str, "匹配方式": str, "相似度": int} 或 None
         """
         if self._df is None or not raw_name:
@@ -134,7 +135,11 @@ class LedgerBase:
 
         # O(1) 字典精确查找（小写化后查询，与缓存 key 一致）
         matched_standards = self._search_cache.get(raw_name.lower())
-        if matched_standards:
+        if not matched_standards:
+            return None
+
+        # 单条记录或所有记录一致 → 命中
+        if len(matched_standards) == 1 or len(set(matched_standards)) == 1:
             return {
                 "标准名称": matched_standards[0],
                 "原始名称": raw_name,
@@ -142,6 +147,11 @@ class LedgerBase:
                 "相似度": 100,
             }
 
+        # 多条不一致 → 歧义，视为未命中
+        logger.debug(
+            "名称匹配歧义: %r 映射到多条不同标准记录 %s，视为未命中",
+            raw_name, matched_standards,
+        )
         return None
 
     def to_dict(self) -> list[dict]:
