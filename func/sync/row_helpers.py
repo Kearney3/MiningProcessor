@@ -43,7 +43,7 @@ def _build_field_mappings(column_mapping: dict[str, str], table: str) -> list[di
         "sourceEquipmentName": {"relation": "equipment", "matchField": "equipName"},
         "sourceTruckName": {"relation": "truck", "matchField": "equipName"},
         "sourceExcavatorName": {"relation": "excavator", "matchField": "equipName"},
-        "sourceMaterialTypeName": {"relation": "materialType", "matchField": "name"},
+        "sourceMaterialTypeName": {"relation": "materialType", "matchField": "code"},
     }
 
     mappings = []
