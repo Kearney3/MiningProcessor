@@ -32,13 +32,18 @@ def _apply_defaults(rows: list[dict[str, Any]], data_type: str) -> list[dict[str
 
 
 def _build_field_mappings(column_mapping: dict[str, str], table: str) -> list[dict]:
-    """构建 MineBase API 所需的 fieldMappings 数组。"""
-    # 定义哪些字段需要 FK 解析
+    """构建 MineBase API 所需的 fieldMappings 数组。
+
+    fkResolve 关系名与 MineBase import-shared.ts RELATION_PRISMA_MAP 一致：
+    - equipment / truck / excavator → equipment (不同角度)
+    - materialType → materialType
+    """
+    # 定义哪些字段需要 FK 解析（新字段名：sourceEquipmentName 等）
     fk_fields = {
-        "equipmentName": {"relation": "equipment", "matchField": "equipName"},
-        "truckName": {"relation": "truck", "matchField": "equipName"},
-        "excavatorName": {"relation": "excavator", "matchField": "equipName"},
-        "materialTypeName": {"relation": "materialType", "matchField": "code"},
+        "sourceEquipmentName": {"relation": "equipment", "matchField": "equipName"},
+        "sourceTruckName": {"relation": "truck", "matchField": "equipName"},
+        "sourceExcavatorName": {"relation": "excavator", "matchField": "equipName"},
+        "sourceMaterialTypeName": {"relation": "materialType", "matchField": "name"},
     }
 
     mappings = []
@@ -56,11 +61,11 @@ def _build_field_mappings(column_mapping: dict[str, str], table: str) -> list[di
 
 # 各数据类型的设备名称字段（用于台账匹配）
 _LEDGER_NAME_FIELDS: dict[str, list[str]] = {
-    "fuel": ["equipmentName"],
-    "electrical": ["equipmentName"],
-    "operation": ["equipmentName"],
-    "work_efficiency": ["equipmentName"],
-    "production": ["truckName", "excavatorName"],
+    "fuel": ["sourceEquipmentName"],
+    "electrical": ["sourceEquipmentName"],
+    "operation": ["sourceEquipmentName"],
+    "work_efficiency": ["sourceEquipmentName"],
+    "production": ["sourceTruckName", "sourceExcavatorName"],
 }
 
 # 各数据类型的油品名称字段（用于油品台账匹配）
@@ -182,12 +187,15 @@ def _resolve_fks_for_db(
     data_type: str, row: dict, db_client: Any,
     warnings: list[dict[str, Any]] | None = None,
 ) -> dict | None:
-    """为直连模式解析 FK 字段。返回解析后的行，FK 未找到时返回 None。"""
+    """为直连模式解析 FK 字段。返回解析后的行，FK 未找到时返回 None。
+
+    使用新字段名: sourceEquipmentName, sourceTruckName, sourceExcavatorName 等。
+    """
     resolved = dict(row)
 
     if data_type in ("production", "production_record"):
         # 矿卡
-        truck_name = row.get("truckName")
+        truck_name = row.get("sourceTruckName")
         if truck_name:
             truck_id = db_client.resolve_equipment_id(truck_name)
             if not truck_id:
@@ -196,7 +204,7 @@ def _resolve_fks_for_db(
                 if warnings is not None:
                     warnings.append({
                         "row": row.get("_row_num", "?"),
-                        "field": "truckName",
+                        "field": "sourceTruckName",
                         "value": str(truck_name),
                         "message": msg,
                     })
@@ -208,14 +216,14 @@ def _resolve_fks_for_db(
             if warnings is not None:
                 warnings.append({
                     "row": row.get("_row_num", "?"),
-                    "field": "truckName",
+                    "field": "sourceTruckName",
                     "value": "（空）",
                     "message": msg,
                 })
             return None
 
         # 挖机
-        excavator_name = row.get("excavatorName")
+        excavator_name = row.get("sourceExcavatorName")
         if excavator_name:
             excavator_id = db_client.resolve_equipment_id(excavator_name)
             if not excavator_id:
@@ -224,7 +232,7 @@ def _resolve_fks_for_db(
                 if warnings is not None:
                     warnings.append({
                         "row": row.get("_row_num", "?"),
-                        "field": "excavatorName",
+                        "field": "sourceExcavatorName",
                         "value": str(excavator_name),
                         "message": msg,
                     })
@@ -236,14 +244,14 @@ def _resolve_fks_for_db(
             if warnings is not None:
                 warnings.append({
                     "row": row.get("_row_num", "?"),
-                    "field": "excavatorName",
+                    "field": "sourceExcavatorName",
                     "value": "（空）",
                     "message": msg,
                 })
             return None
 
         # 物料类型
-        material_name = row.get("materialTypeName")
+        material_name = row.get("sourceMaterialTypeName")
         if material_name:
             material_id = db_client.resolve_material_type_id(material_name)
             if material_id:
@@ -252,7 +260,7 @@ def _resolve_fks_for_db(
 
     else:
         # 通用设备 FK
-        equip_name = row.get("equipmentName")
+        equip_name = row.get("sourceEquipmentName")
         if equip_name:
             equip_id = db_client.resolve_equipment_id(equip_name)
             if not equip_id:
@@ -261,7 +269,7 @@ def _resolve_fks_for_db(
                 if warnings is not None:
                     warnings.append({
                         "row": row.get("_row_num", "?"),
-                        "field": "equipmentName",
+                        "field": "sourceEquipmentName",
                         "value": str(equip_name),
                         "message": msg,
                     })
@@ -273,7 +281,7 @@ def _resolve_fks_for_db(
             if warnings is not None:
                 warnings.append({
                     "row": row.get("_row_num", "?"),
-                    "field": "equipmentName",
+                    "field": "sourceEquipmentName",
                     "value": "（空）",
                     "message": msg,
                 })

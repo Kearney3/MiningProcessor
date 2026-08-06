@@ -41,34 +41,34 @@ def sample_mapping(tmp_path):
         "fuel_consumption": {
             "日期": "date",
             "班次": "shiftType",
-            "设备名称": "equipmentName",
+            "设备名称": "sourceEquipmentName",
             "油品种类": "fuelName",
             "油品消耗": "consumption",
         },
         "electricity_consumption": {
             "日期": "date",
             "班次": "shiftType",
-            "设备名称": "equipmentName",
+            "设备名称": "sourceEquipmentName",
             "电力消耗": "consumption",
         },
         "equipment_operation": {
             "日期": "date",
             "班次": "shiftType",
-            "设备名称": "equipmentName",
+            "设备名称": "sourceEquipmentName",
             "运行小时数": "runningHours",
             "趟次": "tripCount",
         },
         "production_record": {
             "日期": "date",
             "班次": "shiftType",
-            "矿卡名称": "truckName",
-            "挖机名称": "excavatorName",
-            "矿石类型": "materialTypeName",
+            "矿卡名称": "sourceTruckName",
+            "挖机名称": "sourceExcavatorName",
+            "矿石类型": "sourceMaterialTypeName",
             "运次": "tripCount",
             "产量": "production",
         },
         "work_efficiency": {
-            "设备名称": "equipmentName",
+            "设备名称": "sourceEquipmentName",
             "应运行分钟": "plannedMinutes",
             "停车/换班": "parkShift",
         },
@@ -209,7 +209,7 @@ class TestReadAndMapExcel:
         assert len(rows) == 2
         assert rows[0]["date"] == "2025-06-01"
         assert rows[0]["shiftType"] == "Day"
-        assert rows[0]["equipmentName"] == "CAT785D-01"
+        assert rows[0]["sourceEquipmentName"] == "CAT785D-01"
         assert rows[0]["fuelName"] == "0#柴油"
         assert rows[0]["consumption"] == pytest.approx(150.5)
 
@@ -217,14 +217,14 @@ class TestReadAndMapExcel:
         _, mapping = sample_mapping
         rows = read_and_map_excel(sample_electrical_excel, None, mapping["electricity_consumption"])
         assert len(rows) == 2
-        assert rows[0]["equipmentName"] == "EX-001"
+        assert rows[0]["sourceEquipmentName"] == "EX-001"
         assert rows[0]["consumption"] == pytest.approx(500.0)
 
     def test_read_production_running(self, sample_production_excel, sample_mapping):
         _, mapping = sample_mapping
         rows = read_and_map_excel(sample_production_excel, "运行数据", mapping["equipment_operation"])
         assert len(rows) == 1
-        assert rows[0]["equipmentName"] == "CAT785D-01"
+        assert rows[0]["sourceEquipmentName"] == "CAT785D-01"
         assert rows[0]["runningHours"] == pytest.approx(8.0)
         assert rows[0]["tripCount"] == 10
 
@@ -232,8 +232,8 @@ class TestReadAndMapExcel:
         _, mapping = sample_mapping
         rows = read_and_map_excel(sample_production_excel, "生产数据", mapping["production_record"])
         assert len(rows) == 1
-        assert rows[0]["truckName"] == "CAT785D-01"
-        assert rows[0]["excavatorName"] == "EX-001"
+        assert rows[0]["sourceTruckName"] == "CAT785D-01"
+        assert rows[0]["sourceExcavatorName"] == "EX-001"
         assert rows[0]["production"] == pytest.approx(850.0)
 
     def test_read_empty_excel(self, tmp_path, sample_mapping):
@@ -270,8 +270,8 @@ class TestBuildFieldMappings:
         _, mapping = sample_mapping
         result = _build_field_mappings(mapping["fuel_consumption"], "fuel_consumption")
         assert len(result) == 5
-        # equipmentName 应有 fkResolve
-        equip_mapping = next(m for m in result if m["systemField"] == "equipmentName")
+        # sourceEquipmentName 应有 fkResolve
+        equip_mapping = next(m for m in result if m["systemField"] == "sourceEquipmentName")
         assert equip_mapping["fkResolve"]["relation"] == "equipment"
         # date 不应有 fkResolve
         date_mapping = next(m for m in result if m["systemField"] == "date")
@@ -280,11 +280,11 @@ class TestBuildFieldMappings:
     def test_production_mappings(self, sample_mapping):
         _, mapping = sample_mapping
         result = _build_field_mappings(mapping["production_record"], "production_record")
-        truck_mapping = next(m for m in result if m["systemField"] == "truckName")
+        truck_mapping = next(m for m in result if m["systemField"] == "sourceTruckName")
         assert truck_mapping["fkResolve"]["relation"] == "truck"
-        excavator_mapping = next(m for m in result if m["systemField"] == "excavatorName")
+        excavator_mapping = next(m for m in result if m["systemField"] == "sourceExcavatorName")
         assert excavator_mapping["fkResolve"]["relation"] == "excavator"
-        material_mapping = next(m for m in result if m["systemField"] == "materialTypeName")
+        material_mapping = next(m for m in result if m["systemField"] == "sourceMaterialTypeName")
         assert material_mapping["fkResolve"]["relation"] == "materialType"
 
 
@@ -298,7 +298,7 @@ class TestMapRowToDbColumns:
         row = {
             "date": "2025-06-01",
             "shiftType": "Day",
-            "equipmentName": "TEST-01",
+            "sourceEquipmentName": "TEST-01",
             "equipmentId": "uuid-123",
             "consumption": 150.5,
         }
@@ -307,13 +307,13 @@ class TestMapRowToDbColumns:
         assert "updated_at" in columns
         assert "date" in columns
         assert "shift_type" in columns
-        assert "equipment_name" in columns
+        assert "source_equipment_name" in columns
         assert "equipment_id" in columns
         assert "consumption" in columns
 
     def test_id_is_valid_uuid(self):
         """id 列必须是合法 UUID 字符串（Prisma @default(uuid()) 仅在应用层生效）。"""
-        row = {"date": "2026-06-18", "shiftType": "Night", "equipmentName": "EX-001", "equipmentId": "eq-001"}
+        row = {"date": "2026-06-18", "shiftType": "Night", "sourceEquipmentName": "EX-001", "equipmentId": "eq-001"}
         columns, values = _map_row_to_db_columns(row)
         idx = columns.index("id")
         parsed = uuid.UUID(values[idx])
@@ -321,7 +321,7 @@ class TestMapRowToDbColumns:
 
     def test_updated_at_is_recent(self):
         """updated_at 列必须是接近当前时间的 datetime（Prisma @updatedAt 仅在应用层生效）。"""
-        row = {"date": "2026-06-18", "shiftType": "Night", "equipmentName": "EX-001", "equipmentId": "eq-001"}
+        row = {"date": "2026-06-18", "shiftType": "Night", "sourceEquipmentName": "EX-001", "equipmentId": "eq-001"}
         before = datetime.now()
         columns, values = _map_row_to_db_columns(row)
         after = datetime.now()
@@ -345,8 +345,8 @@ class TestMapRowToDbColumns:
 class TestApplyDefaults:
     def test_electrical_no_shift_gets_night(self):
         rows = [
-            {"date": "2025-06-01", "equipmentName": "EX-001", "consumption": 500.0},
-            {"date": "2025-06-02", "equipmentName": "EX-002", "consumption": 600.0},
+            {"date": "2025-06-01", "sourceEquipmentName": "EX-001", "consumption": 500.0},
+            {"date": "2025-06-02", "sourceEquipmentName": "EX-002", "consumption": 600.0},
         ]
         result = _apply_defaults(rows, "electrical")
         assert all(r["shiftType"] == "Night" for r in result)
@@ -354,14 +354,14 @@ class TestApplyDefaults:
 
     def test_electrical_with_shift_not_overridden(self):
         rows = [
-            {"date": "2025-06-01", "shiftType": "Day", "equipmentName": "EX-001", "consumption": 500.0},
+            {"date": "2025-06-01", "shiftType": "Day", "sourceEquipmentName": "EX-001", "consumption": 500.0},
         ]
         result = _apply_defaults(rows, "electrical")
         assert result[0]["shiftType"] == "Day"
 
     def test_non_electrical_not_affected(self):
         rows = [
-            {"date": "2025-06-01", "equipmentName": "CAT785D-01", "consumption": 150.0},
+            {"date": "2025-06-01", "sourceEquipmentName": "CAT785D-01", "consumption": 150.0},
         ]
         result = _apply_defaults(rows, "fuel")
         assert "shiftType" not in result[0]
@@ -386,10 +386,10 @@ class TestApplyDefaults:
 
 class TestFilterByDateRange:
     SAMPLE_ROWS = [
-        {"date": "2025-06-01", "equipmentName": "A", "consumption": 100},
-        {"date": "2025-06-02", "equipmentName": "B", "consumption": 200},
-        {"date": "2025-06-03", "equipmentName": "C", "consumption": 300},
-        {"date": "2025-06-04", "equipmentName": "D", "consumption": 400},
+        {"date": "2025-06-01", "sourceEquipmentName": "A", "consumption": 100},
+        {"date": "2025-06-02", "sourceEquipmentName": "B", "consumption": 200},
+        {"date": "2025-06-03", "sourceEquipmentName": "C", "consumption": 300},
+        {"date": "2025-06-04", "sourceEquipmentName": "D", "consumption": 400},
     ]
 
     def test_no_filter_returns_all(self):
@@ -422,7 +422,7 @@ class TestFilterByDateRange:
         assert len(result) == 0
 
     def test_rows_without_date_kept(self):
-        rows = [{"equipmentName": "X"}, {"date": "2025-06-01"}]
+        rows = [{"sourceEquipmentName": "X"}, {"date": "2025-06-01"}]
         result = _filter_by_date_range(rows, "2025-06-02", None)
         assert len(result) == 1  # 无 date 的行保留
 
@@ -852,7 +852,7 @@ class TestWorkEfficiencyMapping:
         assert len(rows) == 2
         assert rows[0]["date"] == "2025-06-01"
         assert rows[0]["shiftType"] == "Day"
-        assert rows[0]["equipmentName"] == "CAT785D-01"
+        assert rows[0]["sourceEquipmentName"] == "CAT785D-01"
         assert rows[0]["plannedMinutes"] == 720
         assert rows[1]["date"] == "2025-06-02"
         assert rows[1]["shiftType"] == "Night"
@@ -865,17 +865,17 @@ class TestWorkEfficiencyMapping:
 
 class TestDfToMappedRows:
     def test_basic_mapping(self):
-        """df with 日期/班次/设备名称 -> mapped to date/shiftType/equipmentName."""
+        """df with 日期/班次/设备名称 -> mapped to date/shiftType/sourceEquipmentName."""
         df = pd.DataFrame({
             "日期": ["2025-06-01", "2025-06-02"],
             "班次": ["Day", "Night"],
             "设备名称": ["CAT785D-01", "NTE240-02"],
         })
-        mapping = {"日期": "date", "班次": "shiftType", "设备名称": "equipmentName"}
+        mapping = {"日期": "date", "班次": "shiftType", "设备名称": "sourceEquipmentName"}
         rows = _df_to_mapped_rows(df, mapping)
         assert len(rows) == 2
-        assert rows[0] == {"date": "2025-06-01", "shiftType": "Day", "equipmentName": "CAT785D-01"}
-        assert rows[1] == {"date": "2025-06-02", "shiftType": "Night", "equipmentName": "NTE240-02"}
+        assert rows[0] == {"date": "2025-06-01", "shiftType": "Day", "sourceEquipmentName": "CAT785D-01"}
+        assert rows[1] == {"date": "2025-06-02", "shiftType": "Night", "sourceEquipmentName": "NTE240-02"}
 
     def test_nan_handling(self):
         """NaN values skipped in output."""
@@ -885,7 +885,7 @@ class TestDfToMappedRows:
             "设备名称": ["CAT785D-01"],
             "油品消耗": [float("nan")],
         })
-        mapping = {"日期": "date", "班次": "shiftType", "设备名称": "equipmentName", "油品消耗": "consumption"}
+        mapping = {"日期": "date", "班次": "shiftType", "设备名称": "sourceEquipmentName", "油品消耗": "consumption"}
         rows = _df_to_mapped_rows(df, mapping)
         assert len(rows) == 1
         assert "consumption" not in rows[0]
@@ -905,7 +905,7 @@ class TestDfToMappedRows:
     def test_empty_dataframe(self):
         """Empty df returns empty list."""
         df = pd.DataFrame(columns=["日期", "班次", "设备名称"])
-        mapping = {"日期": "date", "班次": "shiftType", "设备名称": "equipmentName"}
+        mapping = {"日期": "date", "班次": "shiftType", "设备名称": "sourceEquipmentName"}
         rows = _df_to_mapped_rows(df, mapping)
         assert rows == []
 
@@ -925,7 +925,7 @@ class TestProcessFuelFile:
         test_df = pd.DataFrame({"col": [1]})
         mock_diesel.return_value = {"油耗信息": test_df}
         expected_rows = [
-            {"date": "2025-06-01", "shiftType": "Day", "equipmentName": "CAT785D-01", "fuelName": "0#柴油", "consumption": 150.5},
+            {"date": "2025-06-01", "shiftType": "Day", "sourceEquipmentName": "CAT785D-01", "fuelName": "0#柴油", "consumption": 150.5},
         ]
         mock_df_map.return_value = expected_rows
 
@@ -958,7 +958,7 @@ class TestProcessElectricalFile:
         test_df = pd.DataFrame({"col": [1]})
         mock_parse.return_value = {"电力消耗": test_df}
         expected_rows = [
-            {"date": "2025-06-01", "shiftType": "Night", "equipmentName": "EX-001", "consumption": 500.0},
+            {"date": "2025-06-01", "shiftType": "Night", "sourceEquipmentName": "EX-001", "consumption": 500.0},
         ]
         mock_df_map.return_value = expected_rows
 
@@ -992,8 +992,8 @@ class TestProcessProductionFile:
         production_df = pd.DataFrame({"col": [2]})
         mock_processor_cls.return_value.process_single_file.return_value = (running_df, production_df)
 
-        prod_rows = [{"date": "2025-06-01", "truckName": "CAT785D-01"}]
-        ops_rows = [{"date": "2025-06-01", "equipmentName": "CAT785D-01"}]
+        prod_rows = [{"date": "2025-06-01", "sourceTruckName": "CAT785D-01"}]
+        ops_rows = [{"date": "2025-06-01", "sourceEquipmentName": "CAT785D-01"}]
         mock_df_map.side_effect = [prod_rows, ops_rows]
 
         result = _process_production_file(Path("/fake/合并产量.xlsx"))
@@ -1025,7 +1025,7 @@ class TestSyncWithProcessors:
         """full integration - patch processor AND api client, verify sync() sends fuel data."""
         mock_discover.return_value = {"fuel": [tmp_path / "Fuel.xlsx"]}
         mock_fuel_proc.return_value = [
-            {"date": "2025-06-01", "shiftType": "Day", "equipmentName": "CAT785D-01", "fuelName": "0#柴油", "consumption": 150.5},
+            {"date": "2025-06-01", "shiftType": "Day", "sourceEquipmentName": "CAT785D-01", "fuelName": "0#柴油", "consumption": 150.5},
         ]
         mock_sync_api.return_value = {"success": 1, "skipped": 0, "failed": 0, "warnings": []}
 
@@ -1050,7 +1050,7 @@ class TestSyncWithProcessors:
         }
         mock_fuel_proc.side_effect = RuntimeError("boom")
         mock_elec_proc.return_value = [
-            {"date": "2025-06-01", "shiftType": "Night", "equipmentName": "EX-001", "consumption": 500.0},
+            {"date": "2025-06-01", "shiftType": "Night", "sourceEquipmentName": "EX-001", "consumption": 500.0},
         ]
         mock_sync_api.return_value = {"success": 1, "skipped": 0, "failed": 0, "warnings": []}
 
@@ -1074,7 +1074,7 @@ class TestResolveFksForDb:
     truck/excavator/material branch, not the generic equipment branch."""
 
     def test_production_row_uses_truck_fk_branch(self):
-        """production rows with truckName/excavatorName should resolve via
+        """production rows with sourceTruckName/sourceExcavatorName should resolve via
         the production_record branch (truckId, excavatorId), NOT be rejected
         with '缺少设备名称'."""
         mock_db = MagicMock()
@@ -1084,9 +1084,9 @@ class TestResolveFksForDb:
         row = {
             "date": "2025-06-15",
             "shiftType": "夜班",
-            "truckName": "CAT785D-01",
-            "excavatorName": "EX-001",
-            "materialTypeName": "铜矿",
+            "sourceTruckName": "CAT785D-01",
+            "sourceExcavatorName": "EX-001",
+            "sourceMaterialTypeName": "铜矿",
             "tripCount": 10,
             "production": 350.0,
         }
@@ -1099,10 +1099,10 @@ class TestResolveFksForDb:
         assert result["truckId"] == "equip-uuid-1"
         assert result["excavatorId"] == "equip-uuid-1"
         assert result["materialTypeId"] == "mat-uuid-1"
-        assert result["truckName"] == "CAT785D-01"
+        assert result["sourceTruckName"] == "CAT785D-01"
 
     def test_operation_row_uses_equipment_fk_branch(self):
-        """operation rows with equipmentName should resolve via the generic
+        """operation rows with sourceEquipmentName should resolve via the generic
         equipment branch (equipmentId)."""
         mock_db = MagicMock()
         mock_db.resolve_equipment_id.return_value = "equip-uuid-2"
@@ -1110,7 +1110,7 @@ class TestResolveFksForDb:
         row = {
             "date": "2025-06-15",
             "shiftType": "夜班",
-            "equipmentName": "CAT785D-01",
+            "sourceEquipmentName": "CAT785D-01",
             "tripCount": 10,
         }
 
@@ -1120,37 +1120,37 @@ class TestResolveFksForDb:
         assert result["equipmentId"] == "equip-uuid-2"
 
     def test_production_row_missing_truck_returns_none(self):
-        """production row without truckName should be rejected."""
+        """production row without sourceTruckName should be rejected."""
         mock_db = MagicMock()
         row = {
             "date": "2025-06-15",
             "shiftType": "夜班",
-            "excavatorName": "EX-001",
+            "sourceExcavatorName": "EX-001",
         }
 
         result = _resolve_fks_for_db("production", row, mock_db)
         assert result is None
 
     def test_production_missing_truck_warning_value_shows_empty_placeholder(self):
-        """production row missing truckName should emit warning with '（空）' as value."""
+        """production row missing sourceTruckName should emit warning with '（空）' as value."""
         mock_db = MagicMock()
         warnings = []
         row = {
             "_row_num": 5,
             "date": "2025-06-15",
             "shiftType": "夜班",
-            "excavatorName": "EX-001",
+            "sourceExcavatorName": "EX-001",
         }
 
         _resolve_fks_for_db("production", row, mock_db, warnings=warnings)
 
         assert len(warnings) == 1
-        assert warnings[0]["field"] == "truckName"
+        assert warnings[0]["field"] == "sourceTruckName"
         assert warnings[0]["value"] == "（空）"
         assert warnings[0]["row"] == 5
 
     def test_production_missing_excavator_warning_value_shows_empty_placeholder(self):
-        """production row missing excavatorName should emit warning with '（空）'."""
+        """production row missing sourceExcavatorName should emit warning with '（空）'."""
         mock_db = MagicMock()
         mock_db.resolve_equipment_id.return_value = "truck-uuid"
         warnings = []
@@ -1158,17 +1158,17 @@ class TestResolveFksForDb:
             "_row_num": 8,
             "date": "2025-06-15",
             "shiftType": "夜班",
-            "truckName": "CAT785D-01",
+            "sourceTruckName": "CAT785D-01",
         }
 
         _resolve_fks_for_db("production", row, mock_db, warnings=warnings)
 
         assert len(warnings) == 1
-        assert warnings[0]["field"] == "excavatorName"
+        assert warnings[0]["field"] == "sourceExcavatorName"
         assert warnings[0]["value"] == "（空）"
 
     def test_generic_missing_equipment_warning_value_shows_empty_placeholder(self):
-        """generic row missing equipmentName should emit warning with '（空）'."""
+        """generic row missing sourceEquipmentName should emit warning with '（空）'."""
         mock_db = MagicMock()
         warnings = []
         row = {
@@ -1180,7 +1180,7 @@ class TestResolveFksForDb:
         _resolve_fks_for_db("fuel", row, mock_db, warnings=warnings)
 
         assert len(warnings) == 1
-        assert warnings[0]["field"] == "equipmentName"
+        assert warnings[0]["field"] == "sourceEquipmentName"
         assert warnings[0]["value"] == "（空）"
         assert warnings[0]["row"] == 12
 
@@ -1198,7 +1198,7 @@ class TestLedgerToggleSplit:
     ):
         """use_equipment_ledger=True 应只加载设备台账，油品台账为 None。"""
         mock_discover.return_value = {"fuel": [tmp_path / "Fuel.xlsx"]}
-        mock_fuel.return_value = [{"date": "2025-06-01", "equipmentName": "CAT785D-01"}]
+        mock_fuel.return_value = [{"date": "2025-06-01", "sourceEquipmentName": "CAT785D-01"}]
         mock_api.return_value = {"success": 1, "skipped": 0, "failed": 0, "warnings": []}
         mock_eq_cache.return_value = [{"标准名称": "CAT785D", "别名": ["卡特785"]}]
         mock_oil_cache.return_value = None
@@ -1307,7 +1307,7 @@ class TestSyncApiValueFallback:
     def test_api_warning_value_from_standard_key(self):
         """API 返回的 warning.value 有值时正常传递。"""
         client = self._make_api_client(warnings=[
-            {"row": 3, "field": "equipmentName", "value": "旧设备", "message": "未匹配"},
+            {"row": 3, "field": "sourceEquipmentName", "value": "旧设备", "message": "未匹配"},
         ])
         result = sync_via_api("fuel", [{"date": "2025-01-01"}], {"日期": "date"}, client)
         assert len(result["warnings"]) == 1
@@ -1334,7 +1334,7 @@ class TestSyncApiValueFallback:
     def test_api_warning_value_all_empty_shows_placeholder(self):
         """API 返回 warning 的 value 与 rawValue 均为空时，显示 '（空）'。"""
         client = self._make_api_client(warnings=[
-            {"row": 3, "field": "equipmentName", "value": "", "rawValue": "", "message": "缺少设备"},
+            {"row": 3, "field": "sourceEquipmentName", "value": "", "rawValue": "", "message": "缺少设备"},
         ])
         result = sync_via_api("fuel", [{"date": "2025-01-01"}], {"日期": "date"}, client)
         assert len(result["warnings"]) == 1
@@ -1343,7 +1343,7 @@ class TestSyncApiValueFallback:
     def test_api_error_value_none_shows_placeholder(self):
         """API 返回 error 的 value 为 None 时，显示 '（空）'。"""
         client = self._make_api_client(errors=[
-            {"row": 1, "field": "truckName", "value": None, "message": "缺少矿卡"},
+            {"row": 1, "field": "sourceTruckName", "value": None, "message": "缺少矿卡"},
         ])
         result = sync_via_api("production", [{"date": "2025-01-01"}], {"日期": "date"}, client)
         assert len(result["warnings"]) == 1
@@ -1373,13 +1373,13 @@ class TestExportDryRunToExcel:
             "fuel": {
                 "日期": "date",
                 "班次": "shiftType",
-                "设备名称": "equipmentName",
+                "设备名称": "sourceEquipmentName",
                 "油品种类": "fuelName",
                 "油品消耗": "consumption",
             },
             "electrical": {
                 "日期": "date",
-                "设备名称": "equipmentName",
+                "设备名称": "sourceEquipmentName",
                 "电力消耗": "consumption",
             },
         }
@@ -1390,11 +1390,11 @@ class TestExportDryRunToExcel:
 
         dry_run_rows = {
             "fuel": [
-                {"date": "2025-06-01", "shiftType": "Day", "equipmentName": "CAT785D-01", "consumption": 150.5},
-                {"date": "2025-06-02", "shiftType": "Night", "equipmentName": "CAT785D-02", "consumption": 200.0},
+                {"date": "2025-06-01", "shiftType": "Day", "sourceEquipmentName": "CAT785D-01", "consumption": 150.5},
+                {"date": "2025-06-02", "shiftType": "Night", "sourceEquipmentName": "CAT785D-02", "consumption": 200.0},
             ],
             "electrical": [
-                {"date": "2025-06-01", "equipmentName": "EX-001", "consumption": 500.0},
+                {"date": "2025-06-01", "sourceEquipmentName": "EX-001", "consumption": 500.0},
             ],
         }
         out_path = export_dry_run_to_excel(
@@ -1430,7 +1430,7 @@ class TestExportDryRunToExcel:
 
         dry_run_rows = {
             "fuel": [
-                {"date": "2025-06-01", "equipmentName": "CAT785D", "_row_num": 2},
+                {"date": "2025-06-01", "sourceEquipmentName": "CAT785D", "_row_num": 2},
             ],
         }
         out_path = export_dry_run_to_excel(dry_run_rows, input_dir=tmp_path)
@@ -1453,7 +1453,7 @@ class TestExportDryRunToExcel:
 
         dry_run_rows = {
             "fuel": [
-                {"date": "2025-06-01", "shiftType": "Day", "equipmentName": "CAT785D-01", "consumption": 150.5},
+                {"date": "2025-06-01", "shiftType": "Day", "sourceEquipmentName": "CAT785D-01", "consumption": 150.5},
             ],
         }
         out_path = export_dry_run_to_excel(
@@ -1474,7 +1474,7 @@ class TestExportDryRunToExcel:
         # 第二行是数据库字段名（英文）
         assert "date" in row2
         assert "shiftType" in row2
-        assert "equipmentName" in row2
+        assert "sourceEquipmentName" in row2
         assert "consumption" in row2
 
     def test_export_no_dual_headers_without_mapping(self, tmp_path):
@@ -1502,7 +1502,7 @@ class TestExportDryRunToExcel:
 
         dry_run_rows = {"fuel": [{"date": "2025-06-01"}]}
         warnings = [
-            ("fuel", {"row": 2, "field": "equipmentName", "value": "未知设备", "message": "未在台账中找到"}),
+            ("fuel", {"row": 2, "field": "sourceEquipmentName", "value": "未知设备", "message": "未在台账中找到"}),
         ]
         out_path = export_dry_run_to_excel(dry_run_rows, warnings=warnings, input_dir=tmp_path)
 
@@ -1510,7 +1510,7 @@ class TestExportDryRunToExcel:
         assert "异常行" in xls.sheet_names
         df = pd.read_excel(out_path, sheet_name="异常行")
         assert len(df) == 1
-        assert df.iloc[0]["字段"] == "equipmentName"
+        assert df.iloc[0]["字段"] == "sourceEquipmentName"
 
     def test_export_no_warnings_no_sheet(self, tmp_path):
         """无警告时不应生成异常行 sheet。"""
@@ -1545,8 +1545,8 @@ class TestDryRunEnginesReturnRows:
     def test_sync_via_api_dry_run_returns_rows(self):
         """API 模式 dry_run 应返回 dry_run_rows 且不调用 API。"""
         rows = [
-            {"date": "2025-06-01", "equipmentName": "CAT785D-01"},
-            {"date": "2025-06-02", "equipmentName": "CAT785D-02"},
+            {"date": "2025-06-01", "sourceEquipmentName": "CAT785D-01"},
+            {"date": "2025-06-02", "sourceEquipmentName": "CAT785D-02"},
         ]
         client = MagicMock()
         result = sync_via_api("fuel", rows, {}, client, dry_run=True)
@@ -1600,16 +1600,16 @@ class TestDryRunIntegration:
         mapping_path, _ = sample_mapping
         mock_discover.return_value = {"fuel": [tmp_path / "Fuel.xlsx"]}
         mock_fuel_proc.return_value = [
-            {"date": "2025-06-01", "shiftType": "Day", "equipmentName": "CAT785D-01", "fuelName": "0#柴油", "consumption": 150.5},
-            {"date": "2025-06-02", "shiftType": "Night", "equipmentName": "CAT785D-02", "fuelName": "0#柴油", "consumption": 200.0},
+            {"date": "2025-06-01", "shiftType": "Day", "sourceEquipmentName": "CAT785D-01", "fuelName": "0#柴油", "consumption": 150.5},
+            {"date": "2025-06-02", "shiftType": "Night", "sourceEquipmentName": "CAT785D-02", "fuelName": "0#柴油", "consumption": 200.0},
         ]
         # sync_via_api 在 dry_run 模式下会被实际调用（未 mock 穿透），
         # 但因为我们用了 @patch，返回值需要包含 dry_run_rows
         mock_sync_api.return_value = {
             "success": 0, "skipped": 0, "failed": 0, "warnings": [],
             "dry_run_rows": [
-                {"date": "2025-06-01", "shiftType": "Day", "equipmentName": "CAT785D-01", "fuelName": "0#柴油", "consumption": 150.5},
-                {"date": "2025-06-02", "shiftType": "Night", "equipmentName": "CAT785D-02", "fuelName": "0#柴油", "consumption": 200.0},
+                {"date": "2025-06-01", "shiftType": "Day", "sourceEquipmentName": "CAT785D-01", "fuelName": "0#柴油", "consumption": 150.5},
+                {"date": "2025-06-02", "shiftType": "Night", "sourceEquipmentName": "CAT785D-02", "fuelName": "0#柴油", "consumption": 200.0},
             ],
         }
 

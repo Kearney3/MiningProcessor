@@ -158,8 +158,8 @@ def _process_fuel_file(
     mapping = {
         "日期": "date",
         "班次": "shiftType",
-        "设备名称": "equipmentName",
-        "设备编号": "equipmentCode",
+        "设备名称": "sourceEquipmentName",
+        "设备编号": "sourceEquipmentCode",
         "油品种类": "fuelName",
         "油品消耗": "consumption",
     }
@@ -204,7 +204,7 @@ def _process_electrical_file(
     mapping = {
         "日期": "date",
         "班次": "shiftType",
-        "设备名称": "equipmentName",
+        "设备名称": "sourceEquipmentName",
         "电力消耗": "consumption",
     }
 
@@ -251,16 +251,16 @@ def _process_production_file(
     prod_map = {
         "日期": "date",
         "班次": "shiftType",
-        "矿卡名称": "truckName",
-        "挖机名称": "excavatorName",
-        "矿石类型": "materialTypeName",
+        "矿卡名称": "sourceTruckName",
+        "挖机名称": "sourceExcavatorName",
+        "矿石类型": "sourceMaterialTypeName",
         "运次": "tripCount",
         "产量": "production",
     }
     ops_map = {
         "日期": "date",
         "班次": "shiftType",
-        "设备名称": "equipmentName",
+        "设备名称": "sourceEquipmentName",
         "公司": "company",
         "小时数仪表开始": "engineHoursStart",
         "小时数仪表结束": "engineHoursEnd",
