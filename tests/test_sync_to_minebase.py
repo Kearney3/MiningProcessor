@@ -233,13 +233,13 @@ class TestMigrateFieldNames:
         result = load_column_mapping(path)
         assert result["production_record"]["矿石类型"] == "sourceMaterialTypeName"
 
-    def test_old_equipmentcode_dropped(self, tmp_path):
-        """equipmentCode 已废弃，应被移除。"""
+    def test_old_equipmentcode_migrated(self, tmp_path):
+        """equipmentCode → sourceEquipmentCode（不是丢弃）。"""
         mapping = {"fuel_consumption": {"设备名称": "equipmentName", "设备编号": "equipmentCode", "日期": "date"}}
         path = tmp_path / "old_mapping.json"
         path.write_text(json.dumps(mapping, ensure_ascii=False))
         result = load_column_mapping(path)
-        assert "设备编号" not in result["fuel_consumption"]
+        assert result["fuel_consumption"]["设备编号"] == "sourceEquipmentCode"
         assert result["fuel_consumption"]["设备名称"] == "sourceEquipmentName"
         assert result["fuel_consumption"]["日期"] == "date"
 
