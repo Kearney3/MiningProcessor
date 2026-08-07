@@ -70,6 +70,12 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         initial=get_minebase_mode(),
     )
 
+    # --- 冲突策略 ---
+    conflict_policy = ChipToggle(
+        options=[("SKIP", "跳过重复"), ("UPDATE", "覆盖更新"), ("REJECT", "拒绝全部")],
+        initial="SKIP",
+    )
+
     # --- 数据类型选择 ---
     type_checks = {}
     for key, label in DATA_TYPES:
@@ -350,10 +356,11 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
             [
                 theme.section_title("MineBase 数据同步"),
 
-                # ── 目录 + 同步模式 ──
+                # ── 目录 + 同步模式 + 冲突策略 ──
                 theme.module_card([
                     ft.Row([sync_path], spacing=8),
                     mode_toggle.row,
+                    conflict_policy.row,
                 ], label="目录与模式"),
 
                 # ── 日期参数 ──
@@ -436,6 +443,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     refs = {
         "path": sync_path,
         "mode": mode_toggle,
+        "conflict_policy": conflict_policy,
         "types": type_checks,
         "dry_run": dry_run_check,
         "btn": sync_btn,
