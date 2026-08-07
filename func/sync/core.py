@@ -18,6 +18,56 @@ from func.sync.constants import DATA_TYPE_REGISTRY
 logger = get_logger(__name__)
 
 
+# MineBase field-definitions.ts 字段重命名映射（旧名 → 新名）。
+# 用于运行时自动迁移用户 config 中的旧列映射。
+_FIELD_RENAMES: dict[str, str] = {
+    "equipmentName": "sourceEquipmentName",
+    "equipmentCode": "sourceEquipmentCode",
+    "truckName": "sourceTruckName",
+    "truckCode": "sourceTruckCode",
+    "excavatorName": "sourceExcavatorName",
+    "excavatorCode": "sourceExcavatorCode",
+    "materialTypeName": "sourceMaterialTypeName",
+}
+
+# 不再作为导入字段的旧字段名（有新等价物或已废弃，直接移除）。
+_FIELDS_TO_DROP: set[str] = {"equipmentCode"}
+
+
+def _migrate_field_names(mapping: dict[str, dict[str, str]]) -> dict[str, dict[str, str]]:
+    """将旧字段名迁移到 MineBase 最新 schema。
+
+    - 旧名重命名为新名（如 equipmentName → sourceEquipmentName）
+    - 已废弃字段（如 equipmentCode → sourceEquipmentCode 不再被导入）移除
+    - 有变更时打印警告日志，提示用户更新映射配置文件
+    """
+    changed = False
+    result: dict[str, dict[str, str]] = {}
+    for table, cols in mapping.items():
+        new_cols: dict[str, str] = {}
+        for src_col, target in cols.items():
+            if target in _FIELD_RENAMES:
+                new_name = _FIELD_RENAMES[target]
+                if target in _FIELDS_TO_DROP:
+                    logger.warning(
+                        "[%s] 列映射 '%s' → '%s' 已废弃，已移除（请更新映射配置文件）",
+                        table, src_col, target,
+                    )
+                else:
+                    logger.warning(
+                        "[%s] 列映射 '%s' → '%s' 已重命名为 '%s'",
+                        table, src_col, target, new_name,
+                    )
+                    new_cols[src_col] = new_name
+                changed = True
+            else:
+                new_cols[src_col] = target
+        result[table] = new_cols
+    if changed:
+        logger.info("列映射已自动迁移旧字段名，请运行 `uv run scripts/bump_version.py` 或手动更新映射配置文件")
+    return result
+
+
 # ---------------------------------------------------------------------------
 # 映射配置加载
 # ---------------------------------------------------------------------------
@@ -29,19 +79,25 @@ def load_column_mapping(mapping_file: str | Path | None = None) -> dict[str, dic
     未指定文件时通过 config_loader 读取（优先用户自定义，回退 config.json 默认值）。
     指定文件时直接读取该文件。
 
+    加载后自动迁移旧字段名到 MineBase 最新 schema。
+
     Returns:
         {data_type: {源列名: 目标字段名}} 的嵌套字典。
     """
     from func.config_loader import get_minebase_column_mapping
 
     if mapping_file is None:
-        return get_minebase_column_mapping()
-    path = Path(mapping_file)
-    if not path.exists():
-        logger.info("映射配置文件不存在: %s，使用默认映射", path)
-        return get_minebase_column_mapping()
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+        mapping = get_minebase_column_mapping()
+    else:
+        path = Path(mapping_file)
+        if not path.exists():
+            logger.info("映射配置文件不存在: %s，使用默认映射", path)
+            mapping = get_minebase_column_mapping()
+        else:
+            with open(path, "r", encoding="utf-8") as f:
+                mapping = json.load(f)
+
+    return _migrate_field_names(mapping)
 
 
 # ---------------------------------------------------------------------------
