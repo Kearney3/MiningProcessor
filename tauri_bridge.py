@@ -773,6 +773,14 @@ def _save_minebase_column_mapping(params: dict) -> dict:
     return {"ok": True}
 
 
+@_register("reset_user_config")
+def _reset_user_config(params: dict) -> dict:
+    """重置所有用户覆盖配置（清空 config.user.json，恢复为系统默认值）。"""
+    from func.config_loader import reset_all_user_overrides
+    reset_all_user_overrides()
+    return {"ok": True}
+
+
 @_register("reset_minebase_column_mapping")
 def _reset_minebase_column_mapping(params: dict) -> dict:
     """重置 MineBase 列映射为默认值。"""

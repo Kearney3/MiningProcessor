@@ -484,6 +484,16 @@ def reset_user_config(section: str | None = None) -> None:
     _invalidate_config_cache()
 
 
+def reset_all_user_overrides() -> None:
+    """重置所有用户覆盖配置（清空 config.user.json，恢复为纯系统默认值）。
+
+    与 reset_user_config() 不同，此函数清除 config.user.json 中的所有内容，
+    包括 minebase、anomaly_detection 等顶层段落。
+    """
+    _save_json(_USER_CONFIG_FILE, {})
+    _invalidate_config_cache()
+
+
 
 # ---------------------------------------------------------------------------
 # 文件关键字
