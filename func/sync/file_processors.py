@@ -261,7 +261,7 @@ def _process_production_file(
         "日期": "date",
         "班次": "shiftType",
         "设备名称": "sourceEquipmentName",
-        "公司": "company",
+        "公司": "sourceCompany",
         "小时数仪表开始": "engineHoursStart",
         "小时数仪表结束": "engineHoursEnd",
         "运行小时数": "runningHours",

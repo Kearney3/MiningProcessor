@@ -192,9 +192,9 @@ class TestLoadColumnMapping:
         assert result["work_efficiency"].get("注释") == "remark"
 
     def test_default_mapping_has_company_for_operation(self):
-        """equipment_operation 映射应包含公司 → company。"""
+        """equipment_operation 映射应包含公司 → sourceCompany。"""
         result = load_column_mapping()
-        assert result["equipment_operation"].get("公司") == "company"
+        assert result["equipment_operation"].get("公司") == "sourceCompany"
 
 
 class TestMigrateFieldNames:
@@ -242,6 +242,14 @@ class TestMigrateFieldNames:
         assert "设备编号" not in result["fuel_consumption"]
         assert result["fuel_consumption"]["设备名称"] == "sourceEquipmentName"
         assert result["fuel_consumption"]["日期"] == "date"
+
+    def test_old_company_migrated(self, tmp_path):
+        """company → sourceCompany。"""
+        mapping = {"equipment_operation": {"公司": "company"}}
+        path = tmp_path / "old_mapping.json"
+        path.write_text(json.dumps(mapping, ensure_ascii=False))
+        result = load_column_mapping(path)
+        assert result["equipment_operation"]["公司"] == "sourceCompany"
 
     def test_new_field_names_unchanged(self, tmp_path):
         """新字段名不被迁移。"""

@@ -82,7 +82,8 @@ FIELD_TO_COLUMN_MAP: dict[str, str] = {
     # 业务字段
     "fuelName": "fuel_name",
     "consumption": "consumption",
-    "company": "company",
+    "company": "source_company",
+    "sourceCompany": "source_company",
     "plannedMinutes": "planned_minutes",
     "plannedHours": "planned_hours",
     "parkShift": "park_shift",
