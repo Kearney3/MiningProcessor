@@ -919,6 +919,10 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
     skip_hidden_rows = skip_hidden_rows_val.value if skip_hidden_rows_val else False
     skip_hidden_cols = skip_hidden_cols_val.value if skip_hidden_cols_val else False
 
+    # 冲突策略
+    conflict_policy_val = sync_refs.get("conflict_policy")
+    conflict_policy = conflict_policy_val.value if conflict_policy_val else "SKIP"
+
     set_btn_state(btn, False, "同步中...")
     result_text.visible = False
     result_text.update()
@@ -952,6 +956,7 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
                 filter_zero_km_meter=filter_zero_km_meter,
                 filter_zero_run_hours=filter_zero_run_hours,
                 filter_zero_run_km=filter_zero_run_km,
+                conflict_policy=conflict_policy,
             )
 
         results = await asyncio.to_thread(_do_sync)

@@ -34,6 +34,7 @@ def sync_via_api(
     api_client: Any,
     dry_run: bool = False,
     row_warnings: list[dict[str, Any]] | None = None,
+    conflict_policy: str = "SKIP",
 ) -> dict[str, Any]:
     """通过 API 模式同步数据 (contractVersion 2)。
 
@@ -43,6 +44,7 @@ def sync_via_api(
     Args:
         row_warnings: 可选警告收集列表（来自台账匹配阶段），
                       合并服务端返回的 warnings/errors 后一并返回。
+        conflict_policy: 冲突策略 ('SKIP' | 'UPDATE' | 'REJECT')。
 
     Returns:
         {"success": N, "skipped": N, "failed": N, "warnings": [...]}
@@ -75,7 +77,7 @@ def sync_via_api(
             table,
             expected_batches=total_batches,
             total_rows=len(rows),
-            conflict_policy="SKIP",
+            conflict_policy=conflict_policy,
         )
     except SessionLimitReachedError as e:
         logger.error("[%s] 并发导入会话数已达上限: %s", data_type, e)

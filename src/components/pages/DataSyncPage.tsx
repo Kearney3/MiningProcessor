@@ -74,6 +74,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const { notify } = useToast();
   const [inputDir, setInputDir] = useState("");
   const [mode, setMode] = useState<"api" | "database">("api");
+  const [conflictPolicy, setConflictPolicy] = useState<"SKIP" | "UPDATE" | "REJECT">("SKIP");
   const [dataTypes, setDataTypes] = useState<string[]>(ALL_TYPES.map((t) => t.id));
   const [dryRun, setDryRun] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -144,6 +145,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
       const res = await bridge.call<SyncResult>("sync_minebase", {
         input_dir: inputDir,
         mode,
+        conflict_policy: conflictPolicy,
         data_types: dataTypes,
         dry_run: dryRun,
         year: year ? Number(year) : undefined,
@@ -240,6 +242,35 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Conflict policy — segmented control */}
+        <div>
+          <label className="text-xs font-medium text-slate-500 mb-1.5 block">冲突策略</label>
+          <div className="inline-flex rounded-md bg-slate-100 p-0.5 gap-0.5">
+            {([
+              { value: "SKIP" as const, label: "跳过重复" },
+              { value: "UPDATE" as const, label: "覆盖更新" },
+              { value: "REJECT" as const, label: "拒绝全部" },
+            ]).map((p) => (
+              <button
+                key={p.value}
+                onClick={() => setConflictPolicy(p.value)}
+                className={`px-4 py-2 text-sm rounded-md transition-all ${
+                  conflictPolicy === p.value
+                    ? "bg-white shadow-sm text-slate-800 font-medium"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-slate-400 mt-1">
+            {conflictPolicy === "SKIP" && "遇到重复记录时跳过，保留已有数据"}
+            {conflictPolicy === "UPDATE" && "遇到重复记录时用新数据覆盖旧数据"}
+            {conflictPolicy === "REJECT" && "存在重复记录时整个批次拒绝"}
+          </p>
         </div>
 
         {/* Data type checkboxes */}

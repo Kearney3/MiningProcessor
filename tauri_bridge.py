@@ -597,6 +597,7 @@ def _sync_minebase(params: dict) -> dict:
         filter_zero_km_meter=params.get("filter_zero_km_meter", True),
         filter_zero_run_hours=params.get("filter_zero_run_hours", False),
         filter_zero_run_km=params.get("filter_zero_run_km", False),
+        conflict_policy=params.get("conflict_policy", "SKIP"),
     )
     dry_run_file = results.pop("_dry_run_file", None)
     resp: dict = {"results": results}

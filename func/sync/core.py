@@ -133,6 +133,7 @@ def sync(
     filter_zero_km_meter: bool = True,
     filter_zero_run_hours: bool = False,
     filter_zero_run_km: bool = False,
+    conflict_policy: str = "SKIP",
 ) -> dict[str, dict[str, int]]:
     """执行同步的主入口。
 
@@ -358,7 +359,7 @@ def sync(
             all_rows = _filter_by_date_range(all_rows, date_start, date_end)
 
             if sync_mode == "api":
-                results[data_type] = _sync_via_api(data_type, all_rows, mapping, api_client, dry_run, row_warnings=data_warnings)
+                results[data_type] = _sync_via_api(data_type, all_rows, mapping, api_client, dry_run, row_warnings=data_warnings, conflict_policy=conflict_policy)
             else:
                 results[data_type] = _sync_via_db(data_type, all_rows, mapping, db_client, dry_run, row_warnings=data_warnings)
 
