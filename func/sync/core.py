@@ -28,6 +28,7 @@ _FIELD_RENAMES: dict[str, str] = {
     "excavatorName": "sourceExcavatorName",
     "excavatorCode": "sourceExcavatorCode",
     "materialTypeName": "sourceMaterialTypeName",
+    "company": "sourceCompany",
 }
 
 # 不再作为导入字段的旧字段名（有新等价物或已废弃，直接移除）。
