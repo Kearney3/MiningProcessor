@@ -31,8 +31,8 @@ _FIELD_RENAMES: dict[str, str] = {
     "company": "sourceCompany",
 }
 
-# 不再作为导入字段的旧字段名（有新等价物或已废弃，直接移除）。
-_FIELDS_TO_DROP: set[str] = {"equipmentCode"}
+# 不再作为导入字段的旧字段名（已废弃且无新等价物）。
+_FIELDS_TO_DROP: set[str] = set()
 
 
 def _migrate_field_names(mapping: dict[str, dict[str, str]]) -> dict[str, dict[str, str]]:
