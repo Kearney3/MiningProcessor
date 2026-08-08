@@ -23,6 +23,8 @@ pub struct PythonBridge {
     event_receiver: Mutex<Option<Receiver<serde_json::Value>>>,
     /// 取消当前可取消 call 的 Rust 等待，同时通过独立 RPC 通知 Python 任务。
     cancelled: AtomicBool,
+    /// 当前可取消 RPC 的请求 ID，用于让 Python 精确匹配取消目标。
+    cancellable_request_id: AtomicU64,
 }
 
 /// 启动 stdout reader：响应按 ID 投递，异步事件单独投递。
@@ -171,6 +173,7 @@ impl PythonBridge {
             pending,
             event_receiver: Mutex::new(Some(event_receiver)),
             cancelled: AtomicBool::new(false),
+            cancellable_request_id: AtomicU64::new(0),
         })
     }
 
@@ -186,6 +189,15 @@ impl PythonBridge {
 
     fn next_request_id(&self) -> u64 {
         self.next_id.fetch_add(1, Ordering::Relaxed)
+    }
+
+    fn clear_cancellable_request(&self, request_id: u64) {
+        let _ = self.cancellable_request_id.compare_exchange(
+            request_id,
+            0,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        );
     }
 
     fn write_request(
@@ -218,11 +230,13 @@ impl PythonBridge {
         params: &serde_json::Value,
     ) -> Result<serde_json::Value, String> {
         let cancellable = is_cancellable_method(method);
+        let request_id = self.next_request_id();
         if cancellable {
             self.cancelled.store(false, Ordering::SeqCst);
+            self.cancellable_request_id
+                .store(request_id, Ordering::SeqCst);
         }
 
-        let request_id = self.next_request_id();
         let (sender, receiver) = mpsc::channel();
 
         self.pending
@@ -234,6 +248,9 @@ impl PythonBridge {
             if let Ok(mut requests) = self.pending.lock() {
                 requests.remove(&request_id);
             }
+            if cancellable {
+                self.clear_cancellable_request(request_id);
+            }
             return Err(error);
         }
 
@@ -242,6 +259,7 @@ impl PythonBridge {
                 if let Ok(mut requests) = self.pending.lock() {
                     requests.remove(&request_id);
                 }
+                self.clear_cancellable_request(request_id);
                 return Err("Task cancelled".into());
             }
 
@@ -250,16 +268,33 @@ impl PythonBridge {
                     if let Some(error) = response.get("error") {
                         let fallback = error.to_string();
                         let message = error.as_str().unwrap_or(&fallback);
+                        if cancellable {
+                            self.clear_cancellable_request(request_id);
+                        }
                         return Err(message.to_string());
                     }
                     if let Some(result) = response.get("result") {
+                        if cancellable {
+                            self.clear_cancellable_request(request_id);
+                        }
                         return Ok(result.clone());
+                    }
+                    if cancellable {
+                        self.clear_cancellable_request(request_id);
                     }
                     return Err(format!("Unexpected response: {}", response));
                 }
-                Ok(Err(error)) => return Err(error),
+                Ok(Err(error)) => {
+                    if cancellable {
+                        self.clear_cancellable_request(request_id);
+                    }
+                    return Err(error);
+                }
                 Err(mpsc::RecvTimeoutError::Timeout) => continue,
                 Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    if cancellable {
+                        self.clear_cancellable_request(request_id);
+                    }
                     return Err("Python process exited unexpectedly".into());
                 }
             }
@@ -275,7 +310,13 @@ impl PythonBridge {
     /// 取消当前任务：立即结束 Rust 侧等待，并通知 Python 设置任务令牌。
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::SeqCst);
-        self.send_notification("cancel", &serde_json::json!({}));
+        let request_id = self.cancellable_request_id.load(Ordering::SeqCst);
+        let params = if request_id == 0 {
+            serde_json::json!({})
+        } else {
+            serde_json::json!({"request_id": request_id})
+        };
+        self.send_notification("cancel", &params);
 
         // LLM 处理器还会在网络请求间隔中读取这个文件，保留文件信号作为兜底。
         if let Ok(home) = std::env::var("HOME") {
@@ -419,6 +460,76 @@ for line in sys.stdin:
 
         let next_result = bridge.call("ping", &serde_json::json!({}));
         assert_eq!(next_result, Ok(serde_json::json!({"ok": true})));
+
+        drop(bridge);
+        let _ = std::fs::remove_file(&script_path);
+        if let Ok(home) = std::env::var("HOME") {
+            let cancel_path = PathBuf::from(home)
+                .join(".cache")
+                .join("mining_processor_cancel");
+            let _ = std::fs::remove_file(cancel_path);
+        }
+    }
+
+    #[test]
+    fn cancel_notification_targets_the_active_request() {
+        let script_path = temp_script(
+            "cancel_target",
+            r#"
+import json
+import sys
+import threading
+import time
+
+process_id = [None]
+cancel_request_id = [None]
+cancelled = threading.Event()
+
+def handle(request):
+    method = request["method"]
+    if method == "process_production":
+        process_id[0] = request["id"]
+        cancelled.wait(2)
+        time.sleep(0.3)
+        print(json.dumps({"id": request["id"], "result": {"ok": True}}), flush=True)
+    elif method == "cancel":
+        cancel_request_id[0] = request["params"].get("request_id")
+        cancelled.set()
+        print(json.dumps({"id": request["id"], "result": {"ok": True}}), flush=True)
+    elif method == "ping":
+        print(json.dumps({
+            "id": request["id"],
+            "result": {"cancel_request_id": cancel_request_id[0]},
+        }), flush=True)
+
+for line in sys.stdin:
+    threading.Thread(
+        target=handle,
+        args=(json.loads(line),),
+        daemon=True,
+    ).start()
+"#,
+        );
+
+        let python = if cfg!(windows) { "python" } else { "python3" };
+        let bridge = Arc::new(
+            PythonBridge::new(python, script_path.to_str().expect("UTF-8 path"))
+                .expect("Python bridge must start"),
+        );
+        let call_bridge = Arc::clone(&bridge);
+        let call = std::thread::spawn(move || {
+            call_bridge.call("process_production", &serde_json::json!({}))
+        });
+
+        std::thread::sleep(Duration::from_millis(100));
+        bridge.cancel();
+        assert_eq!(
+            call.join().expect("call thread must finish"),
+            Err("Task cancelled".to_string())
+        );
+
+        let ping = bridge.call("ping", &serde_json::json!({}));
+        assert_eq!(ping, Ok(serde_json::json!({"cancel_request_id": 1})));
 
         drop(bridge);
         let _ = std::fs::remove_file(&script_path);

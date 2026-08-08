@@ -3,7 +3,9 @@ import importlib.util
 import io
 import json
 import logging
+import os
 import pathlib
+import select
 import subprocess
 import sys
 from datetime import date
@@ -114,6 +116,72 @@ def test_cancel_rpc_reaches_running_batch_task():
     finally:
         process.kill()
         process.wait(timeout=5)
+
+
+def test_cancel_rpc_reaches_llm_task_before_task_registration(tmp_path):
+    """取消请求先于 LLM 任务注册时，也必须取消目标请求。"""
+    cancel_file = tmp_path / "cancel"
+    launcher = (
+        "import os, time, tauri_bridge\n"
+        "from pathlib import Path\n"
+        "import func.label_maintenance_with_llm as llm\n"
+        "import func.config_loader as config\n"
+        "tauri_bridge._CANCEL_FILE = Path(os.environ['MINING_PROCESSOR_CANCEL_TEST'])\n"
+        "config.get_llm_config = lambda: {'url': 'https://example.test/v1', 'api_key': 'k', 'model': 'm'}\n"
+        "original_begin = tauri_bridge._begin_cancellable_task\n"
+        "def delayed_begin(*args, **kwargs):\n"
+        "    time.sleep(0.25)\n"
+        "    return original_begin(*args, **kwargs)\n"
+        "tauri_bridge._begin_cancellable_task = delayed_begin\n"
+        "def fake_process(path, **kwargs):\n"
+        "    event = kwargs['cancel_event']\n"
+        "    while not event.is_set():\n"
+        "        time.sleep(0.01)\n"
+        "    return {'llm_completed': 0}\n"
+        "llm.process_maintenance_llm = fake_process\n"
+        "tauri_bridge.main()\n"
+    )
+    env = os.environ.copy()
+    env["MINING_PROCESSOR_CANCEL_TEST"] = str(cancel_file)
+    process = subprocess.Popen(
+        [sys.executable, "-c", launcher],
+        cwd=ROOT,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+        env=env,
+    )
+
+    try:
+        params = {"path": str(ROOT / "tauri_bridge.py"), "sheet_name": "维修明细"}
+        process.stdin.write(json.dumps({
+            "id": 1,
+            "method": "process_maintenance_llm",
+            "params": params,
+        }) + "\n")
+        process.stdin.write(json.dumps({
+            "id": 2,
+            "method": "cancel",
+            "params": {"request_id": 1},
+        }) + "\n")
+        process.stdin.flush()
+
+        ready, _, _ = select.select([process.stdout], [], [], 1)
+        assert ready, "cancel response was not returned"
+        cancel_response = json.loads(process.stdout.readline())
+        assert cancel_response == {"id": 2, "result": {"ok": True}}
+
+        ready, _, _ = select.select([process.stdout], [], [], 1)
+        assert ready, "LLM task remained running after early cancellation"
+        llm_response = json.loads(process.stdout.readline())
+        assert llm_response["id"] == 1
+        assert llm_response["result"]["cancelled"] is True
+    finally:
+        process.kill()
+        process.wait(timeout=5)
+        cancel_file.unlink(missing_ok=True)
 
 
 class TestStructuredStderrLogging:
