@@ -1,79 +1,109 @@
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::{self, Receiver};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-/// 从 reader 线程发送到 call() 的消息
-enum BridgeMsg {
-    /// 带 id 的 RPC 响应
-    Response(serde_json::Value),
-    /// 不带 id 的异步事件
-    Event(serde_json::Value),
-}
+type PendingSender = Sender<Result<serde_json::Value, String>>;
 
 /// Python 子进程桥接
 ///
 /// 通过 stdin/stdout JSON 行协议与 Python 通信。
-/// stdout 由独立 reader 线程读取，通过 channel 转发给 call()，
-/// 使得 cancel() 可以立即中断正在进行的 call()。
-/// stderr 用于日志流，由外部线程读取。
+/// stdout 由独立 reader 线程读取，并按响应 ID 分发到对应的 call，
+/// 因此多个 Tauri 命令可以同时等待 Python 响应。
+/// stderr 用于日志流，由外部线程读取；stdout 的事件由独立 receiver 转发。
 pub struct PythonBridge {
     child: Mutex<Option<Child>>,
     stdin: Mutex<ChildStdin>,
-    rx: Mutex<Receiver<BridgeMsg>>,
     stderr: Mutex<Option<ChildStderr>>,
-    next_id: Mutex<u64>,
-    /// 整个 call 往返的锁，序列化 stdin 写入 + 响应匹配，
-    /// 防止并发 RPC 调用响应错配 (H3)
-    call_lock: Mutex<()>,
-    /// 取消标志，cancel_task 设置后 call() 在超时循环中检查 (H1)
-    cancelled: Arc<AtomicBool>,
-    /// 上一次 call 中因取消而未消费的响应，供下次 call 复用
-    pending: Mutex<HashMap<u64, serde_json::Value>>,
+    next_id: AtomicU64,
+    pending: Arc<Mutex<HashMap<u64, PendingSender>>>,
+    event_receiver: Mutex<Option<Receiver<serde_json::Value>>>,
+    /// 取消当前可取消 call 的 Rust 等待，同时通过独立 RPC 通知 Python 任务。
+    cancelled: AtomicBool,
 }
 
-/// 启动 reader 线程：持续从 stdout 读取 JSON 行，通过 channel 转发
-fn spawn_reader(stdout: ChildStdout) -> Receiver<BridgeMsg> {
-    let (tx, rx) = mpsc::channel();
+/// 启动 stdout reader：响应按 ID 投递，异步事件单独投递。
+fn spawn_reader(
+    stdout: ChildStdout,
+    pending: Arc<Mutex<HashMap<u64, PendingSender>>>,
+    event_sender: Sender<serde_json::Value>,
+) {
     std::thread::spawn(move || {
         let mut reader = BufReader::new(stdout);
         loop {
             let mut line = String::new();
             match reader.read_line(&mut line) {
-                Ok(0) => break, // EOF: Python 进程已退出
+                Ok(0) => break,
                 Ok(_) => {}
                 Err(_) => break,
             }
-            let trimmed = line.trim().to_string();
+
+            let trimmed = line.trim();
             if trimmed.is_empty() {
                 continue;
             }
-            let parsed: serde_json::Value = match serde_json::from_str(&trimmed) {
-                Ok(v) => v,
+
+            let parsed: serde_json::Value = match serde_json::from_str(trimmed) {
+                Ok(value) => value,
                 Err(_) => continue,
             };
-            let msg = if parsed.get("event").is_some() {
-                BridgeMsg::Event(parsed)
-            } else {
-                BridgeMsg::Response(parsed)
+
+            if parsed.get("event").is_some() {
+                let _ = event_sender.send(parsed);
+                continue;
+            }
+
+            let Some(response_id) = parsed.get("id").and_then(|value| value.as_u64()) else {
+                continue;
             };
-            if tx.send(msg).is_err() {
-                break; // 接收端已关闭
+
+            let sender = pending
+                .lock()
+                .ok()
+                .and_then(|mut requests| requests.remove(&response_id));
+            if let Some(sender) = sender {
+                let _ = sender.send(Ok(parsed));
             }
         }
+
+        // Python 进程退出时唤醒所有等待中的调用，避免永久阻塞。
+        let requests = pending
+            .lock()
+            .map(|mut requests| {
+                requests
+                    .drain()
+                    .map(|(_, sender)| sender)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        for sender in requests {
+            let _ = sender.send(Err("Python process exited unexpectedly".into()));
+        }
     });
-    // reader 线程独立运行，handle 被丢弃后线程在后台继续工作
-    rx
+}
+
+fn is_cancellable_method(method: &str) -> bool {
+    matches!(
+        method,
+        "process_fuel"
+            | "process_production"
+            | "process_electrical"
+            | "process_worktime"
+            | "process_merge"
+            | "process_maintenance"
+            | "process_maintenance_llm"
+            | "batch_process"
+            | "sync_minebase"
+    )
 }
 
 impl PythonBridge {
     /// 启动 Python 子进程
     ///
-    /// `python_cmd` 可以是 "python3" 或 "uv run python3"
-    /// `bridge_script` 是 tauri_bridge.py 的路径
+    /// `python_cmd` 可以是 "python3" 或 "uv run python3"。
     pub fn new(python_cmd: &str, bridge_script: &str) -> Result<Self, String> {
         let parts: Vec<&str> = python_cmd.split_whitespace().collect();
         let (program, args) = parts.split_first().ok_or("Empty python command")?;
@@ -92,23 +122,10 @@ impl PythonBridge {
         let stdin = child.stdin.take().ok_or("Failed to open stdin")?;
         let stdout = child.stdout.take().ok_or("Failed to open stdout")?;
         let stderr = child.stderr.take();
-        let cancelled = Arc::new(AtomicBool::new(false));
-
-        let rx = spawn_reader(stdout);
-
-        Ok(Self {
-            child: Mutex::new(Some(child)),
-            stdin: Mutex::new(stdin),
-            rx: Mutex::new(rx),
-            stderr: Mutex::new(stderr),
-            next_id: Mutex::new(1),
-            call_lock: Mutex::new(()),
-            cancelled,
-            pending: Mutex::new(HashMap::new()),
-        })
+        Self::from_child(child, stdin, stdout, stderr)
     }
 
-    /// 从可执行文件路径直接启动（sidecar 模式）
+    /// 从可执行文件路径直接启动（sidecar 模式）。
     pub fn from_command(binary_path: &std::path::Path) -> Result<Self, String> {
         let mut cmd = Command::new(binary_path);
         cmd.stdin(Stdio::piped())
@@ -133,131 +150,134 @@ impl PythonBridge {
         let stdin = child.stdin.take().ok_or("Failed to open stdin")?;
         let stdout = child.stdout.take().ok_or("Failed to open stdout")?;
         let stderr = child.stderr.take();
-        let cancelled = Arc::new(AtomicBool::new(false));
+        Self::from_child(child, stdin, stdout, stderr)
+    }
 
-        let rx = spawn_reader(stdout);
+    fn from_child(
+        child: Child,
+        stdin: ChildStdin,
+        stdout: ChildStdout,
+        stderr: Option<ChildStderr>,
+    ) -> Result<Self, String> {
+        let pending = Arc::new(Mutex::new(HashMap::new()));
+        let (event_sender, event_receiver) = mpsc::channel();
+        spawn_reader(stdout, Arc::clone(&pending), event_sender);
 
         Ok(Self {
             child: Mutex::new(Some(child)),
             stdin: Mutex::new(stdin),
-            rx: Mutex::new(rx),
             stderr: Mutex::new(stderr),
-            next_id: Mutex::new(1),
-            call_lock: Mutex::new(()),
-            cancelled,
-            pending: Mutex::new(HashMap::new()),
+            next_id: AtomicU64::new(1),
+            pending,
+            event_receiver: Mutex::new(Some(event_receiver)),
+            cancelled: AtomicBool::new(false),
         })
     }
 
-    /// 取出 stderr 句柄（只能调用一次）
-    ///
-    /// 返回 `Some(ChildStderr)` 首次调用时，之后返回 `None`。
+    /// 取出 stdout 异步事件 receiver（只能调用一次）。
+    pub fn take_event_receiver(&self) -> Option<Receiver<serde_json::Value>> {
+        self.event_receiver.lock().ok()?.take()
+    }
+
+    /// 取出 stderr 句柄（只能调用一次）。
     pub fn take_stderr(&self) -> Option<ChildStderr> {
         self.stderr.lock().ok()?.take()
     }
 
-    /// 发送 RPC 请求并等待响应
-    ///
-    /// 整个写入 + 读取过程由 `call_lock` 序列化，防止并发调用时响应错配 (H3)。
-    pub fn call<F>(
+    fn next_request_id(&self) -> u64 {
+        self.next_id.fetch_add(1, Ordering::Relaxed)
+    }
+
+    fn write_request(
         &self,
+        request_id: u64,
         method: &str,
         params: &serde_json::Value,
-        mut on_event: F,
-    ) -> Result<serde_json::Value, String>
-    where
-        F: FnMut(&serde_json::Value),
-    {
-        // 序列化整个往返，防止响应错配
-        let _guard = self.call_lock.lock().map_err(|e| e.to_string())?;
-
-        // 重置取消标志
-        self.cancelled.store(false, Ordering::SeqCst);
-
-        // 清除上次取消残留的响应
-        if let Ok(mut p) = self.pending.lock() {
-            p.clear();
-        }
-
-        let id = {
-            let mut id = self.next_id.lock().map_err(|e| e.to_string())?;
-            let current = *id;
-            *id += 1;
-            current
-        };
-
+    ) -> Result<(), String> {
         let request = serde_json::json!({
-            "id": id,
+            "id": request_id,
             "method": method,
             "params": params,
         });
-
         let request_line =
             serde_json::to_string(&request).map_err(|e| format!("JSON encode error: {}", e))?;
 
-        // 写入 stdin
-        {
-            let mut stdin = self.stdin.lock().map_err(|e| e.to_string())?;
-            writeln!(stdin, "{}", request_line)
-                .map_err(|e| format!("Write to stdin failed: {}", e))?;
-            stdin
-                .flush()
-                .map_err(|e| format!("Flush stdin failed: {}", e))?;
+        let mut stdin = self.stdin.lock().map_err(|e| e.to_string())?;
+        writeln!(stdin, "{}", request_line).map_err(|e| format!("Write to stdin failed: {}", e))?;
+        stdin
+            .flush()
+            .map_err(|e| format!("Flush stdin failed: {}", e))
+    }
+
+    /// 发送 RPC 请求并等待对应 ID 的响应。
+    ///
+    /// 这里只锁住 stdin 写入，不锁住整个响应等待过程。
+    pub fn call(
+        &self,
+        method: &str,
+        params: &serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
+        let cancellable = is_cancellable_method(method);
+        if cancellable {
+            self.cancelled.store(false, Ordering::SeqCst);
         }
 
-        // 从 channel 接收响应（每 500ms 检查一次取消标志）
-        let rx = self.rx.lock().map_err(|e| e.to_string())?;
+        let request_id = self.next_request_id();
+        let (sender, receiver) = mpsc::channel();
+
+        self.pending
+            .lock()
+            .map_err(|e| e.to_string())?
+            .insert(request_id, sender);
+
+        if let Err(error) = self.write_request(request_id, method, params) {
+            if let Ok(mut requests) = self.pending.lock() {
+                requests.remove(&request_id);
+            }
+            return Err(error);
+        }
+
         loop {
-            if self.cancelled.load(Ordering::SeqCst) {
+            if cancellable && self.cancelled.load(Ordering::SeqCst) {
+                if let Ok(mut requests) = self.pending.lock() {
+                    requests.remove(&request_id);
+                }
                 return Err("Task cancelled".into());
             }
 
-            let msg = match rx.recv_timeout(Duration::from_millis(500)) {
-                Ok(msg) => msg,
-                Err(mpsc::RecvTimeoutError::Timeout) => continue,
-                Err(mpsc::RecvTimeoutError::Disconnected) => {
-                    return Err("Python process exited unexpectedly".into());
-                }
-            };
-
-            match msg {
-                BridgeMsg::Event(ref event) => {
-                    on_event(event);
-                }
-                BridgeMsg::Response(ref response) => {
-                    // 检查响应 ID 是否匹配当前请求 (H3)
-                    if let Some(resp_id) = response.get("id").and_then(|v| v.as_u64()) {
-                        if resp_id != id {
-                            // 存储非当前请求的响应（供后续 call 复用）
-                            if let Ok(mut p) = self.pending.lock() {
-                                p.insert(resp_id, response.clone());
-                            }
-                            continue;
-                        }
-                    }
-
-                    // 错误响应
+            match receiver.recv_timeout(Duration::from_millis(100)) {
+                Ok(Ok(response)) => {
                     if let Some(error) = response.get("error") {
                         let fallback = error.to_string();
-                        let msg = error.as_str().unwrap_or(&fallback);
-                        return Err(msg.to_string());
+                        let message = error.as_str().unwrap_or(&fallback);
+                        return Err(message.to_string());
                     }
-
-                    // 成功响应
                     if let Some(result) = response.get("result") {
                         return Ok(result.clone());
                     }
-
                     return Err(format!("Unexpected response: {}", response));
+                }
+                Ok(Err(error)) => return Err(error),
+                Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    return Err("Python process exited unexpectedly".into());
                 }
             }
         }
     }
 
-    /// 设置取消标志，通知正在执行的 call 提前返回 (H1)
+    /// 发送无需等待响应的控制请求。
+    fn send_notification(&self, method: &str, params: &serde_json::Value) {
+        let request_id = self.next_request_id();
+        let _ = self.write_request(request_id, method, params);
+    }
+
+    /// 取消当前任务：立即结束 Rust 侧等待，并通知 Python 设置任务令牌。
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::SeqCst);
-        // Write cancel signal file for Python-side detection.
+        self.send_notification("cancel", &serde_json::json!({}));
+
+        // LLM 处理器还会在网络请求间隔中读取这个文件，保留文件信号作为兜底。
         if let Ok(home) = std::env::var("HOME") {
             let cancel_path = std::path::PathBuf::from(home)
                 .join(".cache")
@@ -267,16 +287,16 @@ impl PythonBridge {
         }
     }
 
-    /// 获取子进程 PID（用于前端展示）
+    /// 获取子进程 PID（用于前端展示）。
     pub fn pid(&self) -> Option<u32> {
         self.child.lock().ok()?.as_ref().map(|c| c.id())
     }
 
-    /// 检查子进程是否仍在运行
+    /// 检查子进程是否仍在运行。
     pub fn is_alive(&self) -> bool {
         if let Ok(mut guard) = self.child.lock() {
-            if let Some(ref mut c) = *guard {
-                return c.try_wait().ok().flatten().is_none();
+            if let Some(ref mut child) = *guard {
+                return child.try_wait().ok().flatten().is_none();
             }
         }
         false
@@ -285,12 +305,10 @@ impl PythonBridge {
 
 impl Drop for PythonBridge {
     fn drop(&mut self) {
-        // 关闭 stdin 让 Python 进程读到 EOF 并退出
-        // 同时 kill + wait 子进程，防止僵尸进程 (H2)
         if let Ok(mut child_guard) = self.child.lock() {
-            if let Some(mut c) = child_guard.take() {
-                let _ = c.kill();
-                let _ = c.wait();
+            if let Some(mut child) = child_guard.take() {
+                let _ = child.kill();
+                let _ = child.wait();
             }
         }
     }
@@ -303,19 +321,69 @@ mod tests {
     use std::sync::Arc;
     use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-    #[test]
-    fn cancel_interrupts_a_call_waiting_for_python() {
+    fn temp_script(name: &str, content: &str) -> PathBuf {
         let stamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("system clock must be after the Unix epoch")
             .as_nanos();
-        let script_path = std::env::temp_dir().join(format!(
-            "mining_processor_python_bridge_cancel_{}_{}.py",
+        let path = std::env::temp_dir().join(format!(
+            "mining_processor_python_bridge_{}_{}_{}.py",
+            name,
             std::process::id(),
             stamp,
         ));
-        std::fs::write(
-            &script_path,
+        std::fs::write(&path, content).expect("test Python script must be writable");
+        path
+    }
+
+    #[test]
+    fn concurrent_calls_are_routed_by_response_id() {
+        let script_path = temp_script(
+            "concurrent",
+            r#"
+import json
+import sys
+import threading
+import time
+
+def handle(request):
+    if request["method"] == "long_running":
+        time.sleep(0.5)
+    print(json.dumps({"id": request["id"], "result": {"method": request["method"]}}), flush=True)
+
+for line in sys.stdin:
+    threading.Thread(target=handle, args=(json.loads(line),), daemon=True).start()
+"#,
+        );
+
+        let python = if cfg!(windows) { "python" } else { "python3" };
+        let bridge = Arc::new(
+            PythonBridge::new(python, script_path.to_str().expect("UTF-8 temp path"))
+                .expect("Python bridge must start"),
+        );
+        let long_bridge = Arc::clone(&bridge);
+        let long_call =
+            std::thread::spawn(move || long_bridge.call("long_running", &serde_json::json!({})));
+
+        std::thread::sleep(Duration::from_millis(50));
+        let started = Instant::now();
+        let quick_result = bridge.call("ping", &serde_json::json!({}));
+
+        assert_eq!(quick_result, Ok(serde_json::json!({"method": "ping"})),);
+        assert!(started.elapsed() < Duration::from_millis(400));
+        assert_eq!(
+            long_call.join().expect("long call must finish"),
+            Ok(serde_json::json!({"method": "long_running"})),
+        );
+
+        drop(bridge);
+        let _ = std::fs::remove_file(&script_path);
+    }
+
+    #[test]
+    fn cancel_interrupts_a_call_waiting_for_python() {
+        let script_path = temp_script(
+            "cancel",
             r#"
 import json
 import sys
@@ -323,11 +391,10 @@ import time
 
 for line in sys.stdin:
     request = json.loads(line)
-    time.sleep(1 if request["method"] == "long_running" else 0)
+    time.sleep(1 if request["method"] == "process_production" else 0)
     print(json.dumps({"id": request["id"], "result": {"ok": True}}), flush=True)
 "#,
-        )
-        .expect("test Python script must be writable");
+        );
 
         let python = if cfg!(windows) { "python" } else { "python3" };
         let bridge = Arc::new(
@@ -336,7 +403,7 @@ for line in sys.stdin:
         );
         let call_bridge = Arc::clone(&bridge);
         let call = std::thread::spawn(move || {
-            call_bridge.call("long_running", &serde_json::json!({}), |_| {})
+            call_bridge.call("process_production", &serde_json::json!({}))
         });
 
         std::thread::sleep(Duration::from_millis(100));
@@ -350,7 +417,7 @@ for line in sys.stdin:
             "cancelled call should return promptly"
         );
 
-        let next_result = bridge.call("ping", &serde_json::json!({}), |_| {});
+        let next_result = bridge.call("ping", &serde_json::json!({}));
         assert_eq!(next_result, Ok(serde_json::json!({"ok": true})));
 
         drop(bridge);

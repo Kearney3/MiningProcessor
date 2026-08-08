@@ -1,12 +1,13 @@
 mod python_bridge;
 
 use python_bridge::PythonBridge;
+use std::sync::Arc;
 use tauri::{Emitter, Manager, State};
 
-/// 应用状态，PythonBridge 自身的内部锁已保证线程安全。
-/// 不再需要外层 Mutex<Option<PythonBridge>>，避免 cancel_task 与 invoke_python 的死锁 (H1)。
+/// 应用状态。PythonBridge 自身的内部锁已保证线程安全；Arc 允许阻塞调用
+/// 被移到 spawn_blocking，而不占用 Tauri 异步运行时线程。
 struct AppState {
-    bridge: PythonBridge,
+    bridge: Arc<PythonBridge>,
     mode: String,
     command: String,
 }
@@ -16,11 +17,11 @@ async fn invoke_python(
     method: String,
     params: serde_json::Value,
     state: State<'_, AppState>,
-    app: tauri::AppHandle,
 ) -> Result<serde_json::Value, String> {
-    state.bridge.call(&method, &params, |event| {
-        let _ = app.emit("python-log", event);
-    })
+    let bridge = Arc::clone(&state.bridge);
+    tauri::async_runtime::spawn_blocking(move || bridge.call(&method, &params))
+        .await
+        .map_err(|error| format!("Python bridge worker failed: {}", error))?
 }
 
 #[tauri::command]
@@ -272,6 +273,24 @@ fn spawn_stderr_logger(bridge: &PythonBridge, handle: &tauri::AppHandle) {
     }
 }
 
+/// 转发 Python stdout 上的异步事件（进度等）。
+/// 响应消息已经由 PythonBridge 按 ID 投递给对应调用，不经过这里。
+fn spawn_stdout_event_logger(bridge: &PythonBridge, handle: &tauri::AppHandle) {
+    if let Some(receiver) = bridge.take_event_receiver() {
+        let handle = handle.clone();
+        std::thread::spawn(move || {
+            while let Ok(event) = receiver.recv() {
+                let _ = handle.emit("python-log", &event);
+            }
+        });
+    }
+}
+
+fn spawn_bridge_loggers(bridge: &PythonBridge, handle: &tauri::AppHandle) {
+    spawn_stderr_logger(bridge, handle);
+    spawn_stdout_event_logger(bridge, handle);
+}
+
 #[cfg(test)]
 mod log_forwarder_tests {
     use super::{is_important_log, stderr_line_to_event};
@@ -302,7 +321,7 @@ fn init_bridge(app: &tauri::App) -> Result<(), String> {
     if cfg!(debug_assertions) {
         if let Some((bridge, info)) = try_start_dev() {
             let pid = bridge.pid();
-            spawn_stderr_logger(&bridge, app.handle());
+            spawn_bridge_loggers(&bridge, app.handle());
             let _ = app.handle().emit(
                 "python-log",
                 &serde_json::json!({
@@ -311,7 +330,7 @@ fn init_bridge(app: &tauri::App) -> Result<(), String> {
                 }),
             );
             app.manage(AppState {
-                bridge,
+                bridge: Arc::new(bridge),
                 mode: "dev".into(),
                 command: info,
             });
@@ -321,7 +340,7 @@ fn init_bridge(app: &tauri::App) -> Result<(), String> {
         // dev 失败时回退到 sidecar
         if let Some(bridge) = try_start_sidecar(app) {
             let pid = bridge.pid();
-            spawn_stderr_logger(&bridge, app.handle());
+            spawn_bridge_loggers(&bridge, app.handle());
             let _ = app.handle().emit(
                 "python-log",
                 &serde_json::json!({
@@ -330,7 +349,7 @@ fn init_bridge(app: &tauri::App) -> Result<(), String> {
                 }),
             );
             app.manage(AppState {
-                bridge,
+                bridge: Arc::new(bridge),
                 mode: "sidecar".into(),
                 command: "tauri-bridge (sidecar fallback)".into(),
             });
@@ -341,7 +360,7 @@ fn init_bridge(app: &tauri::App) -> Result<(), String> {
         // release 构建优先 sidecar（打包二进制）
         if let Some(bridge) = try_start_sidecar(app) {
             let pid = bridge.pid();
-            spawn_stderr_logger(&bridge, app.handle());
+            spawn_bridge_loggers(&bridge, app.handle());
             let _ = app.handle().emit(
                 "python-log",
                 &serde_json::json!({
@@ -350,7 +369,7 @@ fn init_bridge(app: &tauri::App) -> Result<(), String> {
                 }),
             );
             app.manage(AppState {
-                bridge,
+                bridge: Arc::new(bridge),
                 mode: "sidecar".into(),
                 command: "tauri-bridge (sidecar)".into(),
             });
@@ -360,7 +379,7 @@ fn init_bridge(app: &tauri::App) -> Result<(), String> {
         // sidecar 失败时回退到 dev
         if let Some((bridge, info)) = try_start_dev() {
             let pid = bridge.pid();
-            spawn_stderr_logger(&bridge, app.handle());
+            spawn_bridge_loggers(&bridge, app.handle());
             let _ = app.handle().emit(
                 "python-log",
                 &serde_json::json!({
@@ -369,7 +388,7 @@ fn init_bridge(app: &tauri::App) -> Result<(), String> {
                 }),
             );
             app.manage(AppState {
-                bridge,
+                bridge: Arc::new(bridge),
                 mode: "dev".into(),
                 command: info,
             });

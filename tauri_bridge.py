@@ -19,6 +19,7 @@ import os
 import secrets
 import sys
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -115,7 +116,8 @@ class _BridgeEncoder(json.JSONEncoder):
 def _send(obj: dict) -> None:
     """向 stdout 写一行 JSON。"""
     line = json.dumps(obj, ensure_ascii=False, cls=_BridgeEncoder, default=str)
-    print(line, flush=True)
+    with _stdout_lock:
+        print(line, flush=True)
 
 
 def _sanitize(val):
@@ -228,6 +230,47 @@ def _setup_logging() -> None:
 
 # ─── 取消令牌 ───
 _cancel_event = threading.Event()
+_llm_cancel_event = threading.Event()
+_task_state_lock = threading.Lock()
+_active_cancel_event: threading.Event | None = None
+
+
+def _begin_cancellable_task() -> threading.Event:
+    """注册当前长任务的取消令牌。
+
+    长任务在独立的单线程执行器中运行，因此同一时刻只允许一个任务；
+    快速 RPC（包括 cancel）由另一个执行器处理，不会被它阻塞。
+    """
+    global _active_cancel_event
+    event = threading.Event()
+    with _task_state_lock:
+        if _active_cancel_event is not None:
+            raise RuntimeError("已有数据处理任务正在运行")
+        _active_cancel_event = event
+    return event
+
+
+def _end_cancellable_task(event: threading.Event) -> None:
+    """清理当前长任务的取消令牌。"""
+    global _active_cancel_event
+    with _task_state_lock:
+        if _active_cancel_event is event:
+            _active_cancel_event = None
+
+
+def _cancel_active_task() -> None:
+    """设置当前长任务的取消令牌。"""
+    with _task_state_lock:
+        event = _active_cancel_event
+    if event is not None:
+        event.set()
+    # 保留旧事件，兼容仍直接引用这些模块变量的处理器/第三方调用方。
+    _cancel_event.set()
+    _llm_cancel_event.set()
+
+
+# stdout 可能由多个 RPC worker 同时写入，必须保证一条 JSON 完整输出。
+_stdout_lock = threading.Lock()
 
 
 # ─── RPC 方法注册表 ───
@@ -304,16 +347,20 @@ def _process_production(params: dict) -> dict:
     from func.orchestration import process_single
     safe_path = str(_sanitize_path(params["path"], must_exist=True))
     common = _extract_common_params(params)
-    return process_single(
-        "production", safe_path,
-        raw_start=params.get("raw_start", -1),
-        cancel_event=_cancel_event,
-        filter_zero_hours_meter=params.get("filter_zero_hours_meter", True),
-        filter_zero_km_meter=params.get("filter_zero_km_meter", True),
-        filter_zero_run_hours=params.get("filter_zero_run_hours", False),
-        filter_zero_run_km=params.get("filter_zero_run_km", False),
-        **common,
-    )
+    cancel_event = _begin_cancellable_task()
+    try:
+        return process_single(
+            "production", safe_path,
+            raw_start=params.get("raw_start", -1),
+            cancel_event=cancel_event,
+            filter_zero_hours_meter=params.get("filter_zero_hours_meter", True),
+            filter_zero_km_meter=params.get("filter_zero_km_meter", True),
+            filter_zero_run_hours=params.get("filter_zero_run_hours", False),
+            filter_zero_run_km=params.get("filter_zero_run_km", False),
+            **common,
+        )
+    finally:
+        _end_cancellable_task(cancel_event)
 
 
 @_register("process_electrical")
@@ -416,40 +463,43 @@ def _process_maintenance_llm(params: dict) -> dict:
         raise ValueError("请先在配置中填写 LLM 接口 URL 和 API Key")
     if not llm_config.get("model"):
         raise ValueError("请先在配置中选择 LLM 模型")
+    cancel_event = _begin_cancellable_task()
     _llm_cancel_event.clear()
     _CANCEL_FILE.unlink(missing_ok=True)
-    result = process_maintenance_llm(
-        safe_path,
-        llm_config=llm_config,
-        sheet_name=params.get("sheet_name", "维修明细"),
-        content_column=params.get("content_column", "维修内容"),
-        category_column=params.get("category_column", "大类"),
-        minor_column=params.get("minor_column", "小类"),
-        status_column=params.get("status_column", "分类方式"),
-        date_column=params.get("date_column"),
-        device_column=params.get("device_column"),
-        model_column=params.get("model_column"),
-        hours_column=params.get("hours_column"),
-        filter_values=params.get("filter_values"),
-        export_mode=params.get("export_mode", "statistics"),
-        concurrency=llm_config.get("concurrency", 10),
-        batch_size=llm_config.get("batch_size", 50),
-        cancel_event=_llm_cancel_event,
-        cancel_file=_CANCEL_FILE,
-        show_progress_bar=True,
-    )
-    result["cancelled"] = _llm_cancel_event.is_set()
-    return result
+    try:
+        result = process_maintenance_llm(
+            safe_path,
+            llm_config=llm_config,
+            sheet_name=params.get("sheet_name", "维修明细"),
+            content_column=params.get("content_column", "维修内容"),
+            category_column=params.get("category_column", "大类"),
+            minor_column=params.get("minor_column", "小类"),
+            status_column=params.get("status_column", "分类方式"),
+            date_column=params.get("date_column"),
+            device_column=params.get("device_column"),
+            model_column=params.get("model_column"),
+            hours_column=params.get("hours_column"),
+            filter_values=params.get("filter_values"),
+            export_mode=params.get("export_mode", "statistics"),
+            concurrency=llm_config.get("concurrency", 10),
+            batch_size=llm_config.get("batch_size", 50),
+            cancel_event=cancel_event,
+            cancel_file=_CANCEL_FILE,
+            show_progress_bar=True,
+        )
+        result["cancelled"] = cancel_event.is_set()
+        return result
+    finally:
+        _end_cancellable_task(cancel_event)
 
 
-# LLM 标注取消事件（全局，同一时间只允许一个标注任务）
-_llm_cancel_event = threading.Event()
+# LLM 标注取消文件（用于处理器在网络请求间隔中检测取消）。
 _CANCEL_FILE = Path.home() / ".cache" / "mining_processor_cancel"
 
 
 @_register("cancel_llm_labeling")
 def _cancel_llm_labeling(params: dict) -> dict:
-    _llm_cancel_event.set()
+    _cancel_active_task()
     return {"ok": True}
 
 
@@ -496,6 +546,14 @@ def _batch_scan(params: dict) -> dict:
 
 @_register("batch_process")
 def _batch_process(params: dict) -> dict:
+    cancel_event = _begin_cancellable_task()
+    try:
+        return _batch_process_impl(params, cancel_event)
+    finally:
+        _end_cancellable_task(cancel_event)
+
+
+def _batch_process_impl(params: dict, cancel_event: threading.Event) -> dict:
     from func.excel_batch import process_files
     from func.orchestration import load_ledgers, build_worktime_header_mapping
 
@@ -519,9 +577,6 @@ def _batch_process(params: dict) -> dict:
         worktime_header_mapping = build_worktime_header_mapping(
             mode=params.get("header_mode"),
         )
-
-    # 重置取消标记
-    _cancel_event.clear()
 
     safe_folder = str(_sanitize_path(params["folder_path"], allow_file=False))
     matched = params.get("matched")
@@ -551,7 +606,7 @@ def _batch_process(params: dict) -> dict:
         worktime_header_mapping=worktime_header_mapping,
         table_merge_config=params.get("table_merge_config"),
         progress_cb=progress_cb,
-        cancel_event=_cancel_event,
+        cancel_event=cancel_event,
         skip_hidden=params.get("skip_hidden", False),
         skip_hidden_rows=params.get("skip_hidden_rows", False),
         skip_hidden_cols=params.get("skip_hidden_cols", False),
@@ -563,12 +618,12 @@ def _batch_process(params: dict) -> dict:
         filter_zero_run_hours=params.get("filter_zero_run_hours", False),
         filter_zero_run_km=params.get("filter_zero_run_km", False),
     )
-    return {"cancelled": _cancel_event.is_set(), "summary": summary}
+    return {"cancelled": cancel_event.is_set(), "summary": summary}
 
 
 @_register("cancel")
 def _cancel(params: dict) -> dict:
-    _cancel_event.set()
+    _cancel_active_task()
     return {"ok": True}
 
 
@@ -1250,6 +1305,21 @@ def _save_last_directory(params: dict) -> dict:
 # ═══════════════════════════════════════════════════════════
 
 
+# 长任务单独串行，避免两个处理任务同时写同一批输出文件；
+# 快速 RPC 使用独立线程池，因此长任务不会阻塞台账、配置和取消请求。
+_LONG_RUNNING_METHODS = frozenset({
+    "process_fuel",
+    "process_production",
+    "process_electrical",
+    "process_worktime",
+    "process_merge",
+    "process_maintenance",
+    "process_maintenance_llm",
+    "batch_process",
+    "sync_minebase",
+})
+
+
 def _handle_request(req: dict) -> None:
     """处理单个 RPC 请求。"""
     req_id = req.get("id")
@@ -1274,23 +1344,30 @@ def _handle_request(req: dict) -> None:
 
 
 def main() -> None:
-    """入口：从 stdin 逐行读取 JSON 请求，处理后写回 stdout。"""
+    """入口：从 stdin 读取请求，并异步分发后写回 stdout。
+
+    stdin 主线程只负责收包；长任务和快速 RPC 使用不同执行器。
+    因此台账/配置请求可以在数据处理期间继续执行。
+    """
     _setup_logging()
     logger.info("Python bridge started")
 
-    for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            req = json.loads(line)
-        except json.JSONDecodeError as e:
-            _send({"error": f"Invalid JSON: {e}"})
-            continue
+    with (
+        ThreadPoolExecutor(max_workers=4, thread_name_prefix="bridge-rpc") as rpc_executor,
+        ThreadPoolExecutor(max_workers=1, thread_name_prefix="bridge-task") as task_executor,
+    ):
+        for line in sys.stdin:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                req = json.loads(line)
+            except json.JSONDecodeError as e:
+                _send({"error": f"Invalid JSON: {e}"})
+                continue
 
-        # 请求在当前线程处理，长时间任务会阻塞后续请求
-        # 但 batch_process 内部使用 ThreadPoolExecutor，所以可以接受
-        _handle_request(req)
+            executor = task_executor if req.get("method") in _LONG_RUNNING_METHODS else rpc_executor
+            executor.submit(_handle_request, req)
 
 
 if __name__ == "__main__":

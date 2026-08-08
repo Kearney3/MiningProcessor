@@ -935,6 +935,7 @@ def test_llm_connection(config: dict[str, Any] | None = None) -> dict[str, Any]:
 _DATA_DIR = _persistent_root / "data"
 _EQUIPMENT_LEDGER_CACHE = _DATA_DIR / "equipment_ledger_cache.json"
 _OIL_LEDGER_CACHE = _DATA_DIR / "oil_ledger_cache.json"
+_ledger_cache_lock = threading.RLock()
 
 
 def _ensure_data_dir() -> None:
@@ -943,60 +944,80 @@ def _ensure_data_dir() -> None:
 
 def save_equipment_ledger_cache(records: list[dict]) -> None:
     """将设备台账记录缓存为 JSON 文件。"""
-    _ensure_data_dir()
-    with open(_EQUIPMENT_LEDGER_CACHE, "w", encoding="utf-8") as f:
-        json.dump({"data": records}, f, ensure_ascii=False, indent=2, cls=_LedgerEncoder)
+    with _ledger_cache_lock:
+        _ensure_data_dir()
+        tmp = _EQUIPMENT_LEDGER_CACHE.with_suffix(".json.tmp")
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump({"data": records}, f, ensure_ascii=False, indent=2, cls=_LedgerEncoder)
+            tmp.replace(_EQUIPMENT_LEDGER_CACHE)
+        finally:
+            if tmp.exists():
+                tmp.unlink()
 
 
 def load_equipment_ledger_cache() -> list[dict] | None:
     """加载设备台账缓存，不存在时返回 None。"""
-    if not _EQUIPMENT_LEDGER_CACHE.exists():
-        return None
-    try:
-        with open(_EQUIPMENT_LEDGER_CACHE, "r", encoding="utf-8") as f:
-            return json.load(f).get("data")
-    except Exception as e:
-        logger.warning("加载设备台账缓存失败: %s", e)
-        return None
+    with _ledger_cache_lock:
+        if not _EQUIPMENT_LEDGER_CACHE.exists():
+            return None
+        try:
+            with open(_EQUIPMENT_LEDGER_CACHE, "r", encoding="utf-8") as f:
+                return json.load(f).get("data")
+        except Exception as e:
+            logger.warning("加载设备台账缓存失败: %s", e)
+            return None
 
 
 def clear_equipment_ledger_cache() -> None:
     """删除设备台账缓存文件。"""
-    if _EQUIPMENT_LEDGER_CACHE.exists():
-        _EQUIPMENT_LEDGER_CACHE.unlink()
+    with _ledger_cache_lock:
+        if _EQUIPMENT_LEDGER_CACHE.exists():
+            _EQUIPMENT_LEDGER_CACHE.unlink()
 
 
 def has_equipment_ledger_cache() -> bool:
-    return _EQUIPMENT_LEDGER_CACHE.exists()
+    with _ledger_cache_lock:
+        return _EQUIPMENT_LEDGER_CACHE.exists()
 
 
 def save_oil_ledger_cache(records: list[dict]) -> None:
     """将油品台账记录缓存为 JSON 文件。"""
-    _ensure_data_dir()
-    with open(_OIL_LEDGER_CACHE, "w", encoding="utf-8") as f:
-        json.dump({"data": records}, f, ensure_ascii=False, indent=2, cls=_LedgerEncoder)
+    with _ledger_cache_lock:
+        _ensure_data_dir()
+        tmp = _OIL_LEDGER_CACHE.with_suffix(".json.tmp")
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump({"data": records}, f, ensure_ascii=False, indent=2, cls=_LedgerEncoder)
+            tmp.replace(_OIL_LEDGER_CACHE)
+        finally:
+            if tmp.exists():
+                tmp.unlink()
 
 
 def load_oil_ledger_cache() -> list[dict] | None:
     """加载油品台账缓存，不存在时返回 None。"""
-    if not _OIL_LEDGER_CACHE.exists():
-        return None
-    try:
-        with open(_OIL_LEDGER_CACHE, "r", encoding="utf-8") as f:
-            return json.load(f).get("data")
-    except Exception as e:
-        logger.warning("加载油品台账缓存失败: %s", e)
-        return None
+    with _ledger_cache_lock:
+        if not _OIL_LEDGER_CACHE.exists():
+            return None
+        try:
+            with open(_OIL_LEDGER_CACHE, "r", encoding="utf-8") as f:
+                return json.load(f).get("data")
+        except Exception as e:
+            logger.warning("加载油品台账缓存失败: %s", e)
+            return None
 
 
 def clear_oil_ledger_cache() -> None:
     """删除油品台账缓存文件。"""
-    if _OIL_LEDGER_CACHE.exists():
-        _OIL_LEDGER_CACHE.unlink()
+    with _ledger_cache_lock:
+        if _OIL_LEDGER_CACHE.exists():
+            _OIL_LEDGER_CACHE.unlink()
 
 
 def has_oil_ledger_cache() -> bool:
-    return _OIL_LEDGER_CACHE.exists()
+    with _ledger_cache_lock:
+        return _OIL_LEDGER_CACHE.exists()
 
 
 # ---------------------------------------------------------------------------
