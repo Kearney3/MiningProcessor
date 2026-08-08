@@ -699,6 +699,7 @@ function MergeCard({
   const [keyword, setKeyword] = useState("");
   const [stripTime, setStripTime] = useState(false);
   const [tolerantHeader, setTolerantHeader] = useState(false);
+  const [dedup, setDedup] = useState(false);
   const [sortConfigs, setSortConfigs] = useState<SortConfig[]>([]);
   const [nextId, setNextId] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -730,6 +731,7 @@ function MergeCard({
         keyword,
         strip_time: stripTime,
         tolerant_header: tolerantHeader,
+        dedup,
         sort_configs: sortConfigs
           .filter((s) => s.column.trim() !== "")
           .map((s) => ({ column: s.column.trim(), ascending: s.ascending })),
@@ -779,6 +781,15 @@ function MergeCard({
           className="rounded border-slate-300"
         />
         兼容表头
+      </label>
+      <label className="mt-1 flex items-center gap-1.5 text-xs text-slate-600">
+        <input
+          type="checkbox"
+          checked={dedup}
+          onChange={(e) => setDedup(e.target.checked)}
+          className="rounded border-slate-300"
+        />
+        去除重复记录
       </label>
 
       {/* Sort configuration */}

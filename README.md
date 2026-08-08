@@ -3,7 +3,7 @@
 > 矿山运营 Excel 报表批量处理工具
 
 <p>
-  <img src="https://img.shields.io/badge/version-v2.3.0-blue?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-v2.4.0-blue?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/Python-≥3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="python" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square" alt="license" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="platform" />
@@ -430,6 +430,26 @@ uv run scripts/bump_version.py --bump minor --dry-run
 ---
 
 ## 📋 更新日志
+
+### v2.4.0 · 2026-08-08
+
+- 🆕 **文件合并去重开关**
+  - `excel_merger` 新增 `dedup` 参数，合并后可选对每个 Sheet 执行全列去重（移除完全重复的行）
+  - Flet / Tauri / CLI 三端同步支持，默认关闭
+  - Flet 合并模块 UI 重构：路径、关键字、选项分层布局，关键字输入框自适应宽度
+- 🆕 **台账匹配模块增强**
+  - 台账匹配支持列顺序调整、日期格式化、多 Sheet 导出、导出菜单
+- 🆕 **数据同步冲突策略**
+  - 同步模块新增冲突策略选项（SKIP / UPDATE / REJECT）
+- 🆕 **用户配置还原**
+  - 用户配置页面增加「还原为默认配置」按钮（Flet + Tauri）
+- 🐛 **Bug 修复**
+  - 修复 LLM 标注统计为 0 的问题
+  - 修复 Anthropic 模型获取 404 错误
+  - 修复 GUI 异常显示问题
+  - 修复 `equipmentCode` 到 `sourceEquipmentCode` 迁移丢失问题
+  - 修复 `company` → `sourceCompany` 字段未对齐 Prisma schema
+  - 修复列映射运行时旧字段名未自动迁移
 
 ### v2.3.0 · 2026-08-06
 

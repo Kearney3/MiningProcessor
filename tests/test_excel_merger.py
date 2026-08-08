@@ -289,3 +289,44 @@ class TestMergeExcelFiles:
         out = merge_excel_files(str(tmp_path), "数据", strip_time=True)
         result = pd.read_excel(out)
         assert len(result) == 2
+
+    def test_dedup_removes_duplicate_rows(self, tmp_path):
+        """dedup=True 应移除跨文件的完全重复行"""
+        _make_excel(tmp_path / "数据_A.xlsx", {"日期": ["2025-01-01", "2025-01-01"], "值": [10, 10]})
+        _make_excel(tmp_path / "数据_B.xlsx", {"日期": ["2025-01-01"], "值": [10]})
+
+        out = merge_excel_files(str(tmp_path), "数据", dedup=True)
+        result = pd.read_excel(out)
+        assert len(result) == 1
+        assert result["值"].iloc[0] == 10
+
+    def test_dedup_keeps_unique_rows(self, tmp_path):
+        """dedup=True 保留不重复的行"""
+        _make_excel(tmp_path / "数据_A.xlsx", {"日期": ["2025-01-01"], "值": [10]})
+        _make_excel(tmp_path / "数据_B.xlsx", {"日期": ["2025-01-02"], "值": [20]})
+
+        out = merge_excel_files(str(tmp_path), "数据", dedup=True)
+        result = pd.read_excel(out)
+        assert len(result) == 2
+
+    def test_dedup_false_keeps_duplicates(self, tmp_path):
+        """dedup=False（默认）保留所有行，不去重"""
+        _make_excel(tmp_path / "数据_A.xlsx", {"日期": ["2025-01-01"], "值": [10]})
+        _make_excel(tmp_path / "数据_B.xlsx", {"日期": ["2025-01-01"], "值": [10]})
+
+        out = merge_excel_files(str(tmp_path), "数据", dedup=False)
+        result = pd.read_excel(out)
+        assert len(result) == 2
+
+    def test_dedup_multiple_sheets(self, tmp_path):
+        """dedup=True 对每个 Sheet 独立去重"""
+        df1 = pd.DataFrame({"值": [1, 1, 2]})
+        df2 = pd.DataFrame({"值": [1, 3]})
+        with pd.ExcelWriter(tmp_path / "数据_A.xlsx") as w:
+            df1.to_excel(w, sheet_name="表1", index=False)
+        with pd.ExcelWriter(tmp_path / "数据_B.xlsx") as w:
+            df2.to_excel(w, sheet_name="表1", index=False)
+
+        out = merge_excel_files(str(tmp_path), "数据", dedup=True)
+        result = pd.read_excel(out, sheet_name="表1")
+        assert len(result) == 3  # 值为 1, 2, 3

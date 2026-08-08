@@ -356,6 +356,7 @@ def _process_merge(params: dict) -> dict:
         strip_time=params.get("strip_time", False),
         sort_configs=params.get("sort_configs"),
         tolerant_header=params.get("tolerant_header", False),
+        dedup=params.get("dedup", False),
         **common,
     )
 
