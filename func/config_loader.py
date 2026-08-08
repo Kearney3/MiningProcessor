@@ -878,15 +878,16 @@ def test_llm_connection(config: dict[str, Any] | None = None) -> dict[str, Any]:
     fmt = config.get("format", "openai")
     if not url:
         return {"success": False, "models": [], "error": "未配置接口 URL"}
-    if fmt == "anthropic":
-        models_url = url.rstrip("/") + "/v1/models"
-    else:
-        base = url.rstrip("/")
-        if base.endswith("/chat/completions"):
-            base = base.rsplit("/chat/completions", 1)[0]
-        if not base.endswith("/v1"):
-            base = base + "/v1"
-        models_url = base + "/models"
+
+    base = url.rstrip("/")
+    if base.endswith("/chat/completions"):
+        base = base.rsplit("/chat/completions", 1)[0]
+    if base.endswith("/v1/messages"):
+        base = base.rsplit("/v1/messages", 1)[0]
+    if not base.endswith("/v1"):
+        base = base + "/v1"
+    models_url = base + "/models"
+
     headers: dict[str, str] = {"Accept": "application/json"}
     if fmt == "anthropic":
         if api_key:
@@ -914,8 +915,17 @@ def test_llm_connection(config: dict[str, Any] | None = None) -> dict[str, Any]:
         else:
             models = []
         return {"success": True, "models": sorted(models), "error": ""}
+    except urllib.error.HTTPError as exc:
+        # 代理可能不支持 /v1/models 端点（404/405），返回空列表让用户手动输入
+        if exc.code in (404, 405):
+            return {
+                "success": True,
+                "models": [],
+                "error": "该接口不支持自动获取模型列表，请手动输入模型名称",
+            }
+        return {"success": False, "models": [], "error": f"{exc} (URL: {models_url})"}
     except Exception as exc:
-        return {"success": False, "models": [], "error": str(exc)}
+        return {"success": False, "models": [], "error": f"{exc} (URL: {models_url})"}
 
 
 # ---------------------------------------------------------------------------

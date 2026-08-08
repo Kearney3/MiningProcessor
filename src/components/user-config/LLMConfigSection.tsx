@@ -113,15 +113,19 @@ export function LLMConfigSection({ bridge }: { bridge: BridgeProp }) {
     setFetchResult(null);
     try {
       const apiKey = apiKeySaved && config.api_key === MASKED ? "" : config.api_key;
-      const res = await bridge.call<{ success: boolean; message: string; models: string[] }>(
+      const res = await bridge.call<{ success: boolean; error: string; models: string[] }>(
         "test_llm_connection",
         { url: config.url, api_key: apiKey, format: config.format },
       );
       if (res.success && Array.isArray(res.models)) {
         setModels(res.models);
-        setFetchResult({ msg: res.message || `获取到 ${res.models.length} 个模型`, ok: true });
+        if (res.models.length > 0) {
+          setFetchResult({ msg: `获取到 ${res.models.length} 个模型`, ok: true });
+        } else {
+          setFetchResult({ msg: res.error || "未返回模型，请手动输入模型名称", ok: true });
+        }
       } else {
-        setFetchResult({ msg: res.message || "获取模型失败", ok: false });
+        setFetchResult({ msg: res.error || "获取模型失败", ok: false });
       }
     } catch (e) {
       setFetchResult({ msg: `请求异常: ${String(e)}`, ok: false });
@@ -233,16 +237,21 @@ export function LLMConfigSection({ bridge }: { bridge: BridgeProp }) {
         <div>
           <label className="text-xs font-medium text-slate-500 mb-1 block">模型</label>
           <div className="flex gap-2">
-            <select
-              value={config.model}
-              onChange={(e) => updateField("model", e.target.value)}
-              className="input flex-1"
-            >
-              <option value="">-- 请选择模型 --</option>
-              {models.map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
+            <div className="relative flex-1">
+              <input
+                type="text"
+                list="llm-model-list"
+                value={config.model}
+                onChange={(e) => updateField("model", e.target.value)}
+                placeholder="选择或输入模型名称"
+                className="input w-full"
+              />
+              <datalist id="llm-model-list">
+                {models.map((m) => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
+            </div>
             <button
               onClick={fetchModels}
               disabled={fetchingModels}

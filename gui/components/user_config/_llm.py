@@ -1,4 +1,6 @@
 """LLM 标注配置区域组件。"""
+import logging
+
 import flet as ft
 
 try:
@@ -15,7 +17,7 @@ def _create_llm_config_section(page: ft.Page, log):
 
     llm_url = ft.TextField(label="接口 URL", hint_text="https://api.example.com/v1", expand=True, color=theme.TEXT_PRIMARY)
     llm_api_key = ft.TextField(label="API Key", password=True, can_reveal_password=True, expand=True, color=theme.TEXT_PRIMARY)
-    llm_model = ft.Dropdown(label="模型", expand=True, options=[], hint_text="点击「获取模型」加载列表")
+    llm_model = ft.Dropdown(label="模型", expand=True, options=[], hint_text="点击「获取模型」加载列表", editable=True)
     llm_format = ft.Dropdown(
         label="接口格式",
         width=160,
@@ -98,13 +100,19 @@ def _create_llm_config_section(page: ft.Page, log):
                     llm_model.options = [ft.dropdown.Option(m) for m in models]
                     if models and not llm_model.value:
                         llm_model.value = models[0]
-                    llm_test_result.value = f"获取到 {len(models)} 个模型"
-                    llm_test_result.color = theme.TEXT_PRIMARY
-                    _log_message(log, f"获取到 {len(models)} 个可用模型")
+                    info = result.get("error", "")
+                    if models:
+                        llm_test_result.value = f"获取到 {len(models)} 个模型"
+                        llm_test_result.color = theme.TEXT_PRIMARY
+                        _log_message(log, f"获取到 {len(models)} 个可用模型")
+                    else:
+                        llm_test_result.value = info or "未返回模型，请手动输入模型名称"
+                        llm_test_result.color = ft.Colors.ORANGE
+                        _log_message(log, info or "接口未返回模型列表，可手动输入模型名称")
                 else:
                     llm_test_result.value = f"连接失败: {result['error']}"
                     llm_test_result.color = ft.Colors.RED
-                    _log_message(log.error, f"LLM 接口连接失败: {result['error']}")
+                    _log_message(log, f"LLM 接口连接失败: {result['error']}", level=logging.ERROR)
                 try:
                     page.update()
                 except (RuntimeError, AttributeError):
