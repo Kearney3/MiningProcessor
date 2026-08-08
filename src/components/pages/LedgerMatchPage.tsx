@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import type { BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
@@ -9,7 +9,7 @@ import {
   SearchIcon, LayersIcon, PlayIcon, DownloadIcon, TrashIcon,
   ColumnsIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon,
   ArrowUpIcon, ArrowDownIcon, ChevronsUpDownIcon, LoaderIcon,
-  AlertCircleIcon, InfoIcon, TableIcon,
+  AlertCircleIcon, InfoIcon, TableIcon, CheckCircleIcon,
 } from "../../lib/icons";
 import { ToggleSwitch } from "../../lib/ui-components";
 
@@ -29,9 +29,82 @@ interface SortState {
   direction: "asc" | "desc";
 }
 
+interface SheetConfig {
+  nameToggle: MatchToggle;
+  idToggle: MatchToggle;
+  oilToggle: MatchToggle;
+  hasDualColumns: boolean;
+  dualTruckCol: string;
+  dualExcavatorCol: string;
+}
+
+interface SheetData {
+  columns: string[];
+  rows: Record<string, unknown>[];
+}
+
+interface SheetState {
+  raw: SheetData;           // original imported data
+  matched: SheetData | null; // after matching (null = not yet matched)
+  config: SheetConfig;
+  matchedCount: number;
+  unmatchedCount: number;
+}
+
+const EMPTY_CONFIG: SheetConfig = {
+  nameToggle: { enabled: false, column: "" },
+  idToggle: { enabled: false, column: "" },
+  oilToggle: { enabled: false, column: "" },
+  hasDualColumns: false,
+  dualTruckCol: "",
+  dualExcavatorCol: "",
+};
+
 // ---------------------------------------------------------------------------
-// Toggle Switch (w-8 h-5, restrained style — no color flash)
+// Auto-detection helpers
 // ---------------------------------------------------------------------------
+
+const autoDetectNameColumn = (cols: string[]): string =>
+  cols.find((c) => /名称|设备|矿卡|挖机/.test(c) && !/油品|油种|编号|ID/i.test(c)) || "";
+
+const autoDetectIdColumn = (cols: string[]): string =>
+  cols.find((c) => /编号|ID/i.test(c)) || "";
+
+const autoDetectOilColumn = (cols: string[]): string =>
+  cols.find((c) => /油品|油种/.test(c)) || "";
+
+const autoDetectDualColumns = (cols: string[]) => {
+  const truckCol = cols.find((c) => /矿卡.*名称|矿卡名称/.test(c)) || "";
+  const excavCol = cols.find((c) => /挖机.*名称|挖机名称/.test(c)) || "";
+  return { truckCol, excavCol };
+};
+
+function buildAutoConfig(columns: string[]): SheetConfig {
+  const detectedName = autoDetectNameColumn(columns);
+  const detectedId = autoDetectIdColumn(columns);
+  const detectedOil = autoDetectOilColumn(columns);
+  const { truckCol, excavCol } = autoDetectDualColumns(columns);
+
+  const hasDual = !!(truckCol && excavCol);
+
+  return {
+    nameToggle: {
+      enabled: hasDual ? true : !!detectedName,
+      column: hasDual ? truckCol : detectedName,
+    },
+    idToggle: {
+      enabled: !!detectedId && !detectedName && !hasDual,
+      column: detectedId,
+    },
+    oilToggle: {
+      enabled: !!detectedOil,
+      column: detectedOil,
+    },
+    hasDualColumns: hasDual,
+    dualTruckCol: truckCol,
+    dualExcavatorCol: excavCol,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Main Component
@@ -43,11 +116,8 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
   const [filePath, setFilePath] = useState("");
   const [sheetName, setSheetName] = useState("");
   const [availableSheets, setAvailableSheets] = useState<string[]>([]);
-  const [columns, setColumns] = useState<string[]>([]);
-  const [rows, setRows] = useState<Record<string, unknown>[]>([]);
+  const [sheetStates, setSheetStates] = useState<Record<string, SheetState>>({});
   const [viewMode, setViewMode] = useState<ViewMode>("all");
-  const [matchedCount, setMatchedCount] = useState(0);
-  const [unmatchedCount, setUnmatchedCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [matching, setMatching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,34 +126,46 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [dateOnly, setDateOnly] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 20;
 
-  // Independent match toggles
-  const [nameToggle, setNameToggle] = useState<MatchToggle>({ enabled: false, column: "" });
-  const [idToggle, setIdToggle] = useState<MatchToggle>({ enabled: false, column: "" });
-  const [oilToggle, setOilToggle] = useState<MatchToggle>({ enabled: false, column: "" });
+  // Derived state for current sheet
+  const currentState = sheetStates[sheetName] || null;
+  const currentConfig = currentState?.config ?? EMPTY_CONFIG;
 
-  // Dual-column production matching
-  const [hasDualColumns, setHasDualColumns] = useState(false);
-  const [dualTruckCol, setDualTruckCol] = useState("");
-  const [dualExcavatorCol, setDualExcavatorCol] = useState("");
+  // Display data: matched result if available, otherwise raw
+  const displayData: SheetData = currentState?.matched ?? currentState?.raw ?? { columns: [], rows: [] };
+  const columns = displayData.columns;
+  const rows = displayData.rows;
+  const matchedCount = currentState?.matchedCount ?? 0;
+  const unmatchedCount = currentState?.unmatchedCount ?? 0;
 
-  // --- Auto-detection helpers ---
+  // --- Save current sheet's config back to sheetStates ---
+  const saveCurrentConfig = useCallback((config: SheetConfig) => {
+    if (!sheetName) return;
+    setSheetStates((prev) => {
+      const existing = prev[sheetName];
+      if (!existing) return prev;
+      return { ...prev, [sheetName]: { ...existing, config } };
+    });
+  }, [sheetName]);
 
-  const autoDetectNameColumn = (cols: string[]): string =>
-    cols.find((c) => /名称|设备|矿卡|挖机/.test(c) && !/油品|油种|编号|ID/i.test(c)) || "";
-
-  const autoDetectIdColumn = (cols: string[]): string =>
-    cols.find((c) => /编号|ID/i.test(c)) || "";
-
-  const autoDetectOilColumn = (cols: string[]): string =>
-    cols.find((c) => /油品|油种/.test(c)) || "";
-
-  const autoDetectDualColumns = (cols: string[]) => {
-    const truckCol = cols.find((c) => /矿卡.*名称|矿卡名称/.test(c)) || "";
-    const excavCol = cols.find((c) => /挖机.*名称|挖机名称/.test(c)) || "";
-    return { truckCol, excavCol };
+  // --- Toggle handlers (update both local UI + persist to sheetStates) ---
+  const updateNameToggle = (patch: Partial<MatchToggle>) => {
+    const next = { ...currentConfig.nameToggle, ...patch };
+    const config = { ...currentConfig, nameToggle: next };
+    saveCurrentConfig(config);
+  };
+  const updateIdToggle = (patch: Partial<MatchToggle>) => {
+    const next = { ...currentConfig.idToggle, ...patch };
+    const config = { ...currentConfig, idToggle: next };
+    saveCurrentConfig(config);
+  };
+  const updateOilToggle = (patch: Partial<MatchToggle>) => {
+    const next = { ...currentConfig.oilToggle, ...patch };
+    const config = { ...currentConfig, oilToggle: next };
+    saveCurrentConfig(config);
   };
 
   // --- File operations ---
@@ -104,19 +186,13 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
   };
 
   const resetData = () => {
-    setRows([]);
-    setColumns([]);
+    setSheetStates({});
     setAvailableSheets([]);
-    setMatchedCount(0);
-    setUnmatchedCount(0);
+    setSheetName("");
+    setViewMode("all");
     setSort(null);
     setPage(0);
-    setNameToggle({ enabled: false, column: "" });
-    setIdToggle({ enabled: false, column: "" });
-    setOilToggle({ enabled: false, column: "" });
-    setHasDualColumns(false);
-    setDualTruckCol("");
-    setDualExcavatorCol("");
+    setDateOnly(false);
   };
 
   const loadSheets = async (path: string) => {
@@ -126,7 +202,8 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
       const res = await bridge.call<{ sheets: string[] }>("list_excel_sheets", { path });
       setAvailableSheets(res.sheets || []);
       if (res.sheets?.length) {
-        setSheetName(res.sheets[0]);
+        // Auto-load first sheet
+        await loadSheetData(path, res.sheets[0]);
       }
     } catch (e) {
       setError(String(e));
@@ -135,116 +212,146 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
     }
   };
 
-  const loadSheet = async () => {
-    if (!filePath || !sheetName) return;
+  const loadSheetData = async (path: string, sheet: string) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await bridge.call<{ columns: string[]; rows: Record<string, unknown>[] }>(
+      const res = await bridge.call<{ columns: string[]; rows: Record<string, unknown>[]; total: number; truncated: boolean }>(
         "read_excel_sheet",
-        { path: filePath, sheet: sheetName }
+        { path, sheet }
       );
       const cols = res.columns || [];
       const rowData = res.rows || [];
-      setColumns(cols);
-      setRows(rowData);
-      setMatchedCount(0);
-      setUnmatchedCount(0);
+      const autoConfig = buildAutoConfig(cols);
+
+      setSheetStates((prev) => ({
+        ...prev,
+        [sheet]: {
+          raw: { columns: cols, rows: rowData },
+          matched: null,
+          config: autoConfig,
+          matchedCount: 0,
+          unmatchedCount: 0,
+        },
+      }));
+      setSheetName(sheet);
+      setViewMode("all");
       setSort(null);
       setPage(0);
 
-      // Auto-detect columns
-      const detectedName = autoDetectNameColumn(cols);
-      const detectedId = autoDetectIdColumn(cols);
-      const detectedOil = autoDetectOilColumn(cols);
-      const { truckCol, excavCol } = autoDetectDualColumns(cols);
-
-      setNameToggle({
-        enabled: !!detectedName,
-        column: detectedName,
-      });
-      setIdToggle({
-        enabled: !!detectedId && !detectedName,
-        column: detectedId,
-      });
-      setOilToggle({
-        enabled: !!detectedOil,
-        column: detectedOil,
-      });
-
-      if (truckCol && excavCol) {
-        setHasDualColumns(true);
-        setDualTruckCol(truckCol);
-        setDualExcavatorCol(excavCol);
-        if (!detectedName) {
-          setNameToggle({ enabled: true, column: truckCol });
-        }
+      if (res.truncated) {
+        notify(`Sheet "${sheet}" 共 ${res.total} 行，已全部加载`, "info");
       }
     } catch (e) {
       setError(String(e));
     } finally {
       setLoading(false);
     }
+  };
+
+  // --- Sheet switching ---
+  const handleSheetSwitch = async (newSheet: string) => {
+    if (newSheet === sheetName) return;
+
+    // If we already have state for this sheet, just switch
+    if (sheetStates[newSheet]) {
+      setSheetName(newSheet);
+      setViewMode("all");
+      setSort(null);
+      setPage(0);
+      return;
+    }
+
+    // Otherwise load from file
+    await loadSheetData(filePath, newSheet);
   };
 
   // --- Matching ---
 
   const handleMatch = async () => {
-    if (!rows.length) return;
-    if (!nameToggle.enabled && !idToggle.enabled && !oilToggle.enabled) {
+    if (!rows.length || !currentState) return;
+    const cfg = currentConfig;
+    if (!cfg.nameToggle.enabled && !cfg.idToggle.enabled && !cfg.oilToggle.enabled) {
       setError("请至少启用一种匹配方式");
       return;
     }
     setMatching(true);
     setError(null);
     try {
-      if (hasDualColumns && dualTruckCol && dualExcavatorCol) {
+      let finalRows: Record<string, unknown>[] = [];
+      let finalCols: string[] = [];
+      let totalMatched = 0;
+      let totalUnmatched = 0;
+
+      const sourceRows = currentState.raw.rows;
+
+      if (cfg.hasDualColumns && cfg.dualTruckCol && cfg.dualExcavatorCol) {
         const truckRes = await bridge.call<{
-          matched: number; unmatched: number; rows: Record<string, unknown>[];
+          matched: number; unmatched: number; rows: Record<string, unknown>[]; columns: string[];
         }>("ledger_match_preview", {
-          rows,
-          name_column: dualTruckCol,
-          oil_column: oilToggle.enabled ? oilToggle.column : null,
+          rows: sourceRows,
+          name_column: cfg.dualTruckCol,
+          oil_column: cfg.oilToggle.enabled ? cfg.oilToggle.column : null,
           mode: "name",
           result_suffix: "矿卡",
         });
         const excavRes = await bridge.call<{
-          matched: number; unmatched: number; rows: Record<string, unknown>[];
+          matched: number; unmatched: number; rows: Record<string, unknown>[]; columns: string[];
         }>("ledger_match_preview", {
           rows: truckRes.rows,
-          name_column: dualExcavatorCol,
-          oil_column: oilToggle.enabled ? oilToggle.column : null,
+          name_column: cfg.dualExcavatorCol,
+          oil_column: cfg.oilToggle.enabled ? cfg.oilToggle.column : null,
           mode: "name",
           result_suffix: "挖机",
         });
-        setRows(excavRes.rows || []);
-        const totalMatched = (excavRes.rows || []).filter((r) =>
+        finalCols = excavRes.columns || (excavRes.rows?.length ? Object.keys(excavRes.rows[0]) : []);
+        // Normalize rows: rebuild each row object with keys in column order
+        finalRows = (excavRes.rows || []).map((row) => {
+          const ordered: Record<string, unknown> = {};
+          for (const c of finalCols) ordered[c] = row[c];
+          return ordered;
+        });
+        totalMatched = finalRows.filter((r) =>
           r["__matched_矿卡"] === true || r["__matched_挖机"] === true
         ).length;
-        const totalUnmatched = (excavRes.rows || []).length - totalMatched;
-        setMatchedCount(totalMatched);
-        setUnmatchedCount(totalUnmatched);
-        if (excavRes.rows?.length) {
-          setColumns(Object.keys(excavRes.rows[0]));
-        }
+        totalUnmatched = finalRows.length - totalMatched;
       } else {
         const res = await bridge.call<{
-          matched: number; unmatched: number; rows: Record<string, unknown>[];
+          matched: number; unmatched: number; rows: Record<string, unknown>[]; columns: string[];
         }>("ledger_match_preview", {
-          rows,
-          name_column: nameToggle.enabled ? nameToggle.column : null,
-          id_column: idToggle.enabled ? idToggle.column : null,
-          oil_column: oilToggle.enabled ? oilToggle.column : null,
-          mode: nameToggle.enabled ? "name" : "id",
+          rows: sourceRows,
+          name_column: cfg.nameToggle.enabled ? cfg.nameToggle.column : null,
+          id_column: cfg.idToggle.enabled ? cfg.idToggle.column : null,
+          oil_column: cfg.oilToggle.enabled ? cfg.oilToggle.column : null,
+          mode: cfg.nameToggle.enabled ? "name" : "id",
         });
-        setRows(res.rows || []);
-        setMatchedCount(res.matched || 0);
-        setUnmatchedCount(res.unmatched || 0);
-        if (res.rows?.length) {
-          setColumns(Object.keys(res.rows[0]));
-        }
+        finalCols = res.columns || (res.rows?.length ? Object.keys(res.rows[0]) : []);
+        // Normalize rows: rebuild each row object with keys in column order
+        finalRows = (res.rows || []).map((row) => {
+          const ordered: Record<string, unknown> = {};
+          for (const c of finalCols) ordered[c] = row[c];
+          return ordered;
+        });
+        totalMatched = res.matched || 0;
+        totalUnmatched = res.unmatched || 0;
       }
-      notify(`匹配完成: ${matchedCount} 匹配, ${unmatchedCount} 未匹配`, "success");
+
+      // Update sheet state with matched results
+      setSheetStates((prev) => {
+        const existing = prev[sheetName];
+        if (!existing) return prev;
+        return {
+          ...prev,
+          [sheetName]: {
+            ...existing,
+            matched: { columns: finalCols, rows: finalRows },
+            matchedCount: totalMatched,
+            unmatchedCount: totalUnmatched,
+          },
+        };
+      });
+
+      notify(`匹配完成: ${totalMatched} 匹配, ${totalUnmatched} 未匹配`, "success");
     } catch (e) {
       setError(String(e));
       notify(`匹配失败: ${e}`, "error");
@@ -262,24 +369,58 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
 
   // --- Export ---
 
-  const handleExport = async (exportAll: boolean) => {
+  const handleExport = async (mode: "current-view" | "current-all" | "all-sheets") => {
     setShowExportMenu(false);
     const outputPath = await save({
       filters: [{ name: "Excel", extensions: ["xlsx"] }],
-      defaultPath: `${sheetName}_matched.xlsx`,
+      defaultPath: mode === "all-sheets" ? "匹配结果.xlsx" : `${sheetName}_匹配结果.xlsx`,
     });
     if (!outputPath) return;
-    const dataToExport = exportAll ? rows : filtered;
-    try {
-      await bridge.call("export_matched_data", {
-        rows: dataToExport,
-        columns,
-        output_path: outputPath,
-      });
-      notify("导出成功", "success");
-    } catch (e) {
-      setError(String(e));
-      notify(`导出失败: ${e}`, "error");
+
+    if (mode === "all-sheets") {
+      // Export all matched sheets as separate tabs
+      const matchedSheets: Record<string, SheetData> = {};
+      for (const [name, state] of Object.entries(sheetStates)) {
+        if (state.matched) {
+          matchedSheets[name] = state.matched;
+        }
+      }
+      const sheetKeys = Object.keys(matchedSheets);
+      if (sheetKeys.length === 0) {
+        notify("没有已匹配的 Sheet 可导出", "info");
+        return;
+      }
+      try {
+        await bridge.call("export_matched_data", {
+          sheets: matchedSheets,
+          output_path: outputPath,
+          date_only: dateOnly,
+        });
+        notify(`导出成功（${sheetKeys.length} 个 Sheet）`, "success");
+      } catch (e) {
+        setError(String(e));
+        notify(`导出失败: ${e}`, "error");
+      }
+    } else {
+      // Export current sheet
+      const data = currentState?.matched ?? currentState?.raw;
+      if (!data) {
+        notify("没有数据可导出", "info");
+        return;
+      }
+      const rowsToExport = mode === "current-view" ? filtered : data.rows;
+      try {
+        await bridge.call("export_matched_data", {
+          rows: rowsToExport,
+          columns: data.columns,
+          output_path: outputPath,
+          date_only: dateOnly,
+        });
+        notify("导出成功", "success");
+      } catch (e) {
+        setError(String(e));
+        notify(`导出失败: ${e}`, "error");
+      }
     }
   };
 
@@ -299,7 +440,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
   // --- Filtering + Sorting + Paging ---
 
   const getMatchStatus = (row: Record<string, unknown>): boolean => {
-    if (hasDualColumns) {
+    if (currentConfig.hasDualColumns) {
       return row["__matched_矿卡"] === true || row["__matched_挖机"] === true;
     }
     return row["__matched"] === true;
@@ -325,7 +466,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
 
   const displayColumns = columns.filter((c) => !c.startsWith("__matched"));
 
-  const anyToggleEnabled = nameToggle.enabled || idToggle.enabled || oilToggle.enabled;
+  const anyToggleEnabled = currentConfig.nameToggle.enabled || currentConfig.idToggle.enabled || currentConfig.oilToggle.enabled;
 
   const handleExportBlur = () => {
     setTimeout(() => setShowExportMenu(false), 150);
@@ -341,6 +482,9 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
     matched: matchedCount,
     unmatched: unmatchedCount,
   };
+
+  // Count sheets with matched results
+  const matchedSheetCount = Object.values(sheetStates).filter((s) => s.matched).length;
 
   // -----------------------------------------------------------------------
   // Render
@@ -418,27 +562,34 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
           <div className="flex items-center gap-2">
             <span className="shrink-0"><ColumnsIcon /></span>
             <div className="flex gap-1 overflow-x-auto">
-              {availableSheets.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setSheetName(s)}
-                  className={`text-xs px-3 py-1.5 rounded-md whitespace-nowrap transition-colors ${
-                    sheetName === s
-                      ? "bg-white border border-slate-200 shadow-sm text-slate-800 font-medium"
-                      : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
+              {availableSheets.map((s) => {
+                const hasState = !!sheetStates[s];
+                const isMatched = !!sheetStates[s]?.matched;
+                return (
+                  <button
+                    key={s}
+                    onClick={() => handleSheetSwitch(s)}
+                    className={`text-xs px-3 py-1.5 rounded-md whitespace-nowrap transition-colors flex items-center gap-1 ${
+                      sheetName === s
+                        ? "bg-white border border-slate-200 shadow-sm text-slate-800 font-medium"
+                        : isMatched
+                          ? "text-emerald-600 hover:text-emerald-700 bg-emerald-50"
+                          : hasState
+                            ? "text-slate-600 hover:text-slate-700"
+                            : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    {isMatched && <CheckCircleIcon />}
+                    {s}
+                  </button>
+                );
+              })}
             </div>
-            <button
-              onClick={loadSheet}
-              disabled={loading}
-              className={`${btnPrimaryClass} ml-auto shrink-0`}
-            >
-              {loading ? <><LoaderIcon /> 加载中</> : "加载"}
-            </button>
+            {matchedSheetCount > 0 && (
+              <span className="text-xs text-emerald-600 ml-2 shrink-0">
+                {matchedSheetCount}/{availableSheets.length} 已匹配
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -449,6 +600,9 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
           <h3 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
             <span className="text-slate-400"><SearchIcon /></span>
             匹配配置
+            {sheetName && (
+              <span className="text-xs text-slate-400 font-normal">— {sheetName}</span>
+            )}
           </h3>
 
           {/* Three independent toggles in a flex row */}
@@ -456,20 +610,20 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
             {/* Name match */}
             <div className="flex items-center gap-3">
               <ToggleSwitch
-                checked={nameToggle.enabled}
-                onChange={(v) => setNameToggle((p) => ({ ...p, enabled: v }))}
+                checked={currentConfig.nameToggle.enabled}
+                onChange={(v) => updateNameToggle({ enabled: v })}
               />
-              <span className={`text-sm ${nameToggle.enabled ? "text-slate-800 font-medium" : "text-slate-500"}`}>
+              <span className={`text-sm ${currentConfig.nameToggle.enabled ? "text-slate-800 font-medium" : "text-slate-500"}`}>
                 <span className="inline-flex items-center gap-1"><TagIcon /> 设备名称</span>
               </span>
               <select
-                value={nameToggle.column}
-                onChange={(e) => setNameToggle((p) => ({ ...p, column: e.target.value }))}
-                disabled={!nameToggle.enabled}
+                value={currentConfig.nameToggle.column}
+                onChange={(e) => updateNameToggle({ column: e.target.value })}
+                disabled={!currentConfig.nameToggle.enabled}
                 className={`${inputClass} text-xs disabled:opacity-40 disabled:cursor-not-allowed w-40`}
               >
                 <option value="">选择列</option>
-                {columns.map((c) => (
+                {currentState?.raw.columns.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
@@ -478,20 +632,20 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
             {/* ID match */}
             <div className="flex items-center gap-3">
               <ToggleSwitch
-                checked={idToggle.enabled}
-                onChange={(v) => setIdToggle((p) => ({ ...p, enabled: v }))}
+                checked={currentConfig.idToggle.enabled}
+                onChange={(v) => updateIdToggle({ enabled: v })}
               />
-              <span className={`text-sm ${idToggle.enabled ? "text-slate-800 font-medium" : "text-slate-500"}`}>
+              <span className={`text-sm ${currentConfig.idToggle.enabled ? "text-slate-800 font-medium" : "text-slate-500"}`}>
                 <span className="inline-flex items-center gap-1"><HashIcon /> 设备编号</span>
               </span>
               <select
-                value={idToggle.column}
-                onChange={(e) => setIdToggle((p) => ({ ...p, column: e.target.value }))}
-                disabled={!idToggle.enabled}
+                value={currentConfig.idToggle.column}
+                onChange={(e) => updateIdToggle({ column: e.target.value })}
+                disabled={!currentConfig.idToggle.enabled}
                 className={`${inputClass} text-xs disabled:opacity-40 disabled:cursor-not-allowed w-40`}
               >
                 <option value="">选择列</option>
-                {columns.map((c) => (
+                {currentState?.raw.columns.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
@@ -500,20 +654,20 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
             {/* Oil match */}
             <div className="flex items-center gap-3">
               <ToggleSwitch
-                checked={oilToggle.enabled}
-                onChange={(v) => setOilToggle((p) => ({ ...p, enabled: v }))}
+                checked={currentConfig.oilToggle.enabled}
+                onChange={(v) => updateOilToggle({ enabled: v })}
               />
-              <span className={`text-sm ${oilToggle.enabled ? "text-slate-800 font-medium" : "text-slate-500"}`}>
+              <span className={`text-sm ${currentConfig.oilToggle.enabled ? "text-slate-800 font-medium" : "text-slate-500"}`}>
                 <span className="inline-flex items-center gap-1"><DropletIcon /> 油品</span>
               </span>
               <select
-                value={oilToggle.column}
-                onChange={(e) => setOilToggle((p) => ({ ...p, column: e.target.value }))}
-                disabled={!oilToggle.enabled}
+                value={currentConfig.oilToggle.column}
+                onChange={(e) => updateOilToggle({ column: e.target.value })}
+                disabled={!currentConfig.oilToggle.enabled}
                 className={`${inputClass} text-xs disabled:opacity-40 disabled:cursor-not-allowed w-40`}
               >
                 <option value="">选择列</option>
-                {columns.map((c) => (
+                {currentState?.raw.columns.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
               </select>
@@ -521,21 +675,39 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
           </div>
 
           {/* Dual-column detection notice */}
-          {hasDualColumns && (
+          {currentConfig.hasDualColumns && (
             <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-slate-400"><InfoIcon /></span>
                 <span className="text-xs font-medium text-slate-600">双列生产模式已检测</span>
               </div>
               <div className="flex gap-4 text-xs text-slate-500">
-                <span>矿卡列: <code className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-xs">{dualTruckCol}</code></span>
-                <span>挖机列: <code className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-xs">{dualExcavatorCol}</code></span>
+                <span>矿卡列: <code className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-xs">{currentConfig.dualTruckCol}</code></span>
+                <span>挖机列: <code className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-xs">{currentConfig.dualExcavatorCol}</code></span>
               </div>
               <p className="text-xs text-slate-400 mt-1">
                 匹配结果将生成 "标准设备名称（矿卡）" 和 "标准设备名称（挖机）" 两列
               </p>
             </div>
           )}
+
+          {/* Export options */}
+          <div className="flex items-center gap-6 mb-4 pt-3 border-t border-slate-100">
+            <div className="flex items-center gap-2">
+              <ToggleSwitch
+                checked={dateOnly}
+                onChange={setDateOnly}
+              />
+              <span className={`text-sm ${dateOnly ? "text-slate-800 font-medium" : "text-slate-500"}`}>
+                日期格式 YYYY-MM-DD
+              </span>
+            </div>
+            {matchedSheetCount > 1 && (
+              <span className="text-xs text-emerald-600">
+                已匹配 {matchedSheetCount} 个 sheet，导出时将作为独立工作表
+              </span>
+            )}
+          </div>
 
           {/* Match button + inline stats */}
           <div className="flex items-center gap-4 flex-wrap">
@@ -598,22 +770,36 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 <ChevronDownIcon />
               </button>
               {showExportMenu && (
-                <div className="absolute right-0 mt-1.5 w-48 bg-white border border-slate-200 rounded-md z-20 py-1">
+                <div className="absolute right-0 mt-1.5 w-56 bg-white border border-slate-200 rounded-md z-20 py-1">
+                  <div className="px-3 py-1 text-[10px] font-medium text-slate-400 uppercase tracking-wider">
+                    当前 Sheet：{sheetName}
+                  </div>
                   <button
-                    onMouseDown={() => handleExport(false)}
+                    onMouseDown={() => handleExport("current-view")}
                     className="w-full text-left px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center justify-between transition-colors"
                   >
                     导出当前视图
-                    <span className="text-xs text-slate-400 tabular-nums">{sorted.length}</span>
+                    <span className="text-xs text-slate-400 tabular-nums">{sorted.length} 行</span>
                   </button>
-                  <div className="mx-2 border-t border-slate-100 my-0.5" />
                   <button
-                    onMouseDown={() => handleExport(true)}
+                    onMouseDown={() => handleExport("current-all")}
                     className="w-full text-left px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center justify-between transition-colors"
                   >
-                    导出全部
-                    <span className="text-xs text-slate-400 tabular-nums">{rows.length}</span>
+                    导出该 Sheet 全部
+                    <span className="text-xs text-slate-400 tabular-nums">{displayData.rows.length} 行</span>
                   </button>
+                  {matchedSheetCount > 1 && (
+                    <>
+                      <div className="mx-2 border-t border-slate-100 my-1" />
+                      <button
+                        onMouseDown={() => handleExport("all-sheets")}
+                        className="w-full text-left px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center justify-between transition-colors"
+                      >
+                        导出所有已匹配 Sheet
+                        <span className="text-xs text-emerald-600 tabular-nums">{matchedSheetCount} 个</span>
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -659,7 +845,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 {paged.map((row, i) => {
                   const matched = getMatchStatus(row);
                   const isUnmatched = !matched && (
-                    row["__matched"] === false || (hasDualColumns && row["__matched_矿卡"] === false && row["__matched_挖机"] === false)
+                    row["__matched"] === false || (currentConfig.hasDualColumns && row["__matched_矿卡"] === false && row["__matched_挖机"] === false)
                   );
                   return (
                     <tr

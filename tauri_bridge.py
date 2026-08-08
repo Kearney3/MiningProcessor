@@ -425,6 +425,10 @@ def _process_maintenance_llm(params: dict) -> dict:
         category_column=params.get("category_column", "大类"),
         minor_column=params.get("minor_column", "小类"),
         status_column=params.get("status_column", "分类方式"),
+        date_column=params.get("date_column"),
+        device_column=params.get("device_column"),
+        model_column=params.get("model_column"),
+        hours_column=params.get("hours_column"),
         filter_values=params.get("filter_values"),
         export_mode=params.get("export_mode", "statistics"),
         concurrency=llm_config.get("concurrency", 10),
@@ -1002,22 +1006,29 @@ def _list_excel_sheets(params: dict) -> dict:
 
 @_register("read_excel_sheet")
 def _read_excel_sheet(params: dict) -> dict:
-    """读取指定 Sheet 的数据（默认限制 5000 行）。"""
+    """读取指定 Sheet 的数据。
+
+    max_rows=0 或不传表示不限制行数。
+    """
     import pandas as pd
     safe_path = str(_sanitize_path(params["path"], must_exist=True, allow_dir=False))
-    max_rows = params.get("max_rows", 5000)
+    max_rows = params.get("max_rows", 0)
     df = pd.read_excel(safe_path, sheet_name=params["sheet"])
     columns = [str(c) for c in df.columns]
     total = len(df)
-    if len(df) > max_rows:
+    if max_rows > 0 and len(df) > max_rows:
         df = df.head(max_rows)
     rows = _sanitize_rows(df.to_dict("records"))
-    return {"columns": columns, "rows": rows, "total": total, "truncated": total > max_rows}
+    return {"columns": columns, "rows": rows, "total": total, "truncated": max_rows > 0 and total > max_rows}
 
 
 @_register("ledger_match_preview")
 def _ledger_match_preview(params: dict) -> dict:
-    """对数据行进行台账匹配预览。"""
+    """对数据行进行台账匹配预览。
+
+    Returns:
+        matched, unmatched, rows, columns — columns 保持原始列在前、结果列在后。
+    """
     rows = params["rows"]
     name_col = params.get("name_column")
     id_col = params.get("id_column")
@@ -1028,6 +1039,17 @@ def _ledger_match_preview(params: dict) -> dict:
     # 根据 suffix 生成带后缀的字段名
     def _key(base: str) -> str:
         return f"{base}_{suffix}" if suffix else base
+
+    # 记录原始列顺序（从第一行 key 推断）
+    original_columns = list(rows[0].keys()) if rows else []
+
+    # 结果列名（按添加顺序）
+    result_columns: list[str] = []
+
+    def _track(key: str) -> str:
+        if key not in result_columns:
+            result_columns.append(key)
+        return key
 
     # 加载台账
     from func.orchestration import load_equipment_ledger_from_cache, load_oil_ledger_from_cache
@@ -1044,9 +1066,9 @@ def _ledger_match_preview(params: dict) -> dict:
             if device_id:
                 result = equipment_ledger.match_by_id(device_id)
                 if result:
-                    row[_key("标准设备名称")] = result.get("标准设备名称", result.get("标准名称", ""))
-                    row[_key("标准设备编号")] = result.get("标准设备编号", "")
-                    row[_key("标准公司名称")] = result.get("标准公司名称", "")
+                    row[_track(_key("标准设备名称"))] = result.get("标准设备名称", result.get("标准名称", ""))
+                    row[_track(_key("标准设备编号"))] = result.get("标准设备编号", "")
+                    row[_track(_key("标准公司名称"))] = result.get("标准公司名称", "")
                     matched = True
 
         if not matched and name_col and equipment_ledger:
@@ -1057,9 +1079,9 @@ def _ledger_match_preview(params: dict) -> dict:
                 else:
                     result = equipment_ledger.match_device(device_name)
                 if result:
-                    row[_key("标准设备名称")] = result.get("标准设备名称", result.get("标准名称", ""))
-                    row[_key("标准设备编号")] = result.get("标准设备编号", "")
-                    row[_key("标准公司名称")] = result.get("标准公司名称", "")
+                    row[_track(_key("标准设备名称"))] = result.get("标准设备名称", result.get("标准名称", ""))
+                    row[_track(_key("标准设备编号"))] = result.get("标准设备编号", "")
+                    row[_track(_key("标准公司名称"))] = result.get("标准公司名称", "")
                     matched = True
 
         if oil_col:
@@ -1067,41 +1089,68 @@ def _ledger_match_preview(params: dict) -> dict:
             if oil_name and oil_ledger:
                 oil_result = oil_ledger.match(oil_name)
                 if oil_result:
-                    row["标准油品名称"] = oil_result.get("标准名称", "")
-                    row["匹配方式"] = oil_result.get("匹配方式", "")
-                    row["相似度"] = oil_result.get("相似度", "")
+                    row[_track("标准油品名称")] = oil_result.get("标准名称", "")
+                    row[_track("匹配方式")] = oil_result.get("匹配方式", "")
+                    row[_track("相似度")] = oil_result.get("相似度", "")
                     matched = True
 
         row[_key("__matched")] = matched
         if matched:
             matched_count += 1
 
+    # 最终列顺序 = 原始列 + 结果列 + __matched 标记列
+    matched_key = _key("__matched")
+    final_columns = original_columns + result_columns + [matched_key]
+
     return {
         "matched": matched_count,
         "unmatched": len(rows) - matched_count,
         "rows": _sanitize_rows(rows),
+        "columns": final_columns,
     }
 
 
 @_register("export_matched_data")
 def _export_matched_data(params: dict) -> dict:
-    """将匹配后的数据导出为 Excel。"""
-    import pandas as pd
-    rows = params["rows"]
-    columns = params["columns"]
-    safe_output = str(_sanitize_path(params["output_path"], allow_dir=False))
+    """将匹配后的数据导出为 Excel。
 
-    # 移除内部标记列
-    export_cols = [c for c in columns if c != "__matched"]
-    df = pd.DataFrame(rows)
-    # 确保列顺序
-    for col in export_cols:
-        if col not in df.columns:
-            df[col] = ""
+    Params:
+        rows: 当前 sheet 的数据行（单 sheet 模式）
+        columns: 列名列表
+        output_path: 输出文件路径
+        date_only: bool, 是否使用 YYYY-MM-DD 格式（去除时间）
+        sheets: dict[sheet_name, {columns, rows}] — 多 sheet 模式（优先于 rows/columns）
+    """
+    import pandas as pd
     from func.excel_formatter import write_formatted_excel
 
-    df = df[export_cols]
-    write_formatted_excel(safe_output, {"导出数据": df})
+    safe_output = str(_sanitize_path(params["output_path"], allow_dir=False))
+    date_only = params.get("date_only", False)
+
+    sheets_param = params.get("sheets")
+    if sheets_param:
+        # Multi-sheet mode: each key → separate worksheet tab
+        dfs: dict[str, pd.DataFrame] = {}
+        for tab_name, sheet_data in sheets_param.items():
+            cols = [c for c in sheet_data["columns"] if not c.startswith("__matched")]
+            df = pd.DataFrame(sheet_data["rows"])
+            for col in cols:
+                if col not in df.columns:
+                    df[col] = ""
+            dfs[tab_name] = df[cols]
+        write_formatted_excel(safe_output, dfs, date_only=date_only)
+    else:
+        # Single-sheet mode (legacy)
+        rows = params["rows"]
+        columns = params["columns"]
+        export_cols = [c for c in columns if c != "__matched"]
+        df = pd.DataFrame(rows)
+        for col in export_cols:
+            if col not in df.columns:
+                df[col] = ""
+        df = df[export_cols]
+        write_formatted_excel(safe_output, {"导出数据": df}, date_only=date_only)
+
     return {"output_file": safe_output}
 
 

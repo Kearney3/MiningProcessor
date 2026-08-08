@@ -172,6 +172,50 @@ def _write_sheet_xlsxwriter(
 # ── 公开 API ──────────────────────────────────────────────────────────────
 
 
+def _apply_date_only(df: pd.DataFrame) -> pd.DataFrame:
+    """将 DataFrame 中的日期列统一转为 date-only 值（去除时间部分）。
+
+    支持两种情况：
+    1. 已是 datetime64 dtype → 转为 date 对象
+    2. 字符串列含日期格式（如 '2024-01-15T00:00:00'）→ 解析后转为 date 对象
+
+    返回新 DataFrame，不修改原 df。
+    """
+    import warnings
+
+    changed = False
+    result = df
+    for col in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[col]):
+            if not changed:
+                result = df.copy()
+                changed = True
+            result[col] = result[col].apply(
+                lambda v: v.date() if pd.notna(v) else v
+            )
+        elif pd.api.types.is_string_dtype(df[col]) or df[col].dtype == object:
+            # 尝试解析字符串日期列
+            sample = df[col].dropna().head(20)
+            if sample.empty:
+                continue
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    parsed = pd.to_datetime(sample, errors="coerce")
+                if parsed.notna().mean() >= 0.8:
+                    if not changed:
+                        result = df.copy()
+                        changed = True
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        result[col] = pd.to_datetime(result[col], errors="coerce").apply(
+                            lambda v: v.date() if pd.notna(v) else v
+                        )
+            except (ValueError, TypeError):
+                pass
+    return result
+
+
 def write_formatted_excel(
     output_file: str,
     sheets: dict[str, pd.DataFrame],
@@ -183,6 +227,7 @@ def write_formatted_excel(
     auto_filter: bool = True,
     min_col_width: int = MIN_COL_WIDTH,
     max_col_width: int = MAX_COL_WIDTH,
+    date_only: bool = False,
 ) -> str:
     """写入带格式的 Excel 文件（xlsxwriter 单遍流式）。
 
@@ -202,6 +247,7 @@ def write_formatted_excel(
         auto_filter: 是否启用自动筛选。
         min_col_width: 最小列宽（字符数）。
         max_col_width: 最大列宽（字符数）。
+        date_only: 为 True 时，日期列去除时间部分（支持字符串日期）。
 
     Returns:
         输出文件路径。
@@ -222,6 +268,9 @@ def write_formatted_excel(
 
     for sheet_name, df in sheets.items():
         ws = wb.add_worksheet(sheet_name)
+        # date_only mode: convert date columns to date-only values
+        if date_only:
+            df = _apply_date_only(df)
         col_widths = _auto_column_widths(df, min_col_width, max_col_width)
         date_cols = _detect_date_columns(df)
         _write_sheet_xlsxwriter(ws, df, header_fmt, date_fmt, col_widths, date_cols)
