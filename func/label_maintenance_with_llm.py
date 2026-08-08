@@ -1535,6 +1535,7 @@ def process_maintenance_llm(
                     confidence = float(c) if pd.notna(c) else None
                 except (TypeError, ValueError):
                     pass
+            llm_reason = _safe_str(row.get("LLM理由", "")) if "LLM理由" in df.columns else ""
             classified.append({
                 "日期": row.get(resolved_date_col, "") if resolved_date_col else "",
                 "原始设备名称": _safe_str(row.get(resolved_device_col, "")) if resolved_device_col else "",
@@ -1546,6 +1547,7 @@ def process_maintenance_llm(
                 "小类": minor,
                 "分类方式": method if method else "规则",
                 "分类置信度": confidence,
+                "LLM理由": llm_reason,
                 "是否故障": "是" if is_fault else "否",
                 "维修内容": content,
                 "工时_分钟": row.get(resolved_hours_col, 0) if resolved_hours_col else 0,
