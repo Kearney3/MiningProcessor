@@ -4,6 +4,7 @@ import io
 import json
 import logging
 import pathlib
+import subprocess
 import sys
 from datetime import date
 from unittest.mock import MagicMock, patch
@@ -19,6 +20,100 @@ sys.path.insert(0, str(ROOT))
 import tauri_bridge
 
 _has_psycopg2 = importlib.util.find_spec("psycopg2") is not None
+
+
+def test_bridge_processes_ledger_request_while_batch_is_running():
+    """短 RPC 不应排在长批处理之后。"""
+    launcher = (
+        "import time, tauri_bridge\n"
+        "import func.excel_batch as batch\n"
+        "batch.process_files = lambda **kwargs: (time.sleep(0.5), ([], {}))[1]\n"
+        "tauri_bridge.main()\n"
+    )
+    process = subprocess.Popen(
+        [sys.executable, "-c", launcher],
+        cwd=ROOT,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+    )
+
+    try:
+        process.stdin.write(json.dumps({
+            "id": 1,
+            "method": "batch_process",
+            "params": {
+                "folder_path": str(ROOT),
+                "matched": {"fuel": []},
+                "year": 2026,
+                "month": 1,
+            },
+        }) + "\n")
+        process.stdin.write(json.dumps({
+            "id": 2,
+            "method": "get_equipment_ledger_data",
+            "params": {},
+        }) + "\n")
+        process.stdin.flush()
+
+        first = json.loads(process.stdout.readline())
+
+        assert first["id"] == 2
+    finally:
+        process.kill()
+        process.wait(timeout=5)
+
+
+def test_cancel_rpc_reaches_running_batch_task():
+    """取消 RPC 应能在批处理执行器忙碌时设置任务令牌。"""
+    launcher = (
+        "import json, time, tauri_bridge\n"
+        "import func.excel_batch as batch\n"
+        "def wait_for_cancel(**kwargs):\n"
+        "    event = kwargs['cancel_event']\n"
+        "    kwargs['progress_cb']({'stage': 'started'})\n"
+        "    while not event.is_set():\n"
+        "        time.sleep(0.01)\n"
+        "    return [], {}\n"
+        "batch.process_files = wait_for_cancel\n"
+        "tauri_bridge.main()\n"
+    )
+    process = subprocess.Popen(
+        [sys.executable, "-c", launcher],
+        cwd=ROOT,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        bufsize=1,
+    )
+
+    try:
+        params = {
+            "folder_path": str(ROOT),
+            "matched": {"fuel": []},
+            "year": 2026,
+            "month": 1,
+        }
+        process.stdin.write(json.dumps({"id": 1, "method": "batch_process", "params": params}) + "\n")
+        process.stdin.flush()
+
+        started = json.loads(process.stdout.readline())
+        assert started == {"event": "progress", "data": {"stage": "started"}}
+
+        process.stdin.write(json.dumps({"id": 2, "method": "cancel", "params": {}}) + "\n")
+        process.stdin.flush()
+        cancel_response = json.loads(process.stdout.readline())
+        batch_response = json.loads(process.stdout.readline())
+
+        assert cancel_response == {"id": 2, "result": {"ok": True}}
+        assert batch_response["id"] == 1
+        assert batch_response["result"]["cancelled"] is True
+    finally:
+        process.kill()
+        process.wait(timeout=5)
 
 
 class TestStructuredStderrLogging:
