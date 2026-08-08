@@ -1185,6 +1185,21 @@ def preview_excel_columns(input_path: str, sheet_name: str = "维修明细") -> 
     }
 
 
+def _find_column(df: pd.DataFrame, candidates: list[str]) -> str | None:
+    """在 DataFrame 列中查找第一个匹配的列名。"""
+    for name in candidates:
+        if name in df.columns:
+            return name
+    return None
+
+
+# 常见列名别名，用于自动检测
+_DATE_COLUMNS = ["日期", "报修日期", "维修日期", "发生日期", "故障日期"]
+_DEVICE_COLUMNS = ["标准设备名称", "原始设备名称", "设备名称", "设备", "车辆名称"]
+_MODEL_COLUMNS = ["设备型号", "型号", "车辆型号"]
+_HOURS_COLUMNS = ["工时_分钟", "工时", "维修工时", "维修工时（分钟）", "工时（分钟）"]
+
+
 def process_maintenance_llm(
     input_path: str,
     *,
@@ -1195,6 +1210,10 @@ def process_maintenance_llm(
     category_column: str = "大类",
     minor_column: str = "小类",
     status_column: str = "分类方式",
+    date_column: str | None = None,
+    device_column: str | None = None,
+    model_column: str | None = None,
+    hours_column: str | None = None,
     filter_values: list[str] | None = None,
     export_mode: str = "statistics",
     concurrency: int = 10,
@@ -1217,6 +1236,10 @@ def process_maintenance_llm(
         category_column: 大类列名。
         minor_column: 小类列名。
         status_column: 分类方式列名。
+        date_column: 日期列名，None 时自动检测。
+        device_column: 设备名称列名，None 时自动检测。
+        model_column: 设备型号列名，None 时自动检测。
+        hours_column: 工时列名，None 时自动检测。
         filter_values: 分类方式过滤值列表（如 ["待确认", "其他"]），
             为 None 时标注所有记录。
         export_mode: "details" 只导出标注后明细，
@@ -1256,6 +1279,12 @@ def process_maintenance_llm(
             f"筛选记录时输入文件必须存在列“{status_column}”；"
             "请清空筛选条件，或选择实际的分类方式列"
         )
+
+    # 自动检测统计所需的列（允许缺失）
+    resolved_date_col = date_column or _find_column(df, _DATE_COLUMNS)
+    resolved_device_col = device_column or _find_column(df, _DEVICE_COLUMNS)
+    resolved_model_col = model_column or _find_column(df, _MODEL_COLUMNS)
+    resolved_hours_col = hours_column or _find_column(df, _HOURS_COLUMNS)
 
     client = create_llm_client(llm_config)
     taxonomy = get_allowed_taxonomy()
@@ -1507,10 +1536,10 @@ def process_maintenance_llm(
                 except (TypeError, ValueError):
                     pass
             classified.append({
-                "日期": row.get("日期", ""),
-                "原始设备名称": _safe_str(row.get("原始设备名称", row.get("设备名称", ""))),
-                "标准设备名称": _safe_str(row.get("标准设备名称", row.get("原始设备名称", ""))),
-                "设备型号": _safe_str(row.get("设备型号", "")),
+                "日期": row.get(resolved_date_col, "") if resolved_date_col else "",
+                "原始设备名称": _safe_str(row.get(resolved_device_col, "")) if resolved_device_col else "",
+                "标准设备名称": _safe_str(row.get(resolved_device_col, "")) if resolved_device_col else "",
+                "设备型号": _safe_str(row.get(resolved_model_col, "")) if resolved_model_col else "",
                 "原因": _safe_str(row.get("原因", "")),
                 "班次": _safe_str(row.get("班次", "")),
                 "大类": major,
@@ -1519,7 +1548,7 @@ def process_maintenance_llm(
                 "分类置信度": confidence,
                 "是否故障": "是" if is_fault else "否",
                 "维修内容": content,
-                "工时_分钟": row.get("工时_分钟", row.get("工时", 0)),
+                "工时_分钟": row.get(resolved_hours_col, 0) if resolved_hours_col else 0,
             })
         fault_records = [r for r in classified if r["是否故障"] == "是" and r["大类"]]
         sheets = build_sheets(classified, fault_records)
