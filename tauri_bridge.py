@@ -233,40 +233,72 @@ _cancel_event = threading.Event()
 _llm_cancel_event = threading.Event()
 _task_state_lock = threading.Lock()
 _active_cancel_event: threading.Event | None = None
+_active_cancel_request_id: int | None = None
+_pending_cancel_requests: set[int] = set()
 
 
-def _begin_cancellable_task() -> threading.Event:
+def _begin_cancellable_task(request_id: int | None = None) -> threading.Event:
     """注册当前长任务的取消令牌。
 
     长任务在独立的单线程执行器中运行，因此同一时刻只允许一个任务；
     快速 RPC（包括 cancel）由另一个执行器处理，不会被它阻塞。
     """
-    global _active_cancel_event
+    global _active_cancel_event, _active_cancel_request_id
     event = threading.Event()
     with _task_state_lock:
         if _active_cancel_event is not None:
             raise RuntimeError("已有数据处理任务正在运行")
+        if request_id is not None and request_id in _pending_cancel_requests:
+            event.set()
+            _pending_cancel_requests.discard(request_id)
         _active_cancel_event = event
+        _active_cancel_request_id = request_id
     return event
 
 
 def _end_cancellable_task(event: threading.Event) -> None:
     """清理当前长任务的取消令牌。"""
-    global _active_cancel_event
+    global _active_cancel_event, _active_cancel_request_id
     with _task_state_lock:
         if _active_cancel_event is event:
             _active_cancel_event = None
+            _active_cancel_request_id = None
 
 
-def _cancel_active_task() -> None:
-    """设置当前长任务的取消令牌。"""
+def _discard_pending_cancel(request_id: int | None) -> None:
+    """丢弃未能匹配到任务的取消请求，避免污染后续任务。"""
+    if request_id is None:
+        return
     with _task_state_lock:
-        event = _active_cancel_event
+        _pending_cancel_requests.discard(request_id)
+
+
+def _cancel_active_task(params: dict | None = None) -> None:
+    """按请求 ID 设置长任务取消令牌。"""
+    global _cancel_event, _llm_cancel_event
+    target_request_id = (params or {}).get("request_id")
+    if target_request_id is not None:
+        try:
+            target_request_id = int(target_request_id)
+        except (TypeError, ValueError):
+            target_request_id = None
+
+    event = None
+    with _task_state_lock:
+        if _active_cancel_event is not None and (
+            target_request_id is None
+            or target_request_id == _active_cancel_request_id
+        ):
+            event = _active_cancel_event
+        elif target_request_id is not None:
+            # The long-task executor may not have started the handler yet.
+            # Keep the cancellation bound to this request ID only.
+            _pending_cancel_requests.add(target_request_id)
     if event is not None:
         event.set()
-    # 保留旧事件，兼容仍直接引用这些模块变量的处理器/第三方调用方。
-    _cancel_event.set()
-    _llm_cancel_event.set()
+        # 保留旧事件，兼容仍直接引用这些模块变量的处理器/第三方调用方。
+        _cancel_event.set()
+        _llm_cancel_event.set()
 
 
 # stdout 可能由多个 RPC worker 同时写入，必须保证一条 JSON 完整输出。
@@ -347,7 +379,7 @@ def _process_production(params: dict) -> dict:
     from func.orchestration import process_single
     safe_path = str(_sanitize_path(params["path"], must_exist=True))
     common = _extract_common_params(params)
-    cancel_event = _begin_cancellable_task()
+    cancel_event = _begin_cancellable_task(params.get("_bridge_request_id"))
     try:
         return process_single(
             "production", safe_path,
@@ -463,7 +495,7 @@ def _process_maintenance_llm(params: dict) -> dict:
         raise ValueError("请先在配置中填写 LLM 接口 URL 和 API Key")
     if not llm_config.get("model"):
         raise ValueError("请先在配置中选择 LLM 模型")
-    cancel_event = _begin_cancellable_task()
+    cancel_event = _begin_cancellable_task(params.get("_bridge_request_id"))
     _llm_cancel_event.clear()
     _CANCEL_FILE.unlink(missing_ok=True)
     try:
@@ -499,7 +531,7 @@ _CANCEL_FILE = Path.home() / ".cache" / "mining_processor_cancel"
 
 @_register("cancel_llm_labeling")
 def _cancel_llm_labeling(params: dict) -> dict:
-    _cancel_active_task()
+    _cancel_active_task(params)
     return {"ok": True}
 
 
@@ -546,7 +578,7 @@ def _batch_scan(params: dict) -> dict:
 
 @_register("batch_process")
 def _batch_process(params: dict) -> dict:
-    cancel_event = _begin_cancellable_task()
+    cancel_event = _begin_cancellable_task(params.get("_bridge_request_id"))
     try:
         return _batch_process_impl(params, cancel_event)
     finally:
@@ -623,7 +655,7 @@ def _batch_process_impl(params: dict, cancel_event: threading.Event) -> dict:
 
 @_register("cancel")
 def _cancel(params: dict) -> dict:
-    _cancel_active_task()
+    _cancel_active_task(params)
     return {"ok": True}
 
 
@@ -1330,8 +1362,13 @@ def _handle_request(req: dict) -> None:
         _send({"id": req_id, "error": f"Unknown method: {method}"})
         return
 
+    call_params = dict(params) if isinstance(params, dict) else {}
+    if method in _LONG_RUNNING_METHODS and req_id is not None:
+        # 让处理器把取消令牌绑定到具体 RPC 请求，覆盖任务尚未开始执行的窗口。
+        call_params["_bridge_request_id"] = req_id
+
     try:
-        result = _METHODS[method](params)
+        result = _METHODS[method](call_params)
         _send({"id": req_id, "result": result})
     except Exception:
         ref_id = secrets.token_hex(4)
@@ -1341,6 +1378,9 @@ def _handle_request(req: dict) -> None:
         if not root_msg:
             root_msg = sys.exc_info()[0].__name__
         _send({"id": req_id, "error": root_msg})
+    finally:
+        if method in _LONG_RUNNING_METHODS and req_id is not None:
+            _discard_pending_cancel(req_id)
 
 
 def main() -> None:
