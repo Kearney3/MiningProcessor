@@ -51,7 +51,7 @@ class _MatchControls:
         id_match_switch,
         oil_match_switch,
         match_btn,
-        export_btn,
+        export_menu,
         view_segment,
         status_label,
         match_count_label,
@@ -70,7 +70,7 @@ class _MatchControls:
         self.id_match_switch = id_match_switch
         self.oil_match_switch = oil_match_switch
         self.match_btn = match_btn
-        self.export_btn = export_btn
+        self.export_menu = export_menu
         self.view_segment = view_segment
         self.status_label = status_label
         self.match_count_label = match_count_label
@@ -204,7 +204,7 @@ async def _do_match(
     controls.match_btn.disabled = True
     controls.match_btn.text = "匹配中..."
     controls.match_btn.icon = ft.Icons.HOURGLASS_TOP
-    controls.export_btn.disabled = True
+    controls.export_menu.disabled = True
     page.update()
 
     def _on_progress(progress: float, message: str):
@@ -251,20 +251,25 @@ async def _do_match(
         controls.match_btn.disabled = False
         controls.match_btn.text = "执行匹配"
         controls.match_btn.icon = ft.Icons.SEARCH
-        controls.export_btn.disabled = not bool(state.all_sheets)
+        controls.export_menu.disabled = not bool(state.all_sheets)
         page.update()
 
 
-async def _do_export(page, log, state: MatchState, controls: _MatchControls):
-    """Export action — thin UI wrapper around func/ledger_match.export_to_excel."""
+async def _do_export(page, log, state: MatchState, controls: _MatchControls, mode: str = "current-view"):
+    """Export action — thin UI wrapper around func/ledger_match.export_to_excel.
+
+    Args:
+        mode: "current-view" | "current-all" | "all-sheets"
+    """
     if not state.all_sheets and not state.matched_sheets and not state.unmatched_sheets:
         _log_message(log, "没有数据可导出", level=logging.WARNING)
         return
 
+    sheet_label = state.current_sheet or "Sheet"
     picker = ft.FilePicker()
     save_path = await picker.save_file(
         dialog_title="导出结果",
-        file_name="匹配结果.xlsx",
+        file_name=f"{sheet_label}_匹配结果.xlsx" if mode != "all-sheets" else "匹配结果.xlsx",
         allowed_extensions=["xlsx"],
         initial_directory=_import_dir[0] or None,
     )
@@ -276,7 +281,7 @@ async def _do_export(page, log, state: MatchState, controls: _MatchControls):
     controls.import_progress_text.visible = True
     controls.cancel_btn.visible = True
     state.import_cancelled.clear()
-    controls.export_btn.disabled = True
+    controls.export_menu.disabled = True
     page.update()
 
     def _on_progress(progress: float, message: str):
@@ -284,35 +289,51 @@ async def _do_export(page, log, state: MatchState, controls: _MatchControls):
         controls.import_progress_text.value = message
         page.update()
 
-    # 选择导出数据
-    mode = state.view_mode
-    if mode == "matched" and state.matched_sheets:
-        export_sheets = state.matched_sheets
-        sheet_name = "已匹配"
-    elif mode == "unmatched" and state.unmatched_sheets:
-        export_sheets = state.unmatched_sheets
-        sheet_name = "未匹配"
-    else:
-        export_sheets = state.matched_all_sheets if state.matched_all_sheets else state.all_sheets
-        sheet_name = "全部"
-
     try:
-        success = await asyncio.to_thread(
-            export_to_excel, export_sheets, save_path, sheet_name,
-            state.import_cancelled, _on_progress,
-        )
-        if success:
-            _log_message(log, f"已导出: {save_path}")
-            _update_last_directory(save_path)
+        if mode == "all-sheets":
+            # 导出所有已匹配 sheet（每个 sheet 一个 tab）
+            export_sheets = state.matched_all_sheets if state.matched_all_sheets else state.all_sheets
+            if not export_sheets:
+                _log_message(log, "没有已匹配的 Sheet 可导出")
+                return
+            success = await asyncio.to_thread(
+                export_to_excel, export_sheets, save_path, "全部",
+                state.import_cancelled, _on_progress,
+                True, state.date_only,
+            )
+            if success:
+                _log_message(log, f"已导出: {save_path}（{len(export_sheets)} 个 sheet）")
+                _update_last_directory(save_path)
+            else:
+                _log_message(log, "导出已取消")
         else:
-            _log_message(log, "导出已取消")
+            # 导出当前 sheet
+            if mode == "current-view":
+                view_df = get_view_df(state)
+                export_data = {state.current_sheet: view_df} if view_df is not None else {}
+            else:  # current-all
+                df = get_current_df(state)
+                export_data = {state.current_sheet: df} if df is not None else {}
+            if not export_data:
+                _log_message(log, "没有数据可导出")
+                return
+            success = await asyncio.to_thread(
+                export_to_excel, export_data, save_path, state.current_sheet,
+                state.import_cancelled, _on_progress,
+                True, state.date_only,
+            )
+            if success:
+                _log_message(log, f"已导出: {save_path}")
+                _update_last_directory(save_path)
+            else:
+                _log_message(log, "导出已取消")
     except Exception as ex:
         _log_message(log, f"导出失败: {ex}", level=logging.ERROR)
     finally:
         controls.import_progress_bar.visible = False
         controls.import_progress_text.visible = False
         controls.cancel_btn.visible = False
-        controls.export_btn.disabled = False
+        controls.export_menu.disabled = False
         page.update()
 
 
@@ -373,7 +394,20 @@ def create_ledger_match_section(
     )
 
     match_btn = theme.primary_btn("执行匹配", icon=ft.Icons.SEARCH, disabled=True)
-    export_btn = theme.secondary_btn("导出结果", icon=ft.Icons.DOWNLOAD, disabled=True)
+
+    # Export menu — three options: current view, current sheet all, all sheets
+    export_menu = ft.PopupMenuButton(
+        icon=ft.Icons.DOWNLOAD,
+        tooltip="导出 Excel",
+        disabled=True,
+        items=[],  # populated dynamically
+    )
+
+    date_only_switch = ft.Switch(
+        label="日期格式 YYYY-MM-DD",
+        value=False,
+        tooltip="导出时去除时间部分，仅保留日期",
+    )
 
     _VIEW_LABELS = ["全部", "已匹配", "未匹配"]
     _VIEW_MODES = ["all", "matched", "unmatched"]
@@ -449,7 +483,7 @@ def create_ledger_match_section(
         id_match_switch=id_match_switch,
         oil_match_switch=oil_match_switch,
         match_btn=match_btn,
-        export_btn=export_btn,
+        export_menu=export_menu,
         view_segment=view_segment,
         status_label=status_label,
         match_count_label=match_count_label,
@@ -503,6 +537,11 @@ def create_ledger_match_section(
     name_match_switch.on_change = _on_name_toggle
     id_match_switch.on_change = _on_id_toggle
     oil_match_switch.on_change = _on_oil_toggle
+
+    def _on_date_only_toggle(e):
+        state.date_only = date_only_switch.value
+
+    date_only_switch.on_change = _on_date_only_toggle
 
     def _rebuild_columns(cols: list[str]):
         state.columns = cols
@@ -688,12 +727,39 @@ def create_ledger_match_section(
             page, log, state, controls,
             eq_ledger, oil_ledger, name_col, id_col, oil_col, build_table,
         )
+        _build_export_menu()
 
-    async def on_export(e):
-        await _do_export(page, log, state, controls)
+    async def on_export(mode: str):
+        await _do_export(page, log, state, controls, mode)
+
+    def _build_export_menu():
+        """Rebuild export menu items (called when sheet state changes)."""
+        def _make_handler(m: str):
+            def handler(e):
+                page.run_task(on_export, m)
+            return handler
+
+        items = [
+            ft.PopupMenuItem(
+                content=ft.Row([ft.Text("导出当前视图", size=13)]),
+                on_click=_make_handler("current-view"),
+            ),
+            ft.PopupMenuItem(
+                content=ft.Row([ft.Text(f"导出 {state.current_sheet} 全部", size=13)]),
+                on_click=_make_handler("current-all"),
+            ),
+        ]
+        matched_count = len(state.matched_all_sheets)
+        if matched_count > 1:
+            items.append(ft.PopupMenuItem())
+            items.append(ft.PopupMenuItem(
+                content=ft.Row([ft.Text(f"导出所有已匹配 Sheet（{matched_count} 个）", size=13)]),
+                on_click=_make_handler("all-sheets"),
+            ))
+        export_menu.items = items
 
     match_btn.on_click = on_match
-    export_btn.on_click = on_export
+    _build_export_menu()
 
     # ========================================================================
     # 布局
@@ -765,7 +831,7 @@ def create_ledger_match_section(
 
     action_rows = ft.Column(
         [
-            ft.Row([match_btn, export_btn], spacing=8),
+            ft.Row([match_btn, export_menu, date_only_switch], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER),
             ft.Row([status_label, match_count_label], spacing=8, vertical_alignment=ft.CrossAxisAlignment.CENTER),
         ],
         spacing=6,

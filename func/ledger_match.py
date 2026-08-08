@@ -41,6 +41,7 @@ class MatchState:
         self.sort_column: Optional[str] = None
         self.sort_ascending: bool = True
         self.view_mode: str = "all"
+        self.date_only: bool = False
         self.import_cancelled = threading.Event()
 
     def clear(self) -> None:
@@ -55,6 +56,7 @@ class MatchState:
         self.sort_column = None
         self.sort_ascending = True
         self.view_mode = "all"
+        self.date_only = False
         self.import_cancelled.clear()
 
 
@@ -240,8 +242,20 @@ def export_to_excel(
     sheet_name: str = "全部", cancel_event: Optional[threading.Event] = None,
     progress_cb: Optional[ProgressCallback] = None,
     delete_on_cancel: bool = True,
+    date_only: bool = False,
 ) -> bool:
-    """Write concatenated *sheets* to *output_path*.  Returns True on success."""
+    """Write *sheets* to *output_path*.
+
+    When *sheets* contains multiple keys, each key becomes a separate
+    worksheet tab (preserving the original sheet structure).  When it
+    contains a single key whose name equals *sheet_name*, a single sheet
+    is written (legacy behaviour used for "已匹配"/"未匹配" views).
+
+    *date_only*: when True, all datetime columns are formatted as
+    YYYY-MM-DD (time part stripped).
+
+    Returns True on success.
+    """
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
     from openpyxl.utils import get_column_letter
@@ -252,65 +266,91 @@ def export_to_excel(
         HEADER_FONT_COLOR,
         _auto_column_widths,
         _is_date_column,
+        _apply_date_only,
     )
 
     cancelled = cancel_event or threading.Event()
     if not sheets:
         return False
 
-    df_to_export = pd.concat(sheets.values(), ignore_index=True)
+    # Decide export layout: multi-sheet (one tab per original sheet) vs
+    # single-sheet (concatenated, legacy for "已匹配"/"未匹配" views).
+    multi_sheet = len(sheets) > 1
 
     wb = Workbook()
     try:
-        ws = wb.active
-        ws.title = sheet_name
+        first_sheet = True
+        date_fmt = "yyyy-mm-dd" if date_only else DATE_NUM_FORMAT
 
-        header_font = Font(bold=True, color=HEADER_FONT_COLOR)
-        header_fill = PatternFill(start_color=HEADER_FILL, end_color=HEADER_FILL, fill_type="solid")
-        center_align = Alignment(horizontal="center", vertical="center")
-
-        headers = list(df_to_export.columns)
-        for col, header in enumerate(headers, start=1):
-            cell = ws.cell(row=1, column=col, value=header)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = center_align
-
-        # 列宽自适应
-        col_widths = _auto_column_widths(df_to_export)
-        for idx, width in enumerate(col_widths, start=1):
-            ws.column_dimensions[get_column_letter(idx)].width = width
-
-        # 检测日期列
-        date_cols: set[str] = set()
-        for col in headers:
-            if _is_date_column(df_to_export[col]):
-                date_cols.add(col)
-
-        total_rows = len(df_to_export)
-        for i in range(0, total_rows, EXPORT_BATCH):
+        for tab_label, df_src in sheets.items():
             if cancelled.is_set():
                 logger.info("导出已取消")
                 break
-            batch = df_to_export.iloc[i:i + EXPORT_BATCH]
-            for row_idx, (_, row) in enumerate(batch.iterrows(), start=i + 2):
-                for col_idx, col_name in enumerate(headers, start=1):
-                    value = row[col_name]
-                    if pd.isna(value):
-                        ws.cell(row=row_idx, column=col_idx, value=None)
-                    else:
-                        cell = ws.cell(row=row_idx, column=col_idx, value=value)
-                        if col_name in date_cols:
-                            cell.number_format = DATE_NUM_FORMAT
-            if progress_cb and total_rows > 0:
-                processed = min(i + EXPORT_BATCH, total_rows)
-                progress_cb(processed / total_rows, f"正在导出第 {processed}/{total_rows} 行...")
 
-        # 冻结首行 + 自动筛选
-        ws.freeze_panes = "A2"
-        if ws.max_column:
-            last_col = get_column_letter(ws.max_column)
-            ws.auto_filter.ref = f"A1:{last_col}{ws.max_row}"
+            df_to_export = df_src.copy()
+
+            # date_only mode: convert date columns to date-only values
+            if date_only:
+                df_to_export = _apply_date_only(df_to_export)
+
+            # Sanitise sheet name (Excel limit: 31 chars, no special chars)
+            safe_name = tab_label[:31].replace("/", "_").replace("\\", "_") \
+                .replace("*", "_").replace("?", "_").replace("[", "_") \
+                .replace("]", "_").replace(":", "_")
+
+            if first_sheet:
+                ws = wb.active
+                ws.title = safe_name
+                first_sheet = False
+            else:
+                ws = wb.create_sheet(title=safe_name)
+
+            header_font = Font(bold=True, color=HEADER_FONT_COLOR)
+            header_fill = PatternFill(start_color=HEADER_FILL, end_color=HEADER_FILL, fill_type="solid")
+            center_align = Alignment(horizontal="center", vertical="center")
+
+            headers = list(df_to_export.columns)
+            for col, header in enumerate(headers, start=1):
+                cell = ws.cell(row=1, column=col, value=header)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = center_align
+
+            # 列宽自适应
+            col_widths = _auto_column_widths(df_to_export)
+            for idx, width in enumerate(col_widths, start=1):
+                ws.column_dimensions[get_column_letter(idx)].width = width
+
+            # 检测日期列
+            date_cols: set[str] = set()
+            for col in headers:
+                if _is_date_column(df_to_export[col]):
+                    date_cols.add(col)
+
+            total_rows = len(df_to_export)
+            for i in range(0, total_rows, EXPORT_BATCH):
+                if cancelled.is_set():
+                    logger.info("导出已取消")
+                    break
+                batch = df_to_export.iloc[i:i + EXPORT_BATCH]
+                for row_idx, (_, row) in enumerate(batch.iterrows(), start=i + 2):
+                    for col_idx, col_name in enumerate(headers, start=1):
+                        value = row[col_name]
+                        if pd.isna(value):
+                            ws.cell(row=row_idx, column=col_idx, value=None)
+                        else:
+                            cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                            if col_name in date_cols:
+                                cell.number_format = date_fmt
+                if progress_cb and total_rows > 0:
+                    processed = min(i + EXPORT_BATCH, total_rows)
+                    progress_cb(processed / total_rows, f"正在导出 {safe_name}: {processed}/{total_rows} 行")
+
+            # 冻结首行 + 自动筛选
+            ws.freeze_panes = "A2"
+            if ws.max_column:
+                last_col = get_column_letter(ws.max_column)
+                ws.auto_filter.ref = f"A1:{last_col}{ws.max_row}"
 
         wb.save(output_path)
     finally:

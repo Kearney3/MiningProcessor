@@ -82,9 +82,22 @@ class EquipmentLedger(LedgerBase):
                 self._id_cache[device_id] = std_info
 
         # 构建标准设备名称 -> 完整信息的反向索引 (H7)（key 小写化）
+        # 从 _df 直接构建，确保没有 设备编号 的设备也能被索引
         self._name_to_info = {}
-        for _, info in self._id_cache.items():
-            self._name_to_info[info["标准设备名称"].lower()] = info
+        for _, row in self._df.iterrows():
+            std_raw = row.get("标准设备名称")
+            standard_name = clean_string(std_raw)
+            if not standard_name:
+                continue
+            key = standard_name.lower()
+            if key not in self._name_to_info:
+                std_id_raw = row.get("标准设备编号")
+                company_raw = row.get("标准公司名称")
+                self._name_to_info[key] = {
+                    "标准设备名称": standard_name,
+                    "标准设备编号": clean_string(std_id_raw),
+                    "标准公司名称": clean_string(company_raw),
+                }
 
     def match_by_id(self, device_id: str) -> Optional[dict]:
         """按设备编号精确匹配（大小写不敏感），返回标准信息 dict 或 None"""
