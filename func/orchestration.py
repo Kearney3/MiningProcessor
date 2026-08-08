@@ -237,6 +237,7 @@ def process_single(
     default_shift: str = "Day",
     header_mapping: dict | None = None,
     tolerant_header: bool = False,
+    dedup: bool = False,
     skip_hidden: bool = False,
     skip_hidden_rows: bool = False,
     skip_hidden_cols: bool = False,
@@ -361,6 +362,7 @@ def process_single(
             skip_hidden_rows=skip_hidden_rows,
             skip_hidden_cols=skip_hidden_cols,
             tolerant_header=tolerant_header,
+            dedup=dedup,
         )
 
     elif module_type == "maint":

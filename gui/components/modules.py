@@ -163,7 +163,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     merge_keyword = ft.TextField(
         label="关键字",
         hint_text="例如: Fuel",
-        width=150,
+        expand=True,
         color=theme.TEXT_PRIMARY,
     )
     merge_strip_time = ft.Checkbox(
@@ -175,6 +175,11 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         label="兼容表头",
         value=False,
         tooltip="勾选后，表头不一致的文件也会合并，缺失列填空",
+    )
+    merge_dedup = ft.Checkbox(
+        label="去除重复记录",
+        value=False,
+        tooltip="勾选后，合并结果中完全重复的行将被移除，仅保留首次出现的记录",
     )
     merge_btn = theme.primary_btn("合并", icon=ft.Icons.MERGE_TYPE, disabled=False)
 
@@ -474,7 +479,10 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                     header_hint,
                 ]),
                 theme.module_card([
-                    ft.Row([merge_path, merge_keyword, merge_strip_time, merge_tolerant_header, merge_btn], spacing=8),
+                    ft.Row([merge_path, merge_btn], spacing=8),
+                    ft.Row([merge_keyword], spacing=8),
+                    ft.Row([merge_strip_time, merge_tolerant_header, merge_dedup], spacing=8,
+                           vertical_alignment=ft.CrossAxisAlignment.CENTER),
                     ft.Text("排序配置（可选，留空则自动按第一个时间列排序）", size=12,
                             color=theme.TEXT_SECONDARY),
                     ft.Row([sort_rules_column, add_sort_btn], spacing=8,
@@ -524,6 +532,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
             "keyword": merge_keyword,
             "strip_time": merge_strip_time,
             "tolerant_header": merge_tolerant_header,
+            "dedup": merge_dedup,
             "btn": merge_btn,
             "sort_configs_state": sort_configs_state,
         },

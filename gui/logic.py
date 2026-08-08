@@ -425,11 +425,12 @@ async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledge
             sort_configs.append({"column": col, "ascending": bool(cfg.get("ascending", True))})
     strip_time = bool(merge_refs["strip_time"].value)
     tolerant_header = bool(merge_refs.get("tolerant_header") and merge_refs["tolerant_header"].value)
+    dedup = bool(merge_refs.get("dedup") and merge_refs["dedup"].value)
     await _safe_run_task(page, btn, "合并", path, log, "merge",
                          keyword=keyword, strip_time=strip_time, sort_configs=sort_configs,
                          equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
-                         tolerant_header=tolerant_header)
+                         tolerant_header=tolerant_header, dedup=dedup)
 
 
 async def on_maint_process(page: ft.Page, maint_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None) -> None:

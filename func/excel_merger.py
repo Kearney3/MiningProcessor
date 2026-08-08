@@ -53,6 +53,7 @@ def merge_excel_files(
         skip_hidden_rows: bool = False,
         skip_hidden_cols: bool = False,
         tolerant_header: bool = False,
+        dedup: bool = False,
 ) -> str:
     """
     合并指定文件夹中包含关键字的 Excel 文件。
@@ -69,6 +70,7 @@ def merge_excel_files(
         skip_hidden_cols: 若为 True，仅跳过 Excel 中的隐藏列
         tolerant_header: 若为 True，表头不一致时自动对齐合并（缺失列填空）；
                          若为 False（默认），表头不一致时抛出 ValueError
+        dedup: 若为 True，合并后对每个 Sheet 执行全列去重，移除完全重复的行
 
     返回:
         输出文件的完整路径
@@ -274,7 +276,8 @@ def merge_excel_files(
 
     formatted_sheets = {}
     for sname, df in merged_sheets.items():
-        formatted_sheets[sname] = dedup_dataframe(df, f"合并-{sname}")
+        sheet_df = dedup_dataframe(df, f"合并-{sname}") if dedup else df
+        formatted_sheets[sname] = sheet_df
 
     write_formatted_excel(output_file, formatted_sheets)
 
@@ -299,6 +302,7 @@ def main():
     parser.add_argument("--skip-hidden-rows", action="store_true", help="跳过 Excel 中的隐藏行")
     parser.add_argument("--skip-hidden-cols", action="store_true", help="跳过 Excel 中的隐藏列")
     parser.add_argument("--tolerant-header", action="store_true", help="表头不一致时自动对齐合并（缺失列填空），而非报错")
+    parser.add_argument("--dedup", action="store_true", help="合并后对每个 Sheet 执行全列去重，移除完全重复的行")
     args = parser.parse_args()
 
     folder = os.path.abspath(args.folder)
@@ -320,7 +324,8 @@ def main():
                           skip_hidden=args.skiphidden,
                           skip_hidden_rows=args.skip_hidden_rows,
                           skip_hidden_cols=args.skip_hidden_cols,
-                          tolerant_header=args.tolerant_header)
+                          tolerant_header=args.tolerant_header,
+                          dedup=args.dedup)
     except Exception as e:
         logger.error(f"错误: {e}")
         sys.exit(1)
