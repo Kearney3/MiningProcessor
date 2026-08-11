@@ -13,6 +13,7 @@ on:
 env:
   UV_PYTHON: "3.13"
   PYTHONUTF8: 1
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 # 防止同一分支多次触发
 concurrency:
@@ -38,12 +39,12 @@ jobs:
           fetch-depth: 0
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v8.1.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v6.5.0
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -123,7 +124,7 @@ jobs:
           hdiutil verify "$DMG_PATH" && echo "✅ DMG OK" || echo "❌ DMG corrupted"
 
       - name: Upload macOS artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: macos-arm64
           path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
@@ -131,7 +132,7 @@ jobs:
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: "矿山数据处理工具 ${{ github.ref_name }}"
           draft: true
@@ -153,12 +154,12 @@ jobs:
           fetch-depth: 0
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v8.1.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v6.5.0
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -219,7 +220,7 @@ jobs:
           args: "--target x86_64-pc-windows-msvc"
 
       - name: Upload Windows x64 artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: windows-x64
           path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe

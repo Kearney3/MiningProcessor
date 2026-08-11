@@ -13,13 +13,16 @@ on:
 permissions:
   actions: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   cleanup:
     name: Delete old artifacts
     runs-on: ubuntu-latest
     steps:
       - name: Delete artifacts older than ${{ inputs.min_age_days || '30' }} days
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const minAgeDays = parseInt('${{ inputs.min_age_days || '30' }}');
