@@ -860,6 +860,105 @@ def test_flet_datatable_raises_when_columns_empty():
         table.before_update()
 
 
+def test_anomaly_results_table_updates_and_hides_when_empty():
+    """异常明细有记录时显示 DataTable，清空后隐藏结果区。"""
+    from gui.components.common import create_anomaly_results_table
+
+    refs = create_anomaly_results_table()
+    refs["table"].before_update()
+    assert refs["container"].visible is False
+
+    refs["update"]([
+        {
+            "数据类型": "油耗信息",
+            "行号": 3,
+            "日期": "2026-08-11",
+            "设备名称": "TR100",
+            "异常列": "油品消耗",
+            "异常值": 60000,
+            "说明": "超过上限 50000",
+        }
+    ])
+    assert refs["container"].visible is True
+    assert len(refs["table"].rows) == 1
+    assert refs["table"].rows[0].cells[0].content.value == "油耗信息"
+    refs["table"].before_update()
+
+    refs["update"]([])
+    assert refs["container"].visible is False
+    assert refs["table"].rows == []
+
+
+def test_daily_report_export_locks_button_and_ignores_duplicate_click(monkeypatch, tmp_path):
+    """日报导出期间按钮应禁用，重复点击不能启动第二个导出任务。"""
+    import asyncio
+    from types import SimpleNamespace
+
+    import gui.components.daily_report as daily_report_module
+
+    _, refs = components.create_daily_report_section(DummyPage(), lambda *args: None, {}, {})
+    refs["source_path"].value = str(tmp_path)
+    release = asyncio.Event()
+    calls = []
+
+    async def fake_to_thread(func, *args, **kwargs):
+        calls.append((refs["btn"].disabled, refs["btn"].text))
+        await release.wait()
+        return SimpleNamespace(report=[], warnings=[], detail_sheets={})
+
+    monkeypatch.setattr(daily_report_module.asyncio, "to_thread", fake_to_thread)
+
+    async def run_clicks():
+        first = asyncio.create_task(refs["btn"].on_click(DummyControlEvent(refs["btn"])))
+        await asyncio.sleep(0)
+        assert refs["btn"].disabled is True
+        assert refs["btn"].text == "导出中..."
+
+        second = asyncio.create_task(refs["btn"].on_click(DummyControlEvent(refs["btn"])))
+        await asyncio.sleep(0)
+        assert len(calls) == 1
+
+        release.set()
+        await asyncio.gather(first, second)
+
+    asyncio.run(run_clicks())
+    assert refs["btn"].disabled is False
+    assert refs["btn"].text == "导出每日报表"
+
+
+def test_daily_report_shows_export_warnings_in_bottom_table(monkeypatch, tmp_path):
+    """日报导出完成后应在页面底部展示警告/异常明细。"""
+    import asyncio
+    from types import SimpleNamespace
+
+    import gui.components.daily_report as daily_report_module
+
+    _, refs = components.create_daily_report_section(DummyPage(), lambda *args: None, {}, {})
+    refs["source_path"].value = str(tmp_path)
+
+    async def fake_to_thread(func, *args, **kwargs):
+        return SimpleNamespace(
+            report=[],
+            detail_sheets={},
+            warnings=[{
+                "数据类型": "设备台账匹配",
+                "字段": "设备编号",
+                "值": "LP0028",
+                "消息": "设备台账未匹配",
+            }],
+        )
+
+    monkeypatch.setattr(daily_report_module.asyncio, "to_thread", fake_to_thread)
+    asyncio.run(refs["btn"].on_click(DummyControlEvent(refs["btn"])))
+
+    anomaly_refs = refs["anomaly_results"]
+    assert anomaly_refs["container"].visible is True
+    assert len(anomaly_refs["table"].rows) == 1
+    assert anomaly_refs["table"].rows[0].cells[0].content.value == "设备台账匹配"
+    assert anomaly_refs["table"].rows[0].cells[6].content.value == "设备编号"
+    assert anomaly_refs["table"].rows[0].cells[7].content.value == "LP0028"
+
+
 def test_ledger_table_has_placeholder_column_when_empty():
     """Ledger table must always have >= 1 DataColumn, even with no records."""
     _, refs = components.create_ledger_section(DummyPage(), lambda m: None)

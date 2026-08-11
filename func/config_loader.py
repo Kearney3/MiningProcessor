@@ -73,9 +73,6 @@ _USER_CONFIG_SECTION = "user_config"
 
 
 DEFAULT_DAILY_REPORT_CONFIG: dict[str, Any] = {
-    "include_raw_equipment_name": True,
-    "include_raw_equipment_code": True,
-    "include_raw_company_name": True,
     "material_statistics": {
         "焦煤": ["Нү"],
         "动力煤": ["oxid"],
@@ -730,6 +727,14 @@ def get_daily_report_config() -> dict[str, Any]:
         cfg = load_config().get("daily_report", {})
         result = _deep_merge(DEFAULT_DAILY_REPORT_CONFIG, cfg) if isinstance(cfg, dict) else copy.deepcopy(DEFAULT_DAILY_REPORT_CONFIG)
 
+    # 原始设备字段开关已迁移到日报导出页，不再从用户配置读取。
+    for legacy_key in (
+        "include_raw_equipment_name",
+        "include_raw_equipment_code",
+        "include_raw_company_name",
+    ):
+        result.pop(legacy_key, None)
+
     # 兼容第一版日报配置：物料展开已改为自动收集全部物料类型，
     # 公式默认值也随业务口径更新；只替换旧的系统默认值，不覆盖用户真正改过的公式。
     result.pop("production_materials", None)
@@ -758,7 +763,14 @@ def get_daily_report_config() -> dict[str, Any]:
 
 def save_daily_report_config(config: dict[str, Any]) -> dict[str, Any]:
     """持久化日报统计配置到 config.user.json。"""
-    merged = _deep_merge(DEFAULT_DAILY_REPORT_CONFIG, config or {})
+    clean_config = dict(config or {})
+    for legacy_key in (
+        "include_raw_equipment_name",
+        "include_raw_equipment_code",
+        "include_raw_company_name",
+    ):
+        clean_config.pop(legacy_key, None)
+    merged = _deep_merge(DEFAULT_DAILY_REPORT_CONFIG, clean_config)
     # 延迟导入避免 config_loader 与日报模块的初始化循环。
     from func.daily_report import validate_daily_report_formulas
     formula_errors = validate_daily_report_formulas(merged.get("formulas"))

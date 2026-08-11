@@ -24,7 +24,7 @@ class AnomalyConfig:
         "use_threshold", "use_sigma", "use_percentile",
         "sigma_n", "percentile_low", "percentile_high",
         "thresholds", "statistical_columns", "handling_rules",
-        "_anomaly_counts",
+        "_anomaly_counts", "_anomaly_records",
     )
 
     def __init__(
@@ -60,6 +60,8 @@ class AnomalyConfig:
         self.statistical_columns = statistical_columns or {}
         self.handling_rules = handling_rules or {}
         self._anomaly_counts: list[tuple[str, int]] | None = None
+        # 运行时收集异常明细，供 GUI 表格展示；不参与检测规则计算。
+        self._anomaly_records: list[dict] | None = None
 
     @classmethod
     def from_config(cls, config: dict) -> "AnomalyConfig":

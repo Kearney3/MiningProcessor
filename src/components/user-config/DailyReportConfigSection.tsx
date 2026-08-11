@@ -9,17 +9,11 @@ type FormulaKey = typeof FORMULA_KEYS[number];
 
 type MaterialStatistics = Record<string, string[]>;
 type DailyReportConfig = {
-  include_raw_equipment_name: boolean;
-  include_raw_equipment_code: boolean;
-  include_raw_company_name: boolean;
   material_statistics: MaterialStatistics;
   formulas: Record<string, string>;
 };
 
 const DEFAULT_CONFIG: DailyReportConfig = {
-  include_raw_equipment_name: true,
-  include_raw_equipment_code: true,
-  include_raw_company_name: true,
   material_statistics: {
     焦煤: ["Нү"],
     动力煤: ["oxid"],
@@ -111,27 +105,6 @@ export function DailyReportConfigSection({ bridge }: { bridge: BridgeProp }) {
     >
       <div className="space-y-4">
         <div>
-          <p className="text-xs text-slate-500 mb-2">日报设备字段</p>
-          <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-600">
-            {[
-              ["include_raw_equipment_name", "输出原始设备名称"],
-              ["include_raw_equipment_code", "输出原始设备编号"],
-              ["include_raw_company_name", "输出原始公司名称"],
-            ].map(([key, label]) => (
-              <label key={key} className="inline-flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  checked={Boolean(config[key as keyof DailyReportConfig])}
-                  onChange={(e) => setConfig((prev) => ({ ...prev, [key]: e.target.checked }))}
-                  className="rounded border-slate-300"
-                />
-                {label}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div>
           <p className="text-xs text-slate-500 mb-1">物料统计配置</p>
           <p className="text-xs text-slate-400 mb-3">物料类型无需配置，会自动展开全部源物料；统计分类按行顺序关键字匹配，每条生产记录只命中一次。</p>
           <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
@@ -151,7 +124,7 @@ export function DailyReportConfigSection({ bridge }: { bridge: BridgeProp }) {
 
         <div>
           <p className="text-xs text-slate-500 mb-1">延迟、待机与利用率公式</p>
-          <p className="text-xs text-slate-400 mb-3">公式变量必须来自已配置的工时表头/列映射；支持四则运算、比较和三元表达式。</p>
+          <p className="text-xs text-slate-400 mb-3">保存时校验公式语法和字段名，导出前再按实际工时表头复核字段是否存在；支持四则运算、比较和三元表达式。</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {FORMULA_KEYS.map((key) => (
               <label key={key} className="text-xs text-slate-500">

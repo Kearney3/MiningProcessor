@@ -342,11 +342,14 @@ class TestDetectAndFilter:
     def test_flag_mode(self):
         df = pd.DataFrame({"油品消耗": [100, 200, 60000]})
         cfg = AnomalyConfig(enabled=True, flag_anomalies=True)
+        cfg._anomaly_records = []
         result_df, anomalies = detect_and_filter(df, "fuel", config=cfg)
         assert ANOMALY_FLAG_COLUMN in result_df.columns
         assert ANOMALY_REASON_COLUMN in result_df.columns
         assert len(result_df) == 3
         assert anomalies is not None
+        assert cfg._anomaly_records[0]["数据类型"] == "油耗信息"
+        assert cfg._anomaly_records[0]["异常列"] == "油品消耗"
 
     def test_filter_mode(self):
         df = pd.DataFrame({"油品消耗": [100, 200, 60000]})

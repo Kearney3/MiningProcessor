@@ -21,7 +21,7 @@ import { LLMLabelingPage } from "./components/pages/LLMLabelingPage";
 
 function App() {
   const [currentPage, setCurrentPage] = useState<PageId>("data-processing");
-  const [appVersion, setAppVersion] = useState("v2.4.0");
+  const [appVersion, setAppVersion] = useState("v2.5.0");
   const bridge = usePythonBridge();
 
   useEffect(() => {

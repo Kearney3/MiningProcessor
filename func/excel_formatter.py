@@ -198,6 +198,11 @@ def _apply_date_only(df: pd.DataFrame) -> pd.DataFrame:
             sample = df[col].dropna().head(20)
             if sample.empty:
                 continue
+            # Excel 工时表的数值列经常因混有空值而被 pandas 读成 object。
+            # 这些列不能参与日期解析，否则 720 分钟会被当作 Excel 日期序列，
+            # 导出的分项工时数据会变成 1970-01-01。
+            if not sample.map(lambda value: isinstance(value, str)).all():
+                continue
             try:
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore")

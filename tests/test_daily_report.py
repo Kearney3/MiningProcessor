@@ -115,6 +115,32 @@ def test_daily_report_export_has_warning_sheet(tmp_path):
     assert set(pd.ExcelFile(output).sheet_names) == {"日报", "匹配警告"}
 
 
+def test_daily_report_export_can_include_detail_sheets_and_runtime_identity_options(tmp_path):
+    _write_sources(tmp_path)
+    output = tmp_path / "每日分项.xlsx"
+    result = export_daily_report(
+        tmp_path,
+        output,
+        "2026-08-10",
+        "2026-08-10",
+        config={
+            "include_raw_equipment_name": False,
+            "include_raw_equipment_code": False,
+            "include_raw_company_name": False,
+        },
+        include_detail_sheets=True,
+    )
+
+    assert set(result.detail_sheets) == {"工时统计", "运行统计", "生产统计", "油耗统计", "电耗统计"}
+    assert set(pd.ExcelFile(output).sheet_names) == {
+        "日报", "工时统计", "运行统计", "生产统计", "油耗统计", "电耗统计", "匹配警告",
+    }
+    report = pd.read_excel(output, sheet_name="日报")
+    assert "原始设备名称" not in report.columns
+    assert "原始设备编号" not in report.columns
+    assert "原始公司名称" not in report.columns
+
+
 def test_daily_report_formula_validation_rejects_unknown_names_and_bad_syntax():
     valid = {
         "延迟时间": "transfer+auxiliary_work+waiting_load",
@@ -129,6 +155,21 @@ def test_daily_report_formula_validation_rejects_unknown_names_and_bad_syntax():
     assert "not_mapped" in errors["延迟时间"]
     assert "语法错误" in errors["待机时间"]
     assert errors["设备可动率"] == "公式不能为空"
+
+
+def test_daily_report_formula_validation_checks_actual_worktime_fields():
+    formulas = {
+        "延迟时间": "transfer",
+        "待机时间": "standby",
+        "设备可动率": "planned_minutes/planned_minutes",
+        "设备可动利用率": "total_production_minutes/planned_minutes",
+        "设备利用率": "planned_minutes/planned_minutes",
+    }
+    errors = validate_daily_report_formulas(formulas, available_columns=["转移", "待命"])
+
+    assert errors["设备可动率"] == "公式字段不存在于工时表头: planned_minutes"
+    assert errors["设备可动利用率"] == "公式字段不存在于工时表头: planned_minutes, total_production_minutes"
+    assert errors["设备利用率"] == "公式字段不存在于工时表头: planned_minutes"
 
 
 def test_material_statistics_keywords_match_once_in_config_order():

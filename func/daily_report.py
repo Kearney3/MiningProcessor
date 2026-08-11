@@ -9,7 +9,7 @@ from __future__ import annotations
 import ast
 import copy
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Any, Iterable
@@ -29,6 +29,7 @@ logger = get_logger(__name__)
 class DailyReportResult:
     report: pd.DataFrame
     warnings: list[dict[str, Any]]
+    detail_sheets: dict[str, pd.DataFrame] = field(default_factory=dict)
 
 
 _WORKTIME_ALIASES = {
@@ -469,6 +470,14 @@ class _SafeFormula:
         except (ArithmeticError, TypeError, ValueError, KeyError, ZeroDivisionError):
             return 0.0
 
+    def validate(self) -> None:
+        """用一组安全数值执行一次 AST，提前发现不支持的公式节点。"""
+        sample_values = {name: 1.0 for name in self.names}
+        try:
+            self._eval(self.tree, sample_values)
+        except (ArithmeticError, TypeError, ValueError, KeyError, ZeroDivisionError) as exc:
+            raise ValueError(str(exc)) from exc
+
     def _eval(self, node, values):
         if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
             return node.value
@@ -504,10 +513,32 @@ class _SafeFormula:
         raise ValueError("公式包含不支持的语法")
 
 
-def validate_daily_report_formulas(formulas: dict[str, Any] | None) -> dict[str, str]:
-    """校验日报公式语法和变量名，返回 ``{字段: 错误信息}``。"""
+def _available_formula_names(available_columns: Iterable[Any]) -> set[str]:
+    """根据实际工时表头，计算当前可用的公式变量。"""
+    column_names = {str(column).strip() for column in available_columns}
+    aliases = _worktime_formula_aliases()
+    return {
+        name
+        for name, candidates in aliases.items()
+        if any(str(candidate).strip() in column_names for candidate in candidates)
+    }
+
+
+def validate_daily_report_formulas(
+    formulas: dict[str, Any] | None,
+    available_columns: Iterable[Any] | None = None,
+) -> dict[str, str]:
+    """校验日报公式语法、字段名和实际表头，返回 ``{字段: 错误信息}``。
+
+    ``available_columns`` 在日报导出时传入实际工时表头，用于检查公式引用的
+    canonical 字段是否真的存在。用户配置页没有输入文件，因此只做语法和字段名校验。
+    """
     formulas = formulas if isinstance(formulas, dict) else {}
     allowed_names = set(_WORKTIME_ALIASES)
+    available_names = (
+        _available_formula_names(available_columns)
+        if available_columns is not None else None
+    )
     errors: dict[str, str] = {}
     for output_name in DAILY_REPORT_FORMULA_OUTPUTS:
         expression = formulas.get(output_name)
@@ -516,12 +547,18 @@ def validate_daily_report_formulas(formulas: dict[str, Any] | None) -> dict[str,
             continue
         try:
             formula = _SafeFormula(expression)
+            formula.validate()
         except (SyntaxError, ValueError) as exc:
             errors[output_name] = f"公式语法错误: {exc}"
             continue
         unknown = sorted(formula.names - allowed_names)
         if unknown:
             errors[output_name] = f"存在未支持的目标字段: {', '.join(unknown)}"
+            continue
+        if available_names is not None:
+            missing = sorted(formula.names - available_names)
+            if missing:
+                errors[output_name] = f"公式字段不存在于工时表头: {', '.join(missing)}"
     return errors
 
 
@@ -628,6 +665,27 @@ def _energy_aggregates(df: pd.DataFrame, equipment_ledger, model_ledger, start, 
     return result
 
 
+def _build_detail_sheets(
+    sources: dict[str, list[pd.DataFrame]],
+    start: date | str | None,
+    end: date | str | None,
+) -> dict[str, pd.DataFrame]:
+    """构建可选的日报分项 Sheet，保留各模块经过预处理后的明细。"""
+    sheet_specs = (
+        ("工时统计", "worktime"),
+        ("运行统计", "operation"),
+        ("生产统计", "production"),
+        ("油耗统计", "fuel"),
+        ("电耗统计", "electrical"),
+    )
+    sheets: dict[str, pd.DataFrame] = {}
+    for sheet_name, data_type in sheet_specs:
+        frame = _filter_dates(_concat_frames(sources.get(data_type, [])), start, end)
+        if not frame.empty:
+            sheets[sheet_name] = frame.reset_index(drop=True)
+    return sheets
+
+
 def build_daily_report(
     source_dir: str | Path,
     start: date | str | None = None,
@@ -637,19 +695,36 @@ def build_daily_report(
     model_ledger=None,
     config: dict[str, Any] | None = None,
     preprocess_options: dict[str, Any] | None = None,
+    include_detail_sheets: bool = False,
 ) -> DailyReportResult:
     """先预处理原始数据，再构建日报 DataFrame，不写文件。"""
-    config = config or get_daily_report_config()
+    base_config = get_daily_report_config()
+    if isinstance(config, dict):
+        config = {
+            **base_config,
+            **config,
+            "material_statistics": {
+                **base_config.get("material_statistics", {}),
+                **config.get("material_statistics", {}),
+            },
+            "formulas": {
+                **base_config.get("formulas", {}),
+                **config.get("formulas", {}),
+            },
+        }
+    else:
+        config = base_config
     warnings: list[dict[str, Any]] = []
     options = _preprocess_options(preprocess_options)
     sources = _preprocess_sources(source_dir, start, end, options, warnings)
+    detail_sheets = _build_detail_sheets(sources, start, end) if include_detail_sheets else {}
 
     worktime = _concat_frames(sources["worktime"])
     if worktime.empty:
         raise ValueError("未找到工时数据文件，日报必须以工效设备列表为基准")
     worktime = _filter_dates(worktime, start, end)
     if worktime.empty:
-        return DailyReportResult(pd.DataFrame(), warnings)
+        return DailyReportResult(pd.DataFrame(), warnings, detail_sheets)
 
     identity_columns = {
         "日期", "班次", "设备名称", "设备编号", "公司",
@@ -779,27 +854,23 @@ def build_daily_report(
     formulas = config.get("formulas", {}) if isinstance(config.get("formulas", {}), dict) else {}
     formula_aliases = _worktime_formula_aliases()
     compiled_formulas = {}
-    for key, expression in formulas.items():
+    formula_errors = validate_daily_report_formulas(formulas, available_columns=worktime.columns)
+    for key, message in formula_errors.items():
+        warnings.append({
+            "数据类型": "日报配置",
+            "字段": key,
+            "值": formulas.get(key, ""),
+            "消息": message,
+        })
+    for key in DAILY_REPORT_FORMULA_OUTPUTS:
+        expression = formulas.get(key)
+        if key in formula_errors or expression is None:
+            continue
         try:
             compiled_formulas[key] = _SafeFormula(expression)
-        except (SyntaxError, ValueError) as exc:
-            warnings.append({"数据类型": "日报配置", "字段": key, "值": expression, "消息": f"公式无效: {exc}"})
-
-    # 公式只能引用已通过工时表头映射/列映射配置声明的目标字段。
-    # 缺失字段若直接按 0 计算，会让日报看起来成功但指标失真，因此在导出结果中明确提示。
-    available_formula_names = {
-        name for name, aliases in formula_aliases.items()
-        if any(str(alias) in {str(column) for column in worktime.columns} for alias in aliases)
-    }
-    for key, formula in compiled_formulas.items():
-        missing = sorted(formula.names - available_formula_names)
-        if missing:
-            warnings.append({
-                "数据类型": "日报配置",
-                "字段": key,
-                "值": formulas.get(key, ""),
-                "消息": f"公式字段未在工时表头/列映射中找到: {', '.join(missing)}，缺失值按 0 计算",
-            })
+        except (SyntaxError, ValueError):
+            # validate_daily_report_formulas 已经给出可展示的错误信息。
+            continue
 
     material_target_names = [target for target, _ in statistic_materials]
     output_rows = []
@@ -865,7 +936,7 @@ def build_daily_report(
             extra_worktime_columns.append(column)
     columns.extend(extra_worktime_columns)
     report = report.reindex(columns=[column for column in columns if column in report.columns])
-    return DailyReportResult(report, warnings)
+    return DailyReportResult(report, warnings, detail_sheets)
 
 
 def export_daily_report(
@@ -878,16 +949,19 @@ def export_daily_report(
     model_ledger=None,
     config: dict[str, Any] | None = None,
     preprocess_options: dict[str, Any] | None = None,
+    include_detail_sheets: bool = False,
 ) -> DailyReportResult:
-    """构建并导出日报，附加「匹配警告」sheet（无警告时仍保留空表头）。"""
+    """构建并导出日报，可选附加各模块分项 Sheet。"""
     result = build_daily_report(
         source_dir, start, end,
         equipment_ledger=equipment_ledger,
         model_ledger=model_ledger,
         config=config,
         preprocess_options=preprocess_options,
+        include_detail_sheets=include_detail_sheets,
     )
     warning_df = pd.DataFrame(result.warnings, columns=["数据类型", "字段", "值", "消息"])
-    write_formatted_excel(str(output_file), {"日报": result.report, "匹配警告": warning_df}, date_only=True)
+    sheets = {"日报": result.report, **result.detail_sheets, "匹配警告": warning_df}
+    write_formatted_excel(str(output_file), sheets, date_only=True)
     logger.info("日报已导出: %s，共 %d 行，警告 %d 条", output_file, len(result.report), len(result.warnings))
     return result

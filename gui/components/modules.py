@@ -3,7 +3,12 @@ from datetime import datetime
 
 import flet as ft
 
-from .common import _last_directory, _update_last_directory, _log_message, _get_initial_directory, _show_path_confirm, ChipToggle, year_options, month_options, make_browse_handler, HeaderModeConfig, safe_update, create_anomaly_controls
+from .common import (
+    _last_directory, _update_last_directory, _log_message, _get_initial_directory,
+    _show_path_confirm, ChipToggle, year_options, month_options,
+    make_browse_handler, HeaderModeConfig, safe_update, create_anomaly_controls,
+    create_anomaly_results_table,
+)
 from .types import ModuleRefs
 
 try:
@@ -434,6 +439,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     # --- 异常值检测开关（使用共享工厂） ---
     anomaly_ctrls = create_anomaly_controls()
     anomaly_panel = anomaly_ctrls["container"]
+    anomaly_results = create_anomaly_results_table()
 
     header_hint = ft.Row(
         [
@@ -508,6 +514,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                 anomaly_panel,
                 ft.Row([match_eq_toggle, match_oil_toggle, match_model_toggle,
                         skip_hidden_rows_toggle, skip_hidden_cols_toggle], spacing=8),
+                anomaly_results["container"],
             ],
             spacing=8,
             expand=True,
@@ -528,6 +535,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         "_anomaly_enabled": anomaly_ctrls["_anomaly_enabled"],
         "_anomaly_report": anomaly_ctrls["_anomaly_report"],
         "_anomaly_mode": anomaly_ctrls["_anomaly_mode"],
+        "anomaly_results": anomaly_results,
         "fuel": {"path": fuel_path, "year": fuel_year, "btn": fuel_btn, "_filter_zero_hours_toggle": filter_zero_hours_toggle, "_filter_zero_work_hours_toggle": filter_zero_work_hours_toggle},
         "prod": {"path": prod_path, "raw_start": prod_raw_start, "btn": prod_btn, "auto_detect": prod_auto_detect, "summary_container": prod_summary_container,
                  "_filter_zero_hours_meter_toggle": prod_filter_zero_hours_meter, "_filter_zero_km_meter_toggle": prod_filter_zero_km_meter,

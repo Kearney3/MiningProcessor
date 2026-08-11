@@ -3,7 +3,12 @@ from datetime import datetime, timedelta
 
 import flet as ft
 
-from .common import _last_directory, _update_last_directory, _log_message, _get_initial_directory, _show_path_confirm, ChipToggle, year_options, month_options, make_browse_handler, HeaderModeConfig, to_local_dt, create_anomaly_controls
+from .common import (
+    _last_directory, _update_last_directory, _log_message, _get_initial_directory,
+    _show_path_confirm, ChipToggle, year_options, month_options,
+    make_browse_handler, HeaderModeConfig, to_local_dt, create_anomaly_controls,
+    create_anomaly_results_table,
+)
 
 try:
     from . import theme
@@ -133,6 +138,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     # --- 异常值检测 ---
     _anomaly = create_anomaly_controls()
+    anomaly_results = create_anomaly_results_table()
 
     # --- 表内合并 ---
     batch_table_merge = ft.Checkbox(
@@ -418,6 +424,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
                     [batch_btn],
                     alignment=ft.MainAxisAlignment.END,
                 ),
+                anomaly_results["container"],
             ],
             spacing=theme.SPACING_MD,
             expand=True,
@@ -452,6 +459,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "_anomaly_enabled": _anomaly["_anomaly_enabled"],
         "_anomaly_report": _anomaly["_anomaly_report"],
         "_anomaly_mode": _anomaly["_anomaly_mode"],
+        "anomaly_results": anomaly_results,
         "header_toggle": _batch_hmc.toggle,
         "header_mode": _batch_hmc.mode,
                 "date_filter_toggle": date_filter_toggle,

@@ -323,6 +323,19 @@ def process_single(
 
     result: dict = {}
 
+    # 单次任务使用独立的异常明细缓冲，供 GUI 任务完成后展示。
+    if anomaly_config is not None and anomaly_config.enabled:
+        anomaly_config._anomaly_counts = []
+        anomaly_config._anomaly_records = []
+
+    def _attach_anomaly_records() -> None:
+        if anomaly_config is None:
+            return
+        records = list(getattr(anomaly_config, "_anomaly_records", None) or [])
+        if records:
+            result["anomalies"] = records
+        anomaly_config._anomaly_records = None
+
     # 向后兼容
     if skip_hidden:
         skip_hidden_rows = True
@@ -439,10 +452,12 @@ def process_single(
                     postprocess_from_cache(str(f), use_equipment_ledger=False, use_oil_ledger=True)
             result["output_file"] = str(maint_result[-1]) if maint_result else None
             result["output_files"] = [str(f) for f in maint_result]
+            _attach_anomaly_records()
             return result
         if use_oil_ledger and maint_result:
             postprocess_from_cache(str(maint_result), use_equipment_ledger=False, use_oil_ledger=True)
         result["output_file"] = str(maint_result) if maint_result else None
+        _attach_anomaly_records()
         return result
 
     else:
@@ -454,6 +469,7 @@ def process_single(
     )
     if not output_file:
         result["output_file"] = None
+        _attach_anomaly_records()
         return result
 
     # ── 台账匹配后处理 ──
@@ -475,4 +491,5 @@ def process_single(
             )
 
     result["output_file"] = output_file
+    _attach_anomaly_records()
     return result

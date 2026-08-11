@@ -72,6 +72,21 @@ export interface BatchSummary {
   success_modules: string[];
   failed_modules: string[];
   warnings: string[];
+  anomalies?: AnomalyRecord[];
+}
+
+/** 异常值明细 */
+export interface AnomalyRecord {
+  数据类型?: string;
+  行号?: number | string;
+  日期?: unknown;
+  班次?: unknown;
+  设备名称?: unknown;
+  设备编号?: unknown;
+  异常列?: string;
+  异常值?: unknown;
+  检测方法?: string;
+  说明?: string;
 }
 
 /** 同步警告条目 */
