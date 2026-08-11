@@ -12,6 +12,8 @@ import { DataSyncPage } from "./components/pages/DataSyncPage";
 import { LedgerMatchPage } from "./components/pages/LedgerMatchPage";
 import { EquipmentLedgerPage } from "./components/pages/EquipmentLedgerPage";
 import { OilLedgerPage } from "./components/pages/OilLedgerPage";
+import { ModelLedgerPage } from "./components/pages/ModelLedgerPage";
+import { DailyReportPage } from "./components/pages/DailyReportPage";
 import { LoadConfigPage } from "./components/pages/LoadConfigPage";
 import { MaintConfigPage } from "./components/pages/MaintConfigPage";
 import { UserConfigPage } from "./components/pages/UserConfigPage";
@@ -101,6 +103,12 @@ function App() {
           </div>
           <div style={{ display: currentPage === "oil-ledger" ? "block" : "none" }}>
             <OilLedgerPage bridge={bridge} />
+          </div>
+          <div style={{ display: currentPage === "model-ledger" ? "block" : "none" }}>
+            <ModelLedgerPage bridge={bridge} />
+          </div>
+          <div style={{ display: currentPage === "daily-report" ? "block" : "none" }}>
+            <DailyReportPage bridge={bridge} />
           </div>
           <div style={{ display: currentPage === "load-config" ? "block" : "none" }}>
             <LoadConfigPage bridge={bridge} />

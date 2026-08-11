@@ -85,6 +85,11 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         value=True,
         tooltip="批量处理时自动匹配油品台账",
     )
+    batch_match_model = ft.Checkbox(
+        label="型号台账匹配",
+        value=False,
+        tooltip="需同时开启设备台账匹配，按标准设备编号补充型号属性",
+    )
     batch_skip_hidden_rows = ft.Checkbox(
         label="跳过隐藏行",
         value=False,
@@ -134,7 +139,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         label="表内合并",
         value=False,
         tooltip="将所有数据通过左合并聚合到单个 Sheet（需先开启台账匹配）",
-        disabled=not (batch_match_eq.value or batch_match_oil.value),
+        disabled=not (batch_match_eq.value or batch_match_oil.value or batch_match_model.value),
     )
 
     # ── 基准表芯片切换（表内合并专用） ──
@@ -171,7 +176,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
             batch_table_merge.disabled = True
             batch_base_table.row.visible = False
         else:
-            any_ledger = batch_match_eq.value or batch_match_oil.value
+            any_ledger = batch_match_eq.value or batch_match_oil.value or batch_match_model.value
             batch_table_merge.disabled = not any_ledger
         try:
             batch_table_merge.update()
@@ -182,7 +187,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
     batch_merge.on_change = _on_merge_change
 
     def _on_ledger_toggle_for_merge(e):
-        any_ledger = batch_match_eq.value or batch_match_oil.value
+        any_ledger = batch_match_eq.value or batch_match_oil.value or batch_match_model.value
         if not any_ledger:
             batch_table_merge.value = False
             batch_table_merge.disabled = True
@@ -197,6 +202,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     batch_match_eq.on_change = _on_ledger_toggle_for_merge
     batch_match_oil.on_change = _on_ledger_toggle_for_merge
+    batch_match_model.on_change = _on_ledger_toggle_for_merge
 
     # --- 日期筛选 ---
     _selected_date = [current_date.date()]  # 用列表包裹以便闭包修改
@@ -365,6 +371,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
                         [
                             ft.Container(batch_match_eq, col={"xs": 6}),
                             ft.Container(batch_match_oil, col={"xs": 6}),
+                            ft.Container(batch_match_model, col={"xs": 6}),
                             ft.Container(batch_skip_hidden_rows, col={"xs": 6}),
                             ft.Container(batch_skip_hidden_cols, col={"xs": 6}),
                         ],
@@ -433,6 +440,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "base_table": batch_base_table,
         "match_eq_toggle": batch_match_eq,
         "match_oil_toggle": batch_match_oil,
+        "match_model_toggle": batch_match_model,
         "_skip_hidden_rows_toggle": batch_skip_hidden_rows,
         "_skip_hidden_cols_toggle": batch_skip_hidden_cols,
         "_filter_zero_hours_toggle": batch_filter_zero_hours,

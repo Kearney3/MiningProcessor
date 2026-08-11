@@ -120,6 +120,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
   // -- Ledger --
   const [useEquipmentLedger, setUseEquipmentLedger] = useState(false);
   const [useOilLedger, setUseOilLedger] = useState(false);
+  const [useModelLedger, setUseModelLedger] = useState(false);
   const [skipHiddenRows, setSkipHiddenRows] = useState(false);
   const [skipHiddenCols, setSkipHiddenCols] = useState(false);
   const [filterZeroEngineHours, setFilterZeroEngineHours] = useState(true);
@@ -186,6 +187,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
         raw_start: parseInt(rawStart),
         use_equipment_ledger: useEquipmentLedger,
         use_oil_ledger: useOilLedger,
+        use_model_ledger: useModelLedger,
         skip_hidden_rows: skipHiddenRows,
         skip_hidden_cols: skipHiddenCols,
         filter_zero_engine_hours: filterZeroEngineHours,
@@ -236,7 +238,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
       setProcessing(false);
       bridge.setProgress(null);
     }
-  }, [scanResult, folderPath, year, month, rawStart, useEquipmentLedger, useOilLedger, skipHiddenRows, skipHiddenCols, filterZeroEngineHours, filterZeroWorkHours, filterZeroHoursMeter, filterZeroKmMeter, filterZeroRunHours, filterZeroRunKm, tableMergeMode, baseTableType, dateFilterEnabled, filterDate, useHeaderMapping, headerMode, bridge]);
+  }, [scanResult, folderPath, year, month, rawStart, useEquipmentLedger, useOilLedger, useModelLedger, skipHiddenRows, skipHiddenCols, filterZeroEngineHours, filterZeroWorkHours, filterZeroHoursMeter, filterZeroKmMeter, filterZeroRunHours, filterZeroRunKm, tableMergeMode, baseTableType, dateFilterEnabled, filterDate, useHeaderMapping, headerMode, bridge]);
 
   const handleProcess = () => {
     if (hasMissing) {
@@ -383,6 +385,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
             <div className="flex flex-wrap gap-x-4 gap-y-1">
               <Toggle checked={useEquipmentLedger} onChange={setUseEquipmentLedger} label="设备台账匹配" />
               <Toggle checked={useOilLedger} onChange={setUseOilLedger} label="油品台账匹配" />
+              <Toggle checked={useModelLedger} onChange={setUseModelLedger} label="型号台账匹配" />
             </div>
           </div>
           <div className="border-t border-slate-100 pt-3">

@@ -65,6 +65,24 @@ def load_oil_ledger_from_cache():
     return None
 
 
+def load_model_ledger_from_cache():
+    """从缓存加载型号台账实例，失败返回 None。"""
+    from func.model_ledger import ModelLedger
+    from func.config_loader import has_model_ledger_cache, load_model_ledger_cache
+
+    try:
+        if has_model_ledger_cache():
+            cached = load_model_ledger_cache()
+            if cached:
+                ledger = ModelLedger()
+                ledger._df = pd.DataFrame(cached)
+                ledger._build_search_cache()
+                return ledger
+    except Exception:
+        logger.debug("型号台账缓存加载失败", exc_info=True)
+    return None
+
+
 def load_ledgers(
     use_equipment: bool = False,
     use_oil: bool = False,
@@ -93,6 +111,7 @@ def postprocess_with_ledgers(
     equipment_ledger=None,
     oil_ledger=None,
     preloaded_sheets: Optional[dict[str, pd.DataFrame]] = None,
+    model_ledger=None,
 ) -> bool:
     """对输出 Excel 文件进行台账匹配后处理。
 
@@ -107,13 +126,24 @@ def postprocess_with_ledgers(
     """
     from func.ledger_postprocess import apply_ledger_matching
 
-    return apply_ledger_matching(output_file, equipment_ledger, oil_ledger, preloaded_sheets)
+    if model_ledger is None:
+        return apply_ledger_matching(
+            output_file, equipment_ledger, oil_ledger, preloaded_sheets
+        )
+    return apply_ledger_matching(
+        output_file,
+        equipment_ledger,
+        oil_ledger,
+        preloaded_sheets,
+        model_ledger=model_ledger,
+    )
 
 
 def postprocess_from_cache(
     output_file: str,
     use_equipment_ledger: bool = False,
     use_oil_ledger: bool = False,
+    use_model_ledger: bool = False,
     preloaded_sheets: Optional[dict[str, pd.DataFrame]] = None,
 ) -> bool:
     """加载缓存台账后执行匹配后处理。
@@ -130,14 +160,25 @@ def postprocess_from_cache(
     Returns:
         True 表示有匹配发生并已写回，False 表示无匹配
     """
-    if not use_equipment_ledger and not use_oil_ledger:
+    if not use_equipment_ledger and not use_oil_ledger and not use_model_ledger:
         return False
 
     equipment_ledger, oil_ledger = load_ledgers(
         use_equipment=use_equipment_ledger,
         use_oil=use_oil_ledger,
     )
-    return postprocess_with_ledgers(output_file, equipment_ledger, oil_ledger, preloaded_sheets)
+    model_ledger = load_model_ledger_from_cache() if use_model_ledger else None
+    if model_ledger is None:
+        return postprocess_with_ledgers(
+            output_file, equipment_ledger, oil_ledger, preloaded_sheets
+        )
+    return postprocess_with_ledgers(
+        output_file,
+        equipment_ledger,
+        oil_ledger,
+        preloaded_sheets,
+        model_ledger=model_ledger,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -243,8 +284,10 @@ def process_single(
     skip_hidden_cols: bool = False,
     use_equipment_ledger: bool = False,
     use_oil_ledger: bool = False,
+    use_model_ledger: bool = False,
     equipment_ledger=None,
     oil_ledger=None,
+    model_ledger=None,
     anomaly_config=None,
     cancel_event=None,
     # maintenance 专属
@@ -286,6 +329,13 @@ def process_single(
         skip_hidden_cols = True
 
     effective_year = year if year is not None else datetime.now().year
+
+    if use_model_ledger and not use_equipment_ledger and equipment_ledger is None:
+        logger.warning("型号台账匹配需要同时启用设备台账匹配，已跳过型号台账")
+        use_model_ledger = False
+        model_ledger = None
+    elif use_model_ledger and model_ledger is None:
+        model_ledger = load_model_ledger_from_cache()
 
     # ── 分发到各处理器 ──
     if module_type == "fuel":
@@ -407,15 +457,22 @@ def process_single(
         return result
 
     # ── 台账匹配后处理 ──
-    if use_equipment_ledger or use_oil_ledger:
-        if equipment_ledger is None and oil_ledger is None:
-            postprocess_from_cache(
-                output_file,
-                use_equipment_ledger=use_equipment_ledger,
-                use_oil_ledger=use_oil_ledger,
-            )
+    if use_equipment_ledger or use_oil_ledger or use_model_ledger:
+        if equipment_ledger is None and oil_ledger is None and model_ledger is None:
+            cache_kwargs = {
+                "use_equipment_ledger": use_equipment_ledger,
+                "use_oil_ledger": use_oil_ledger,
+            }
+            if use_model_ledger:
+                cache_kwargs["use_model_ledger"] = True
+            postprocess_from_cache(output_file, **cache_kwargs)
         else:
-            postprocess_with_ledgers(output_file, equipment_ledger, oil_ledger)
+            postprocess_with_ledgers(
+                output_file,
+                equipment_ledger,
+                oil_ledger,
+                model_ledger=model_ledger,
+            )
 
     result["output_file"] = output_file
     return result

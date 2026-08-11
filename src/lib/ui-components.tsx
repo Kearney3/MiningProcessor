@@ -16,20 +16,24 @@ export function ToggleSwitch({
   checked,
   onChange,
   activeColor = "bg-blue-600",
+  disabled = false,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   /** 选中时的背景色，默认 bg-blue-600；LedgerMatchPage 使用 bg-slate-900 */
   activeColor?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       role="switch"
       aria-checked={checked}
+      aria-disabled={disabled}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
       className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors ${
         checked ? activeColor : "bg-slate-200"
-      }`}
+      } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
     >
       <span
         className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
@@ -48,15 +52,17 @@ export function StyledToggle({
   checked,
   onChange,
   label,
+  disabled = false,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   label: string;
+  disabled?: boolean;
 }) {
   return (
-    <label className="flex items-center gap-2.5 cursor-pointer select-none">
-      <ToggleSwitch checked={checked} onChange={onChange} />
-      <span className="text-sm text-slate-700">{label}</span>
+    <label className={`flex items-center gap-2.5 select-none ${disabled ? "cursor-not-allowed" : "cursor-pointer"}`}>
+      <ToggleSwitch checked={checked} onChange={onChange} disabled={disabled} />
+      <span className={`text-sm ${disabled ? "text-slate-400" : "text-slate-700"}`}>{label}</span>
     </label>
   );
 }

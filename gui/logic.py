@@ -170,16 +170,20 @@ def _dispatch_module(module_type: str, path: str, cancel_event: threading.Event 
     # 将 equipment_ledger/oil_ledger 实例转为 use_*_ledger 布尔值
     eq_ledger = kwargs.pop("equipment_ledger", None)
     oil_ledger = kwargs.pop("oil_ledger", None)
+    model_ledger = kwargs.pop("model_ledger", None)
     use_eq = eq_ledger is not None
     use_oil = oil_ledger is not None
+    use_model = model_ledger is not None
 
     return process_single(
         module_type, path,
         cancel_event=cancel_event,
         use_equipment_ledger=use_eq,
         use_oil_ledger=use_oil,
+        use_model_ledger=use_model,
         equipment_ledger=eq_ledger,
         oil_ledger=oil_ledger,
+        model_ledger=model_ledger,
         **kwargs,
     )
 
@@ -256,7 +260,7 @@ async def _safe_run_task(
 # ---------------------------------------------------------------------------
 # 各模块按钮回调
 # ---------------------------------------------------------------------------
-async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None, filter_zero_engine_hours=True, filter_zero_work_hours=False) -> None:
+async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=None, oil_ledger=None, model_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None, filter_zero_engine_hours=True, filter_zero_work_hours=False) -> None:
     """燃油处理按钮回调"""
     btn = fuel_refs["btn"]
     path = fuel_refs["path"].value
@@ -269,7 +273,7 @@ async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=
         _log_message(log, "请先选择有效的年份", level=logging.WARNING)
         return
     await _safe_run_task(page, btn, "处理", path, log, "fuel",
-                         year=year, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
+                         year=year, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger, model_ledger=model_ledger,
                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
                          anomaly_config=anomaly_config, filter_zero_engine_hours=filter_zero_engine_hours,
                          filter_zero_work_hours=filter_zero_work_hours)
@@ -314,7 +318,7 @@ def _update_prod_summary(container: ft.Column, summary: dict | None) -> None:
         container.update()
 
 
-async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None, filter_zero_hours_meter=True, filter_zero_km_meter=True, filter_zero_run_hours=False, filter_zero_run_km=False) -> None:
+async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=None, oil_ledger=None, model_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None, filter_zero_hours_meter=True, filter_zero_km_meter=True, filter_zero_run_hours=False, filter_zero_run_km=False) -> None:
     """生产处理按钮回调"""
     btn = prod_refs["btn"]
     path = prod_refs["path"].value
@@ -336,7 +340,7 @@ async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=
             return
 
     summary = await _safe_run_task(page, btn, "处理", path, log, "production",
-                         raw_start=raw_start, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
+                         raw_start=raw_start, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger, model_ledger=model_ledger,
                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
                          anomaly_config=anomaly_config,
                          filter_zero_hours_meter=filter_zero_hours_meter,
@@ -350,7 +354,7 @@ async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=
         _update_prod_summary(summary_container, summary)
 
 
-async def on_elec_process(page: ft.Page, elec_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None) -> None:
+async def on_elec_process(page: ft.Page, elec_refs: dict, log, equipment_ledger=None, oil_ledger=None, model_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None) -> None:
     """电力处理按钮回调"""
     btn = elec_refs["btn"]
     path = elec_refs["path"].value
@@ -371,12 +375,12 @@ async def on_elec_process(page: ft.Page, elec_refs: dict, log, equipment_ledger=
                          year=year,
                          add_shift_column=add_shift.value if add_shift else False,
                          default_shift=default_shift_ref.value if default_shift_ref else "Day",
-                         equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
+                         equipment_ledger=equipment_ledger, oil_ledger=oil_ledger, model_ledger=model_ledger,
                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
                          anomaly_config=anomaly_config)
 
 
-async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None) -> None:
+async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=None, oil_ledger=None, model_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None) -> None:
     """工时处理按钮回调"""
     btn = work_refs["btn"]
     path = work_refs["path"].value
@@ -400,13 +404,13 @@ async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=
         )
     await _safe_run_task(page, btn, "处理", path, log, "worktime",
                          year=year, month=month,
-                         equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
+                         equipment_ledger=equipment_ledger, oil_ledger=oil_ledger, model_ledger=model_ledger,
                          header_mapping=header_mapping,
                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
                          anomaly_config=anomaly_config)
 
 
-async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None) -> None:
+async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledger=None, oil_ledger=None, model_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None) -> None:
     """Excel 合并按钮回调"""
     btn = merge_refs["btn"]
     path = merge_refs["path"].value
@@ -428,12 +432,12 @@ async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledge
     dedup = bool(merge_refs.get("dedup") and merge_refs["dedup"].value)
     await _safe_run_task(page, btn, "合并", path, log, "merge",
                          keyword=keyword, strip_time=strip_time, sort_configs=sort_configs,
-                         equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
+                         equipment_ledger=equipment_ledger, oil_ledger=oil_ledger, model_ledger=model_ledger,
                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
                          tolerant_header=tolerant_header, dedup=dedup)
 
 
-async def on_maint_process(page: ft.Page, maint_refs: dict, log, equipment_ledger=None, oil_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None) -> None:
+async def on_maint_process(page: ft.Page, maint_refs: dict, log, equipment_ledger=None, oil_ledger=None, model_ledger=None, skip_hidden_rows=False, skip_hidden_cols=False, anomaly_config=None) -> None:
     """维修记录处理按钮回调"""
     btn = maint_refs["btn"]
     path = maint_refs["path"].value
@@ -446,7 +450,7 @@ async def on_maint_process(page: ft.Page, maint_refs: dict, log, equipment_ledge
         maint_refs.get("use_ml") is None or maint_refs["use_ml"].value
     )
     await _safe_run_task(page, btn, "处理", path, log, "maint",
-                         equipment_ledger=equipment_ledger, oil_ledger=oil_ledger,
+                         equipment_ledger=equipment_ledger, oil_ledger=oil_ledger, model_ledger=model_ledger,
                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
                          split_by_year=split_by_year, details_only=details_only,
                          use_ml_fallback=use_ml_fallback,
@@ -524,7 +528,7 @@ async def _poll_batch_progress_queue(progress_queue, progress_bar, progress_text
     _drain_batch_progress_queue_once(progress_queue, progress_bar, progress_text)
 
 
-async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledger=None, oil_ledger=None, anomaly_config=None) -> None:
+async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledger=None, oil_ledger=None, model_ledger=None, anomaly_config=None) -> None:
     """批量处理按钮回调（带文件扫描 + 缺失确认弹窗）"""
     import queue
     import threading
@@ -677,6 +681,7 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
                         equipment_ledger, oil_ledger, filter_date,
                         worktime_header_mapping,
                         table_merge_config,
+                        model_ledger=model_ledger,
                         progress_cb=progress_queue.put_nowait,
                         cancel_event=cancel_event,
                         **params,
@@ -759,10 +764,12 @@ def _get_ledgers_from_refs(
     module_refs: dict,
     ledger_refs: dict,
     oil_ledger_refs: dict,
+    model_ledger_refs: dict | None = None,
 ) -> tuple:
     """根据独立开关状态获取台账实例"""
     eq_toggle = module_refs.get("_match_eq_toggle")
     oil_toggle = module_refs.get("_match_oil_toggle")
+    model_toggle = module_refs.get("_match_model_toggle")
 
     eq = None
     if eq_toggle and eq_toggle.value:
@@ -776,7 +783,15 @@ def _get_ledgers_from_refs(
         if oil is None:
             logging.warning("油品台账匹配已启用，但油品台账未加载")
 
-    return eq, oil
+    model = None
+    if model_toggle and model_toggle.value:
+        if eq is None:
+            logging.warning("型号台账匹配需要同时启用设备台账匹配")
+        else:
+            model = (model_ledger_refs or {}).get("get_model_ledger", lambda: None)()
+        if model is None:
+            logging.warning("型号台账匹配已启用，但型号台账未加载")
+    return eq, oil, model
 
 
 def _make_module_handler(
@@ -787,11 +802,12 @@ def _make_module_handler(
     ledger_refs: dict,
     oil_ledger_refs: dict,
     callback,
+    model_ledger_refs: dict | None = None,
 ):
     """Create a click handler that resolves ledgers and invokes *callback*."""
 
     async def handler(e: ft.ControlEvent) -> None:
-        eq, oil = _get_ledgers_from_refs(module_refs, ledger_refs, oil_ledger_refs)
+        eq, oil, model = _get_ledgers_from_refs(module_refs, ledger_refs, oil_ledger_refs, model_ledger_refs)
 
         # 从公共 refs 和模块 refs 中提取处理参数
         params = collect_processing_params(module_refs)
@@ -804,7 +820,7 @@ def _make_module_handler(
                 params[key] = module_params[key]
 
         await callback(page, module_refs[module_key], log,
-                       equipment_ledger=eq, oil_ledger=oil,
+                       equipment_ledger=eq, oil_ledger=oil, model_ledger=model,
                        **params)
 
     return handler
@@ -831,6 +847,7 @@ def wire_processing_buttons(
     log,
     ledger_refs: dict | None = None,
     oil_ledger_refs: dict | None = None,
+    model_ledger_refs: dict | None = None,
 ) -> None:
     """
     将模块 refs 中的按钮绑定到处理回调
@@ -838,6 +855,7 @@ def wire_processing_buttons(
     """
     ledger_refs = ledger_refs or {}
     oil_ledger_refs = oil_ledger_refs or {}
+    model_ledger_refs = model_ledger_refs or {}
 
     _MODULE_CALLBACKS = [
         ("fuel", on_fuel_process),
@@ -851,6 +869,7 @@ def wire_processing_buttons(
     for key, callback in _MODULE_CALLBACKS:
         module_refs[key]["btn"].on_click = _make_module_handler(
             page, module_refs, key, log, ledger_refs, oil_ledger_refs, callback,
+            model_ledger_refs=model_ledger_refs,
         )
 
     # Batch
@@ -858,10 +877,12 @@ def wire_processing_buttons(
         async def handle_batch_click(e: ft.ControlEvent) -> None:
             eq_toggle = module_refs["batch"].get("match_eq_toggle")
             oil_toggle = module_refs["batch"].get("match_oil_toggle")
+            model_toggle = module_refs["batch"].get("match_model_toggle")
             eq = ledger_refs.get("get_ledger", lambda: None)() if eq_toggle and eq_toggle.value else None
             oil = oil_ledger_refs.get("get_oil", lambda: None)() if oil_toggle and oil_toggle.value else None
+            model = model_ledger_refs.get("get_model_ledger", lambda: None)() if model_toggle and model_toggle.value else None
             anomaly_config = _build_anomaly_config(module_refs["batch"])
-            await on_batch_process(page, module_refs["batch"], log, equipment_ledger=eq, oil_ledger=oil, anomaly_config=anomaly_config)
+            await on_batch_process(page, module_refs["batch"], log, equipment_ledger=eq, oil_ledger=oil, model_ledger=model, anomaly_config=anomaly_config)
         module_refs["batch"]["btn"].on_click = handle_batch_click
 
 

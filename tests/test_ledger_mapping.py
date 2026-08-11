@@ -330,11 +330,10 @@ class TestCaseInsensitiveMatch:
         assert result is not None
         assert result["标准设备名称"] == "HITACHI EX5600 EX#0123"
 
-    def test_device_match_id_case_insensitive(self, case_sensitive_ledger):
-        """match_device 编号大小写混合应命中"""
+    def test_device_match_id_without_name_fails(self, case_sensitive_ledger):
+        """没有设备名称时不能仅凭大小写混合的编号命中"""
         result = case_sensitive_ledger.match_device(name=None, device_id="ht#1101")
-        assert result is not None
-        assert result["标准设备名称"] == "NTE240 HT#1101"
+        assert result is None
 
     def test_device_match_name_case_insensitive(self, case_sensitive_ledger):
         """match_device 名称大小写混合应命中"""
@@ -425,11 +424,13 @@ class TestMatchDeviceIdNameCombined:
         assert result["标准设备名称"] == "标准卡车A"
         assert result["标准设备编号"] == "S001"
 
-    def test_id_and_name_disagree_fallback_to_name(self, ambiguous_ledger):
-        """编号和名称匹配到不同标准记录 → 回退到名称匹配"""
-        # "卡车A" 映射到 "标准卡车A1" 和 "标准卡车A2"（不一致）→ 名称歧义也失败
+    def test_name_ambiguity_is_resolved_by_id(self, ambiguous_ledger):
+        """名称本身有歧义时，编号应能通过联合匹配消除歧义"""
+        # "卡车A" 映射到两个标准设备，但 001 唯一对应第一条记录。
         result = ambiguous_ledger.match_device(name="卡车A", device_id="001")
-        assert result is None
+        assert result is not None
+        assert result["标准设备名称"] == "标准卡车A1"
+        assert result["标准设备编号"] == "S001"
 
     def test_id_matches_name_not_found(self, std_ledger):
         """编号匹配但名称不在台账中 → 编号和名称不一致，回退名称也失败"""
@@ -442,6 +443,11 @@ class TestMatchDeviceIdNameCombined:
         assert result is not None
         assert result["标准设备名称"] == "标准卡车A"
 
+    def test_id_only_does_not_match(self, std_ledger):
+        """没有设备名称时不能仅凭编号匹配"""
+        result = std_ledger.match_device(name=None, device_id="001")
+        assert result is None
+
 
 class TestNameAmbiguity:
     """测试名称歧义处理"""
@@ -452,10 +458,9 @@ class TestNameAmbiguity:
         assert result is None
 
     def test_duplicate_name_returns_match(self, duplicate_ledger):
-        """同一名称映射到相同标准记录 → 视为命中"""
+        """同一名称但标准设备编号不同 → 视为歧义"""
         result = duplicate_ledger.match("卡车A")
-        assert result is not None
-        assert result["标准名称"] == "标准卡车A"
+        assert result is None
 
     def test_unique_name_matches_normally(self, ambiguous_ledger):
         """无歧义的名称正常匹配"""
@@ -468,16 +473,14 @@ class TestNameAmbiguity:
         result = ambiguous_ledger.match_device(name="卡车A")
         assert result is None
 
-    def test_duplicate_name_match_device_succeeds(self, duplicate_ledger):
-        """重复但一致的名称通过 match_device 应成功"""
+    def test_duplicate_name_match_device_fails(self, duplicate_ledger):
+        """名称匹配到不同标准设备编号时，match_device 应失败"""
         result = duplicate_ledger.match_device(name="卡车A")
-        assert result is not None
-        assert result["标准设备名称"] == "标准卡车A"
+        assert result is None
 
     def test_id_name_disagree_but_name_consistent(self, duplicate_ledger):
-        """编号和名称不一致，但名称匹配到唯一标准记录 → 回退名称成功"""
+        """联合匹配失败后，名称歧义仍不能回退成功"""
         # 003 对应 "标准挖掘机B"，"卡车A" 对应 "标准卡车A"（不一致）
-        # 回退到名称匹配："卡车A" → 重复但一致 → "标准卡车A"
+        # 回退到名称匹配："卡车A" 对应 S001/S002，标准编号不一致 → 失败
         result = duplicate_ledger.match_device(name="卡车A", device_id="003")
-        assert result is not None
-        assert result["标准设备名称"] == "标准卡车A"
+        assert result is None

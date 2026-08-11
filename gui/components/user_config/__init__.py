@@ -21,6 +21,7 @@ from ._minebase import _create_minebase_section
 from ._column_mapping import _create_column_mapping_section
 from ._anomaly import _create_anomaly_config_section
 from ._llm import _create_llm_config_section
+from ._daily_report import _create_daily_report_config_section
 
 __all__ = ["create_user_config_section", "UserConfigRefs"]
 
@@ -40,6 +41,7 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
     mapping_card, map_refs = _create_column_mapping_section(page, log)
     anomaly_card, anomaly_refs = _create_anomaly_config_section(page, log)
     llm_card, llm_refs = _create_llm_config_section(page, log)
+    daily_report_card, daily_report_refs = _create_daily_report_config_section(page, log)
 
     def _reload_all():
         """重新加载所有子区域的配置。"""
@@ -50,6 +52,7 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
         map_refs["reload"]()
         map_refs["build"]()
         anomaly_refs["reload"]()
+        daily_report_refs["reload"]()
 
     def _on_reset_all(e):
         """还原所有用户配置为默认值。"""
@@ -100,6 +103,7 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
                 header_mapping_card,
                 mapping_card,
                 anomaly_card,
+                daily_report_card,
             ],
             spacing=8,
             expand=True,

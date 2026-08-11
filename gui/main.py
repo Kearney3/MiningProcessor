@@ -119,6 +119,10 @@ def main(page: ft.Page):
     # ---- 创建各区域 UI ----
     ledger_section, ledger_refs = cmp.create_ledger_section(page, log)
     oil_ledger_section, oil_ledger_refs = cmp.create_oil_ledger_section(page, log)
+    model_ledger_section, model_ledger_refs = cmp.create_model_ledger_section(page, log)
+    daily_report_section, daily_report_refs = cmp.create_daily_report_section(
+        page, log, ledger_refs, model_ledger_refs
+    )
     config_section, config_refs = cmp.create_config_section(page, log)
     user_config_section, user_config_refs = cmp.create_user_config_section(page, log)
     maint_config_section, maint_config_refs = cmp.create_maint_config_section(page, log)
@@ -130,7 +134,9 @@ def main(page: ft.Page):
     sync_section, sync_refs = cmp.create_sync_section(page)
 
     # ---- 绑定处理按钮 ----
-    logic.wire_processing_buttons(module_refs, page, log, ledger_refs, oil_ledger_refs)
+    logic.wire_processing_buttons(
+        module_refs, page, log, ledger_refs, oil_ledger_refs, model_ledger_refs
+    )
     logic.wire_sync_button(sync_refs, page, log, module_refs=module_refs)
     logic.wire_test_db_button(user_config_refs, page, log)
     logic.wire_test_api_button(user_config_refs, page, log)
@@ -142,11 +148,13 @@ def main(page: ft.Page):
             ("批量处理", ft.Icons.BOLT, "batch"),
             ("LLM 标注", ft.Icons.SMART_TOY, "llm"),
             ("数据同步", ft.Icons.CLOUD_SYNC, "sync"),
+            ("日报导出", getattr(ft.Icons, "SUMMARIZE", ft.Icons.DESCRIPTION), "daily_report"),
             ("台账匹配", ft.Icons.MANAGE_SEARCH, "ledger_match"),
         ]),
         ("管理", [
             ("设备台账", ft.Icons.INVENTORY_2, "ledger"),
             ("油品台账", ft.Icons.OIL_BARREL, "oil_ledger"),
+            ("型号台账", getattr(ft.Icons, "ENGINEERING", ft.Icons.INVENTORY_2), "model_ledger"),
             ("装载量配置", ft.Icons.TUNE, "config"),
             ("维修分类配置", ft.Icons.CATEGORY, "maint_config"),
             ("用户配置", ft.Icons.SETTINGS, "user_config"),
@@ -163,6 +171,8 @@ def main(page: ft.Page):
         "ledger_match": ft.Column([ledger_match_section], expand=True, spacing=8),
         "ledger": ft.Column([ledger_section], expand=True, spacing=8),
         "oil_ledger": ft.Column([oil_ledger_section], expand=True, spacing=8),
+        "model_ledger": ft.Column([model_ledger_section], expand=True, spacing=8),
+        "daily_report": ft.Column([daily_report_section], expand=True, spacing=8),
         "config": ft.Column([config_section], expand=True, spacing=8),
         "maint_config": ft.Column([maint_config_section], expand=True, spacing=8),
         "user_config": ft.Column([user_config_section], expand=True, spacing=8),

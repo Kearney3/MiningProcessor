@@ -121,6 +121,8 @@ export type PageId =
   | "llm-labeling"
   | "equipment-ledger"
   | "oil-ledger"
+  | "model-ledger"
+  | "daily-report"
   | "load-config"
   | "maint-config"
   | "user-config";
