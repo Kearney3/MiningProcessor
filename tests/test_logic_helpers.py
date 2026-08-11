@@ -581,6 +581,19 @@ class TestExecuteTaskReturnValues:
         assert result is None
         assert extra is None
 
+    def test_execute_task_returns_anomalies_for_non_production(self, tmp_path):
+        """非 production 模块的异常明细应传给界面。"""
+        input_file = str(tmp_path / "test.xlsx")
+        pd.DataFrame().to_excel(input_file, index=False)
+
+        anomalies = [{"数据类型": "油耗信息", "异常列": "油品消耗", "异常值": 60000}]
+        mock_result = {"output_file": str(tmp_path / "Fuel.xlsx"), "anomalies": anomalies}
+        with patch("gui.logic._dispatch_module", return_value=mock_result):
+            result, extra = _execute_task("fuel", input_file)
+
+        assert result is None
+        assert extra == {"anomalies": anomalies}
+
 
 # ---------------------------------------------------------------------------
 # wire_sync_button 导入路径测试

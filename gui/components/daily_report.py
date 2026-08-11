@@ -7,12 +7,36 @@ from pathlib import Path
 import flet as ft
 
 from func.daily_report import export_daily_report
-from gui.components.common import _get_initial_directory, to_local_dt
+from gui.components.common import (
+    _get_initial_directory,
+    create_anomaly_results_table,
+    safe_update,
+    to_local_dt,
+)
 
 try:
     from . import theme
 except ImportError:
     import gui.theme as theme
+
+
+def _warning_records(warnings: list[dict] | None) -> list[dict]:
+    """将日报导出的警告结构转换为共享异常明细表所需的字段。"""
+    records = []
+    for warning in warnings or []:
+        records.append({
+            "数据类型": warning.get("数据类型", "日报"),
+            "行号": warning.get("行号", warning.get("row")),
+            "日期": warning.get("日期"),
+            "班次": warning.get("班次"),
+            "设备名称": warning.get("设备名称"),
+            "设备编号": warning.get("设备编号"),
+            "异常列": warning.get("字段", warning.get("field")),
+            "异常值": warning.get("值", warning.get("value")),
+            "检测方法": warning.get("检测方法", "规则"),
+            "说明": warning.get("消息", warning.get("message", "")),
+        })
+    return records
 
 
 def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_ledger_refs: dict) -> tuple[ft.Container, dict]:
@@ -33,6 +57,10 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
 
     eq_toggle = ft.Checkbox(label="设备台账匹配", value=True, active_color=theme.PRIMARY)
     model_toggle = ft.Checkbox(label="型号台账匹配", value=False, active_color=theme.PRIMARY)
+    include_raw_name = ft.Checkbox(label="输出原始设备名称", value=True, active_color=theme.PRIMARY)
+    include_raw_code = ft.Checkbox(label="输出原始设备编号", value=True, active_color=theme.PRIMARY)
+    include_raw_company = ft.Checkbox(label="输出原始公司名称", value=True, active_color=theme.PRIMARY)
+    include_detail_sheets = ft.Checkbox(label="输出分项表格", value=False, active_color=theme.PRIMARY)
     skip_hidden_rows = ft.Checkbox(label="跳过隐藏行", value=False, active_color=theme.PRIMARY)
     skip_hidden_cols = ft.Checkbox(label="跳过隐藏列", value=False, active_color=theme.PRIMARY)
     filter_zero_engine_hours = ft.Checkbox(label="过滤零小时数", value=False, active_color=theme.PRIMARY)
@@ -41,6 +69,8 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
     filter_zero_km_meter = ft.Checkbox(label="过滤零公里仪表", value=False, active_color=theme.PRIMARY)
     filter_zero_run_hours = ft.Checkbox(label="过滤零运行小时数", value=False, active_color=theme.PRIMARY)
     filter_zero_run_km = ft.Checkbox(label="过滤零运行里程", value=False, active_color=theme.PRIMARY)
+    anomaly_results = create_anomaly_results_table()
+    exporting = False
 
     def on_equipment_toggle(e):
         model_toggle.disabled = not bool(eq_toggle.value)
@@ -114,21 +144,30 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
         update_date_label("end")
 
     async def export(e):
+        nonlocal exporting
+        if exporting:
+            return
+
         path = (source_path.value or "").strip()
         if not path:
             result_text.value, result_text.color, result_text.visible = "请选择数据目录", theme.ERROR, True
-            result_text.update()
+            safe_update(result_text)
             return
         if model_toggle.value and not eq_toggle.value:
             result_text.value, result_text.color, result_text.visible = "型号台账匹配需要设备台账", theme.ERROR, True
-            result_text.update()
+            safe_update(result_text)
             return
         if selected_dates["end"] < selected_dates["start"]:
             result_text.value, result_text.color, result_text.visible = "结束日期早于起始日期", theme.ERROR, True
-            result_text.update()
+            safe_update(result_text)
             return
 
         output = str(Path(path) / f"每日报表_{selected_dates['start']:%Y-%m-%d}_{selected_dates['end']:%Y-%m-%d}.xlsx")
+        exporting = True
+        export_btn.disabled = True
+        export_btn.text = "导出中..."
+        safe_update(export_btn)
+        anomaly_results["update"]([])
         try:
             eq = ledger_refs.get("get_ledger", lambda: None)() if eq_toggle.value else None
             model = model_ledger_refs.get("get_model_ledger", lambda: None)() if model_toggle.value else None
@@ -140,6 +179,12 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
                 selected_dates["end"].isoformat(),
                 equipment_ledger=eq,
                 model_ledger=model,
+                config={
+                    "include_raw_equipment_name": bool(include_raw_name.value),
+                    "include_raw_equipment_code": bool(include_raw_code.value),
+                    "include_raw_company_name": bool(include_raw_company.value),
+                },
+                include_detail_sheets=bool(include_detail_sheets.value),
                 preprocess_options={
                     "skip_hidden_rows": bool(skip_hidden_rows.value),
                     "skip_hidden_cols": bool(skip_hidden_cols.value),
@@ -151,15 +196,22 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
                     "filter_zero_run_km": bool(filter_zero_run_km.value),
                 },
             )
-            result_text.value = f"已保存至当前目录，{len(result.report)} 行，警告 {len(result.warnings)} 条"
+            anomaly_results["update"](_warning_records(result.warnings))
+            detail_message = f"，分项表 {len(result.detail_sheets)} 个" if result.detail_sheets else ""
+            result_text.value = f"已保存至当前目录，{len(result.report)} 行，警告 {len(result.warnings)} 条{detail_message}"
             result_text.color = theme.WARNING if result.warnings else theme.SUCCESS
             result_text.visible = True
             log(result_text.value, logging.WARNING if result.warnings else logging.INFO)
-            result_text.update()
+            safe_update(result_text)
         except Exception as ex:
             log(f"日报导出失败: {ex}", logging.ERROR)
             result_text.value, result_text.color, result_text.visible = f"日报导出失败: {ex}", theme.ERROR, True
-            result_text.update()
+            safe_update(result_text)
+        finally:
+            exporting = False
+            export_btn.disabled = False
+            export_btn.text = "导出每日报表"
+            safe_update(export_btn)
 
     export_btn = theme.primary_btn("导出每日报表", icon=ft.Icons.DOWNLOAD)
     export_btn.on_click = export
@@ -187,6 +239,16 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
             ft.Container(model_toggle, col={"xs": 12, "md": 6}),
             ft.Container(skip_hidden_rows, col={"xs": 12, "md": 6}),
             ft.Container(skip_hidden_cols, col={"xs": 12, "md": 6}),
+        ],
+        run_spacing=4,
+    )
+
+    output_options = ft.ResponsiveRow(
+        [
+            ft.Container(include_raw_name, col={"xs": 12, "md": 6}),
+            ft.Container(include_raw_code, col={"xs": 12, "md": 6}),
+            ft.Container(include_raw_company, col={"xs": 12, "md": 6}),
+            ft.Container(include_detail_sheets, col={"xs": 12, "md": 6}),
         ],
         run_spacing=4,
     )
@@ -223,6 +285,7 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
                 theme.module_card([ft.Row([source_path], spacing=8)], label="数据目录"),
                 theme.module_card([date_range], label="日期范围"),
                 theme.module_card([options], label="处理选项"),
+                theme.module_card([output_options], label="输出选项"),
                 theme.module_card([filters], label="数据过滤"),
                 ft.Row(
                     [export_btn, result_text],
@@ -230,6 +293,7 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     spacing=12,
                 ),
+                anomaly_results["container"],
             ],
             spacing=theme.SPACING_MD,
         ),
@@ -237,9 +301,15 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
     )
     return container, {
         "btn": export_btn,
+        "source_path": source_path,
         "result_text": result_text,
+        "anomaly_results": anomaly_results,
         "eq_toggle": eq_toggle,
         "model_toggle": model_toggle,
+        "include_raw_name": include_raw_name,
+        "include_raw_code": include_raw_code,
+        "include_raw_company": include_raw_company,
+        "include_detail_sheets": include_detail_sheets,
         "skip_hidden_rows": skip_hidden_rows,
         "skip_hidden_cols": skip_hidden_cols,
         "filter_zero_engine_hours": filter_zero_engine_hours,

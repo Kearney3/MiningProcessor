@@ -97,6 +97,30 @@ class TestSaveConfig:
         assert saved["shift_mapping"]["白班"] == "Day"
 
 
+def test_daily_report_runtime_identity_options_are_not_persisted(tmp_path, monkeypatch):
+    config_file = tmp_path / "config.json"
+    config_file.write_text(json.dumps({}), encoding="utf-8")
+    user_file = tmp_path / "config.user.json"
+    monkeypatch.setattr(config_loader, "_CONFIG_FILE", config_file)
+    monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", user_file)
+
+    config_loader.save_daily_report_config({
+        "include_raw_equipment_name": False,
+        "include_raw_equipment_code": False,
+        "include_raw_company_name": False,
+    })
+
+    saved = json.loads(user_file.read_text(encoding="utf-8"))
+    assert saved["user_config"]["daily_report"] == {
+        "material_statistics": config_loader.DEFAULT_DAILY_REPORT_CONFIG["material_statistics"],
+        "formulas": config_loader.DEFAULT_DAILY_REPORT_CONFIG["formulas"],
+    }
+    loaded = config_loader.get_daily_report_config()
+    assert "include_raw_equipment_name" not in loaded
+    assert "include_raw_equipment_code" not in loaded
+    assert "include_raw_company_name" not in loaded
+
+
 class TestGetDeviceLoadMap:
     def test_get_new_version(self, temp_config):
         result = config_loader.get_device_load_map("new")
@@ -490,4 +514,3 @@ class TestAnomalyDetectionConfig:
         cfg = config_loader.get_anomaly_detection_config()
         assert cfg["enabled"] is True
         assert cfg["generate_report"] is True
-

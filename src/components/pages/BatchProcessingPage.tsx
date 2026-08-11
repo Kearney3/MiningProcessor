@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { BridgeProp, BatchProgress, ScanResult, BatchSummary } from "../../lib/types";
+import type { BridgeProp, BatchProgress, ScanResult, BatchSummary, AnomalyRecord } from "../../lib/types";
 import { useToast } from "../Toast";
 import {
   FolderIcon, SearchIcon, SettingsIcon, CalendarIcon, RulerIcon,
@@ -13,6 +13,7 @@ import { ChipToggle, StyledToggle as Toggle, ConfirmDialog, Collapsible, Section
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { useLastDirectory } from "../../hooks/useLastDirectory";
 import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG } from "../AnomalyPanel";
+import { AnomalyResultsTable } from "../AnomalyResultsTable";
 
 // ═══════════════════════════════════════
 // Types
@@ -104,6 +105,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<BatchSummary | null>(null);
+  const [anomalies, setAnomalies] = useState<AnomalyRecord[]>([]);
 
   // -- Confirmation dialog --
   const [showConfirm, setShowConfirm] = useState(false);
@@ -177,6 +179,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
     setError(null);
     setResult(null);
     setSummary(null);
+    setAnomalies([]);
     bridge.setProgress(null);
     try {
       const params: Record<string, unknown> = {
@@ -222,6 +225,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
       const res = await bridge.call<{ cancelled?: boolean; summary?: BatchSummary }>("batch_process", params);
       if (res.summary) {
         setSummary(res.summary);
+        setAnomalies(res.summary.anomalies ?? []);
       }
       setResult("批量处理完成");
       notify("批量处理完成", "success");
@@ -657,6 +661,8 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
           )}
         </div>
       )}
+
+      <AnomalyResultsTable records={anomalies} />
 
       {/* ════════════════════════════════════
           Confirmation Dialog

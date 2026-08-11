@@ -1,4 +1,4 @@
-"""日报导出设置：物料关键字、公式和原始字段开关。"""
+"""日报导出设置：物料关键字和公式。"""
 from __future__ import annotations
 
 import logging
@@ -23,9 +23,6 @@ def _create_daily_report_config_section(page: ft.Page, log):
     config_state: dict = {}
     material_rows: list[dict] = []
     formula_fields: dict[str, ft.TextField] = {}
-    include_raw_name = ft.Checkbox(label="输出原始设备名称")
-    include_raw_code = ft.Checkbox(label="输出原始设备编号")
-    include_raw_company = ft.Checkbox(label="输出原始公司名称")
     status_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
     material_column = ft.Column(spacing=6)
     formula_column = ft.Column(spacing=6)
@@ -82,9 +79,6 @@ def _create_daily_report_config_section(page: ft.Page, log):
     def _reload(e=None):
         nonlocal config_state
         config_state = config_loader.get_daily_report_config()
-        include_raw_name.value = bool(config_state.get("include_raw_equipment_name", True))
-        include_raw_code.value = bool(config_state.get("include_raw_equipment_code", True))
-        include_raw_company.value = bool(config_state.get("include_raw_company_name", True))
         for key in DAILY_REPORT_FORMULA_OUTPUTS:
             if key not in formula_fields:
                 formula_fields[key] = ft.TextField(
@@ -129,9 +123,6 @@ def _create_daily_report_config_section(page: ft.Page, log):
             return
 
         report_config = {
-            "include_raw_equipment_name": bool(include_raw_name.value),
-            "include_raw_equipment_code": bool(include_raw_code.value),
-            "include_raw_company_name": bool(include_raw_company.value),
             "material_statistics": _collect_material_mapping(),
             "formulas": formulas,
         }
@@ -146,9 +137,6 @@ def _create_daily_report_config_section(page: ft.Page, log):
     def _reset(e=None):
         _rebuild_material_rows(deepcopy(config_loader.DEFAULT_DAILY_REPORT_CONFIG["material_statistics"]))
         defaults = config_loader.DEFAULT_DAILY_REPORT_CONFIG
-        include_raw_name.value = defaults["include_raw_equipment_name"]
-        include_raw_code.value = defaults["include_raw_equipment_code"]
-        include_raw_company.value = defaults["include_raw_company_name"]
         for key, field in formula_fields.items():
             field.value = defaults["formulas"].get(key, "")
             field.error_text = None
@@ -172,7 +160,7 @@ def _create_daily_report_config_section(page: ft.Page, log):
         border_radius=8,
     )
     formula_hint = ft.Text(
-        "公式变量必须来自已配置的工时表头/列映射；支持四则运算、比较和三元表达式。",
+        "保存时校验公式语法和字段名，导出前再按实际工时表头复核字段是否存在；支持四则运算、比较和三元表达式。",
         size=11, color=theme.TEXT_SECONDARY,
     )
     action_row = ft.Row(
@@ -189,7 +177,6 @@ def _create_daily_report_config_section(page: ft.Page, log):
         initially_expanded=False,
         content_controls=[
             ft.Text("物料类型无需配置，日报会自动展开源数据中出现的全部物料类型。统计分类按配置行顺序进行关键字匹配，每条记录只归入第一个命中类别。", size=12, color=theme.TEXT_SECONDARY),
-            ft.Row([include_raw_name, include_raw_code, include_raw_company], wrap=True, spacing=8),
             theme.module_card([material_box], label="物料统计配置"),
             formula_hint,
             theme.module_card([formula_column], label="延迟、待机与利用率公式"),

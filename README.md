@@ -3,13 +3,13 @@
 > 矿山运营 Excel 报表批量处理工具
 
 <p>
-  <img src="https://img.shields.io/badge/version-v2.4.0-blue?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-v2.5.0-blue?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/Python-≥3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="python" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square" alt="license" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="platform" />
   <img src="https://img.shields.io/badge/Tauri-v2-FFC131?style=flat-square&logo=tauri&logoColor=black" alt="tauri" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="react" />
-  <img src="https://img.shields.io/badge/tests-1054%20passed-brightgreen?style=flat-square" alt="tests" />
+  <img src="https://img.shields.io/badge/tests-1144%20passed-brightgreen?style=flat-square" alt="tests" />
 </p>
 
 <p>
@@ -74,6 +74,7 @@ pnpm dev:bridge
 - 用户配置菜单（数据库连接、工作效率表头映射）
 - 实时日志展示
 - 设备台账管理（支持设备名称模糊匹配、编号匹配）
+- 日报导出（日期范围汇总、公式校验、原始字段开关、可选分项 Sheet）
 - 异常值检测（阈值 / σ 异常 / 百分位，支持标记、过滤、替换默认值三种处理模式）
 
 ### 命令行使用
@@ -208,7 +209,7 @@ MiningProcessor/
 ├── tsconfig.json / tsconfig.node.json
 ├── config.json                 # 持久化默认配置（提交 Git）
 ├── config.user.json            # 用户覆盖配置（gitignore，含凭据）
-├── tests/                      # pytest 测试（37 个文件，747 个用例）
+├── tests/                      # pytest 测试（46 个文件，1144 个用例）
 ├── hooks/                      # Git hooks（push 前自动运行测试）
 │   └── pre-push
 ├── .github/workflows/
@@ -410,6 +411,7 @@ uv run flet build windows # Windows
 - `package.json`（Node.js / Flet 前端）
 - `src-tauri/tauri.conf.json`（Tauri 应用配置）
 - `src-tauri/Cargo.toml`（Rust crate）
+- `src/App.tsx`（前端开发环境的版本回退显示）
 
 ```bash
 # 查看当前版本，同步所有文件
@@ -430,6 +432,24 @@ uv run scripts/bump_version.py --bump minor --dry-run
 ---
 
 ## 📋 更新日志
+
+### v2.5.0 · 2026-08-11
+
+- 🆕 **每日报表导出**
+  - 新增按日期范围汇总的日报导出模块，支持设备台账和型号台账匹配
+  - 原始设备名称、编号、公司名称的输出开关移动到日报页面
+  - 新增可选分项 Sheet：工时、运行、生产、油耗和电耗统计
+  - 导出期间按钮进入“导出中”状态，防止重复提交
+- 🧪 **日报配置校验**
+  - 日报公式保存/导出前校验语法、字段名和实际工时表头
+  - 配置错误和数据处理警告写入“匹配警告” Sheet，并在界面底部展示明细
+- 🛡️ **异常值可视化**
+  - 数据处理、批量处理、日报导出和数据同步页面增加异常/警告明细表格
+  - 异常记录支持保留数据类型、设备、字段、异常值和说明等定位信息
+- 🐛 **Excel 导出修复**
+  - 修复工时分项 Sheet 将数字时间字段误识别为日期、导出为 `1970-01-01` 的问题
+- ✅ **测试覆盖**
+  - Python 测试共 1144 个，覆盖日报导出、公式校验、异常值明细和 Excel 格式化
 
 ### v2.4.0 · 2026-08-08
 

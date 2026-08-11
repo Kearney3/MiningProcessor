@@ -730,11 +730,13 @@ def _daily_report_export(params: dict) -> dict:
         model_ledger=model,
         config=params.get("config"),
         preprocess_options=params.get("preprocess_options"),
+        include_detail_sheets=bool(params.get("include_detail_sheets", False)),
     )
     return {
         "output_file": output_path,
         "rows": len(result.report),
         "warnings": result.warnings,
+        "detail_sheets": list(result.detail_sheets),
     }
 
 
@@ -754,7 +756,10 @@ def _save_daily_report_config(params: dict) -> dict:
 def _validate_daily_report_config(params: dict) -> dict:
     from func.daily_report import validate_daily_report_formulas
 
-    errors = validate_daily_report_formulas((params.get("config") or {}).get("formulas"))
+    errors = validate_daily_report_formulas(
+        (params.get("config") or {}).get("formulas"),
+        available_columns=params.get("available_columns"),
+    )
     return {"valid": not errors, "errors": errors}
 
 

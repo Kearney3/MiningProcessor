@@ -130,6 +130,29 @@ class TestIsDateColumn:
 
 
 class TestWriteFormattedExcel:
+    def test_date_only_preserves_numeric_object_columns(self, tmp_path):
+        """日报分项工时列即使因空值成为 object，也不能被当成日期转换。"""
+        from openpyxl import load_workbook
+
+        from func.excel_formatter import write_formatted_excel
+
+        out = tmp_path / "worktime-detail.xlsx"
+        df = pd.DataFrame({
+            "日期": [datetime.date(2026, 8, 1), datetime.date(2026, 8, 2)],
+            "应运行分钟": pd.Series([720, 600], dtype=object),
+            "应运行小时数": pd.Series([12, 10], dtype=object),
+            "总产量生产运行小时": pd.Series([8.6, 7.5], dtype=object),
+        })
+        write_formatted_excel(str(out), {"工时统计": df}, date_only=True)
+
+        wb = load_workbook(str(out), data_only=True)
+        ws = wb["工时统计"]
+        assert ws.cell(row=2, column=2).value == 720
+        assert ws.cell(row=2, column=3).value == 12
+        assert ws.cell(row=2, column=4).value == pytest.approx(8.6)
+        assert ws.cell(row=2, column=2).number_format == "General"
+        wb.close()
+
     def test_creates_file(self, tmp_path):
         from func.excel_formatter import write_formatted_excel
 

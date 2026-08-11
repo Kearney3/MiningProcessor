@@ -130,6 +130,12 @@ def detect_and_filter(
     # 构建异常明细 DataFrame
     anomalies_df = _build_anomalies_df(df, hits)
 
+    # 运行时保留明细，供 GUI 在任务完成后展示；报告生成仍沿用原有路径。
+    if config._anomaly_records is not None and anomalies_df is not None:
+        for record in anomalies_df.to_dict("records"):
+            record["数据类型"] = label
+            config._anomaly_records.append(record)
+
     # 处理
     effective_rules = handling_rules or config.handling_rules
     # config.handling_rules 按数据类型嵌套，需提取当前类型的规则

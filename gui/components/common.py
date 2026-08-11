@@ -269,6 +269,113 @@ def _cell_text(value) -> str:
     return str(value)
 
 
+# 异常值明细表：保留高频定位字段，长说明在单元格内截断并可通过表格滚动查看。
+_ANOMALY_RESULT_COLUMNS = [
+    ("数据类型", 86),
+    ("行号", 52),
+    ("日期", 92),
+    ("班次", 56),
+    ("设备名称", 160),
+    ("设备编号", 90),
+    ("异常列", 100),
+    ("异常值", 86),
+    ("检测方法", 82),
+    ("说明", 320),
+]
+
+
+def create_anomaly_results_table() -> dict:
+    """创建异常值结果表及其更新函数。
+
+    返回的 ``update(records)`` 可由处理完成回调调用；空列表会隐藏整个结果区，
+    有数据时在页面底部显示可纵向、横向滚动的 DataTable。
+    """
+    try:
+        from . import theme
+    except ImportError:
+        import gui.theme as theme
+
+    columns = [name for name, _ in _ANOMALY_RESULT_COLUMNS]
+    table = ft.DataTable(
+        columns=[ft.DataColumn(ft.Text(name, size=12, no_wrap=True)) for name in columns],
+        rows=[],
+        column_spacing=12,
+        heading_row_height=32,
+        data_row_min_height=30,
+        data_row_max_height=44,
+    )
+    count_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
+
+    table_view = ft.Container(
+        content=ft.Column(
+            [ft.Row([table], scroll=ft.ScrollMode.ALWAYS)],
+            scroll=ft.ScrollMode.AUTO,
+            horizontal_alignment=ft.CrossAxisAlignment.START,
+        ),
+        height=250,
+    )
+    container = ft.Container(
+        visible=False,
+        content=ft.Column(
+            [
+                ft.Row(
+                    [
+                        ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED, color=theme.WARNING, size=17),
+                        ft.Text(
+                            "异常值明细",
+                            size=13,
+                            weight=ft.FontWeight.W_600,
+                            color=theme.WARNING,
+                        ),
+                        count_text,
+                    ],
+                    spacing=6,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                ),
+                table_view,
+            ],
+            spacing=6,
+        ),
+        bgcolor=theme.SURFACE,
+        border=ft.Border.all(1, theme.WARNING),
+        border_radius=theme.RADIUS_SM,
+        padding=theme.SPACING_SM,
+    )
+
+    def update(records: list[dict] | None) -> None:
+        rows = list(records or [])
+        table.rows = []
+        for record in rows:
+            cells = []
+            for column, width in _ANOMALY_RESULT_COLUMNS:
+                color = theme.ERROR if column == "异常值" else theme.TEXT_PRIMARY
+                if column == "说明":
+                    color = theme.TEXT_SECONDARY
+                cells.append(
+                    ft.DataCell(
+                        ft.Text(
+                            _cell_text(record.get(column)),
+                            width=width,
+                            size=11,
+                            color=color,
+                            max_lines=2,
+                            overflow=ft.TextOverflow.ELLIPSIS,
+                        )
+                    )
+                )
+            table.rows.append(ft.DataRow(cells=cells))
+
+        count_text.value = f"共 {len(rows)} 条"
+        container.visible = bool(rows)
+        safe_update(container)
+
+    return {
+        "container": container,
+        "table": table,
+        "update": update,
+    }
+
+
 def _show_path_confirm(text_field: ft.TextField):
     """在路径输入框右侧显示绿色确认勾，1.5 秒后恢复为原图标。"""
     try:
