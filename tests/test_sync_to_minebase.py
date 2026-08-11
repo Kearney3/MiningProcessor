@@ -526,6 +526,12 @@ class TestDiscoverFiles:
         assert "fuel" in found
         assert "electrical" not in found
 
+    def test_discover_processed_outputs_supports_xls_without_xlsm(self, tmp_path):
+        (tmp_path / "Fuel.xls").write_bytes(b"")
+        (tmp_path / "Fuel.xlsm").write_bytes(b"")
+        found = discover_files(tmp_path, keywords={})
+        assert found["fuel"][0].name == "Fuel.xls"
+
     def test_discover_with_keywords(self, tmp_path):
         """关键字匹配模式与 excel_batch 一致。"""
         import shutil

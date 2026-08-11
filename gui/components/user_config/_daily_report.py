@@ -1,0 +1,201 @@
+"""日报导出设置：物料关键字、公式和原始字段开关。"""
+from __future__ import annotations
+
+import logging
+from copy import deepcopy
+
+import flet as ft
+
+from func import config_loader
+from func.daily_report import DAILY_REPORT_FORMULA_OUTPUTS, validate_daily_report_formulas
+from gui.components.common import _log_message
+
+try:
+    from gui import theme
+except ImportError:
+    import gui.theme as theme
+
+from ._helpers import _create_keyword_input
+
+
+def _create_daily_report_config_section(page: ft.Page, log):
+    """创建日报设置卡片，使用与工作效率表头映射一致的关键字标签交互。"""
+    config_state: dict = {}
+    material_rows: list[dict] = []
+    formula_fields: dict[str, ft.TextField] = {}
+    include_raw_name = ft.Checkbox(label="输出原始设备名称")
+    include_raw_code = ft.Checkbox(label="输出原始设备编号")
+    include_raw_company = ft.Checkbox(label="输出原始公司名称")
+    status_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
+    material_column = ft.Column(spacing=6)
+    formula_column = ft.Column(spacing=6)
+
+    def _set_status(message: str, color=theme.TEXT_SECONDARY):
+        status_text.value = message
+        status_text.color = color
+        try:
+            status_text.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    def _rebuild_material_rows(mapping: dict):
+        material_rows.clear()
+        for target, keywords in mapping.items():
+            kw_column, kw_get, kw_set = _create_keyword_input(
+                page, "", "输入关键字后回车添加",
+            )
+            kw_set(keywords if isinstance(keywords, list) else [])
+            target_field = ft.TextField(
+                value=str(target), width=115, dense=True, text_size=13,
+                border_color=theme.BORDER, focused_border_color=theme.PRIMARY,
+            )
+            material_rows.append({"target": target_field, "get": kw_get})
+            material_column.controls.append(
+                ft.Container(
+                    content=ft.Row(
+                        [
+                            ft.Text("统计列", width=48, size=11, color=theme.TEXT_SECONDARY),
+                            target_field,
+                            ft.Container(content=kw_column, expand=True),
+                        ],
+                        spacing=8,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    ),
+                    padding=ft.Padding.symmetric(horizontal=8, vertical=6),
+                    border=ft.Border(bottom=ft.BorderSide(1, theme.BORDER)),
+                )
+            )
+        try:
+            material_column.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    def _collect_material_mapping() -> dict[str, list[str]]:
+        result = {}
+        for row in material_rows:
+            target = (row["target"].value or "").strip()
+            keywords = [str(value).strip() for value in row["get"]() if str(value).strip()]
+            if target and keywords:
+                result[target] = keywords
+        return result
+
+    def _reload(e=None):
+        nonlocal config_state
+        config_state = config_loader.get_daily_report_config()
+        include_raw_name.value = bool(config_state.get("include_raw_equipment_name", True))
+        include_raw_code.value = bool(config_state.get("include_raw_equipment_code", True))
+        include_raw_company.value = bool(config_state.get("include_raw_company_name", True))
+        for key in DAILY_REPORT_FORMULA_OUTPUTS:
+            if key not in formula_fields:
+                formula_fields[key] = ft.TextField(
+                    label=key,
+                    value="",
+                    multiline=True,
+                    min_lines=1,
+                    max_lines=2,
+                    expand=True,
+                    dense=True,
+                    text_size=12,
+                    border_color=theme.BORDER,
+                    focused_border_color=theme.PRIMARY,
+                )
+            formula_fields[key].value = str(config_state.get("formulas", {}).get(key, ""))
+            formula_fields[key].error_text = None
+        formula_column.controls = list(formula_fields.values())
+        try:
+            formula_column.update()
+        except (RuntimeError, AttributeError):
+            pass
+        _rebuild_material_rows(config_state.get("material_statistics", {}))
+        _set_status("")
+        try:
+            page.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    def _save(e=None):
+        formulas = {key: field.value or "" for key, field in formula_fields.items()}
+        errors = validate_daily_report_formulas(formulas)
+        for key, field in formula_fields.items():
+            field.error_text = errors.get(key)
+        if errors:
+            message = "；".join(f"{key}：{value}" for key, value in errors.items())
+            _set_status(message, theme.ERROR)
+            _log_message(log, f"日报公式校验失败：{message}", level=logging.WARNING)
+            try:
+                page.update()
+            except (RuntimeError, AttributeError):
+                pass
+            return
+
+        report_config = {
+            "include_raw_equipment_name": bool(include_raw_name.value),
+            "include_raw_equipment_code": bool(include_raw_code.value),
+            "include_raw_company_name": bool(include_raw_company.value),
+            "material_statistics": _collect_material_mapping(),
+            "formulas": formulas,
+        }
+        try:
+            config_loader.save_daily_report_config(report_config)
+            _set_status("日报导出设置已保存", theme.SUCCESS)
+            _log_message(log, "已保存日报导出设置")
+        except Exception as exc:
+            _set_status(str(exc), theme.ERROR)
+            _log_message(log, f"日报导出设置保存失败：{exc}", level=logging.ERROR)
+
+    def _reset(e=None):
+        _rebuild_material_rows(deepcopy(config_loader.DEFAULT_DAILY_REPORT_CONFIG["material_statistics"]))
+        defaults = config_loader.DEFAULT_DAILY_REPORT_CONFIG
+        include_raw_name.value = defaults["include_raw_equipment_name"]
+        include_raw_code.value = defaults["include_raw_equipment_code"]
+        include_raw_company.value = defaults["include_raw_company_name"]
+        for key, field in formula_fields.items():
+            field.value = defaults["formulas"].get(key, "")
+            field.error_text = None
+        _set_status("已恢复默认值（请点击保存生效）", theme.TEXT_SECONDARY)
+        try:
+            page.update()
+        except (RuntimeError, AttributeError):
+            pass
+
+    material_header = ft.Row(
+        [
+            ft.Text("统计列", width=48, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
+            ft.Text("目标名称", width=115, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
+            ft.Text("关键字（名称匹配，按顺序只命中一次）", expand=True, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
+        ],
+        spacing=8,
+    )
+    material_box = ft.Container(
+        content=ft.Column([material_header, material_column], spacing=0),
+        border=ft.Border.all(1, theme.BORDER),
+        border_radius=8,
+    )
+    formula_hint = ft.Text(
+        "公式变量必须来自已配置的工时表头/列映射；支持四则运算、比较和三元表达式。",
+        size=11, color=theme.TEXT_SECONDARY,
+    )
+    action_row = ft.Row(
+        [
+            theme.primary_btn("保存", icon=ft.Icons.SAVE, on_click=_save),
+            theme.secondary_btn("重新加载", icon=ft.Icons.REFRESH, on_click=_reload, height=34),
+            theme.secondary_btn("恢复默认", icon=ft.Icons.RESTART_ALT, on_click=_reset, height=34),
+        ], spacing=8, wrap=True,
+    )
+    card = theme.make_collapsible(
+        title="日报导出设置",
+        subtitle="日报导出页只选择日期和数据来源，统计口径在这里统一维护",
+        icon=getattr(ft.Icons, "SUMMARIZE", ft.Icons.DESCRIPTION),
+        initially_expanded=False,
+        content_controls=[
+            ft.Text("物料类型无需配置，日报会自动展开源数据中出现的全部物料类型。统计分类按配置行顺序进行关键字匹配，每条记录只归入第一个命中类别。", size=12, color=theme.TEXT_SECONDARY),
+            ft.Row([include_raw_name, include_raw_code, include_raw_company], wrap=True, spacing=8),
+            theme.module_card([material_box], label="物料统计配置"),
+            formula_hint,
+            theme.module_card([formula_column], label="延迟、待机与利用率公式"),
+            action_row,
+            status_text,
+        ],
+    )
+    _reload()
+    return card, {"reload": _reload, "save": _save, "reset": _reset}

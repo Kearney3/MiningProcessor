@@ -72,6 +72,26 @@ _USER_CONFIG_FILE = _persistent_root / "config.user.json"
 _USER_CONFIG_SECTION = "user_config"
 
 
+DEFAULT_DAILY_REPORT_CONFIG: dict[str, Any] = {
+    "include_raw_equipment_name": True,
+    "include_raw_equipment_code": True,
+    "include_raw_company_name": True,
+    "material_statistics": {
+        "焦煤": ["Нү"],
+        "动力煤": ["oxid"],
+        "工程作业": ["И.А"],
+        "土石": ["Хө", "Ш.Х", "Шг.х", "Б.н"],
+    },
+    "formulas": {
+        "延迟时间": "transfer+auxiliary_work+waiting_load",
+        "待机时间": "blasting+refueling+standby+weather_snow+weather_dust+fill_water+power_issue_planned+power_issue_unplanned",
+        "设备可动率": "(planned_minutes-planned_maintenance-unplanned_fault)/planned_minutes",
+        "设备可动利用率": "(planned_minutes-planned_maintenance-unplanned_fault)>0?(transfer+auxiliary_work+waiting_load+total_production_minutes)/(planned_minutes-planned_maintenance-unplanned_fault):0",
+        "设备利用率": "(planned_minutes-planned_maintenance-unplanned_fault)>0?(transfer+auxiliary_work+waiting_load+total_production_minutes)/(planned_minutes):0",
+    },
+}
+
+
 def _init_persistent_defaults() -> None:
     """首次运行时，将打包的默认配置复制到持久化目录。"""
     if _persistent_root == _BUNDLED_ROOT:
@@ -698,6 +718,58 @@ def save_worktime_header_mapping(mapping: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
+# 日报统计配置
+# ---------------------------------------------------------------------------
+
+def get_daily_report_config() -> dict[str, Any]:
+    """获取日报统计配置（默认配置 + 用户覆盖）。"""
+    saved = get_user_config("daily_report", None)
+    if isinstance(saved, dict):
+        result = _deep_merge(DEFAULT_DAILY_REPORT_CONFIG, saved)
+    else:
+        cfg = load_config().get("daily_report", {})
+        result = _deep_merge(DEFAULT_DAILY_REPORT_CONFIG, cfg) if isinstance(cfg, dict) else copy.deepcopy(DEFAULT_DAILY_REPORT_CONFIG)
+
+    # 兼容第一版日报配置：物料展开已改为自动收集全部物料类型，
+    # 公式默认值也随业务口径更新；只替换旧的系统默认值，不覆盖用户真正改过的公式。
+    result.pop("production_materials", None)
+    legacy_material_statistics = {
+        "焦煤": ["焦煤"],
+        "动力煤": ["动力煤"],
+        "工程作业": ["工程作业"],
+        "土石": ["土石"],
+    }
+    if result.get("material_statistics") == legacy_material_statistics:
+        result["material_statistics"] = copy.deepcopy(DEFAULT_DAILY_REPORT_CONFIG["material_statistics"])
+    legacy_formulas = {
+        "延迟时间": "transfer+auxiliary_work+waiting_load",
+        "待机时间": "standby",
+        "设备可动率": "(planned_minutes-planned_maintenance-unplanned_fault)>0?(planned_minutes-planned_maintenance-unplanned_fault)/planned_minutes:0",
+        "设备可动利用率": "(planned_minutes-planned_maintenance-unplanned_fault)>0?total_production_minutes/(planned_minutes-planned_maintenance-unplanned_fault):0",
+        "设备利用率": "planned_minutes>0?total_production_minutes/planned_minutes:0",
+    }
+    formulas = result.get("formulas", {})
+    if isinstance(formulas, dict):
+        for key, old_value in legacy_formulas.items():
+            if formulas.get(key) == old_value:
+                formulas[key] = DEFAULT_DAILY_REPORT_CONFIG["formulas"][key]
+    return result
+
+
+def save_daily_report_config(config: dict[str, Any]) -> dict[str, Any]:
+    """持久化日报统计配置到 config.user.json。"""
+    merged = _deep_merge(DEFAULT_DAILY_REPORT_CONFIG, config or {})
+    # 延迟导入避免 config_loader 与日报模块的初始化循环。
+    from func.daily_report import validate_daily_report_formulas
+    formula_errors = validate_daily_report_formulas(merged.get("formulas"))
+    if formula_errors:
+        details = "；".join(f"{field}：{message}" for field, message in formula_errors.items())
+        raise ValueError(f"日报公式配置无效：{details}")
+    update_user_config({"daily_report": merged})
+    return merged
+
+
+# ---------------------------------------------------------------------------
 # 异常值检测配置
 # ---------------------------------------------------------------------------
 
@@ -935,6 +1007,7 @@ def test_llm_connection(config: dict[str, Any] | None = None) -> dict[str, Any]:
 _DATA_DIR = _persistent_root / "data"
 _EQUIPMENT_LEDGER_CACHE = _DATA_DIR / "equipment_ledger_cache.json"
 _OIL_LEDGER_CACHE = _DATA_DIR / "oil_ledger_cache.json"
+_MODEL_LEDGER_CACHE = _DATA_DIR / "model_ledger_cache.json"
 _ledger_cache_lock = threading.RLock()
 
 
@@ -1018,6 +1091,45 @@ def clear_oil_ledger_cache() -> None:
 def has_oil_ledger_cache() -> bool:
     with _ledger_cache_lock:
         return _OIL_LEDGER_CACHE.exists()
+
+
+def save_model_ledger_cache(records: list[dict]) -> None:
+    """将型号台账记录缓存为 JSON 文件。"""
+    with _ledger_cache_lock:
+        _ensure_data_dir()
+        tmp = _MODEL_LEDGER_CACHE.with_suffix(".json.tmp")
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump({"data": records}, f, ensure_ascii=False, indent=2, cls=_LedgerEncoder)
+            tmp.replace(_MODEL_LEDGER_CACHE)
+        finally:
+            if tmp.exists():
+                tmp.unlink()
+
+
+def load_model_ledger_cache() -> list[dict] | None:
+    """加载型号台账缓存，不存在时返回 None。"""
+    with _ledger_cache_lock:
+        if not _MODEL_LEDGER_CACHE.exists():
+            return None
+        try:
+            with open(_MODEL_LEDGER_CACHE, "r", encoding="utf-8") as f:
+                return json.load(f).get("data")
+        except Exception as e:
+            logger.warning("加载型号台账缓存失败: %s", e)
+            return None
+
+
+def clear_model_ledger_cache() -> None:
+    """删除型号台账缓存文件。"""
+    with _ledger_cache_lock:
+        if _MODEL_LEDGER_CACHE.exists():
+            _MODEL_LEDGER_CACHE.unlink()
+
+
+def has_model_ledger_cache() -> bool:
+    with _ledger_cache_lock:
+        return _MODEL_LEDGER_CACHE.exists()
 
 
 # ---------------------------------------------------------------------------

@@ -499,6 +499,20 @@ def discover_files(
     if keywords is None:
         keywords = get_file_keywords()
 
+    def _excel_pattern_matches(pattern: str) -> list[Path]:
+        """按 xlsx 优先、xls 回退匹配固定/通配文件名，不接收 xlsm。"""
+        patterns = [pattern]
+        if pattern.lower().endswith(".xlsx"):
+            patterns.append(pattern[:-5] + ".xls")
+        matches: list[Path] = []
+        for candidate in patterns:
+            matches.extend(input_dir.glob(candidate))
+        unique = {path.resolve(): path for path in matches}
+        return sorted(
+            unique.values(),
+            key=lambda path: (path.suffix.lower() != ".xlsx", path.name.lower()),
+        )
+
     # 列出目录中所有 Excel 文件（排除临时文件）
     excel_files = sorted(
         f for f in input_dir.iterdir()
@@ -515,10 +529,7 @@ def discover_files(
         if data_type == "work_efficiency" and year and month:
             continue
         pattern = info["file_pattern"]
-        if "*" in pattern:
-            matches = sorted(input_dir.glob(pattern))
-        else:
-            matches = list(input_dir.glob(pattern))
+        matches = _excel_pattern_matches(pattern)
         if matches:
             found[data_type] = [matches[0]]
             logger.info("精确匹配: %s → %s", data_type, matches[0].name)
@@ -526,13 +537,13 @@ def discover_files(
     # 2. work_efficiency 专用 glob: 按 year/month 构造精确文件名模式（补充）
     if "work_efficiency" not in found and year and month:
         pattern = f"*{year}{month:02d}*工作效率表*.xlsx"
-        matches = sorted(input_dir.glob(pattern))
+        matches = _excel_pattern_matches(pattern)
         if matches:
             found["work_efficiency"] = [matches[0]]
             logger.info("Glob 匹配: work_efficiency → %s", matches[0].name)
     elif "work_efficiency" not in found:
         pattern = "*工作效率表*.xlsx"
-        matches = sorted(input_dir.glob(pattern))
+        matches = _excel_pattern_matches(pattern)
         if matches:
             found["work_efficiency"] = [matches[0]]
             logger.info("Glob 匹配: work_efficiency → %s", matches[0].name)

@@ -352,6 +352,7 @@ def _extract_common_params(params: dict) -> dict:
         "anomaly_config": _build_anomaly_config(params),
         "use_equipment_ledger": params.get("use_equipment_ledger", False),
         "use_oil_ledger": params.get("use_oil_ledger", False),
+        "use_model_ledger": params.get("use_model_ledger", False),
     }
 
 
@@ -593,6 +594,10 @@ def _batch_process_impl(params: dict, cancel_event: threading.Event) -> dict:
     use_eq = params.get("use_equipment_ledger", False)
     use_oil = params.get("use_oil_ledger", False)
     equipment_ledger, oil_ledger = load_ledgers(use_equipment=use_eq, use_oil=use_oil)
+    model_ledger = None
+    if params.get("use_model_ledger", False):
+        from func.orchestration import load_model_ledger_from_cache
+        model_ledger = load_model_ledger_from_cache()
 
     # 进度回调 → 事件推送
     def progress_cb(payload):
@@ -634,6 +639,7 @@ def _batch_process_impl(params: dict, cancel_event: threading.Event) -> dict:
         merge_output=params.get("merge_output", True),
         equipment_ledger=equipment_ledger,
         oil_ledger=oil_ledger,
+        model_ledger=model_ledger,
         filter_date=filter_date,
         worktime_header_mapping=worktime_header_mapping,
         table_merge_config=params.get("table_merge_config"),
@@ -696,6 +702,60 @@ def _sync_minebase(params: dict) -> dict:
     if dry_run_file:
         resp["dry_run_file"] = dry_run_file
     return resp
+
+
+@_register("daily_report_export")
+def _daily_report_export(params: dict) -> dict:
+    """按日期范围导出每日报表。"""
+    from func.daily_report import export_daily_report
+    from func.orchestration import (
+        load_equipment_ledger_from_cache,
+        load_model_ledger_from_cache,
+    )
+
+    source_dir = str(_sanitize_path(params["source_dir"], must_exist=True, allow_file=False))
+    output_path = str(_sanitize_path(params["output_path"], allow_dir=False))
+    use_equipment = bool(params.get("use_equipment_ledger", True))
+    use_model = bool(params.get("use_model_ledger", False))
+    if use_model and not use_equipment:
+        raise ValueError("型号台账匹配需要同时启用设备台账匹配")
+    equipment = load_equipment_ledger_from_cache() if use_equipment else None
+    model = load_model_ledger_from_cache() if use_model else None
+    result = export_daily_report(
+        source_dir,
+        output_path,
+        params.get("date_start"),
+        params.get("date_end"),
+        equipment_ledger=equipment,
+        model_ledger=model,
+        config=params.get("config"),
+        preprocess_options=params.get("preprocess_options"),
+    )
+    return {
+        "output_file": output_path,
+        "rows": len(result.report),
+        "warnings": result.warnings,
+    }
+
+
+@_register("get_daily_report_config")
+def _get_daily_report_config(params: dict) -> dict:
+    from func.config_loader import get_daily_report_config
+    return get_daily_report_config()
+
+
+@_register("save_daily_report_config")
+def _save_daily_report_config(params: dict) -> dict:
+    from func.config_loader import save_daily_report_config
+    return save_daily_report_config(params.get("config") or {})
+
+
+@_register("validate_daily_report_config")
+def _validate_daily_report_config(params: dict) -> dict:
+    from func.daily_report import validate_daily_report_formulas
+
+    errors = validate_daily_report_formulas((params.get("config") or {}).get("formulas"))
+    return {"valid": not errors, "errors": errors}
 
 
 @_register("export_sync_warnings")
@@ -902,6 +962,16 @@ def _get_oil_ledger_data(params: dict) -> dict:
     return {"rows": rows, "columns": list(rows[0].keys()) if rows else []}
 
 
+@_register("get_model_ledger_data")
+def _get_model_ledger_data(params: dict) -> dict:
+    from func.orchestration import load_model_ledger_from_cache
+    ledger = load_model_ledger_from_cache()
+    if not ledger:
+        return {"rows": [], "columns": []}
+    rows = _sanitize_rows(ledger.to_dict())
+    return {"rows": rows, "columns": list(rows[0].keys()) if rows else []}
+
+
 # ─── 台账文件操作方法 ───
 
 
@@ -925,6 +995,11 @@ def _load_ledger_file_columns(params: dict) -> dict:
 @_register("load_oil_ledger_file_columns")
 def _load_oil_ledger_file_columns(params: dict) -> dict:
     """读取 Excel 文件的列名和 sheet 列表（油品台账，用于列映射）。"""
+    return _load_excel_columns(params)
+
+
+@_register("load_model_ledger_file_columns")
+def _load_model_ledger_file_columns(params: dict) -> dict:
     return _load_excel_columns(params)
 
 
@@ -964,6 +1039,23 @@ def _import_oil_ledger(params: dict) -> dict:
     return {"ok": True, "count": len(records)}
 
 
+@_register("import_model_ledger")
+def _import_model_ledger(params: dict) -> dict:
+    from func.model_ledger import ModelLedger
+    from func.config_loader import save_model_ledger_cache
+
+    safe_path = str(_sanitize_path(params["file_path"], must_exist=True, allow_dir=False))
+    ledger = ModelLedger()
+    ledger.load(
+        safe_path,
+        column_mapping=params.get("column_mapping"),
+        sheet_name=params.get("sheet_name"),
+    )
+    records = ledger.to_dict()
+    save_model_ledger_cache(records)
+    return {"ok": True, "count": len(records)}
+
+
 @_register("export_equipment_ledger_template")
 def _export_equipment_ledger_template(params: dict) -> dict:
     """导出设备台账模板 Excel。"""
@@ -981,6 +1073,14 @@ def _export_oil_ledger_template(params: dict) -> dict:
     safe_path = str(_sanitize_path(params["output_path"], allow_dir=False))
     ledger = OilLedger()
     ledger.export_template(safe_path)
+    return {"ok": True, "output_file": safe_path}
+
+
+@_register("export_model_ledger_template")
+def _export_model_ledger_template(params: dict) -> dict:
+    from func.model_ledger import ModelLedger
+    safe_path = str(_sanitize_path(params["output_path"], allow_dir=False))
+    ModelLedger().export_template(safe_path)
     return {"ok": True, "output_file": safe_path}
 
 
@@ -1002,6 +1102,14 @@ def _set_default_oil_ledger(params: dict) -> dict:
     return {"ok": False, "message": "无台账数据可保存"}
 
 
+@_register("set_default_model_ledger")
+def _set_default_model_ledger(params: dict) -> dict:
+    from func.config_loader import has_model_ledger_cache
+    if has_model_ledger_cache():
+        return {"ok": True, "message": "已是默认台账"}
+    return {"ok": False, "message": "无台账数据可保存"}
+
+
 @_register("cancel_default_equipment_ledger")
 def _cancel_default_equipment_ledger(params: dict) -> dict:
     """清除设备台账默认缓存。"""
@@ -1015,6 +1123,13 @@ def _cancel_default_oil_ledger(params: dict) -> dict:
     """清除油品台账默认缓存。"""
     from func.config_loader import clear_oil_ledger_cache
     clear_oil_ledger_cache()
+    return {"ok": True}
+
+
+@_register("cancel_default_model_ledger")
+def _cancel_default_model_ledger(params: dict) -> dict:
+    from func.config_loader import clear_model_ledger_cache
+    clear_model_ledger_cache()
     return {"ok": True}
 
 
@@ -1034,6 +1149,13 @@ def _clear_oil_ledger(params: dict) -> dict:
     return {"ok": True}
 
 
+@_register("clear_model_ledger")
+def _clear_model_ledger(params: dict) -> dict:
+    from func.config_loader import clear_model_ledger_cache
+    clear_model_ledger_cache()
+    return {"ok": True}
+
+
 @_register("export_ledger_data")
 def _export_ledger_data(params: dict) -> dict:
     """将当前台账数据导出为 Excel。
@@ -1050,6 +1172,10 @@ def _export_ledger_data(params: dict) -> dict:
     if data_type == "oil":
         records = load_oil_ledger_cache()
         sheet_name = "油品台账"
+    elif data_type == "model":
+        from func.config_loader import load_model_ledger_cache
+        records = load_model_ledger_cache()
+        sheet_name = "型号台账"
     else:
         records = load_equipment_ledger_cache()
         sheet_name = "设备台账"

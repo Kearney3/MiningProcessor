@@ -68,6 +68,14 @@ _LEDGER_NAME_FIELDS: dict[str, list[str]] = {
     "production": ["sourceTruckName", "sourceExcavatorName"],
 }
 
+_LEDGER_ID_FIELDS: dict[tuple[str, str], str] = {
+    ("fuel", "sourceEquipmentName"): "sourceEquipmentCode",
+    ("operation", "sourceEquipmentName"): "sourceEquipmentCode",
+    ("work_efficiency", "sourceEquipmentName"): "sourceEquipmentCode",
+    ("production", "sourceTruckName"): "sourceTruckCode",
+    ("production", "sourceExcavatorName"): "sourceExcavatorCode",
+}
+
 # 各数据类型的油品名称字段（用于油品台账匹配）
 _OIL_LEDGER_NAME_FIELDS: dict[str, list[str]] = {
     "fuel": ["fuelName"],
@@ -108,9 +116,12 @@ def _apply_ledger_matching(
             raw_name = row.get(field)
             if not raw_name:
                 continue
-            match = ledger.match(str(raw_name))
-            if match and match["标准名称"] != raw_name:
-                new_row[field] = match["标准名称"]
+            device_id = row.get(
+                _LEDGER_ID_FIELDS.get((data_type, field), "sourceEquipmentCode")
+            )
+            match = ledger.match_device(name=str(raw_name), device_id=device_id)
+            if match and match["标准设备名称"] != raw_name:
+                new_row[field] = match["标准设备名称"]
                 matched_count += 1
             elif not match and warnings is not None:
                 warnings.append({

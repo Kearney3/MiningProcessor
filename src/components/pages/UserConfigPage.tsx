@@ -8,6 +8,7 @@ import {
   HeaderMappingSection,
   ColumnMappingSection,
   AnomalyConfigSection,
+  DailyReportConfigSection,
 } from "../user-config";
 import { RestoreIcon } from "../../lib/icons";
 
@@ -100,6 +101,7 @@ export function UserConfigPage({ bridge }: { bridge: BridgeProp }) {
         <HeaderMappingSection key={`hm-${resetKey}`} bridge={bridge} />
         <ColumnMappingSection key={`cm-${resetKey}`} bridge={bridge} />
         <AnomalyConfigSection key={`anomaly-${resetKey}`} bridge={bridge} />
+        <DailyReportConfigSection key={`daily-report-${resetKey}`} bridge={bridge} />
       </div>
 
       {showConfirm && (

@@ -383,6 +383,11 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         label="油品台账匹配",
         value=False,
     )
+    match_model_toggle = ft.Checkbox(
+        label="型号台账匹配",
+        value=False,
+        tooltip="需同时开启设备台账匹配，按标准设备编号补充型号属性",
+    )
     skip_hidden_rows_toggle = ft.Checkbox(
         label="跳过隐藏行",
         value=False,
@@ -501,7 +506,8 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                     ),
                 ]),
                 anomaly_panel,
-                ft.Row([match_eq_toggle, match_oil_toggle, skip_hidden_rows_toggle, skip_hidden_cols_toggle], spacing=8),
+                ft.Row([match_eq_toggle, match_oil_toggle, match_model_toggle,
+                        skip_hidden_rows_toggle, skip_hidden_cols_toggle], spacing=8),
             ],
             spacing=8,
             expand=True,
@@ -516,6 +522,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     module_refs = {
         "_match_eq_toggle": match_eq_toggle,
         "_match_oil_toggle": match_oil_toggle,
+        "_match_model_toggle": match_model_toggle,
         "_skip_hidden_rows_toggle": skip_hidden_rows_toggle,
         "_skip_hidden_cols_toggle": skip_hidden_cols_toggle,
         "_anomaly_enabled": anomaly_ctrls["_anomaly_enabled"],

@@ -104,6 +104,18 @@ function IconCategory() {
   );
 }
 
+function IconReport() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 3h9l3 3v15H6z" />
+      <path d="M15 3v4h4" />
+      <path d="M9 16v-3" />
+      <path d="M12 16v-6" />
+      <path d="M15 16v-4" />
+    </svg>
+  );
+}
+
 function IconBot() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -127,9 +139,11 @@ const ICONS: Record<string, () => JSX.Element> = {
   "llm-labeling": IconBot,
   "equipment-ledger": IconTruck,
   "oil-ledger": IconDroplet,
+  "model-ledger": IconSlidersHorizontal,
   "load-config": IconSlidersHorizontal,
   "maint-config": IconCategory,
   "user-config": IconUserCog,
+  "daily-report": IconReport,
 };
 
 // --- Nav item definitions ---
@@ -145,11 +159,13 @@ const WORKSPACE_ITEMS: NavItem[] = [
   { id: "llm-labeling", label: "LLM 标注" },
   { id: "data-sync", label: "数据同步" },
   { id: "ledger-match", label: "台账匹配" },
+  { id: "daily-report", label: "日报导出" },
 ];
 
 const MANAGEMENT_ITEMS: NavItem[] = [
   { id: "equipment-ledger", label: "设备台账" },
   { id: "oil-ledger", label: "油品台账" },
+  { id: "model-ledger", label: "型号台账" },
   { id: "load-config", label: "装载量配置" },
   { id: "maint-config", label: "维修分类配置" },
   { id: "user-config", label: "用户配置" },

@@ -226,6 +226,7 @@ def process_files(
     filter_zero_km_meter: bool = False,
     filter_zero_run_hours: bool = False,
     filter_zero_run_km: bool = False,
+    model_ledger=None,
 ) -> dict[str, dict[str, pd.DataFrame]]:
     """
     根据已匹配的文件列表执行批量处理。
@@ -344,10 +345,10 @@ def process_files(
         return all_results, summary
 
     # ── 台账匹配 ──
-    if equipment_ledger or oil_ledger:
+    if equipment_ledger or oil_ledger or model_ledger:
         for module_type in list(all_results.keys()):
             all_results[module_type] = _apply_ledger_to_sheets(
-                all_results[module_type], equipment_ledger, oil_ledger
+                all_results[module_type], equipment_ledger, oil_ledger, model_ledger
             )
 
     if _check_cancel(cancel_event):
@@ -404,9 +405,10 @@ def _apply_ledger_to_sheets(
     sheets: dict[str, pd.DataFrame],
     equipment_ledger: EquipmentLedger = None,
     oil_ledger: OilLedger = None,
+    model_ledger=None,
 ) -> dict[str, pd.DataFrame]:
     """对 sheets 字典进行台账匹配后处理，返回更新后的 sheets。"""
-    return match_sheets(sheets, equipment_ledger, oil_ledger)
+    return match_sheets(sheets, equipment_ledger, oil_ledger, model_ledger)
 
 
 

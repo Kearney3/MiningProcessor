@@ -10,6 +10,7 @@ import pandas as pd
 
 from func.equipment_ledger import EquipmentLedger
 from func.oil_ledger import OilLedger
+from func.ledger_enrichment import MODEL_FIELDS, resolve_equipment_attributes
 from func.excel_utils import dedup_dataframe
 from func.string_utils import clean_string
 
@@ -37,6 +38,7 @@ def _match_equipment_rows(
     name_col: str,
     id_col: Optional[str],
     equipment_ledger: EquipmentLedger,
+    model_ledger=None,
     suffix: str = "",
 ) -> bool:
     """
@@ -46,6 +48,10 @@ def _match_equipment_rows(
     result_name_col = f"标准设备名称{suffix}"
     result_id_col = f"标准设备编号{suffix}"
     result_company_col = f"标准公司名称{suffix}"
+    model_result_cols = (
+        {key: f"{key}{suffix}" for key in MODEL_FIELDS}
+        if model_ledger else {}
+    )
 
     def _extract(result, key):
         return result.get(key, "") if result else ""
@@ -60,8 +66,11 @@ def _match_equipment_rows(
         for _, row in unique_pairs.iterrows():
             name_str = clean_string(row[name_col]) or None
             id_str = clean_string(row[id_col]) or None
-            result = equipment_ledger.match_device(
-                name=name_str, device_id=id_str
+            result = resolve_equipment_attributes(
+                name=name_str,
+                device_id=id_str,
+                equipment_ledger=equipment_ledger,
+                model_ledger=model_ledger,
             )
             pair_to_result[(row[name_col], row[id_col])] = result
             if result:
@@ -81,13 +90,22 @@ def _match_equipment_rows(
             lambda r: _extract(pair_to_result.get((r[name_col], r[id_col])), "标准公司名称"),
             axis=1,
         )
+        for key, col in model_result_cols.items():
+            df[col] = df.apply(
+                lambda r, k=key: _extract(pair_to_result.get((r[name_col], r[id_col])), k),
+                axis=1,
+            )
     else:
         # No id column: batch match on unique names only
         unique_names = df[name_col].dropna().unique()
         name_to_result: dict = {}
         for name in unique_names:
             name_str = clean_string(name) or None
-            result = equipment_ledger.match_device(name=name_str)
+            result = resolve_equipment_attributes(
+                name=name_str,
+                equipment_ledger=equipment_ledger,
+                model_ledger=model_ledger,
+            )
             name_to_result[name] = result
             if result:
                 matched_count += 1
@@ -103,6 +121,10 @@ def _match_equipment_rows(
         df[result_company_col] = df[name_col].map(
             lambda n: _extract(name_to_result.get(n), "标准公司名称")
         )
+        for key, col in model_result_cols.items():
+            df[col] = df[name_col].map(
+                lambda n, k=key: _extract(name_to_result.get(n), k)
+            )
 
     label = f"设备{suffix}" if suffix else "设备"
     logger.info(
@@ -150,6 +172,7 @@ def match_sheets(
     sheets: dict[str, pd.DataFrame],
     equipment_ledger: Optional[EquipmentLedger] = None,
     oil_ledger: Optional[OilLedger] = None,
+    model_ledger=None,
 ) -> dict[str, pd.DataFrame]:
     """对 sheets 字典进行台账匹配后处理，返回更新后的 sheets。
 
@@ -164,7 +187,7 @@ def match_sheets(
     Returns:
         匹配后的 sheets 字典（返回新字典，DataFrame 为副本）
     """
-    if not equipment_ledger and not oil_ledger:
+    if not equipment_ledger and not oil_ledger and not model_ledger:
         return sheets
 
     result = {}
@@ -178,13 +201,13 @@ def match_sheets(
 
             if has_truck_col and has_excavator_col:
                 id_col = "设备编号" if "设备编号" in cols else None
-                _match_equipment_rows(new_df, "矿卡名称", id_col, equipment_ledger, "（矿卡）")
-                _match_equipment_rows(new_df, "挖机名称", None, equipment_ledger, "（挖机）")
+                _match_equipment_rows(new_df, "矿卡名称", id_col, equipment_ledger, model_ledger, "（矿卡）")
+                _match_equipment_rows(new_df, "挖机名称", None, equipment_ledger, model_ledger, "（挖机）")
             else:
                 name_col = _find_col(cols, ["设备名称", "矿卡名称", "原始设备名称"])
                 id_col = "设备编号" if "设备编号" in cols else None
                 if name_col:
-                    _match_equipment_rows(new_df, name_col, id_col, equipment_ledger)
+                    _match_equipment_rows(new_df, name_col, id_col, equipment_ledger, model_ledger)
 
         if oil_ledger:
             oil_col = _find_col(cols, ["油品种类", "油品名称"])
@@ -201,6 +224,7 @@ def apply_ledger_matching(
     equipment_ledger: Optional[EquipmentLedger] = None,
     oil_ledger: Optional[OilLedger] = None,
     preloaded_sheets: Optional[dict[str, pd.DataFrame]] = None,
+    model_ledger=None,
 ) -> bool:
     """
     对已写入的 Excel 文件进行台账匹配后处理。
@@ -218,7 +242,7 @@ def apply_ledger_matching(
     Returns:
         True 表示有匹配发生并已写回，False 表示无匹配或无需处理
     """
-    if not equipment_ledger and not oil_ledger:
+    if not equipment_ledger and not oil_ledger and not model_ledger:
         return False
 
     if preloaded_sheets:
@@ -232,7 +256,7 @@ def apply_ledger_matching(
         sheets_to_match = {name: xl.parse(name) for name in xl.sheet_names}
 
     initial_col_counts = {name: len(df.columns) for name, df in sheets_to_match.items()}
-    matched_sheets = match_sheets(sheets_to_match, equipment_ledger, oil_ledger)
+    matched_sheets = match_sheets(sheets_to_match, equipment_ledger, oil_ledger, model_ledger)
 
     # 检查是否有匹配发生（match_sheets 返回副本，比较列数前后的差异）
     any_matched = any(
