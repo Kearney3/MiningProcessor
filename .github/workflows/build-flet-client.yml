@@ -10,6 +10,7 @@ on:
 env:
   UV_PYTHON: 3.12
   PYTHONUTF8: 1
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
   # https://flet.dev/docs/reference/environment-variables
   FLET_CLI_NO_RICH_OUTPUT: 1
@@ -44,7 +45,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v8.1.0
 
       - name: Install Linux dependencies
         if: matrix.needs_linux_deps
@@ -83,7 +84,7 @@ jobs:
           PY
 
       - name: Upload Artifact
-        uses: actions/upload-artifact@v5.0.0
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: ${{ matrix.name }}-build-artifact
           path: ${{ matrix.artifact_path }}
