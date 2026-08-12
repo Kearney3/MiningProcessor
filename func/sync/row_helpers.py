@@ -2,10 +2,10 @@
 行数据辅助函数、FK 解析、列映射转换、台账匹配、日期过滤。
 """
 import uuid
-from datetime import datetime
 from typing import Any
 
 from func.logger import get_logger
+from func.time_utils import local_now
 
 logger = get_logger(__name__)
 
@@ -311,7 +311,7 @@ def _map_row_to_db_columns(row: dict) -> tuple[list[str], list[Any]]:
     from func.sync.constants import FIELD_TO_COLUMN_MAP
 
     columns = ["id", "updated_at"]
-    values = [str(uuid.uuid4()), datetime.now()]
+    values = [str(uuid.uuid4()), local_now()]
     for field_name, value in row.items():
         col_name = FIELD_TO_COLUMN_MAP.get(field_name)
         if col_name is None:

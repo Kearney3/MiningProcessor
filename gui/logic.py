@@ -14,6 +14,7 @@ from func.excel_batch import scan_files, process_files, MODULE_LABELS
 from func.sync_to_minebase import sync as sync_to_minebase
 from func.sync_to_minebase import test_db_connection
 from func.sync_to_minebase import test_api_connection
+from func.time_utils import local_now
 
 
 from gui.utils import _log_message
@@ -1109,9 +1110,8 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
                 save_picker = sync_refs.get("save_warnings_picker")
                 if export_btn:
                     async def _on_export_click(e):
-                        from datetime import datetime
                         from func.sync.export import export_warnings_to_excel
-                        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        ts = local_now().strftime("%Y%m%d_%H%M%S")
                         target_path = None
                         if save_picker:
                             res = await save_picker.save_file(

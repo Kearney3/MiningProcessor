@@ -6,7 +6,7 @@
 
 import os
 import pandas as pd
-from datetime import datetime, date as date_type
+from datetime import date as date_type
 
 from func.excel_fuel import process_fuel_data
 from func.excel_electrical import process_electrical_data
@@ -18,6 +18,7 @@ from func import config_loader
 from func.logger import get_logger
 from func.excel_utils import dedup_dataframe, get_output_filename
 from func.ledger_postprocess import match_sheets
+from func.time_utils import local_now
 
 
 logger = get_logger(__name__)
@@ -245,7 +246,7 @@ def process_files(
     Returns:
         {模块类型: {sheet名: DataFrame}}
     """
-    now = datetime.now()
+    now = local_now()
     if year is None:
         year = now.year
     if month is None:
@@ -762,7 +763,7 @@ def _table_merge_and_write(
 
     merged = _reorder_columns(merged)
     merged = dedup_dataframe(merged, "表内合并")
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = local_now().strftime("%Y%m%d_%H%M%S")
     output_file = os.path.join(folder_path, f"表内合并结果_{year}{month:02d}_{timestamp}.xlsx")
     write_formatted_excel(output_file, {"合并数据": merged})
     logger.info(f"表内合并完成: {output_file} ({len(merged)} 行)")
@@ -783,7 +784,7 @@ def _write_merged(
     """将所有模块的结果合并到单个 Excel 文件"""
     from func.excel_formatter import write_formatted_excel
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = local_now().strftime("%Y%m%d_%H%M%S")
     output_file = os.path.join(folder_path, f"批量处理结果_{year}{month:02d}_{timestamp}.xlsx")
 
     total = sum(len(sheets) for sheets in all_results.values())

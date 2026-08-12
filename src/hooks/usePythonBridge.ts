@@ -9,6 +9,7 @@ import type {
   LogEntry,
   PythonEvent,
 } from "../lib/types";
+import { localDateTimeISO } from "../lib/dateUtils";
 
 const HEARTBEAT_INTERVAL = 30_000;
 const MAX_FAIL_COUNT = 2;
@@ -73,7 +74,7 @@ export function usePythonBridge() {
       clientSequenceRef.current = Math.max(clientSequenceRef.current, sequence);
       return {
         seq: sequence,
-        timestamp: typeof raw.timestamp === "string" ? raw.timestamp : new Date().toISOString(),
+        timestamp: typeof raw.timestamp === "string" ? raw.timestamp : localDateTimeISO(),
         level: typeof raw.level === "string" ? raw.level : "INFO",
         logger: typeof raw.logger === "string" ? raw.logger : undefined,
         message: typeof raw.message === "string" ? raw.message : String(raw.message ?? ""),

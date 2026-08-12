@@ -3,7 +3,7 @@ import json
 import pathlib
 import sys
 import uuid
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -27,6 +27,7 @@ from func.sync_to_minebase import (
     sync,
     sync_via_api,
 )
+from func.time_utils import local_now
 
 
 # ---------------------------------------------------------------------------
@@ -385,9 +386,9 @@ class TestMapRowToDbColumns:
     def test_updated_at_is_recent(self):
         """updated_at 列必须是接近当前时间的 datetime（Prisma @updatedAt 仅在应用层生效）。"""
         row = {"date": "2026-06-18", "shiftType": "Night", "sourceEquipmentName": "EX-001", "equipmentId": "eq-001"}
-        before = datetime.now()
+        before = local_now()
         columns, values = _map_row_to_db_columns(row)
-        after = datetime.now()
+        after = local_now()
         idx = columns.index("updated_at")
         ts = values[idx]
         assert before <= ts <= after

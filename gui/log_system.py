@@ -9,7 +9,6 @@ import asyncio
 import concurrent.futures
 import inspect
 import logging
-from datetime import datetime
 from pathlib import Path
 import sys
 import threading
@@ -19,6 +18,7 @@ import flet as ft
 from . import theme
 from .components.common import _last_directory, _update_last_directory
 from .log_broker import LogEntry, LogSubscription, get_log_broker
+from func.time_utils import local_datetime_from_timestamp, local_now
 
 
 MAX_LOG_RECORDS = 5000
@@ -255,7 +255,7 @@ class LogSystem:
 
     def _make_text(self, entry: LogEntry) -> ft.Text:
         timestamp = (
-            datetime.fromtimestamp(entry.created).strftime("%H:%M:%S")
+            local_datetime_from_timestamp(entry.created).strftime("%H:%M:%S")
             if entry.created else "--:--:--"
         )
         level = "WARN" if entry.levelname == "WARNING" else entry.levelname
@@ -318,7 +318,7 @@ class LogSystem:
     async def _export_logs(self, _e: ft.ControlEvent) -> None:
         path = await self._log_export_picker.save_file(
             dialog_title="导出日志",
-            file_name=f"logs-{datetime.now().strftime('%Y-%m-%d')}.txt",
+            file_name=f"logs-{local_now().strftime('%Y-%m-%d')}.txt",
             allowed_extensions=["txt", "log"],
             initial_directory=_last_directory[0] or None,
         )

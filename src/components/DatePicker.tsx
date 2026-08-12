@@ -2,22 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from "../lib/icons";
-
-// ─── Formatting ───────────────────────────────────────────────────────
-function formatDate(d: Date | undefined): string {
-  if (!d) return "";
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function parseDate(s: string): Date | undefined {
-  if (!s) return undefined;
-  const parts = s.split("-").map(Number);
-  if (parts.length !== 3 || parts.some(isNaN)) return undefined;
-  return new Date(parts[0], parts[1] - 1, parts[2]);
-}
+import { formatLocalDate, localToday, parseLocalDate } from "../lib/dateUtils";
 
 // ─── Component ────────────────────────────────────────────────────────
 
@@ -38,7 +23,7 @@ export function DatePicker({
 }: DatePickerProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const selected = parseDate(value);
+  const selected = parseLocalDate(value);
 
   // Close on outside click
   useEffect(() => {
@@ -53,7 +38,7 @@ export function DatePicker({
   }, [open]);
 
   const handleSelect = (day: Date | undefined) => {
-    onChange(formatDate(day));
+    onChange(formatLocalDate(day));
     setOpen(false);
   };
 
@@ -96,7 +81,7 @@ export function DatePicker({
             mode="single"
             selected={selected}
             onSelect={handleSelect}
-            defaultMonth={selected ?? new Date()}
+            defaultMonth={selected ?? localToday()}
             captionLayout="dropdown"
             navLayout="around"
             startMonth={new Date(2015, 0)}

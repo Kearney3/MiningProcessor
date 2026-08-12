@@ -1,13 +1,13 @@
 """
 异常行警告导出 & 试运行预览导出模块
 """
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
 from func.logger import get_logger
+from func.time_utils import local_now
 
 logger = get_logger(__name__)
 
@@ -41,7 +41,7 @@ def export_warnings_to_excel(
     """
     if not output_path:
         base_dir = Path(input_dir) if input_dir else Path.cwd()
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = local_now().strftime("%Y%m%d_%H%M%S")
         output_path = base_dir / f"异常行明细_{timestamp}.xlsx"
 
     out_file = Path(output_path)
@@ -113,7 +113,7 @@ def export_dry_run_to_excel(
     """
     if not output_path:
         base_dir = Path(input_dir) if input_dir else Path.cwd()
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = local_now().strftime("%Y%m%d_%H%M%S")
         output_path = base_dir / f"同步预览_{timestamp}.xlsx"
 
     out_file = Path(output_path)

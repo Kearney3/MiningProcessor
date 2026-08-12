@@ -12,6 +12,7 @@ from typing import Optional
 import pandas as pd
 
 from func.excel_utils import get_output_filename
+from func.time_utils import local_now
 
 logger = logging.getLogger(__name__)
 
@@ -236,8 +237,6 @@ def get_output_path(
         输出文件路径字符串；batch 返回 None（已在内部处理）；
         维修记录返回 None（由 process_maintenance_data 自行返回路径）
     """
-    from datetime import datetime
-
     if module_type == "batch":
         return None
     if module_type == "maint":
@@ -245,7 +244,7 @@ def get_output_path(
     if module_type == "merge":
         return os.path.join(path, f"{keyword}_合并.xlsx")
 
-    effective_year = year if year is not None else datetime.now().year
+    effective_year = year if year is not None else local_now().year
 
     # 工时文件夹模式
     if module_type == "worktime" and os.path.isdir(path):
@@ -319,8 +318,6 @@ def process_single(
     Raises:
         ValueError: module_type 不支持
     """
-    from datetime import datetime
-
     result: dict = {}
 
     # 单次任务使用独立的异常明细缓冲，供 GUI 任务完成后展示。
@@ -341,7 +338,7 @@ def process_single(
         skip_hidden_rows = True
         skip_hidden_cols = True
 
-    effective_year = year if year is not None else datetime.now().year
+    effective_year = year if year is not None else local_now().year
 
     if use_model_ledger and not use_equipment_ledger and equipment_ledger is None:
         logger.warning("型号台账匹配需要同时启用设备台账匹配，已跳过型号台账")

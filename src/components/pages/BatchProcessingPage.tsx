@@ -14,6 +14,7 @@ import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-cla
 import { useLastDirectory } from "../../hooks/useLastDirectory";
 import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG } from "../AnomalyPanel";
 import { AnomalyResultsTable } from "../AnomalyResultsTable";
+import { addLocalDays, formatLocalDate, localToday } from "../../lib/dateUtils";
 
 // ═══════════════════════════════════════
 // Types
@@ -49,14 +50,13 @@ function getTypeConfig(type: string) {
 }
 
 function formatToday(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return formatLocalDate(localToday());
 }
 
 function shiftDate(dateStr: string, days: number): string {
-  const d = new Date(dateStr + "T00:00:00");
-  d.setDate(d.getDate() + days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const parts = dateStr.split("-").map(Number);
+  const date = new Date(parts[0], parts[1] - 1, parts[2]);
+  return formatLocalDate(addLocalDays(date, days));
 }
 
 // ═══════════════════════════════════════
@@ -111,8 +111,8 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
   const [showConfirm, setShowConfirm] = useState(false);
 
   // -- Basic params --
-  const [year, setYear] = useState(new Date().getFullYear().toString());
-  const [month, setMonth] = useState((new Date().getMonth() + 1).toString());
+  const [year, setYear] = useState(localToday().getFullYear().toString());
+  const [month, setMonth] = useState((localToday().getMonth() + 1).toString());
   const [rawStart, setRawStart] = useState("-1");
 
   // -- Output mode --
@@ -355,7 +355,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
               onChange={(e) => setYear(e.target.value)}
               className={`${inputClass} h-9`}
             >
-              {Array.from({ length: 61 }, (_, i) => new Date().getFullYear() - 30 + i).map((y) => (
+              {Array.from({ length: 61 }, (_, i) => localToday().getFullYear() - 30 + i).map((y) => (
                 <option key={y} value={y}>{y}年</option>
               ))}
             </select>

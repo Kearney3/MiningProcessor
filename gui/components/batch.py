@@ -9,6 +9,7 @@ from .common import (
     make_browse_handler, HeaderModeConfig, to_local_dt, create_anomaly_controls,
     create_anomaly_results_table,
 )
+from func.time_utils import local_now, local_today
 
 try:
     from . import theme
@@ -19,7 +20,7 @@ except ImportError:
 def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
     """创建批量处理模块区域，返回 (container, batch_refs)"""
 
-    current_date = datetime.now()
+    current_date = local_now()
     current_year = str(current_date.year)
     current_month = str(current_date.month)
 
@@ -252,7 +253,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         _update_date_display()
 
     def _on_today(e):
-        _selected_date[0] = datetime.now().date()
+        _selected_date[0] = local_today()
         _update_date_display()
 
     async def _on_pick_date(e):

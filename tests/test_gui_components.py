@@ -279,7 +279,7 @@ def test_modules_section_uses_consistent_vertical_spacing(monkeypatch):
 
 def test_work_module_exposes_year_month_refs_with_current_date_defaults(monkeypatch):
     import gui.components.modules as _cmp_modules
-    monkeypatch.setattr(_cmp_modules, "datetime", FrozenDateTime, raising=False)
+    monkeypatch.setattr(_cmp_modules, "local_now", FrozenDateTime.now, raising=False)
 
     _, module_refs = components.create_modules_section(DummyPage())
 
