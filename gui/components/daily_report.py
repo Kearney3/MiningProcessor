@@ -13,6 +13,7 @@ from gui.components.common import (
     safe_update,
     to_local_dt,
 )
+from func.time_utils import local_today
 
 try:
     from . import theme
@@ -46,8 +47,8 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
         expand=True,
     )
     selected_dates = {
-        "start": date.today() - timedelta(days=1),
-        "end": date.today() - timedelta(days=1),
+        "start": local_today() - timedelta(days=1),
+        "end": local_today() - timedelta(days=1),
     }
     date_labels = {
         key: ft.Text(value.strftime("%Y-%m-%d"), size=13, color=theme.TEXT_PRIMARY)
@@ -137,7 +138,7 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
         )
 
     def set_yesterday(e):
-        yesterday = date.today() - timedelta(days=1)
+        yesterday = local_today() - timedelta(days=1)
         selected_dates["start"] = yesterday
         selected_dates["end"] = yesterday
         update_date_label("start")

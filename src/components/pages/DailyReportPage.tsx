@@ -5,12 +5,7 @@ import { DatePicker } from "../DatePicker";
 import { Collapsible, PathInput, StyledToggle as Toggle } from "../../lib/ui-components";
 import { btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { useLastDirectory } from "../../hooks/useLastDirectory";
-
-function yesterdayISO() {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
-}
+import { localYesterdayString } from "../../lib/dateUtils";
 
 function joinPath(directory: string, filename: string): string {
   const trimmed = directory.replace(/[\\/]+$/, "");
@@ -22,8 +17,8 @@ export function DailyReportPage({ bridge }: { bridge: BridgeProp }) {
   const { notify } = useToast();
   const { initialDir } = useLastDirectory(bridge, "daily_report_input_dir");
   const [sourceDir, setSourceDir] = useState("");
-  const [start, setStart] = useState(yesterdayISO());
-  const [end, setEnd] = useState(yesterdayISO());
+  const [start, setStart] = useState(localYesterdayString());
+  const [end, setEnd] = useState(localYesterdayString());
   const [useEquipment, setUseEquipment] = useState(true);
   const [useModel, setUseModel] = useState(false);
   const [includeRawEquipmentName, setIncludeRawEquipmentName] = useState(true);
@@ -124,7 +119,7 @@ export function DailyReportPage({ bridge }: { bridge: BridgeProp }) {
             <DatePicker label="结束日期" value={end} onChange={setEnd} className="w-44" />
             <button
               type="button"
-              onClick={() => { setStart(yesterdayISO()); setEnd(yesterdayISO()); }}
+              onClick={() => { setStart(localYesterdayString()); setEnd(localYesterdayString()); }}
               className={btnSecondaryClass}
             >昨日</button>
             <button

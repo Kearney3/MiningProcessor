@@ -17,6 +17,7 @@ from .common import (
     year_options,
     month_options,
 )
+from func.time_utils import local_today
 
 try:
     from . import theme
@@ -159,7 +160,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     year_dropdown = ft.Dropdown(
         label="年份",
         options=_YEAR_OPTIONS,
-        value=str(date.today().year),
+        value=str(local_today().year),
         width=120,
         dense=True,
     )
@@ -167,7 +168,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     month_dropdown = ft.Dropdown(
         label="月份",
         options=_MONTH_OPTIONS,
-        value=str(date.today().month),
+        value=str(local_today().month),
         width=100,
         dense=True,
     )
@@ -182,7 +183,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     )
 
     # --- 日期范围 ---
-    today = date.today()
+    today = local_today()
     yesterday = today - timedelta(days=1)
 
     date_filter_check = ft.Checkbox(

@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import type { LogEntry } from "../lib/types";
 import { ClipboardIcon, CheckIcon, TrashIcon, DownloadIcon } from "../lib/icons";
+import { localTodayString } from "../lib/dateUtils";
 
 interface LogPanelProps {
   logs: LogEntry[];
@@ -159,7 +160,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
   }, [filteredLogs, showFeedback]);
 
   const handleExport = useCallback(async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localTodayString();
     const filePath = await save({
       defaultPath: `logs-${today}.txt`,
       filters: [{ name: "Text", extensions: ["txt", "log"] }],

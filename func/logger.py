@@ -5,7 +5,8 @@
 import logging
 import sys
 import threading
-from datetime import datetime
+
+from func.time_utils import local_datetime_from_timestamp
 
 # 默认日志格式“[日志级别]时间戳(秒级)｜文件名｜消息内容”
 DEFAULT_FORMAT = "[%(levelname)s]%(asctime)s | %(filename)s | %(message)s"
@@ -33,7 +34,7 @@ class QueueHandler(logging.Handler):
         try:
             msg = self.format(record)
             payload = {
-                "timestamp": datetime.fromtimestamp(record.created).strftime("%Y-%m-%d %H:%M:%S"),
+                "timestamp": local_datetime_from_timestamp(record.created).strftime("%Y-%m-%d %H:%M:%S"),
                 "created": record.created,
                 "seq": _next_seq(),
                 "levelno": record.levelno,

@@ -21,6 +21,7 @@ from func.excel_formatter import write_formatted_excel
 from func.ledger_enrichment import resolve_equipment_attributes
 from func.logger import get_logger
 from func.string_utils import clean_string
+from func.time_utils import local_today
 
 logger = get_logger(__name__)
 
@@ -220,7 +221,7 @@ def _processing_year_month(start: date | str | None, end: date | str | None,
         match = re.search(r"(20\d{2})[.\-_](\d{1,2})", path.name)
         if match:
             return int(match.group(1)), int(match.group(2))
-    today = date.today()
+    today = local_today()
     return today.year, today.month
 
 

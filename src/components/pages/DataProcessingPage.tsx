@@ -8,8 +8,9 @@ import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-cla
 import { useLastDirectory } from "../../hooks/useLastDirectory";
 import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG } from "../AnomalyPanel";
 import { AnomalyResultsTable } from "../AnomalyResultsTable";
+import { localToday } from "../../lib/dateUtils";
 
-const currentYear = new Date().getFullYear();
+const currentYear = localToday().getFullYear();
 const yearOptions = Array.from({ length: 61 }, (_, i) => currentYear - 30 + i);
 const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1);
 
@@ -606,7 +607,7 @@ function WorktimeCard({
   const { notify } = useToast();
   const [path, setPath] = useState("");
   const [year, setYear] = useState(String(currentYear));
-  const [month, setMonth] = useState(String(new Date().getMonth() + 1));
+  const [month, setMonth] = useState(String(localToday().getMonth() + 1));
   const [useHeaderMapping, setUseHeaderMapping] = useState(false);
   const [headerMode, setHeaderMode] = useState("position");
   const [loading, setLoading] = useState(false);

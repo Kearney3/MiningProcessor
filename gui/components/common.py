@@ -1,6 +1,4 @@
 """GUI 组件共享工具函数与状态"""
-from datetime import datetime
-
 import flet as ft
 import logging
 import math
@@ -10,6 +8,7 @@ from pathlib import Path
 
 from func.config_loader import get_user_config, update_user_config, get_anomaly_detection_config
 from func.excel_utils import strip_date_only_times
+from func.time_utils import local_midnight, local_today
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +27,7 @@ def _get_initial_directory() -> str | None:
 
 def year_options(start_offset: int = -30, end_offset: int = 30) -> list[ft.dropdown.Option]:
     """生成年份下拉选项列表，基于当前年份动态计算范围（默认前后30年）。"""
-    current = datetime.now().year
+    current = local_today().year
     return [ft.dropdown.Option(str(y)) for y in range(current + start_offset, current + end_offset + 1)]
 
 
@@ -57,8 +56,7 @@ def to_local_dt(d):
     导致 UTC+时区的用户选中的日期往前偏移一天。
     传入带本地时区的 datetime 可避免二次转换。
     """
-    naive = datetime.combine(d, datetime.min.time())
-    return naive.replace(tzinfo=datetime.now().astimezone().tzinfo)
+    return local_midnight(d)
 
 
 PAGE_SIZE = 20

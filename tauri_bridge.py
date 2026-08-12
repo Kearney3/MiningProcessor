@@ -24,6 +24,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
+from func.time_utils import local_datetime_from_timestamp
+
 # ─── 强制 UTF-8 编码 ───
 # PyInstaller 打包后 PYTHONUTF8 环境变量可能不生效，
 # 需要在代码中显式设置，避免中文 Windows 使用 GBK 编码
@@ -199,7 +201,7 @@ class _StderrLogHandler(logging.Handler):
                 sequence = self._sequence
             data = {
                 "seq": sequence,
-                "timestamp": datetime.fromtimestamp(record.created).isoformat(timespec="milliseconds"),
+                "timestamp": local_datetime_from_timestamp(record.created).isoformat(timespec="milliseconds"),
                 "level": record.levelname,
                 "logger": record.name,
                 "message": message,

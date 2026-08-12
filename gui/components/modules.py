@@ -1,6 +1,4 @@
 """数据处理模块区域组件"""
-from datetime import datetime
-
 import flet as ft
 
 from .common import (
@@ -10,6 +8,7 @@ from .common import (
     create_anomaly_results_table,
 )
 from .types import ModuleRefs
+from func.time_utils import local_now
 
 try:
     from . import theme
@@ -20,7 +19,7 @@ except ImportError:
 def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     """创建数据处理模块区域，返回 (container, module_refs)"""
 
-    current_date = datetime.now()
+    current_date = local_now()
     current_year = str(current_date.year)
     current_month = str(current_date.month)
 

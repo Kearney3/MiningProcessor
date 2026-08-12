@@ -12,16 +12,7 @@ import { ChipToggle } from "../../lib/ui-components";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { DatePicker } from "../DatePicker";
 import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG } from "../AnomalyPanel";
-
-// ═══════════════════════════════════════
-// Date helpers
-// ═══════════════════════════════════════
-
-function yesterdayISO(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
-}
+import { localToday, localTodayString, localYesterdayString } from "../../lib/dateUtils";
 
 // ═══════════════════════════════════════
 // Constants
@@ -82,15 +73,16 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const [error, setError] = useState<string | null>(null);
 
   // 处理参数
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1;
+  const currentDate = localToday();
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth() + 1;
   const [year, setYear] = useState(String(currentYear));
   const [month, setMonth] = useState(String(currentMonth));
   const [headerRow, setHeaderRow] = useState("");
 
   // 日期范围
-  const [dateStart, setDateStart] = useState(yesterdayISO());
-  const [dateEnd, setDateEnd] = useState(yesterdayISO());
+  const [dateStart, setDateStart] = useState(localYesterdayString());
+  const [dateEnd, setDateEnd] = useState(localYesterdayString());
   const [applyHeaderMapping, setApplyHeaderMapping] = useState(true);
   const [headerMode, setHeaderMode] = useState("position");
   const [useEquipmentLedger, setUseEquipmentLedger] = useState(false);
@@ -398,7 +390,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
             />
             <button
               type="button"
-              onClick={() => { setDateStart(yesterdayISO()); setDateEnd(yesterdayISO()); }}
+              onClick={() => { setDateStart(localYesterdayString()); setDateEnd(localYesterdayString()); }}
               className={btnSecondaryClass}
             >
               昨日
@@ -724,7 +716,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
 
         const handleExportWarnings = async () => {
           try {
-            const today = new Date().toISOString().slice(0, 10);
+            const today = localTodayString();
             const savePath = await save({
               defaultPath: `异常行明细_${today}.xlsx`,
               filters: [{ name: "Excel", extensions: ["xlsx"] }],
