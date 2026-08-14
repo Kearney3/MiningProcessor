@@ -17,11 +17,11 @@ from gui.i18n import t
 def _create_keywords_section(page: ft.Page, log):
     """创建文件关键字配置卡片，返回 (card, refs_dict)。"""
 
-    fuel_input, fuel_get, fuel_set = _create_keyword_input(page, t("components:user_config._keywords.燃油数据_f769"), t("components:user_config._keywords.输入关键字后按回车或点击添加_45a8"))
-    elec_input, elec_get, elec_set = _create_keyword_input(page, t("components:user_config._keywords.电力数据_2456"), t("components:user_config._keywords.输入关键字后按回车或点击添加_45a8"))
-    prod_input, prod_get, prod_set = _create_keyword_input(page, t("components:user_config._keywords.生产数据_9fb6"), t("components:user_config._keywords.输入关键字后按回车或点击添加_45a8"))
-    work_input, work_get, work_set = _create_keyword_input(page, t("components:user_config._keywords.工时数据_8c32"), t("components:user_config._keywords.输入关键字后按回车或点击添加_45a8"))
-    maint_input, maint_get, maint_set = _create_keyword_input(page, t("components:user_config._keywords.维修数据_ba9e"), t("components:user_config._keywords.输入关键字后按回车或点击添加_45a8"))
+    fuel_input, fuel_get, fuel_set = _create_keyword_input(page, t("components:user_config._keywords.fuelData"), t("components:user_config._keywords.enterAKeywordAndPressEnterOrClickAdd"))
+    elec_input, elec_get, elec_set = _create_keyword_input(page, t("components:user_config._keywords.electricalData"), t("components:user_config._keywords.enterAKeywordAndPressEnterOrClickAdd"))
+    prod_input, prod_get, prod_set = _create_keyword_input(page, t("components:user_config._keywords.productionData"), t("components:user_config._keywords.enterAKeywordAndPressEnterOrClickAdd"))
+    work_input, work_get, work_set = _create_keyword_input(page, t("components:user_config._keywords.worktimeData"), t("components:user_config._keywords.enterAKeywordAndPressEnterOrClickAdd"))
+    maint_input, maint_get, maint_set = _create_keyword_input(page, t("components:user_config._keywords.maintenanceData"), t("components:user_config._keywords.enterAKeywordAndPressEnterOrClickAdd"))
 
     _kw_getters = {
         "fuel": fuel_get, "electrical": elec_get,
@@ -56,8 +56,8 @@ def _create_keywords_section(page: ft.Page, log):
     def save_keywords(_e):
         kw = _collect_kw_from_ui()
         config_loader.update_user_config({"file_keywords": kw})
-        kw_status_text.value = t("components:user_config._keywords.文件关键字配置已保存_73b3")
-        _log_message(log, t("components:user_config._keywords.已保存文件关键字配置_e565"))
+        kw_status_text.value = t("components:user_config._keywords.filenameKeywordConfigurationSaved")
+        _log_message(log, t("components:user_config._keywords.savedfilenameKeywordConfiguration"))
         try:
             page.update()
         except (RuntimeError, AttributeError):
@@ -66,27 +66,27 @@ def _create_keywords_section(page: ft.Page, log):
     def reset_keywords(_e):
         config_loader.update_user_config({"file_keywords": dict(DEFAULT_FILE_KEYWORDS)})
         _apply_kw_to_ui(DEFAULT_FILE_KEYWORDS)
-        kw_status_text.value = t("components:user_config._keywords.已恢复默认关键字_bb96")
-        _log_message(log, t("components:user_config._keywords.已恢复默认文件关键字配置_fe90"))
+        kw_status_text.value = t("components:user_config._keywords.restoreddefaultkeyword")
+        _log_message(log, t("components:user_config._keywords.restoreddefaultfilenameKeywordConfiguration"))
         try:
             page.update()
         except (RuntimeError, AttributeError):
             pass
 
     kw_action_buttons = [
-        theme.primary_btn(t("components:user_config._keywords.保存关键字_f436"), icon=ft.Icons.SAVE, on_click=save_keywords),
-        theme.secondary_btn(t("components:user_config._keywords.重新加载_64ca"), icon=ft.Icons.REFRESH, on_click=lambda _: _reload_keywords()),
-        theme.secondary_btn(t("components:user_config._keywords.恢复默认_7468"), icon=ft.Icons.RESTART_ALT, on_click=reset_keywords),
+        theme.primary_btn(t("components:user_config._keywords.saveKeywords"), icon=ft.Icons.SAVE, on_click=save_keywords),
+        theme.secondary_btn(t("components:user_config._keywords.reload"), icon=ft.Icons.REFRESH, on_click=lambda _: _reload_keywords()),
+        theme.secondary_btn(t("components:user_config._keywords.restoreDefault"), icon=ft.Icons.RESTART_ALT, on_click=reset_keywords),
     ]
 
     keywords_card = theme.make_collapsible(
-        title=t("components:user_config._keywords.文件关键字配置_c38a"),
-        subtitle=t("components:user_config._keywords.用于批量处理时自动识别文件夹中_9d40"),
+        title=t("components:user_config._keywords.filenameKeywordConfiguration"),
+        subtitle=t("components:user_config._keywords.usedToAutomaticallyIdentifyDataFilesInAFolderDuringBatchProcessing"),
         icon=ft.Icons.KEY,
         initially_expanded=False,
         content_controls=[
             ft.Text(
-                t("components:user_config._keywords.所有类型均按文件名关键字匹配，_f0c5"),
+                t("components:user_config._keywords.matchingtypematchingfilenameKeywordmatchingSheetLevelmatchingprocessingmatchingM"),
                 size=12,
                 color=theme.TEXT_SECONDARY,
             ),

@@ -96,7 +96,7 @@ i18n.on("languageChanged", (language) => {
   if (typeof document !== "undefined") {
     document.documentElement.lang = normalized;
     document.documentElement.dir = "ltr";
-    document.title = i18n.t("app:矿山数据处理_ece7");
+    document.title = i18n.t("app:miningData");
   }
 });
 
@@ -105,7 +105,7 @@ writeStorage(LANGUAGE_STORAGE_KEY, activeLanguage);
 if (typeof document !== "undefined") {
   document.documentElement.lang = activeLanguage;
   document.documentElement.dir = "ltr";
-  document.title = i18n.t("app:矿山数据处理_ece7");
+  document.title = i18n.t("app:miningData");
 }
 
 export default i18n;

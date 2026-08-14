@@ -52,7 +52,7 @@ function ConfirmDialog({
             onClick={onConfirm}
             className="px-3 py-1.5 text-xs text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
           >
-            {t("pages:UserConfigPage.确认还原_f1bf")}
+            {t("pages:UserConfigPage.confirmRestore")}
           </button>
         </div>
       </div>
@@ -74,9 +74,9 @@ export function UserConfigPage({ bridge }: { bridge: BridgeProp }) {
     try {
       await bridge.call("reset_user_config");
       setResetKey((k) => k + 1);
-      notify(t("pages:UserConfigPage.已还原所有用户配置为默认值_c205"), "success");
+      notify(t("pages:UserConfigPage.configurationconfigurationconfigurationdefaultValue"), "success");
     } catch (e) {
-      notify(t("pages:UserConfigPage.还原失败:$_5a84", { error: String(e) }), "error");
+      notify(t("pages:UserConfigPage.itemfailed", { error: String(e) }), "error");
     }
     setShowConfirm(false);
   }, [bridge.call, notify]);
@@ -85,8 +85,8 @@ export function UserConfigPage({ bridge }: { bridge: BridgeProp }) {
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-base font-semibold text-slate-800">{t("pages:UserConfigPage.用户配置_dd1e")}</h2>
-          <p className="text-xs text-slate-500 mt-0.5">{t("pages:UserConfigPage.管理与业务处理无关的个人偏好设_a426")}</p>
+          <h2 className="text-base font-semibold text-slate-800">{t("pages:UserConfigPage.userConfig")}</h2>
+          <p className="text-xs text-slate-500 mt-0.5">{t("pages:UserConfigPage.managePersonalPreferencesUnrelatedToBusinessProcessing")}</p>
         </div>
         <button
           onClick={() => setShowConfirm(true)}
@@ -109,8 +109,8 @@ export function UserConfigPage({ bridge }: { bridge: BridgeProp }) {
 
       {showConfirm && (
         <ConfirmDialog
-          title={t("pages:UserConfigPage.确认还原_f1bf")}
-          message={t("pages:UserConfigPage.将清除所有用户自定义配置，恢复_7bee")}
+          title={t("pages:UserConfigPage.confirmRestore")}
+          message={t("pages:UserConfigPage.thisWillRemoveAllUserCustomizationsAndRestoreSystemDefaultsNthisActionCannotBeUn")}
           onConfirm={handleResetAll}
           onCancel={() => setShowConfirm(false)}
         />

@@ -13,11 +13,11 @@ const SKIP = "__SKIP__";
 
 const getDataTypeLabel = (t: (k: string) => string, dt: string): string => {
   const labels: Record<string, string> = {
-    work_efficiency: t("userConfig:ColumnMappingSection.工时数据_8c32"),
-    fuel_consumption: t("userConfig:ColumnMappingSection.油耗数据_0971"),
-    electricity_consumption: t("userConfig:ColumnMappingSection.电力消耗_79c4"),
-    equipment_operation: t("userConfig:ColumnMappingSection.设备运行_9a39"),
-    production_record: t("userConfig:ColumnMappingSection.生产记录_436f"),
+    work_efficiency: t("userConfig:ColumnMappingSection.worktimeData"),
+    fuel_consumption: t("userConfig:ColumnMappingSection.fuelData"),
+    electricity_consumption: t("userConfig:ColumnMappingSection.electricalConsumption"),
+    equipment_operation: t("userConfig:ColumnMappingSection.equipmentOperation"),
+    production_record: t("userConfig:ColumnMappingSection.productionRecords"),
   };
   return labels[dt] || dt;
 };
@@ -75,28 +75,28 @@ export function ColumnMappingSection({ bridge }: { bridge: BridgeProp }) {
     setSuccess(null);
     try {
       await bridge.call("save_minebase_column_mapping", { mapping });
-      setSuccess(t("userConfig:ColumnMappingSection.列映射已保存_de4d"));
-      notify(t("userConfig:ColumnMappingSection.列映射已保存_de4d"), "success");
+      setSuccess(t("userConfig:ColumnMappingSection.columnMappingSaved"));
+      notify(t("userConfig:ColumnMappingSection.columnMappingSaved"), "success");
       setTimeout(() => setSuccess(null), 2000);
     } catch (e) {
       setError(String(e));
-      notify(t("userConfig:ColumnMappingSection.保存失败:$_e5b7", { error: String(e) }), "error");
+      notify(t("userConfig:ColumnMappingSection.saveFailed", { error: String(e) }), "error");
     } finally {
       setSaving(false);
     }
   };
 
   const handleReset = async () => {
-    if (!confirm(t("userConfig:ColumnMappingSection.确定要重置列映射为默认配置吗？_a4e0"))) return;
+    if (!confirm(t("userConfig:ColumnMappingSection.resetColumnMappingToDefaultConfiguration"))) return;
     try {
       await bridge.call("reset_minebase_column_mapping");
       await loadMapping();
-      setSuccess(t("userConfig:ColumnMappingSection.已重置为默认配置_0fd4"));
-      notify(t("userConfig:ColumnMappingSection.已重置为默认配置_0fd4"), "success");
+      setSuccess(t("userConfig:ColumnMappingSection.resetToDefaultConfiguration"));
+      notify(t("userConfig:ColumnMappingSection.resetToDefaultConfiguration"), "success");
       setTimeout(() => setSuccess(null), 2000);
     } catch (e) {
       setError(String(e));
-      notify(t("userConfig:ColumnMappingSection.重置失败:$_c7e3", { error: String(e) }), "error");
+      notify(t("userConfig:ColumnMappingSection.resetFailed", { error: String(e) }), "error");
     }
   };
 
@@ -129,7 +129,7 @@ export function ColumnMappingSection({ bridge }: { bridge: BridgeProp }) {
   };
 
   const addRow = (dataType: string) => {
-    const source = prompt(t("userConfig:ColumnMappingSection.输入源列名（中文列名）：_aaa7"));
+    const source = prompt(t("userConfig:ColumnMappingSection.enterSourceColumnNameChineseColumnName"));
     if (!source?.trim()) return;
     setMapping((prev) => ({
       ...prev,
@@ -146,14 +146,14 @@ export function ColumnMappingSection({ bridge }: { bridge: BridgeProp }) {
 
   return (
     <SectionCard
-      title={t("userConfig:ColumnMappingSection.列映射配置_50e5")}
-      subtitle={t("userConfig:ColumnMappingSection.配置MiningProcess_f3d4")}
+      title={t("userConfig:ColumnMappingSection.columnMappingConfig")}
+      subtitle={t("userConfig:ColumnMappingSection.configurationMiningprocessorOutputconfigurationMinebaseApiConfiguration")}
       icon={<ColumnsIcon />}
       expanded={expanded}
       onToggle={() => setExpanded(!expanded)}
     >
       {loading ? (
-        <div className="flex items-center justify-center py-8 text-slate-400 text-sm">{t("userConfig:ColumnMappingSection.加载中..._26b5")}</div>
+        <div className="flex items-center justify-center py-8 text-slate-400 text-sm">{t("userConfig:ColumnMappingSection.textVariant")}</div>
       ) : (
         <div className="space-y-4">
           {/* 数据类型选项卡 */}
@@ -179,9 +179,9 @@ export function ColumnMappingSection({ bridge }: { bridge: BridgeProp }) {
               <thead>
                 <tr className="bg-slate-50">
                   <th className="text-left px-3 py-2 text-xs font-medium text-slate-500 w-8">#</th>
-                  <th className="text-left px-3 py-2 text-xs font-medium text-slate-500">{t("userConfig:ColumnMappingSection.源列名_15d3")}</th>
-                  <th className="text-left px-3 py-2 text-xs font-medium text-slate-500">{t("userConfig:ColumnMappingSection.目标字段_f278")}</th>
-                  <th className="text-center px-3 py-2 text-xs font-medium text-slate-500 w-16">{t("userConfig:ColumnMappingSection.排除_93bd")}</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-slate-500">{t("userConfig:ColumnMappingSection.sourceColumn")}</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-slate-500">{t("userConfig:ColumnMappingSection.targetField")}</th>
+                  <th className="text-center px-3 py-2 text-xs font-medium text-slate-500 w-16">{t("userConfig:ColumnMappingSection.exclude")}</th>
                   <th className="w-10 px-3 py-2"></th>
                 </tr>
               </thead>
@@ -199,7 +199,7 @@ export function ColumnMappingSection({ bridge }: { bridge: BridgeProp }) {
                           disabled={isExcluded}
                           className="w-full text-xs border border-slate-200 rounded px-2 py-1 bg-white disabled:bg-slate-50 disabled:text-slate-400"
                         >
-                          <option value="">{t("userConfig:ColumnMappingSection.--选择目标字段--_ba06")}</option>
+                          <option value="">{t("userConfig:ColumnMappingSection.selectTargetField")}</option>
                           {fields.map((f) => (
                             <option key={f} value={f}>{f}</option>
                           ))}
@@ -217,7 +217,7 @@ export function ColumnMappingSection({ bridge }: { bridge: BridgeProp }) {
                         <button
                           onClick={() => removeRow(activeType, source)}
                           className="text-slate-400 hover:text-red-500 transition-colors"
-                          title={t("userConfig:ColumnMappingSection.删除_2f4a")}
+                          title={t("userConfig:ColumnMappingSection.delete")}
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -253,7 +253,7 @@ export function ColumnMappingSection({ bridge }: { bridge: BridgeProp }) {
               disabled={saving}
               className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 rounded-md font-medium transition-colors disabled:opacity-50"
             >
-              {saving ? t("userConfig:ColumnMappingSection.保存中..._2a33") : t("userConfig:ColumnMappingSection.保存映射_ee41")}
+              {saving ? t("userConfig:ColumnMappingSection.text") : t("userConfig:ColumnMappingSection.saveMapping")}
             </button>
             <button
               onClick={handleReset}

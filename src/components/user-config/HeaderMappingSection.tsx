@@ -93,10 +93,10 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
     const seen: Record<number, number> = {};
     for (let i = 0; i < entries.length; i++) {
       const e = entries[i];
-      if (!e.new.trim()) return t("userConfig:HeaderMappingSection.第$行：新列名不能为空_3d11", { row: i + 1 });
+      if (!e.new.trim()) return t("userConfig:HeaderMappingSection.columnColumnNewColumnNamecolumn", { row: i + 1 });
       if (e.index !== null) {
         if (seen[e.index] !== undefined) {
-          return t("userConfig:HeaderMappingSection.行号$重复（第$行和第$行）_e259", { index: e.index, first: seen[e.index], second: i + 1 });
+          return t("userConfig:HeaderMappingSection.itemItemItemItemItem", { index: e.index, first: seen[e.index], second: i + 1 });
         }
         seen[e.index] = i + 1;
       }
@@ -127,15 +127,15 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
       const posCount = cleanEntries.filter((e) => e.index !== undefined).length;
       const kwCount = cleanEntries.filter((e) => Array.isArray(e.keywords)).length;
       const hints: string[] = [];
-      if (posCount) hints.push(t("userConfig:HeaderMappingSection.$条按位置匹配_43d3", { count: posCount }));
-      if (kwCount) hints.push(t("userConfig:HeaderMappingSection.$条按关键字匹配_21f7", { count: kwCount }));
+      if (posCount) hints.push(t("userConfig:HeaderMappingSection.itemsbyPositionmatching", { count: posCount }));
+      if (kwCount) hints.push(t("userConfig:HeaderMappingSection.itemsmatchingkeywordmatching", { count: kwCount }));
       const hintText = hints.length ? `（${hints.join("；")}）` : "";
-      setStatus({ msg: t("userConfig:HeaderMappingSection.已保存$条表头映射$_74b8", { count: cleanEntries.length, hint: hintText }), kind: "success" });
-      notify(t("userConfig:HeaderMappingSection.已保存$条表头映射_7bcf", { count: cleanEntries.length }), "success");
+      setStatus({ msg: t("userConfig:HeaderMappingSection.savedItemsconfigurationWithHint", { count: cleanEntries.length, hint: hintText }), kind: "success" });
+      notify(t("userConfig:HeaderMappingSection.savedItemsconfigurationSave", { count: cleanEntries.length }), "success");
       setTimeout(() => setStatus({ msg: "", kind: "info" }), 2500);
     } catch (e) {
-      setStatus({ msg: t("userConfig:HeaderMappingSection.保存失败:$_2655", { error: String(e) }), kind: "error" });
-      notify(t("userConfig:HeaderMappingSection.保存失败:$_e5b7", { error: String(e) }), "error");
+      setStatus({ msg: t("userConfig:HeaderMappingSection.saveFailed", { error: String(e) }), kind: "error" });
+      notify(t("userConfig:HeaderMappingSection.saveFailed", { error: String(e) }), "error");
     } finally {
       setSaving(false);
     }
@@ -144,7 +144,7 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
   const resetToDefault = () => {
     setEntries(DEFAULT_HEADER_MAPPING.entries.map((e) => ({ ...e })));
     setExpandedRows(new Set());
-    setStatus({ msg: t("userConfig:HeaderMappingSection.已恢复默认配置（需点击保存生效_c62f"), kind: "info" });
+    setStatus({ msg: t("userConfig:HeaderMappingSection.defaultConfigurationRestoredClickSaveToApply"), kind: "info" });
   };
 
   const addRow = () => {
@@ -189,8 +189,8 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
 
   return (
     <SectionCard
-      title={t("userConfig:HeaderMappingSection.工时表头映射_b8a9")}
-      subtitle={t("userConfig:HeaderMappingSection.配置列号（位置匹配）或关键字（_afad")}
+      title={t("userConfig:HeaderMappingSection.worktimeHeaderMapping")}
+      subtitle={t("userConfig:HeaderMappingSection.configurationcolumnNumberPositionmatchingConfigurationkeywordNameMatchingConfigu")}
       icon={<TableHeaderIcon />}
       expanded={expanded}
       onToggle={() => setExpanded(!expanded)}
@@ -205,7 +205,7 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t("userConfig:HeaderMappingSection.搜索列名或关键字..._a031")}
+            placeholder={t("userConfig:HeaderMappingSection.searchColumnsOrKeywords")}
             className="input w-full pl-8"
           />
         </div>
@@ -215,7 +215,7 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
           className={`inline-flex items-center gap-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-md transition-colors ${saving ? "opacity-50 cursor-not-allowed" : ""}`}
         >
           <SaveIcon />
-          {saving ? t("userConfig:HeaderMappingSection.保存中..._2a33") : t("userConfig:HeaderMappingSection.保存_be5f")}
+          {saving ? t("userConfig:HeaderMappingSection.text") : t("userConfig:HeaderMappingSection.save")}
         </button>
         <button
           onClick={addRow}
@@ -251,10 +251,10 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
       {/* Table header */}
       <div className="bg-slate-50 rounded-t-lg border border-slate-200 border-b-0">
         <div className="grid grid-cols-[52px_56px_1fr_140px_36px] gap-1 px-2 py-1.5">
-          <span className="text-xs font-semibold text-slate-500">{t("userConfig:HeaderMappingSection.列号_27c2")}</span>
-          <span className="text-xs font-semibold text-slate-500">{t("userConfig:HeaderMappingSection.匹配_f504")}</span>
-          <span className="text-xs font-semibold text-slate-500">{t("userConfig:HeaderMappingSection.关键字（名称匹配）_c92b")}</span>
-          <span className="text-xs font-semibold text-slate-500">{t("userConfig:HeaderMappingSection.新列名_d6e7")}</span>
+          <span className="text-xs font-semibold text-slate-500">{t("userConfig:HeaderMappingSection.columnNumber")}</span>
+          <span className="text-xs font-semibold text-slate-500">{t("userConfig:HeaderMappingSection.matching")}</span>
+          <span className="text-xs font-semibold text-slate-500">{t("userConfig:HeaderMappingSection.keywordNameMatching")}</span>
+          <span className="text-xs font-semibold text-slate-500">{t("userConfig:HeaderMappingSection.newColumnName")}</span>
           <span />
         </div>
       </div>
@@ -263,14 +263,14 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
       <div className="border border-slate-200 border-t-0 rounded-b-lg overflow-hidden max-h-96 overflow-y-auto">
         {filteredEntries.length === 0 && (
           <div className="py-8 text-center text-xs text-slate-400">
-            {entries.length === 0 ? t("userConfig:HeaderMappingSection.暂无映射配置，点击「添加映射」_2fd0") : t("userConfig:HeaderMappingSection.没有匹配的映射_97b7")}
+            {entries.length === 0 ? t("userConfig:HeaderMappingSection.noMappingRulesClickAddMappingToBegin") : t("userConfig:HeaderMappingSection.noMatchingMappings")}
           </div>
         )}
         {filteredEntries.map(({ entry, idx }, visibleIdx) => {
           const isRowExpanded = expandedRows.has(idx);
           const hasIndex = entry.index !== null;
           const hasKw = entry.keywords.length > 0;
-          const matchMode = hasIndex ? t("userConfig:HeaderMappingSection.位置_d4d2") : hasKw ? t("userConfig:HeaderMappingSection.关键字_cfb5") : "—";
+          const matchMode = hasIndex ? t("userConfig:HeaderMappingSection.position") : hasKw ? t("userConfig:HeaderMappingSection.keyword") : "—";
           const badgeCls = hasIndex
             ? "bg-teal-100 text-teal-800"
             : hasKw
@@ -296,7 +296,7 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
                         const v = e.target.value.trim();
                         updateEntry(idx, "index", v ? parseInt(v, 10) : null);
                       }}
-                      placeholder={t("userConfig:HeaderMappingSection.从1起_ad5f")}
+                      placeholder={t("userConfig:HeaderMappingSection.startingAt1")}
                       className="input w-[52px]"
                     />
                     <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${badgeCls}`}>
@@ -306,14 +306,14 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
                       type="text"
                       value={entry.new}
                       onChange={(e) => updateEntry(idx, "new", e.target.value)}
-                      placeholder={t("userConfig:HeaderMappingSection.新列名_d6e7")}
+                      placeholder={t("userConfig:HeaderMappingSection.newColumnName")}
                       className="input flex-1"
                     />
                     <div className="flex items-center gap-0.5 ml-auto shrink-0">
                       <button
                         onClick={() => toggleRow(idx)}
                         className="w-7 h-7 flex items-center justify-center rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                        title={t("userConfig:HeaderMappingSection.折叠_e082")}
+                        title={t("userConfig:HeaderMappingSection.collapse")}
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
@@ -322,7 +322,7 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
                       <button
                         onClick={() => removeRow(idx)}
                         className="w-7 h-7 flex items-center justify-center rounded text-red-700 hover:text-red-800 hover:bg-red-50 transition-colors"
-                        title={t("userConfig:HeaderMappingSection.删除此行_43e8")}
+                        title={t("userConfig:HeaderMappingSection.deleteThisRow")}
                       >
                         <CloseIcon />
                       </button>
@@ -331,7 +331,7 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
                   <KeywordChipInput
                     label=""
                     items={entry.keywords}
-                    placeholder={t("userConfig:HeaderMappingSection.输入关键字后回车添加_fafd")}
+                    placeholder={t("userConfig:HeaderMappingSection.enterAKeywordAndPressEnterToAdd")}
                     onChange={(items) => updateEntry(idx, "keywords", items)}
                   />
                 </div>

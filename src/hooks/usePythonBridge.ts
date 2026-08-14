@@ -119,11 +119,11 @@ export function usePythonBridge() {
     } catch (err) {
       failCountRef.current += 1;
       const msg = err instanceof Error ? err.message : String(err);
-      addConnectionLog("WARNING", i18n.t("hooks:usePythonBridge.心跳失败($/$):$_6496", { count: failCountRef.current, max: MAX_FAIL_COUNT, msg }));
+      addConnectionLog("WARNING", i18n.t("hooks:usePythonBridge.heartbeatFailed", { count: failCountRef.current, max: MAX_FAIL_COUNT, msg }));
       if (failCountRef.current >= MAX_FAIL_COUNT) {
         setConnectionStatus("disconnected");
         setIsConnected(false);
-        addConnectionLog("ERROR", i18n.t("hooks:usePythonBridge.Python进程已断开连接_c558"));
+        addConnectionLog("ERROR", i18n.t("hooks:usePythonBridge.pythonProcessDisconnected"));
       }
       return null;
     }
@@ -143,7 +143,7 @@ export function usePythonBridge() {
   useEffect(() => {
     doPing().then((result) => {
       if (result) {
-        addConnectionLog("INFO", i18n.t("hooks:usePythonBridge.连接成功(PID:$)_7a46", { pid: result.pid }));
+        addConnectionLog("INFO", i18n.t("hooks:usePythonBridge.connectionSucceededPid", { pid: result.pid }));
       }
       fetchBridgeInfo();
     });
@@ -175,7 +175,7 @@ export function usePythonBridge() {
           setConnectionError(null);
           const mode = connData.mode as string;
           const pid = connData.pid as number | undefined;
-          addConnectionLog("INFO", i18n.t("hooks:usePythonBridge.Pythonbridge启动(_6754", { mode, pid }));
+          addConnectionLog("INFO", i18n.t("hooks:usePythonBridge.pythonBridgeStartedItemPid", { mode, pid }));
           setBridgeInfo({
             mode: (mode as "sidecar" | "dev") ?? null,
             pid: pid ?? null,
@@ -185,7 +185,7 @@ export function usePythonBridge() {
         } else if (status === "error") {
           setConnectionStatus("error");
           setIsConnected(false);
-          const errMsg = (connData.error as string) ?? i18n.t("hooks:usePythonBridge.未知错误_974e");
+          const errMsg = (connData.error as string) ?? i18n.t("hooks:usePythonBridge.unknownError");
           setConnectionError(errMsg);
           addConnectionLog("ERROR", errMsg);
         }
@@ -259,7 +259,7 @@ export function usePythonBridge() {
     setConnectionStatus("connecting");
     setConnectionError(null);
     failCountRef.current = 0;
-    addConnectionLog("INFO", i18n.t("hooks:usePythonBridge.正在重新连接..._de56"));
+    addConnectionLog("INFO", i18n.t("hooks:usePythonBridge.reconnecting"));
     const result = await doPing();
     if (result) {
       fetchBridgeInfo();

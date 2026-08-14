@@ -33,7 +33,7 @@ def _create_header_mapping_section(page: ft.Page, log):
 
     # ── 搜索过滤栏 ──
     search_field = ft.TextField(
-        hint_text=t("components:user_config._header_mapping.搜索列名或关键字..._a031"),
+        hint_text=t("components:user_config.columnkeyword"),
         expand=True,
         dense=True,
         text_size=13,
@@ -73,10 +73,10 @@ def _create_header_mapping_section(page: ft.Page, log):
         header_labels = ft.Container(
             content=ft.Row(
                 [
-                    ft.Text(t("components:user_config._header_mapping.列号_27c2"), width=52, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
-                    ft.Text(t("components:user_config._header_mapping.匹配_f504"), width=56, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
-                    ft.Text(t("components:user_config._header_mapping.关键字（名称匹配）_c92b"), expand=True, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
-                    ft.Text(t("components:user_config._header_mapping.新列名_d6e7"), width=140, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
+                    ft.Text(t("components:user_config._header_mapping.columnNumber"), width=52, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
+                    ft.Text(t("components:user_config._header_mapping.matching"), width=56, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
+                    ft.Text(t("components:user_config._header_mapping.keywordNameMatching"), expand=True, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
+                    ft.Text(t("components:user_config._header_mapping.newColumnName"), width=140, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
                     ft.Text("", width=36),
                 ],
                 spacing=4,
@@ -97,7 +97,7 @@ def _create_header_mapping_section(page: ft.Page, log):
             is_expanded = idx in _expanded_rows
             has_index = entry.get("index") is not None
             has_keywords = bool(entry.get("keywords", []))
-            match_mode = t("components:user_config._header_mapping.位置_d4d2") if has_index else (t("components:user_config._header_mapping.关键字_cfb5") if has_keywords else "—")
+            match_mode = t("components:user_config._header_mapping.position") if has_index else (t("components:user_config._header_mapping.keyword") if has_keywords else "—")
 
             # 徽章样式（与 Tauri tailwind 色值一致）
             badge_color = ft.Colors.TEAL_100 if has_index else (
@@ -120,7 +120,7 @@ def _create_header_mapping_section(page: ft.Page, log):
                 # Row1: 列号输入 + 徽章 + 新列名输入 + 折叠/删除按钮
                 index_field = ft.TextField(
                     value=str(entry.get("index", "")) if entry.get("index") is not None else "",
-                    hint_text=t("components:user_config._header_mapping.从1起_ad5f"),
+                    hint_text=t("components:user_config._header_mapping.startingAt1"),
                     width=52,
                     text_size=13,
                     dense=True,
@@ -139,7 +139,7 @@ def _create_header_mapping_section(page: ft.Page, log):
 
                 new_field = ft.TextField(
                     value=entry.get("new", ""),
-                    hint_text=t("components:user_config._header_mapping.新列名_d6e7"),
+                    hint_text=t("components:user_config._header_mapping.newColumnName"),
                     expand=True,
                     text_size=13,
                     dense=True,
@@ -157,7 +157,7 @@ def _create_header_mapping_section(page: ft.Page, log):
                 # 折叠 + 删除按钮
                 fold_btn = ft.IconButton(
                     icon=ft.Icons.EXPAND_LESS,
-                    tooltip=t("components:user_config._header_mapping.折叠_e082"),
+                    tooltip=t("components:user_config._header_mapping.collapse"),
                     icon_size=16,
                     icon_color=theme.TEXT_SECONDARY,
                 )
@@ -169,7 +169,7 @@ def _create_header_mapping_section(page: ft.Page, log):
 
                 delete_btn = ft.IconButton(
                     icon=ft.Icons.DELETE_OUTLINE,
-                    tooltip=t("components:user_config._header_mapping.删除此行_43e8"),
+                    tooltip=t("components:user_config._header_mapping.deleteThisRow"),
                     icon_size=16,
                     icon_color=theme.ERROR,
                 )
@@ -183,7 +183,7 @@ def _create_header_mapping_section(page: ft.Page, log):
 
                 # Row2: 关键字 chip 输入
                 kw_column, kw_get, kw_set = _create_keyword_input(
-                    page, "", t("components:user_config._header_mapping.输入关键字后回车添加_fafd"),
+                    page, "", t("components:user_config._header_mapping.enterAKeywordAndPressEnterToAdd"),
                 )
                 kw_set(entry.get("keywords", []))
                 _header_mapping_state[idx]["_kw_get"] = kw_get
@@ -267,7 +267,7 @@ def _create_header_mapping_section(page: ft.Page, log):
         if visible_count == 0 and _header_mapping_state:
             controls.append(
                 ft.Container(
-                    content=ft.Text(t("components:user_config._header_mapping.没有匹配的映射_97b7"), size=12, color=theme.TEXT_SECONDARY, text_align=ft.TextAlign.CENTER),
+                    content=ft.Text(t("components:user_config._header_mapping.noMatchingMappings"), size=12, color=theme.TEXT_SECONDARY, text_align=ft.TextAlign.CENTER),
                     padding=ft.Padding.symmetric(vertical=16),
                     alignment=ft.Alignment.CENTER,
                 )
@@ -275,7 +275,7 @@ def _create_header_mapping_section(page: ft.Page, log):
         elif not _header_mapping_state:
             controls.append(
                 ft.Container(
-                    content=ft.Text(t("components:user_config._header_mapping.暂无映射配置，点击「添加映射」_2fd0"), size=12, color=theme.TEXT_SECONDARY, text_align=ft.TextAlign.CENTER),
+                    content=ft.Text(t("components:user_config._header_mapping.noMappingRulesClickAddMappingToBegin"), size=12, color=theme.TEXT_SECONDARY, text_align=ft.TextAlign.CENTER),
                     padding=ft.Padding.symmetric(vertical=16),
                     alignment=ft.Alignment.CENTER,
                 )
@@ -346,7 +346,7 @@ def _create_header_mapping_section(page: ft.Page, log):
                 continue
 
             if not new_name:
-                header_status_text.value = t("components:user_config._header_mapping.第行：新列名不能为空_4f36", row_num=row_num)
+                header_status_text.value = t("components:user_config._header_mapping.columnColumnNewColumnNamecolumn", row_num=row_num)
                 header_status_text.color = theme.ERROR
                 has_error = True
                 break
@@ -354,7 +354,7 @@ def _create_header_mapping_section(page: ft.Page, log):
             if idx_val is not None:
                 if idx_val in indices_seen:
                     header_status_text.value = t(
-                        "components:user_config._header_mapping.行号重复（第行和第行）_8565", idx_val=idx_val, first_row=indices_seen[idx_val], row_num=row_num
+                        "components:user_config._header_mapping.itemItemItemItemItem", idx_val=idx_val, first_row=indices_seen[idx_val], row_num=row_num
                     )
                     header_status_text.color = theme.ERROR
                     has_error = True
@@ -383,16 +383,16 @@ def _create_header_mapping_section(page: ft.Page, log):
         kw_count = sum(1 for e in entries if e.get("keywords"))
         hints = []
         if pos_count:
-            hints.append(t("components:user_config._header_mapping.条按位置匹配_1bd2", pos_count=pos_count))
+            hints.append(t("components:user_config._header_mapping.itemsbyPositionmatching", pos_count=pos_count))
         if kw_count:
-            hints.append(t("components:user_config._header_mapping.条按关键字匹配_8645", kw_count=kw_count))
+            hints.append(t("components:user_config._header_mapping.itemsmatchingkeywordmatching", kw_count=kw_count))
         hint_text = "；".join(hints) if hints else ""
-        status_msg = t("components:user_config._header_mapping.已保存条表头映射_1c12", count=len(entries))
+        status_msg = t("components:user_config._header_mapping.savedItemsconfiguration", count=len(entries))
         if hint_text:
             status_msg += f"（{hint_text}）"
         header_status_text.value = status_msg
         header_status_text.color = theme.TEXT_SECONDARY
-        _log_message(log, t("components:user_config._header_mapping.已保存工作效率表头映射（条）_f70f", count=len(entries)))
+        _log_message(log, t("components:user_config._header_mapping.savedworktimeHeaderMappingItems", count=len(entries)))
         try:
             page.update()
         except (RuntimeError, AttributeError):
@@ -407,9 +407,9 @@ def _create_header_mapping_section(page: ft.Page, log):
         for entry in default_entries:
             _header_mapping_state.append(dict(entry))
         _build_header_rows()
-        header_status_text.value = t("components:user_config._header_mapping.已恢复默认配置_455f")
+        header_status_text.value = t("components:user_config._header_mapping.defaultConfigurationRestored")
         header_status_text.color = theme.TEXT_SECONDARY
-        _log_message(log, t("components:user_config._header_mapping.已重置工作效率表头映射_e24a"))
+        _log_message(log, t("components:user_config._header_mapping.worktimeHeaderMappingReset"))
         try:
             page.update()
         except (RuntimeError, AttributeError):
@@ -420,9 +420,9 @@ def _create_header_mapping_section(page: ft.Page, log):
         _header_mapping_state.clear()
         _expanded_rows.clear()
         _build_header_rows()
-        header_status_text.value = t("components:user_config._header_mapping.已清空配置_6878")
+        header_status_text.value = t("components:user_config._header_mapping.configurationclearconfiguration")
         header_status_text.color = theme.TEXT_SECONDARY
-        _log_message(log, t("components:user_config._header_mapping.已清空工作效率表头映射配置_55ec"))
+        _log_message(log, t("components:user_config._header_mapping.configurationclearconfigurationconfiguration"))
         try:
             page.update()
         except (RuntimeError, AttributeError):
@@ -432,8 +432,8 @@ def _create_header_mapping_section(page: ft.Page, log):
     toolbar = ft.Row(
         [
             search_field,
-            theme.primary_btn(t("components:user_config._header_mapping.保存_be5f"), icon=ft.Icons.SAVE, on_click=_save_header_mapping),
-            theme.accent_btn(t("components:user_config._header_mapping.添加映射_4ecc"), icon=ft.Icons.ADD, on_click=_add_header_row),
+            theme.primary_btn(t("components:user_config._header_mapping.save"), icon=ft.Icons.SAVE, on_click=_save_header_mapping),
+            theme.accent_btn(t("components:user_config._header_mapping.addMapping"), icon=ft.Icons.ADD, on_click=_add_header_row),
         ],
         spacing=8,
         vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -441,25 +441,25 @@ def _create_header_mapping_section(page: ft.Page, log):
 
     secondary_toolbar = ft.Row(
         [
-            theme.secondary_btn(t("components:user_config._header_mapping.重新加载_64ca"), icon=ft.Icons.REFRESH, on_click=lambda _: _reload_header_mapping(), height=34),
-            theme.secondary_btn(t("components:user_config._header_mapping.恢复默认_7468"), icon=ft.Icons.RESTART_ALT, on_click=_reset_header_mapping, height=34),
-            theme.secondary_btn(t("components:user_config._header_mapping.清空配置_0314"), icon=ft.Icons.DELETE_SWEEP, on_click=_clear_header_mapping, height=34),
+            theme.secondary_btn(t("components:user_config._header_mapping.reload"), icon=ft.Icons.REFRESH, on_click=lambda _: _reload_header_mapping(), height=34),
+            theme.secondary_btn(t("components:user_config._header_mapping.restoreDefault"), icon=ft.Icons.RESTART_ALT, on_click=_reset_header_mapping, height=34),
+            theme.secondary_btn(t("components:user_config._header_mapping.clearConfiguration"), icon=ft.Icons.DELETE_SWEEP, on_click=_clear_header_mapping, height=34),
             ft.Container(expand=True),
-            theme.secondary_btn(t("components:user_config._header_mapping.全部展开_6993"), icon=ft.Icons.UNFOLD_MORE, on_click=_expand_all, height=34),
-            theme.secondary_btn(t("components:user_config._header_mapping.全部折叠_450c"), icon=ft.Icons.UNFOLD_LESS, on_click=_collapse_all, height=34),
+            theme.secondary_btn(t("components:user_config._header_mapping.expandAll"), icon=ft.Icons.UNFOLD_MORE, on_click=_expand_all, height=34),
+            theme.secondary_btn(t("components:user_config._header_mapping.collapseAll"), icon=ft.Icons.UNFOLD_LESS, on_click=_collapse_all, height=34),
         ],
         spacing=4,
         vertical_alignment=ft.CrossAxisAlignment.CENTER,
     )
 
     header_mapping_card = theme.make_collapsible(
-        title=t("components:user_config._header_mapping.工作效率表头映射配置_6998"),
-        subtitle=t("components:user_config._header_mapping.配置列号（位置匹配）或关键字（_afad"),
+        title=t("components:user_config._header_mapping.configurationconfiguration"),
+        subtitle=t("components:user_config._header_mapping.configurationcolumnNumberPositionmatchingConfigurationkeywordNameMatchingConfigu"),
         icon=ft.Icons.TABLE_CHART,
         initially_expanded=False,
         content_controls=[
             ft.Text(
-                t("components:user_config._header_mapping.点击行可展开编辑；关键字默认以_7cc9"),
+                t("components:user_config._header_mapping.selectARowToEditGreenMeansPositionMatchYellowMeansKeywordMatch"),
                 size=11,
                 color=theme.TEXT_SECONDARY,
             ),

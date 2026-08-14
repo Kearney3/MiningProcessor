@@ -8,19 +8,10 @@ const IconTruck = () => (
   </svg>
 );
 
-const EQUIPMENT_LEDGER_COLUMNS = [
-  "设备名称",
-  "设备编号",
-  "公司",
-  "标准设备名称",
-  "标准设备编号",
-  "标准公司名称",
-];
+type LedgerBackendConfig = Omit<LedgerPageConfig, "title" | "standardColumns" | "emptyMessage">;
 
-const config: LedgerPageConfig = {
-  title: "设备台账",
+const config: LedgerBackendConfig = {
   icon: <IconTruck />,
-  standardColumns: EQUIPMENT_LEDGER_COLUMNS,
   loadDataMethod: "get_equipment_ledger_data",
   importMethod: "import_equipment_ledger",
   loadFileColumnsMethod: "load_ledger_file_columns",
@@ -31,7 +22,6 @@ const config: LedgerPageConfig = {
   setDefaultMethod: "set_default_equipment_ledger",
   cancelDefaultMethod: "cancel_default_equipment_ledger",
   clearMethod: "clear_equipment_ledger",
-  emptyMessage: "暂无设备台账数据，请先导入设备台账 Excel",
 };
 
 export function EquipmentLedgerPage({ bridge }: { bridge: BridgeProp }) {
@@ -39,16 +29,16 @@ export function EquipmentLedgerPage({ bridge }: { bridge: BridgeProp }) {
 
   const translatedConfig: LedgerPageConfig = {
     ...config,
-    title: t("pages:EquipmentLedgerPage.设备台账_e6a7"),
+    title: t("pages:EquipmentLedgerPage.equipmentLedger"),
     standardColumns: [
-      t("pages:EquipmentLedgerPage.设备名称_9f69"),
-      t("pages:EquipmentLedgerPage.设备编号_cf05"),
-      t("pages:EquipmentLedgerPage.公司_4171"),
-      t("pages:EquipmentLedgerPage.标准设备名称_7494"),
-      t("pages:EquipmentLedgerPage.标准设备编号_d45a"),
-      t("pages:EquipmentLedgerPage.标准公司名称_907e"),
+      t("pages:EquipmentLedgerPage.equipment"),
+      t("pages:EquipmentLedgerPage.equipmentId"),
+      t("pages:EquipmentLedgerPage.company"),
+      t("pages:EquipmentLedgerPage.standardEquipmentName"),
+      t("pages:EquipmentLedgerPage.standardEquipmentId"),
+      t("pages:EquipmentLedgerPage.standardCompanyName"),
     ],
-    emptyMessage: t("pages:EquipmentLedgerPage.暂无设备台账数据，请先导入设备_ccd7"),
+    emptyMessage: t("pages:EquipmentLedgerPage.noEquipmentLedgerDataImportAnEquipmentLedgerExcelFileFirst"),
   };
 
   return <LedgerPage bridge={bridge} config={translatedConfig} />;

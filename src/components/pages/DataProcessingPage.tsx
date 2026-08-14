@@ -86,10 +86,10 @@ function PathInputDual({
         placeholder={placeholder}
         className={`${inputClass} flex-1 ${value === "" ? "border-amber-300 bg-amber-50/30" : ""}`}
       />
-      <button onClick={browseFile} className={btnSecondaryClass} title={t("pages:DataProcessingPage.选择文件_fd7e")}>
+      <button onClick={browseFile} className={btnSecondaryClass} title={t("pages:DataProcessingPage.selectFile")}>
         <FileIcon />
       </button>
-      <button onClick={browseFolder} className={btnSecondaryClass} title={t("pages:DataProcessingPage.选择文件夹_aaa4")}>
+      <button onClick={browseFolder} className={btnSecondaryClass} title={t("pages:DataProcessingPage.selectFolder")}>
         <FolderIcon />
       </button>
     </div>
@@ -188,10 +188,10 @@ function ProcessButton({
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          {t("pages:DataProcessingPage.处理中..._2fb9")}
+          {t("pages:DataProcessingPage.text")}
         </>
       ) : (
-        t("pages:DataProcessingPage.开始处理_a18f")
+        t("pages:DataProcessingPage.startProcessing")
       )}
     </button>
   );
@@ -267,37 +267,37 @@ function FuelCard({
         params,
       );
       onAnomalies(res.anomalies ?? []);
-      const msg = res.output_file ? t("pages:DataProcessingPage.输出:$_72cb", { path: res.output_file }) : t("pages:DataProcessingPage.处理完成_7be3");
+      const msg = res.output_file ? t("pages:DataProcessingPage.output", { path: res.output_file }) : t("pages:DataProcessingPage.processingCompleted");
       setResult(msg);
-      notify(t("pages:DataProcessingPage.油耗处理完成_e540"), "success");
+      notify(t("pages:DataProcessingPage.fuelProcessingCompleted"), "success");
     } catch (e) {
       setError(String(e));
-      notify(t("pages:DataProcessingPage.油耗处理失败:$_ea1a", { error: e }), "error");
+      notify(t("pages:DataProcessingPage.fuelProcessingFailed", { error: e }), "error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <ModuleCard title={t("pages:DataProcessingPage.油耗处理_1a41")} icon={<FuelIcon />}>
-      <PathInput value={path} onChange={setPath} placeholder={t("pages:DataProcessingPage.选择Excel文件_8e82")} defaultPath={defaultPath} onFileSelected={onFileSelected} />
+    <ModuleCard title={t("pages:DataProcessingPage.fuelProcessing")} icon={<FuelIcon />}>
+      <PathInput value={path} onChange={setPath} placeholder={t("pages:DataProcessingPage.selectExcelFile")} defaultPath={defaultPath} onFileSelected={onFileSelected} />
       {path === "" && <PathWarning />}
       <div className="mt-2">
         <StyledSelect
           value={year}
           onChange={setYear}
-          placeholder={t("pages:DataProcessingPage.年份（可选）_240d")}
-          options={yearOptions.map((y) => ({ label: t("pages:DataProcessingPage.$年_b668", { y }), value: String(y) }))}
+          placeholder={t("pages:DataProcessingPage.yearOptional")}
+          options={yearOptions.map((y) => ({ label: t("pages:DataProcessingPage.year", { y }), value: String(y) }))}
         />
       </div>
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
         <label className="flex items-center gap-1.5 text-xs text-slate-600">
           <input type="checkbox" checked={filterZeroEngineHours} onChange={(e) => setFilterZeroEngineHours(e.target.checked)} className="rounded border-slate-300" />
-          {t("pages:DataProcessingPage.过滤零小时数_549f")}
+          {t("pages:DataProcessingPage.filterZeroEngineHours")}
         </label>
         <label className="flex items-center gap-1.5 text-xs text-slate-600">
           <input type="checkbox" checked={filterZeroWorkHours} onChange={(e) => setFilterZeroWorkHours(e.target.checked)} className="rounded border-slate-300" />
-          {t("pages:DataProcessingPage.过滤零运行小时数_eaf1")}
+          {t("pages:DataProcessingPage.filterZeroWorkHours")}
         </label>
       </div>
       <ProcessButton loading={loading} onClick={handleProcess} disabled={path === ""} />
@@ -388,22 +388,22 @@ function ProductionCard({
         setSummary(res.summary);
       }
       onAnomalies(res.anomalies ?? []);
-      setResult(t("pages:DataProcessingPage.处理完成_7be3"));
-      notify(t("pages:DataProcessingPage.生产数据处理完成_8949"), "success");
+      setResult(t("pages:DataProcessingPage.processingCompleted"));
+      notify(t("pages:DataProcessingPage.productionProcessingCompleted"), "success");
     } catch (e) {
       setError(String(e));
-      notify(t("pages:DataProcessingPage.生产数据处理失败:$_7451", { error: e }), "error");
+      notify(t("pages:DataProcessingPage.productionProcessingFailed", { error: e }), "error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <ModuleCard title={t("pages:DataProcessingPage.生产数据_9fb6")} icon={<ProductionIcon />}>
+    <ModuleCard title={t("pages:DataProcessingPage.productionData")} icon={<ProductionIcon />}>
       <PathInputDual
         value={path}
         onChange={setPath}
-        placeholder={t("pages:DataProcessingPage.选择Excel文件或文件夹_23be")}
+        placeholder={t("pages:DataProcessingPage.selectExcelFileOrFolder")}
         defaultPath={defaultPath}
         onFileSelected={onFileSelected}
       />
@@ -412,38 +412,38 @@ function ProductionCard({
         <StyledToggle
           checked={autoDetect}
           onChange={handleAutoDetectChange}
-          label={t("pages:DataProcessingPage.自动识别表头_515c")}
+          label={t("pages:DataProcessingPage.autoDetectHeader")}
         />
       </div>
       {!autoDetect && (
         <div className="mt-2 space-y-1">
-          <label className="text-xs text-slate-500">{t("pages:DataProcessingPage.表头起始行_7c63")}</label>
+          <label className="text-xs text-slate-500">{t("pages:DataProcessingPage.headerStartRow")}</label>
           <input
             type="number"
             value={rawStart}
             onChange={(e) => setRawStart(e.target.value)}
-            placeholder={t("pages:DataProcessingPage.复合表头所在行号_3174")}
+            placeholder={t("pages:DataProcessingPage.compositeHeaderRow")}
             className={inputClass}
           />
-          <p className="text-xs text-slate-400">{t("pages:DataProcessingPage.复合表头（矿车+矿石类型）所在_0c8e")}</p>
+          <p className="text-xs text-slate-400">{t("pages:DataProcessingPage.compositeHeaderRowTruckOreTypeDefault6")}</p>
         </div>
       )}
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
         <label className="flex items-center gap-1.5 text-xs text-slate-600">
           <input type="checkbox" checked={filterZeroHoursMeter} onChange={(e) => setFilterZeroHoursMeter(e.target.checked)} className="rounded border-slate-300" />
-          {t("pages:DataProcessingPage.过滤零小时仪表_99e8")}
+          {t("pages:DataProcessingPage.filterZeroHoursMeter")}
         </label>
         <label className="flex items-center gap-1.5 text-xs text-slate-600">
           <input type="checkbox" checked={filterZeroKmMeter} onChange={(e) => setFilterZeroKmMeter(e.target.checked)} className="rounded border-slate-300" />
-          {t("pages:DataProcessingPage.过滤零公里仪表_2e3c")}
+          {t("pages:DataProcessingPage.filterZeroKmMeter")}
         </label>
         <label className="flex items-center gap-1.5 text-xs text-slate-600">
           <input type="checkbox" checked={filterZeroRunHours} onChange={(e) => setFilterZeroRunHours(e.target.checked)} className="rounded border-slate-300" />
-          {t("pages:DataProcessingPage.过滤零运行小时数_eaf1")}
+          {t("pages:DataProcessingPage.filterZeroWorkHours")}
         </label>
         <label className="flex items-center gap-1.5 text-xs text-slate-600">
           <input type="checkbox" checked={filterZeroRunKm} onChange={(e) => setFilterZeroRunKm(e.target.checked)} className="rounded border-slate-300" />
-          {t("pages:DataProcessingPage.过滤零运行里程_d55d")}
+          {t("pages:DataProcessingPage.filterZeroRunKm")}
         </label>
       </div>
       <ProcessButton
@@ -528,26 +528,26 @@ function ElectricalCard({
       if (year) params.year = parseInt(year);
       const res = await bridge.call<{ anomalies?: AnomalyRecord[] }>("process_electrical", params);
       onAnomalies(res.anomalies ?? []);
-      setResult(t("pages:DataProcessingPage.处理完成_7be3"));
-      notify(t("pages:DataProcessingPage.电力消耗处理完成_d43b"), "success");
+      setResult(t("pages:DataProcessingPage.processingCompleted"));
+      notify(t("pages:DataProcessingPage.electricalProcessingCompleted"), "success");
     } catch (e) {
       setError(String(e));
-      notify(t("pages:DataProcessingPage.电力消耗处理失败:$_b535", { error: e }), "error");
+      notify(t("pages:DataProcessingPage.electricalProcessingFailed", { error: e }), "error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <ModuleCard title={t("pages:DataProcessingPage.电力消耗_79c4")} icon={<ElectricalIcon />}>
-      <PathInput value={path} onChange={setPath} placeholder={t("pages:DataProcessingPage.选择Excel文件_8e82")} defaultPath={defaultPath} onFileSelected={onFileSelected} />
+    <ModuleCard title={t("pages:DataProcessingPage.electricalConsumption")} icon={<ElectricalIcon />}>
+      <PathInput value={path} onChange={setPath} placeholder={t("pages:DataProcessingPage.selectExcelFile")} defaultPath={defaultPath} onFileSelected={onFileSelected} />
       {path === "" && <PathWarning />}
       <div className="mt-2">
         <StyledSelect
           value={year}
           onChange={setYear}
-          placeholder={t("pages:DataProcessingPage.年份（可选）_240d")}
-          options={yearOptions.map((y) => ({ label: t("pages:DataProcessingPage.$年_b668", { y }), value: String(y) }))}
+          placeholder={t("pages:DataProcessingPage.yearOptional")}
+          options={yearOptions.map((y) => ({ label: t("pages:DataProcessingPage.year", { y }), value: String(y) }))}
         />
       </div>
       <div className="mt-2 space-y-2">
@@ -558,17 +558,17 @@ function ElectricalCard({
             onChange={(e) => setAddShift(e.target.checked)}
             className="rounded border-slate-300"
           />
-          {t("pages:DataProcessingPage.班次列_4574")}
+          {t("pages:DataProcessingPage.shiftColumn")}
         </label>
         {addShift && (
           <div className="flex items-center gap-2 pl-5">
-            <span className="text-xs text-slate-500">{t("pages:DataProcessingPage.默认班次_d68b")}</span>
+            <span className="text-xs text-slate-500">{t("pages:DataProcessingPage.defaultShift")}</span>
             <StyledSelect
               value={defaultShift}
               onChange={setDefaultShift}
               options={[
-                { label: "Day", value: "Day" },
-                { label: "Night", value: "Night" },
+                { label: t("common:dayShift"), value: "Day" },
+                { label: t("common:nightShift"), value: "Night" },
               ]}
             />
           </div>
@@ -647,30 +647,30 @@ function WorktimeCard({
       }
       const res = await bridge.call<{ anomalies?: AnomalyRecord[] }>("process_worktime", params);
       onAnomalies(res.anomalies ?? []);
-      setResult(t("pages:DataProcessingPage.处理完成_7be3"));
-      notify(t("pages:DataProcessingPage.工时处理完成_d784"), "success");
+      setResult(t("pages:DataProcessingPage.processingCompleted"));
+      notify(t("pages:DataProcessingPage.worktimeProcessingCompleted"), "success");
     } catch (e) {
       setError(String(e));
-      notify(t("pages:DataProcessingPage.工时处理失败:$_37ad", { error: e }), "error");
+      notify(t("pages:DataProcessingPage.worktimeProcessingFailed", { error: e }), "error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <ModuleCard title={t("pages:DataProcessingPage.工时处理_97ee")} icon={<WorktimeIcon />}>
-      <PathInputDual value={path} onChange={setPath} placeholder={t("pages:DataProcessingPage.选择Excel文件或文件夹_23be")} defaultPath={defaultPath} onFileSelected={onFileSelected} />
+    <ModuleCard title={t("pages:DataProcessingPage.worktimeProcessing")} icon={<WorktimeIcon />}>
+      <PathInputDual value={path} onChange={setPath} placeholder={t("pages:DataProcessingPage.selectExcelFileOrFolder")} defaultPath={defaultPath} onFileSelected={onFileSelected} />
       {path === "" && <PathWarning />}
       <div className="mt-2 grid grid-cols-2 gap-2">
         <StyledSelect
           value={year}
           onChange={setYear}
-          options={yearOptions.map((y) => ({ label: t("pages:DataProcessingPage.$年_b668", { y }), value: String(y) }))}
+          options={yearOptions.map((y) => ({ label: t("pages:DataProcessingPage.year", { y }), value: String(y) }))}
         />
         <StyledSelect
           value={month}
           onChange={setMonth}
-          options={monthOptions.map((m) => ({ label: t("pages:DataProcessingPage.$月_d5bf", { m }), value: String(m) }))}
+          options={monthOptions.map((m) => ({ label: t("pages:DataProcessingPage.month", { m }), value: String(m) }))}
         />
       </div>
       <div className="mt-2 space-y-2">
@@ -681,18 +681,18 @@ function WorktimeCard({
             onChange={(e) => setUseHeaderMapping(e.target.checked)}
             className="rounded border-slate-300"
           />
-          {t("pages:DataProcessingPage.应用表头映射_77bc")}
+          {t("pages:DataProcessingPage.applyHeaderMapping")}
         </label>
         {useHeaderMapping && (
           <div className="space-y-2 pl-5">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500">{t("pages:DataProcessingPage.映射模式_2ba8")}</span>
+              <span className="text-xs text-slate-500">{t("pages:DataProcessingPage.mappingMode")}</span>
               <ChipToggle
                 value={headerMode}
                 onChange={setHeaderMode}
                 options={[
-                  { label: t("pages:DataProcessingPage.位置映射_51c1"), value: "position" },
-                  { label: t("pages:DataProcessingPage.名称映射_817c"), value: "name" },
+                  { label: t("pages:DataProcessingPage.positionMapping"), value: "position" },
+                  { label: t("pages:DataProcessingPage.nameMapping"), value: "name" },
                 ]}
               />
             </div>
@@ -783,27 +783,27 @@ function MergeCard({
         skip_hidden_rows: skipHiddenRows,
         skip_hidden_cols: skipHiddenCols,
       });
-      const msg = res.output_file ? t("pages:DataProcessingPage.输出:$_72cb", { path: res.output_file }) : t("pages:DataProcessingPage.合并完成_8828");
+      const msg = res.output_file ? t("pages:DataProcessingPage.output", { path: res.output_file }) : t("pages:DataProcessingPage.mergeComplete");
       setResult(msg);
-      notify(t("pages:DataProcessingPage.文件合并完成_d93a"), "success");
+      notify(t("pages:DataProcessingPage.fileMergeCompleted"), "success");
     } catch (e) {
       setError(String(e));
-      notify(t("pages:DataProcessingPage.文件合并失败:$_1b1d", { error: e }), "error");
+      notify(t("pages:DataProcessingPage.fileMergeFailed", { error: e }), "error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <ModuleCard title={t("pages:DataProcessingPage.文件合并_798c")} icon={<MergeIcon />}>
-      <PathInput value={folderPath} onChange={setFolderPath} placeholder={t("pages:DataProcessingPage.选择文件夹_aaa4")} directory defaultPath={defaultPath} onFileSelected={onFileSelected} />
+    <ModuleCard title={t("pages:DataProcessingPage.fileMerge")} icon={<MergeIcon />}>
+      <PathInput value={folderPath} onChange={setFolderPath} placeholder={t("pages:DataProcessingPage.selectFolder")} directory defaultPath={defaultPath} onFileSelected={onFileSelected} />
       {folderPath === "" && <PathWarning />}
       <div className="mt-2">
         <input
           type="text"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
-          placeholder={t("pages:DataProcessingPage.文件名关键字_bc3a")}
+          placeholder={t("pages:DataProcessingPage.filenameKeyword")}
           className={inputClass}
         />
       </div>
@@ -814,7 +814,7 @@ function MergeCard({
           onChange={(e) => setStripTime(e.target.checked)}
           className="rounded border-slate-300"
         />
-        {t("pages:DataProcessingPage.去除时间部分_60dd")}
+        {t("pages:DataProcessingPage.stripTimePart")}
       </label>
       <label className="mt-1 flex items-center gap-1.5 text-xs text-slate-600">
         <input
@@ -823,7 +823,7 @@ function MergeCard({
           onChange={(e) => setTolerantHeader(e.target.checked)}
           className="rounded border-slate-300"
         />
-        {t("pages:DataProcessingPage.兼容表头_3795")}
+        {t("pages:DataProcessingPage.tolerantHeader")}
       </label>
       <label className="mt-1 flex items-center gap-1.5 text-xs text-slate-600">
         <input
@@ -832,13 +832,13 @@ function MergeCard({
           onChange={(e) => setDedup(e.target.checked)}
           className="rounded border-slate-300"
         />
-        {t("pages:DataProcessingPage.去除重复记录_02bb")}
+        {t("pages:DataProcessingPage.removeDuplicates")}
       </label>
 
       {/* Sort configuration */}
       <div className="mt-3 border-t border-slate-100 pt-3">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-slate-600">{t("pages:DataProcessingPage.排序规则_726a")}</span>
+          <span className="text-xs font-medium text-slate-600">{t("pages:DataProcessingPage.sortRules")}</span>
           <button
             onClick={addSortRow}
             className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-800 transition-colors"
@@ -860,7 +860,7 @@ function MergeCard({
                   onChange={(e) =>
                     updateSortRow(sc.id, { column: e.target.value })
                   }
-                  placeholder={t("pages:DataProcessingPage.列名_8f98")}
+                  placeholder={t("pages:DataProcessingPage.columnName")}
                   className="flex-1 text-xs outline-none bg-transparent"
                 />
                 <select
@@ -870,13 +870,13 @@ function MergeCard({
                   }
                   className="text-xs border-0 bg-transparent outline-none text-slate-600 appearance-none pr-4"
                 >
-                  <option value="asc">{t("pages:DataProcessingPage.升序_a4ac")}</option>
-                  <option value="desc">{t("pages:DataProcessingPage.降序_d05d")}</option>
+                  <option value="asc">{t("pages:DataProcessingPage.asc")}</option>
+                  <option value="desc">{t("pages:DataProcessingPage.desc")}</option>
                 </select>
                 <button
                   onClick={() => removeSortRow(sc.id)}
                   className="shrink-0 p-1 text-slate-400 hover:text-red-600 transition-colors"
-                  title={t("pages:DataProcessingPage.删除_2f4a")}
+                  title={t("pages:DataProcessingPage.delete")}
                 >
                   <TrashIcon />
                 </button>
@@ -885,7 +885,7 @@ function MergeCard({
           </div>
         )}
         {sortConfigs.length === 0 && (
-          <p className="text-xs text-slate-400">{t("pages:DataProcessingPage.暂无排序规则，数据按原始顺序合_c49b")}</p>
+          <p className="text-xs text-slate-400">{t("pages:DataProcessingPage.noSortRulesMergeDataInOriginalOrder")}</p>
         )}
       </div>
 
@@ -946,33 +946,33 @@ function MaintenanceCard({
         use_ml_fallback: useMlFallback,
       });
       const msg = res.output_files
-        ? t("pages:DataProcessingPage.输出:$个文件_0b1d", { count: res.output_files.length })
-        : res.output_file ? t("pages:DataProcessingPage.输出:$_72cb", { path: res.output_file }) : t("pages:DataProcessingPage.处理完成_7be3");
+        ? t("pages:DataProcessingPage.outputItemsfile", { count: res.output_files.length })
+        : res.output_file ? t("pages:DataProcessingPage.output", { path: res.output_file }) : t("pages:DataProcessingPage.processingCompleted");
       setResult(msg);
-      notify(t("pages:DataProcessingPage.维修记录处理完成_a533"), "success");
+      notify(t("pages:DataProcessingPage.maintenanceProcessingCompleted"), "success");
     } catch (e) {
       setError(String(e));
-      notify(t("pages:DataProcessingPage.维修记录处理失败:$_b71e", { error: e }), "error");
+      notify(t("pages:DataProcessingPage.maintenanceProcessingFailed", { error: e }), "error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <ModuleCard title={t("pages:DataProcessingPage.维修记录处理_7e96")} icon={<MaintenanceIcon />}>
-      <PathInputDual value={path} onChange={setPath} placeholder={t("pages:DataProcessingPage.选择出勤统计表文件或文件夹_cf57")} defaultPath={defaultPath} onFileSelected={onFileSelected} />
+    <ModuleCard title={t("pages:DataProcessingPage.maintenanceRecords")} icon={<MaintenanceIcon />}>
+      <PathInputDual value={path} onChange={setPath} placeholder={t("pages:DataProcessingPage.selectAttendanceReportFileOrFolder")} defaultPath={defaultPath} onFileSelected={onFileSelected} />
       {path === "" && <PathWarning />}
       <div className="mt-2">
-        <StyledToggle checked={splitByYear} onChange={setSplitByYear} label={t("pages:DataProcessingPage.按年份拆分输出_0709")} />
+        <StyledToggle checked={splitByYear} onChange={setSplitByYear} label={t("pages:DataProcessingPage.splitByYear")} />
       </div>
       <div className="mt-2">
-        <StyledToggle checked={detailsOnly} onChange={setDetailsOnly} label={t("pages:DataProcessingPage.仅导出明细_02b8")} />
+        <StyledToggle checked={detailsOnly} onChange={setDetailsOnly} label={t("pages:DataProcessingPage.detailsOnly")} />
       </div>
       <div className="mt-2">
         <StyledToggle
           checked={useMlFallback}
           onChange={setUseMlFallback}
-          label={t("pages:DataProcessingPage.启用机器学习辅助识别_0cea")}
+          label={t("pages:DataProcessingPage.enableMlAssistedClassification")}
         />
         <p className="mt-1 pl-[42px] text-xs leading-5 text-slate-500">
           {t("pages:DataProcessingPage.ui.mlFallbackHint")}
@@ -1003,34 +1003,34 @@ export function DataProcessingPage({ bridge }: { bridge: BridgeProp }) {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">{t("pages:DataProcessingPage.数据处理_cfc0")}</h2>
-          <p className="text-sm text-slate-500">{t("pages:DataProcessingPage.选择模块处理矿山数据_ff77")}</p>
+          <h2 className="text-lg font-semibold text-slate-800">{t("pages:DataProcessingPage.dataProcessing")}</h2>
+          <p className="text-sm text-slate-500">{t("pages:DataProcessingPage.selectAModuleToProcessMiningData")}</p>
         </div>
         <div className="flex items-center gap-4">
           <StyledToggle
             checked={useEquipmentLedger}
             onChange={setUseEquipmentLedger}
-            label={t("pages:DataProcessingPage.设备台账匹配_5a23")}
+            label={t("pages:DataProcessingPage.equipmentLedgerMatch")}
           />
           <StyledToggle
             checked={useOilLedger}
             onChange={setUseOilLedger}
-            label={t("pages:DataProcessingPage.油品台账匹配_8663")}
+            label={t("pages:DataProcessingPage.oilLedgerMatch")}
           />
           <StyledToggle
             checked={useModelLedger}
             onChange={setUseModelLedger}
-            label={t("pages:DataProcessingPage.型号台账匹配_135c")}
+            label={t("pages:DataProcessingPage.modelLedgerMatch")}
           />
           <StyledToggle
             checked={skipHiddenRows}
             onChange={setSkipHiddenRows}
-            label={t("pages:DataProcessingPage.跳过隐藏行_bc25")}
+            label={t("pages:DataProcessingPage.skipHiddenRows")}
           />
           <StyledToggle
             checked={skipHiddenCols}
             onChange={setSkipHiddenCols}
-            label={t("pages:DataProcessingPage.跳过隐藏列_3ed3")}
+            label={t("pages:DataProcessingPage.skipHiddenColumns")}
           />
         </div>
       </div>

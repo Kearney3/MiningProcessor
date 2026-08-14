@@ -3,21 +3,21 @@ import type { AnomalyRecord } from "../lib/types";
 import { AlertTriangleIcon } from "../lib/icons";
 
 const getColumns = (t: (k: string) => string): { key: keyof AnomalyRecord; label: string; className?: string }[] => [
-  { key: "数据类型", label: t("components:AnomalyResultsTable.数据类型_185f"), className: "px-4" },
-  { key: "行号", label: t("components:AnomalyResultsTable.行号_89c8") },
-  { key: "日期", label: t("components:AnomalyResultsTable.日期_4ff1") },
-  { key: "班次", label: t("components:AnomalyResultsTable.班次_b689") },
-  { key: "设备名称", label: t("components:AnomalyResultsTable.设备名称_9f69") },
-  { key: "设备编号", label: t("components:AnomalyResultsTable.设备编号_cf05") },
-  { key: "异常列", label: t("components:AnomalyResultsTable.异常列_abcd") },
-  { key: "异常值", label: t("components:AnomalyResultsTable.异常值_56c9") },
-  { key: "检测方法", label: t("components:AnomalyResultsTable.检测方法_2b87") },
-  { key: "说明", label: t("components:AnomalyResultsTable.说明_f411"), className: "pr-4" },
+  { key: "数据类型", label: t("components:AnomalyResultsTable.dataType"), className: "px-4" },
+  { key: "行号", label: t("components:AnomalyResultsTable.row") },
+  { key: "日期", label: t("components:AnomalyResultsTable.date") },
+  { key: "班次", label: t("components:AnomalyResultsTable.shift") },
+  { key: "设备名称", label: t("components:AnomalyResultsTable.equipment") },
+  { key: "设备编号", label: t("components:AnomalyResultsTable.equipmentId") },
+  { key: "异常列", label: t("components:AnomalyResultsTable.anomalyColumn") },
+  { key: "异常值", label: t("components:AnomalyResultsTable.anomalyValue") },
+  { key: "检测方法", label: t("components:AnomalyResultsTable.method") },
+  { key: "说明", label: t("components:AnomalyResultsTable.note"), className: "pr-4" },
 ];
 
 function makeDisplayValue(t: (k: string) => string) {
   return function displayValue(value: unknown): string {
-    if (value === null || value === undefined || value === "") return t("components:AnomalyResultsTable.（空）_27c4");
+    if (value === null || value === undefined || value === "") return t("components:AnomalyResultsTable.empty");
     if (typeof value === "object") {
       try {
         return JSON.stringify(value);
@@ -40,10 +40,10 @@ export function AnomalyResultsTable({ records }: { records: AnomalyRecord[] }) {
       <div className="px-4 py-3 border-b border-amber-100 bg-amber-50 flex items-center justify-between">
         <h3 className="text-sm font-medium text-amber-700 flex items-center gap-2">
           <AlertTriangleIcon />
-          {t("components:AnomalyResultsTable.异常值明细_41e7")}
-          <span className="text-xs text-amber-500">{t("components:AnomalyResultsTable.共条_ccc5", { count: records.length })}</span>
+          {t("components:AnomalyResultsTable.anomalyDetails")}
+          <span className="text-xs text-amber-500">{t("components:AnomalyResultsTable.total", { count: records.length })}</span>
         </h3>
-        <span className="text-xs text-amber-600">{t("components:AnomalyResultsTable.滚动查看全部记录_9c1a")}</span>
+        <span className="text-xs text-amber-600">{t("components:AnomalyResultsTable.scrollToViewAll")}</span>
       </div>
       <div className="max-h-72 overflow-auto">
         <table className="min-w-[980px] w-full text-sm">

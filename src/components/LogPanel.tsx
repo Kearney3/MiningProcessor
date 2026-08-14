@@ -154,10 +154,10 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
-      showFeedback(t("components:LogPanel.日志已复制_ced6"));
+      showFeedback(t("components:LogPanel.logCopied"));
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      showFeedback(t("components:LogPanel.复制失败，请检查剪贴板权限_4d7c"));
+      showFeedback(t("components:LogPanel.copyFailedCheckClipboardPermissions"));
     }
   }, [filteredLogs, showFeedback]);
 
@@ -176,13 +176,13 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
         method: "write_text_file",
         params: { path: filePath, content: text },
       });
-      showFeedback(t("components:LogPanel.日志已导出_af33"));
+      showFeedback(t("components:LogPanel.logExported"));
     } catch {
       try {
         await navigator.clipboard.writeText(text);
-        showFeedback(t("components:LogPanel.导出失败，日志已复制到剪贴板_2007"));
+        showFeedback(t("components:LogPanel.exportFailedTheLogWasCopiedToTheClipboard"));
       } catch {
-        showFeedback(t("components:LogPanel.日志导出失败_ae46"));
+        showFeedback(t("components:LogPanel.logExportFailed"));
       }
     }
   }, [filteredLogs, showFeedback]);
@@ -204,7 +204,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
       {/* Drag handle */}
       {!collapsed && <div
         role="separator"
-        aria-label={t("components:LogPanel.调整日志面板高度_3d3a")}
+        aria-label={t("components:LogPanel.resizeLogPanel")}
         aria-orientation="horizontal"
         aria-valuemin={MIN_HEIGHT}
         aria-valuemax={MAX_HEIGHT}
@@ -232,20 +232,20 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
 
       {/* Toolbar */}
       <div className="flex items-center px-3 py-1.5 border-b border-slate-100 shrink-0">
-        <span className="text-xs font-medium text-slate-500">{t("components:LogPanel.日志_456d")}</span>
+        <span className="text-xs font-medium text-slate-500">{t("components:LogPanel.logs")}</span>
         <span className="inline-flex items-center justify-center min-w-[24px] h-4 px-1.5 ml-2 text-[10px] font-medium text-slate-400 bg-slate-50 rounded-full">
           {filteredLogs.length}
         </span>
         {filteredLogs.length > renderedLogs.length && (
           <span className="ml-2 text-xs text-slate-500">
-            {t("components:LogPanel.显示最近条_a1b2", { count: renderedLogs.length })}
+            {t("components:LogPanel.showingLatest", { count: renderedLogs.length })}
           </span>
         )}
         <span className="ml-2 text-xs text-slate-600" role="status" aria-live="polite">
           {feedback}
         </span>
         <div className="ml-auto flex items-center gap-1">
-          <label htmlFor="log-level-filter" className="sr-only">{t("components:LogPanel.日志级别_2be3")}</label>
+          <label htmlFor="log-level-filter" className="sr-only">{t("components:LogPanel.logLevel")}</label>
           <select
             id="log-level-filter"
             value={filterLevel}
@@ -260,7 +260,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
           <button
             onClick={resumeFollowing}
             aria-pressed={followTail}
-            title={followTail ? t("components:LogPanel.正在跟随最新日志_003c") : t("components:LogPanel.滚动到底部并恢复跟随_568a")}
+            title={followTail ? t("components:LogPanel.followingLatestLogs") : t("components:LogPanel.scrollToBottomAndResumeFollowing")}
             className={`
               text-xs px-2 py-1 rounded cursor-pointer transition-colors
               ${followTail
@@ -269,12 +269,12 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
               }
             `}
           >
-            {followTail ? t("components:LogPanel.跟随中_b561") : t("components:LogPanel.继续跟随_c4d7")}
+            {followTail ? t("components:LogPanel.following") : t("components:LogPanel.resume")}
           </button>
           <button
             onClick={handleCopyAll}
-            title={copied ? t("components:LogPanel.已复制_52e6") : t("components:LogPanel.复制全部_2733")}
-            aria-label={copied ? t("components:LogPanel.日志已复制_ced6") : t("components:LogPanel.复制全部日志_34ac")}
+            title={copied ? t("components:LogPanel.copied") : t("components:LogPanel.copyAll")}
+            aria-label={copied ? t("components:LogPanel.logCopied") : t("components:LogPanel.copyAllLogs")}
             disabled={filteredLogs.length === 0}
             className="p-1.5 rounded text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed cursor-pointer transition-colors"
           >
@@ -282,8 +282,8 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
           </button>
           <button
             onClick={handleExport}
-            title={t("components:LogPanel.导出日志_609e")}
-            aria-label={t("components:LogPanel.导出日志_609e")}
+            title={t("components:LogPanel.exportLogs")}
+            aria-label={t("components:LogPanel.exportLogs")}
             disabled={filteredLogs.length === 0}
             className="p-1.5 rounded text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed cursor-pointer transition-colors"
           >
@@ -291,8 +291,8 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
           </button>
           <button
             onClick={onClear}
-            title={t("components:LogPanel.清空_288f")}
-            aria-label={t("components:LogPanel.清空日志_a15a")}
+            title={t("components:LogPanel.clear")}
+            aria-label={t("components:LogPanel.clearLogs")}
             disabled={logs.length === 0}
             className="p-1.5 rounded text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed cursor-pointer transition-colors"
           >
@@ -300,8 +300,8 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
           </button>
           <button
             onClick={() => setCollapsed((value) => !value)}
-            title={collapsed ? t("components:LogPanel.展开日志_34c1") : t("components:LogPanel.折叠日志_c26f")}
-            aria-label={collapsed ? t("components:LogPanel.展开日志_34c1") : t("components:LogPanel.折叠日志_c26f")}
+            title={collapsed ? t("components:LogPanel.expandLog") : t("components:LogPanel.collapseLog")}
+            aria-label={collapsed ? t("components:LogPanel.expandLog") : t("components:LogPanel.collapseLog")}
             aria-expanded={!collapsed}
             className="p-1.5 rounded text-slate-500 hover:text-slate-700 cursor-pointer transition-colors"
           >
@@ -323,7 +323,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
       {!collapsed && <div
         ref={scrollRef}
         role="region"
-        aria-label={t("components:LogPanel.处理日志_98ea")}
+        aria-label={t("components:LogPanel.processingLog")}
         onScroll={(event) => {
           const element = event.currentTarget;
           const distance = element.scrollHeight - element.scrollTop - element.clientHeight;
@@ -332,7 +332,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
         className="flex-1 overflow-y-auto thin-scrollbar font-mono text-xs text-slate-600 px-4 py-1.5"
       >
         {filteredLogs.length === 0 ? (
-          <div className="text-slate-500 text-center py-6 text-xs">{t("components:LogPanel.等待日志..._8b65")}</div>
+          <div className="text-slate-500 text-center py-6 text-xs">{t("components:LogPanel.waitingForLogs")}</div>
         ) : (
           renderedLogs.map((entry) => <LogRow key={entry.seq} entry={entry} />)
         )}

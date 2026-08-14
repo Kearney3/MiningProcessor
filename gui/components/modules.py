@@ -26,36 +26,36 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
 
     # --- Fuel ---
     fuel_path = ft.TextField(
-        label=t("components:modules.燃油数据处理_8744"),
-        hint_text=t("components:modules.输入路径或点击按钮选择..._d300"),
+        label=t("components:modules.fuelProcessing"),
+        hint_text=t("components:modules.enterAPathOrUseTheBrowseButton"),
         expand=2,
         read_only=False,
         color=theme.TEXT_PRIMARY,
         suffix=ft.IconButton(
             icon=ft.Icons.FOLDER_OPEN,
-            tooltip=t("components:modules.浏览_9c5c"),
+            tooltip=t("components:modules.browse"),
         ),
     )
     fuel_year = ft.Dropdown(
-        label=t("components:modules.年份_8f30"),
+        label=t("components:modules.year"),
         width=125,
         options=year_options(),
         value=current_year,
     )
-    fuel_btn = theme.primary_btn(t("components:modules.处理_7b1d"), icon=ft.Icons.PLAY_ARROW, disabled=False)
+    fuel_btn = theme.primary_btn(t("components:modules.process"), icon=ft.Icons.PLAY_ARROW, disabled=False)
 
     # --- Production ---
     prod_path = ft.TextField(
-        label=t("components:modules.生产数据处理_ea37"),
-        hint_text=t("components:modules.输入路径或点击按钮选择..._d300"),
+        label=t("components:modules.productionProcessing"),
+        hint_text=t("components:modules.enterAPathOrUseTheBrowseButton"),
         expand=2,
         read_only=False,
         color=theme.TEXT_PRIMARY,
     )
-    prod_file_btn = theme.secondary_btn(t("components:modules.选文件_ef59"), icon=ft.Icons.UPLOAD_FILE)
-    prod_folder_btn = theme.secondary_btn(t("components:modules.选文件夹_2f6e"), icon=ft.Icons.FOLDER_OPEN)
+    prod_file_btn = theme.secondary_btn(t("components:modules.file"), icon=ft.Icons.UPLOAD_FILE)
+    prod_folder_btn = theme.secondary_btn(t("components:modules.folder"), icon=ft.Icons.FOLDER_OPEN)
     prod_raw_start = ft.TextField(
-        label=t("components:modules.表头起始行_7c63"),
+        label=t("components:modules.headerStartRow"),
         width=100,
         value="6",
         hint_text="6",
@@ -63,7 +63,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         disabled=True,
     )
     prod_auto_detect = ft.Switch(
-        label=t("components:modules.自动识别表头_515c"),
+        label=t("components:modules.autoDetectHeader"),
         value=True,
         active_color=theme.PRIMARY,
     )
@@ -76,7 +76,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         prod_raw_start.update()
 
     prod_auto_detect.on_change = _on_prod_auto_detect_change
-    prod_btn = theme.primary_btn(t("components:modules.处理_7b1d"), icon=ft.Icons.PLAY_ARROW, disabled=False)
+    prod_btn = theme.primary_btn(t("components:modules.process"), icon=ft.Icons.PLAY_ARROW, disabled=False)
 
     # --- 生产处理汇总区域 ---
     prod_summary_container = ft.Column(
@@ -86,32 +86,35 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
 
     # --- Electrical ---
     elec_path = ft.TextField(
-        label=t("components:modules.电力数据处理_0a6f"),
-        hint_text=t("components:modules.输入路径或点击按钮选择..._d300"),
+        label=t("components:modules.electricalProcessing"),
+        hint_text=t("components:modules.enterAPathOrUseTheBrowseButton"),
         expand=2,
         read_only=False,
         color=theme.TEXT_PRIMARY,
         suffix=ft.IconButton(
             icon=ft.Icons.FOLDER_OPEN,
-            tooltip=t("components:modules.浏览_9c5c"),
+            tooltip=t("components:modules.browse"),
         ),
     )
     elec_year = ft.Dropdown(
-        label=t("components:modules.年份_8f30"),
+        label=t("components:modules.year"),
         width=125,
         options=year_options(),
         value=current_year,
     )
-    elec_btn = theme.primary_btn(t("components:modules.处理_7b1d"), icon=ft.Icons.PLAY_ARROW, disabled=False)
+    elec_btn = theme.primary_btn(t("components:modules.process"), icon=ft.Icons.PLAY_ARROW, disabled=False)
     elec_add_shift = ft.Checkbox(
-        label=t("components:modules.添加班次列_2612"),
+        label=t("components:modules.addShiftColumn"),
         value=False,
-        tooltip=t("components:modules.在日期列右侧新增班次列_b6ce"),
+        tooltip=t("components:modules.addShiftColumnAfterDate"),
     )
     elec_default_shift = ft.Dropdown(
-        label=t("components:modules.默认班次_d68b"),
+        label=t("components:modules.defaultShift"),
         width=100,
-        options=[ft.dropdown.Option("Day"), ft.dropdown.Option("Night")],
+        options=[
+            ft.dropdown.Option("Day", t("common:dayShift")),
+            ft.dropdown.Option("Night", t("common:nightShift")),
+        ],
         value="Day",
         visible=False,
     )
@@ -124,69 +127,69 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
 
     # --- Work time ---
     work_path = ft.TextField(
-        label=t("components:modules.工时数据处理_f56b"),
-        hint_text=t("components:modules.输入路径或点击按钮选择..._d300"),
+        label=t("components:modules.worktimeProcessing"),
+        hint_text=t("components:modules.enterAPathOrUseTheBrowseButton"),
         expand=2,
         read_only=False,
         color=theme.TEXT_PRIMARY,
         suffix=ft.IconButton(
             icon=ft.Icons.FOLDER_OPEN,
-            tooltip=t("components:modules.浏览_9c5c"),
+            tooltip=t("components:modules.browse"),
         ),
     )
     work_year = ft.Dropdown(
-        label=t("components:modules.年份_8f30"),
+        label=t("components:modules.year"),
         width=125,
         options=year_options(),
         value=current_year,
     )
     work_month = ft.Dropdown(
-        label=t("components:modules.月份_8190"),
+        label=t("components:modules.month"),
         width=125,
         options=month_options(),
         value=current_month,
     )
     _work_hmc = HeaderModeConfig(
-        label=t("components:modules.表头修改_6f3e"),
-        tooltip=t("components:modules.开启后按配置的映射关系重命名输_539a"),
+        label=t("components:modules.headerMapping"),
+        tooltip=t("components:modules.whenEnabledRenameOutputHeadersUsingTheConfiguredMapping"),
     )
 
-    work_btn = theme.primary_btn(t("components:modules.处理_7b1d"), icon=ft.Icons.PLAY_ARROW, disabled=False)
+    work_btn = theme.primary_btn(t("components:modules.process"), icon=ft.Icons.PLAY_ARROW, disabled=False)
 
     # --- Excel Merger ---
     merge_path = ft.TextField(
-        label=t("components:modules.Excel合并_bbe4"),
-        hint_text=t("components:modules.输入路径或点击按钮选择..._d300"),
+        label=t("components:modules.excelMerge"),
+        hint_text=t("components:modules.enterAPathOrUseTheBrowseButton"),
         expand=2,
         read_only=False,
         color=theme.TEXT_PRIMARY,
         suffix=ft.IconButton(
             icon=ft.Icons.FOLDER_OPEN,
-            tooltip=t("components:modules.浏览_9c5c"),
+            tooltip=t("components:modules.browse"),
         ),
     )
     merge_keyword = ft.TextField(
-        label=t("components:modules.关键字_cfb5"),
-        hint_text=t("components:modules.例如:Fuel_8734"),
+        label=t("components:modules.keyword"),
+        hint_text=t("components:modules.itemFuel"),
         expand=True,
         color=theme.TEXT_PRIMARY,
     )
     merge_strip_time = ft.Checkbox(
-        label=t("components:modules.仅保留日期_b960"),
+        label=t("components:modules.dateOnly"),
         value=False,
-        tooltip=t("components:modules.勾选后，时间列将去除时分秒，格_88e2"),
+        tooltip=t("components:modules.columnColumnColumnYyyyMmDd"),
     )
     merge_tolerant_header = ft.Checkbox(
-        label=t("components:modules.兼容表头_3795"),
+        label=t("components:modules.compatibleHeaders"),
         value=False,
-        tooltip=t("components:modules.勾选后，表头不一致的文件也会合_4a49"),
+        tooltip=t("components:modules.columnColumnfilecolumnColumn"),
     )
     merge_dedup = ft.Checkbox(
-        label=t("components:modules.去除重复记录_6f2d"),
+        label=t("components:modules.removeDuplicateRecords"),
         value=False,
-        tooltip=t("components:modules.勾选后，合并结果中完全重复的行_2e26"),
+        tooltip=t("components:modules.itemItemItemrecords"),
     )
-    merge_btn = theme.primary_btn(t("components:modules.合并_bd81"), icon=ft.Icons.MERGE_TYPE, disabled=False)
+    merge_btn = theme.primary_btn(t("components:modules.merge"), icon=ft.Icons.MERGE_TYPE, disabled=False)
 
     # --- 排序配置列表（Excel 合并用） ---
     sort_configs_state: list[dict] = []
@@ -204,14 +207,14 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
             col_field = ft.TextField(
                 value=cfg.get("column", ""),
                 text_size=12,
-                hint_text=t("components:modules.列名_8f98"),
+                hint_text=t("components:modules.columnName"),
                 expand=True,
                 color=theme.TEXT_PRIMARY,
                 hint_style=ft.TextStyle(color=theme.TEXT_SECONDARY),
             )
             order_dropdown = ft.Dropdown(
-                value=t("components:modules.升序_a4ac") if cfg.get("ascending", True) else t("components:modules.降序_d05d"),
-                options=[ft.dropdown.Option(t("components:modules.升序_a4ac")), ft.dropdown.Option(t("components:modules.降序_d05d"))],
+                value=t("components:modules.asc") if cfg.get("ascending", True) else t("components:modules.desc"),
+                options=[ft.dropdown.Option(t("components:modules.asc")), ft.dropdown.Option(t("components:modules.desc"))],
                 width=90,
                 text_size=12,
             )
@@ -220,7 +223,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                 sort_configs_state[_idx]["column"] = e.control.value
 
             def on_order_select(e, _idx=idx):
-                sort_configs_state[_idx]["ascending"] = (e.control.value == t("components:modules.升序_a4ac"))
+                sort_configs_state[_idx]["ascending"] = (e.control.value == t("components:modules.asc"))
 
             col_field.on_change = on_col_change
             order_dropdown.on_select = on_order_select
@@ -249,13 +252,13 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                 sort_rules_column.update()
 
             up_btn = ft.IconButton(
-                icon=ft.Icons.ARROW_UPWARD, tooltip=t("components:modules.上移_315e"), on_click=move_up, icon_size=16
+                icon=ft.Icons.ARROW_UPWARD, tooltip=t("components:modules.moveUp"), on_click=move_up, icon_size=16
             )
             down_btn = ft.IconButton(
-                icon=ft.Icons.ARROW_DOWNWARD, tooltip=t("components:modules.下移_17ac"), on_click=move_down, icon_size=16
+                icon=ft.Icons.ARROW_DOWNWARD, tooltip=t("components:modules.moveDown"), on_click=move_down, icon_size=16
             )
             del_btn = ft.IconButton(
-                icon=ft.Icons.DELETE, tooltip=t("components:modules.删除_2f4a"), on_click=remove_row, icon_size=16
+                icon=ft.Icons.DELETE, tooltip=t("components:modules.delete"), on_click=remove_row, icon_size=16
             )
 
             row_container = ft.Container(
@@ -284,33 +287,33 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         sort_configs_state.append({"column": "", "ascending": True})
         build_sort_rules()
 
-    add_sort_btn = theme.secondary_btn(t("components:modules.添加排序条件_9336"), icon=ft.Icons.ADD, on_click=add_sort_config, height=36)
+    add_sort_btn = theme.secondary_btn(t("components:modules.addSortRule"), icon=ft.Icons.ADD, on_click=add_sort_config, height=36)
 
     # --- Maintenance ---
     maint_path = ft.TextField(
-        label=t("components:modules.维修记录处理_7e96"),
-        hint_text=t("components:modules.选择出勤统计表文件或文件夹.._cdbd"),
+        label=t("components:modules.maintenanceRecords"),
+        hint_text=t("components:modules.selectAttendanceReportFileOrFolder"),
         expand=2,
         read_only=False,
         color=theme.TEXT_PRIMARY,
     )
-    maint_file_btn = theme.secondary_btn(t("components:modules.选文件_ef59"), icon=ft.Icons.UPLOAD_FILE)
-    maint_folder_btn = theme.secondary_btn(t("components:modules.选文件夹_2f6e"), icon=ft.Icons.FOLDER_OPEN)
-    maint_btn = theme.primary_btn(t("components:modules.处理_7b1d"), icon=ft.Icons.PLAY_ARROW, disabled=False)
+    maint_file_btn = theme.secondary_btn(t("components:modules.file"), icon=ft.Icons.UPLOAD_FILE)
+    maint_folder_btn = theme.secondary_btn(t("components:modules.folder"), icon=ft.Icons.FOLDER_OPEN)
+    maint_btn = theme.primary_btn(t("components:modules.process"), icon=ft.Icons.PLAY_ARROW, disabled=False)
     maint_split_year = ft.Checkbox(
-        label=t("components:modules.按年份拆分输出_0709"),
+        label=t("components:modules.splitByYear"),
         value=False,
-        tooltip=t("components:modules.勾选后，每年生成独立的统计文件_c64a"),
+        tooltip=t("components:modules.fileFilefile"),
     )
     maint_details_only = ft.Checkbox(
-        label=t("components:modules.仅导出明细_02b8"),
+        label=t("components:modules.detailsOnly"),
         value=False,
-        tooltip=t("components:modules.勾选后只输出维修明细sheet_a420"),
+        tooltip=t("components:modules.itemoutputmaintenanceDetailsSheetItemFileitemItem"),
     )
     maint_use_ml = ft.Checkbox(
-        label=t("components:modules.启用机器学习辅助识别_0cea"),
+        label=t("components:modules.enableMlAssistedClassification"),
         value=True,
-        tooltip=t("components:modules.仅对规则仍判为'其他/待确认'_47d8"),
+        tooltip=t("components:modules.mlFallbackHint"),
     )
 
     # --- FilePicker instances (must be added to page.overlay to work repeatedly) ---
@@ -329,42 +332,42 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     ])
 
     on_fuel_browse = make_browse_handler(
-        _fuel_picker, fuel_path, fuel_btn, t("components:modules.选择燃油数据文件_5fbd"),
+        _fuel_picker, fuel_path, fuel_btn, t("components:modules.selectFuelDataFile"),
         extensions=["xlsx", "xls"],
         log_fn=lambda msg: _log_message(page.logger.error, msg),
     )
     on_prod_pick_file = make_browse_handler(
-        _prod_file_picker, prod_path, prod_btn, t("components:modules.选择生产数据文件_51cb"),
+        _prod_file_picker, prod_path, prod_btn, t("components:modules.selectProductionDataFile"),
         extensions=["xlsx", "xls"],
         log_fn=lambda msg: _log_message(page.logger.error, msg),
     )
     on_prod_pick_folder = make_browse_handler(
-        _prod_folder_picker, prod_path, prod_btn, t("components:modules.选择生产数据文件夹_3b6e"),
+        _prod_folder_picker, prod_path, prod_btn, t("components:modules.selectfiledatafolder"),
         mode="folder",
         log_fn=lambda msg: _log_message(page.logger.error, msg),
     )
     on_elec_browse = make_browse_handler(
-        _elec_picker, elec_path, elec_btn, t("components:modules.选择电力数据文件_dcf4"),
+        _elec_picker, elec_path, elec_btn, t("components:modules.selectElectricalDataFile"),
         extensions=["xlsx", "xls"],
         log_fn=lambda msg: _log_message(page.logger.error, msg),
     )
     on_work_browse = make_browse_handler(
-        _work_picker, work_path, work_btn, t("components:modules.选择工时数据文件或文件夹_9fd1"),
+        _work_picker, work_path, work_btn, t("components:modules.selectWorktimeFileOrFolder"),
         extensions=["xlsx", "xls"],
         log_fn=lambda msg: _log_message(page.logger.error, msg),
     )
     on_merge_browse = make_browse_handler(
-        _merge_picker, merge_path, merge_btn, t("components:modules.选择包含Excel文件的文件夹_6903"),
+        _merge_picker, merge_path, merge_btn, t("components:modules.selectfileExcelFilefilefolder"),
         mode="folder",
         log_fn=lambda msg: _log_message(page.logger.error, msg),
     )
     on_maint_pick_file = make_browse_handler(
-        _maint_file_picker, maint_path, maint_btn, t("components:modules.选择出勤统计表文件_804e"),
+        _maint_file_picker, maint_path, maint_btn, t("components:modules.selectfilefile"),
         extensions=["xlsx", "xls"],
         log_fn=lambda msg: _log_message(page.logger.error, msg),
     )
     on_maint_pick_folder = make_browse_handler(
-        _maint_folder_picker, maint_path, maint_btn, t("components:modules.选择出勤统计表文件夹_2119"),
+        _maint_folder_picker, maint_path, maint_btn, t("components:modules.selectfilefolder"),
         mode="folder",
         log_fn=lambda msg: _log_message(page.logger.error, msg),
     )
@@ -381,59 +384,59 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
 
     # --- 台账匹配开关（设备 / 油品 独立控制） ---
     match_eq_toggle = ft.Checkbox(
-        label=t("components:modules.设备台账匹配_5a23"),
+        label=t("components:modules.equipmentLedgerMatch"),
         value=False,
     )
     match_oil_toggle = ft.Checkbox(
-        label=t("components:modules.油品台账匹配_8663"),
+        label=t("components:modules.oilLedgerMatch"),
         value=False,
     )
     match_model_toggle = ft.Checkbox(
-        label=t("components:modules.型号台账匹配_135c"),
+        label=t("components:modules.modelLedgerMatch"),
         value=False,
-        tooltip=t("components:modules.需同时开启设备台账匹配，按标准_6668"),
+        tooltip=t("components:modules.requiresEquipmentLedgerMatchingFillModelAttributesUsingTheStandardEquipmentId"),
     )
     skip_hidden_rows_toggle = ft.Checkbox(
-        label=t("components:modules.跳过隐藏行_bc25"),
+        label=t("components:modules.skipHiddenRows"),
         value=False,
-        tooltip=t("components:modules.勾选后，Excel中被隐藏的行_ecd7"),
+        tooltip=t("components:modules.whenSelectedExcelHiddenRowsAreNotRead"),
     )
     skip_hidden_cols_toggle = ft.Checkbox(
-        label=t("components:modules.跳过隐藏列_3ed3"),
+        label=t("components:modules.skipHiddenColumns"),
         value=False,
-        tooltip=t("components:modules.勾选后，Excel中被隐藏的列_398b"),
+        tooltip=t("components:modules.whenSelectedExcelHiddenColumnsAreNotRead"),
     )
     filter_zero_hours_toggle = ft.Checkbox(
-        label=t("components:modules.过滤零小时数_549f"),
+        label=t("components:modules.filterZeroEngineHours"),
         value=False,
-        tooltip=t("components:modules.勾选后，发动机小时数为0或为空_78cd"),
+        tooltip=t("components:modules.whenSelectedEngineHoursAre0ZeroOrEmptyRecordsAreFiltered"),
     )
     filter_zero_work_hours_toggle = ft.Checkbox(
-        label=t("components:modules.过滤零运行小时数_eaf1"),
+        label=t("components:modules.filterZeroOperatingHours"),
         value=False,
-        tooltip=t("components:modules.勾选后，运行小时数为0或为空的_c4ff"),
+        tooltip=t("components:modules.hoursOperatingHourshours0OrEmptyhoursrecordshours"),
     )
 
     # --- 生产模块过滤开关 ---
     prod_filter_zero_hours_meter = ft.Checkbox(
-        label=t("components:modules.过滤零小时仪表_99e8"),
+        label=t("components:modules.filterZeroHoursMeter"),
         value=False,
-        tooltip=t("components:modules.勾选后，小时数仪表开始或结束为_3b68"),
+        tooltip=t("components:modules.whenSelectedHourMeterStartOrEndIs0ZeroOrEmptyRecordsAreFiltered"),
     )
     prod_filter_zero_km_meter = ft.Checkbox(
-        label=t("components:modules.过滤零公里仪表_2e3c"),
+        label=t("components:modules.filterZeroKilometerMeter"),
         value=False,
-        tooltip=t("components:modules.勾选后，公里数仪表开始或结束为_1e34"),
+        tooltip=t("components:modules.whenSelectedOdometerStartOrEndIs0ZeroOrEmptyRecordsAreFiltered"),
     )
     prod_filter_zero_run_hours = ft.Checkbox(
-        label=t("components:modules.过滤零运行小时数_eaf1"),
+        label=t("components:modules.filterZeroOperatingHours"),
         value=False,
-        tooltip=t("components:modules.勾选后，运行小时数为0或为空的_c4ff"),
+        tooltip=t("components:modules.hoursOperatingHourshours0OrEmptyhoursrecordshours"),
     )
     prod_filter_zero_run_km = ft.Checkbox(
-        label=t("components:modules.过滤零运行里程_d55d"),
+        label=t("components:modules.filterZeroOperatingDistance"),
         value=False,
-        tooltip=t("components:modules.勾选后，运行里程为0或为空的记_3be2"),
+        tooltip=t("components:modules.itemOperatingDistanceitem0OrEmptyitemrecordsitem"),
     )
 
     # --- 异常值检测开关（使用共享工厂） ---
@@ -444,7 +447,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     header_hint = ft.Row(
         [
             ft.Icon(ft.Icons.INFO_OUTLINE, size=14, color=theme.TEXT_SECONDARY),
-            ft.Text(t("components:modules.映射规则可在「用户配置→工作效_e843"), size=11, color=theme.TEXT_SECONDARY),
+            ft.Text(t("components:modules.editMappingRulesInUserConfigWorktimeHeaderMapping"), size=11, color=theme.TEXT_SECONDARY),
         ],
         spacing=4,
         vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -460,9 +463,9 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     container = ft.Container(
         content=ft.Column(
             [
-                theme.section_title(t("components:modules.数据处理模块_89fa")),
+                theme.section_title(t("components:modules.dataProcessing")),
                 ft.Text(
-                    t("components:modules.选择数据文件或文件夹后点击处理_5fea"),
+                    t("components:modules.selectADataFileOrFolderThenClickProcessEachModuleRunsIndependently"),
                     size=13,
                     color=theme.TEXT_SECONDARY,
                 ),
@@ -494,7 +497,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                     ft.Row([merge_keyword], spacing=8),
                     ft.Row([merge_strip_time, merge_tolerant_header, merge_dedup], spacing=8,
                            vertical_alignment=ft.CrossAxisAlignment.CENTER),
-                    ft.Text(t("components:modules.排序配置（可选，留空则自动按第_1d9b"), size=12,
+                    ft.Text(t("components:modules.configurationconfigurationConfigurationConfigurationitemsconfiguration"), size=12,
                             color=theme.TEXT_SECONDARY),
                     ft.Row([sort_rules_column, add_sort_btn], spacing=8,
                            alignment=ft.MainAxisAlignment.START),

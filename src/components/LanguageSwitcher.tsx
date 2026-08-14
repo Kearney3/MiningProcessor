@@ -14,7 +14,7 @@ export function LanguageSwitcher() {
     <div
       className="flex items-center gap-0.5 ml-2 rounded-md border border-slate-200 bg-slate-50 p-0.5"
       role="group"
-      aria-label={t("changeLanguage")}
+      aria-label={t("common:changeLanguage")}
     >
       {LANGUAGE_OPTIONS.map((lang) => (
         <button
@@ -22,7 +22,7 @@ export function LanguageSwitcher() {
           type="button"
           onClick={() => void handleChange(lang.code)}
           aria-pressed={activeLanguage === lang.code}
-          title={t("switchToLanguage", { language: lang.label })}
+          title={t("common:switchToLanguage", { language: lang.label })}
           className={`px-2 py-0.5 text-[11px] font-medium rounded cursor-pointer transition-colors ${
             activeLanguage === lang.code
               ? "bg-white text-slate-800 shadow-sm"

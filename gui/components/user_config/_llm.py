@@ -16,15 +16,15 @@ from gui.i18n import t
 def _create_llm_config_section(page: ft.Page, log):
     """创建 LLM 标注配置卡片，返回 (card, refs_dict)。"""
 
-    llm_url = ft.TextField(label=t("components:user_config._llm.接口URL_71a3"), hint_text="https://api.example.com/v1", expand=True, color=theme.TEXT_PRIMARY)
-    llm_api_key = ft.TextField(label="API Key", password=True, can_reveal_password=True, expand=True, color=theme.TEXT_PRIMARY)
-    llm_model = ft.Dropdown(label=t("components:user_config._llm.模型_8000"), expand=True, options=[], hint_text=t("components:user_config._llm.点击「获取模型」加载列表_c38d"), editable=True)
+    llm_url = ft.TextField(label=t("components:user_config._llm.apiUrl"), hint_text="https://api.example.com/v1", expand=True, color=theme.TEXT_PRIMARY)
+    llm_api_key = ft.TextField(label=t("common:apiKey"), password=True, can_reveal_password=True, expand=True, color=theme.TEXT_PRIMARY)
+    llm_model = ft.Dropdown(label=t("components:user_config._llm.model"), expand=True, options=[], hint_text=t("components:user_config._llm.columnColumnmodelColumn"), editable=True)
     llm_format = ft.Dropdown(
-        label=t("components:user_config._llm.接口格式_3471"),
+        label=t("components:user_config._llm.apiFormat"),
         width=160,
         options=[
-            ft.dropdown.Option("openai", t("components:user_config._llm.OpenAI兼容_a2fb")),
-            ft.dropdown.Option("anthropic", "Anthropic"),
+            ft.dropdown.Option("openai", t("components:user_config._llm.openaiCompatible")),
+            ft.dropdown.Option("anthropic", t("common:anthropic")),
         ],
         value="openai",
     )
@@ -79,14 +79,14 @@ def _create_llm_config_section(page: ft.Page, log):
             "format": llm_format.value or "openai",
         }
         if not cfg["url"]:
-            llm_test_result.value = t("components:user_config._llm.请先填写接口URL_fd01")
+            llm_test_result.value = t("components:user_config._llm.enterTheApiUrlFirstVariant")
             llm_test_result.color = ft.Colors.RED
             try:
                 page.update()
             except (RuntimeError, AttributeError):
                 pass
             return
-        llm_test_result.value = t("components:user_config._llm.正在获取模型列表..._9167")
+        llm_test_result.value = t("components:user_config.fetchingModelList")
         llm_test_result.color = theme.TEXT_SECONDARY
         try:
             page.update()
@@ -103,17 +103,17 @@ def _create_llm_config_section(page: ft.Page, log):
                         llm_model.value = models[0]
                     info = result.get("error", "")
                     if models:
-                        llm_test_result.value = t("components:user_config._llm.获取到个模型_ef8a", count=len(models))
+                        llm_test_result.value = t("components:user_config._llm.retrievedModels", count=len(models))
                         llm_test_result.color = theme.TEXT_PRIMARY
-                        _log_message(log, t("components:user_config._llm.获取到个可用模型_2492", count=len(models)))
+                        _log_message(log, t("components:user_config._llm.itemItemsitemmodel", count=len(models)))
                     else:
-                        llm_test_result.value = info or t("components:user_config._llm.未返回模型，请手动输入模型名称_4683")
+                        llm_test_result.value = info or t("components:user_config._llm.noModelsReturnedEnterAModelNameManually")
                         llm_test_result.color = ft.Colors.ORANGE
-                        _log_message(log, info or t("components:user_config._llm.接口未返回模型列表，可手动输入_62ea"))
+                        _log_message(log, info or t("components:user_config._llm.theApiReturnedNoModelListEnterAModelNameManually"))
                 else:
-                    llm_test_result.value = t("components:user_config._llm.连接失败:_bb44", error=result['error'])
+                    llm_test_result.value = t("components:user_config._llm.connectionFailedVariant", error=result['error'])
                     llm_test_result.color = ft.Colors.RED
-                    _log_message(log, t("components:user_config._llm.LLM接口连接失败:_c328", error=result['error']), level=logging.ERROR)
+                    _log_message(log, t("components:user_config._llm.llmApiconnectionFailed", error=result['error']), level=logging.ERROR)
                 try:
                     page.update()
                 except (RuntimeError, AttributeError):
@@ -136,8 +136,8 @@ def _create_llm_config_section(page: ft.Page, log):
         config_loader.update_llm_config(updates)
         # 重新加载以同步掩码状态
         _reload_llm()
-        llm_status.value = t("components:user_config._llm.LLM配置已保存_0e52")
-        _log_message(log, t("components:user_config._llm.已保存LLM标注配置_c543"))
+        llm_status.value = t("components:user_config._llm.llmConfigurationSaved")
+        _log_message(log, t("components:user_config._llm.savedLlmConfigurationconfiguration"))
         try:
             page.update()
         except (RuntimeError, AttributeError):
@@ -146,14 +146,14 @@ def _create_llm_config_section(page: ft.Page, log):
     def _reset_llm(_e):
         config_loader.update_user_config({"llm_labeling": {}})
         _reload_llm()
-        llm_status.value = t("components:user_config._llm.已恢复默认配置_455f")
-        _log_message(log, t("components:user_config._llm.已重置LLM标注配置_c20c"))
+        llm_status.value = t("components:user_config._llm.defaultConfigurationRestored")
+        _log_message(log, t("components:user_config._llm.configurationLlmConfigurationconfiguration"))
         try:
             page.update()
         except (RuntimeError, AttributeError):
             pass
 
-    fetch_btn = theme.secondary_btn(t("components:user_config._llm.获取模型_9259"), icon=ft.Icons.REFRESH, on_click=_fetch_models)
+    fetch_btn = theme.secondary_btn(t("components:user_config._llm.getModels"), icon=ft.Icons.REFRESH, on_click=_fetch_models)
 
     def _verify_connection(_e):
         cfg = {
@@ -162,14 +162,14 @@ def _create_llm_config_section(page: ft.Page, log):
             "format": llm_format.value or "openai",
         }
         if not cfg["url"]:
-            llm_verify_result.value = t("components:user_config._llm.⚠请先填写接口URL_998d")
+            llm_verify_result.value = t("components:user_config._llm.enterTheApiUrlFirstEnterApiUrlFirst")
             llm_verify_result.color = ft.Colors.AMBER
             try:
                 page.update()
             except (RuntimeError, AttributeError):
                 pass
             return
-        llm_verify_result.value = t("components:user_config._llm.正在验证..._59e6")
+        llm_verify_result.value = t("components:user_config.verifying")
         llm_verify_result.color = theme.TEXT_SECONDARY
         try:
             page.update()
@@ -184,14 +184,14 @@ def _create_llm_config_section(page: ft.Page, log):
                 if result["success"]:
                     models = result["models"]
                     if selected_model and selected_model not in models:
-                        llm_verify_result.value = t("components:user_config._llm.⚠连接成功，但所选模型「」_bf74", selected_model=selected_model, count=len(models))
+                        llm_verify_result.value = t("components:user_config._llm.connectionSucceededConnectionmodel", selected_model=selected_model, count=len(models))
                         llm_verify_result.color = ft.Colors.AMBER
                     else:
-                        model_info = t("components:user_config._llm.，模型「」可用_3be5", selected_model=selected_model) if selected_model else ""
-                        llm_verify_result.value = t("components:user_config._llm.✓连接成功（个模型可用）_f10d", count=len(models), model_info=model_info)
+                        model_info = t("components:user_config._llm.modelItem", selected_model=selected_model) if selected_model else ""
+                        llm_verify_result.value = t("components:user_config._llm.connectionSucceededItemsmodelconnection", count=len(models), model_info=model_info)
                         llm_verify_result.color = ft.Colors.GREEN
                 else:
-                    llm_verify_result.value = t("components:user_config._llm.✗连接失败:_3890", error=result['error'])
+                    llm_verify_result.value = t("components:user_config._llm.connectionFailedConnectionFailed", error=result['error'])
                     llm_verify_result.color = ft.Colors.RED
                 try:
                     page.update()
@@ -203,16 +203,16 @@ def _create_llm_config_section(page: ft.Page, log):
         import threading
         threading.Thread(target=_do_verify, daemon=True).start()
 
-    verify_btn = theme.secondary_btn(t("components:user_config._llm.验证连接_c476"), icon=ft.Icons.CHECK_CIRCLE, on_click=_verify_connection)
+    verify_btn = theme.secondary_btn(t("components:user_config._llm.verifyConnection"), icon=ft.Icons.CHECK_CIRCLE, on_click=_verify_connection)
     action_buttons = [
-        theme.primary_btn(t("components:user_config._llm.保存配置_ed75"), icon=ft.Icons.SAVE, on_click=_save_llm),
-        theme.secondary_btn(t("components:user_config._llm.重新加载_64ca"), icon=ft.Icons.REFRESH, on_click=lambda _: _reload_llm()),
-        theme.secondary_btn(t("components:user_config._llm.恢复默认_7468"), icon=ft.Icons.RESTART_ALT, on_click=_reset_llm),
+        theme.primary_btn(t("components:user_config._llm.saveConfig"), icon=ft.Icons.SAVE, on_click=_save_llm),
+        theme.secondary_btn(t("components:user_config._llm.reload"), icon=ft.Icons.REFRESH, on_click=lambda _: _reload_llm()),
+        theme.secondary_btn(t("components:user_config._llm.restoreDefault"), icon=ft.Icons.RESTART_ALT, on_click=_reset_llm),
     ]
 
     llm_card = theme.make_collapsible(
-        title=t("components:user_config._llm.LLM标注配置_4aee"),
-        subtitle=t("components:user_config._llm.配置大模型接口用于维修记录智能_8504"),
+        title=t("components:user_config._llm.llmConfigurationconfiguration"),
+        subtitle=t("components:user_config._llm.configureAnLlmEndpointForIntelligentMaintenanceLabeling"),
         icon=ft.Icons.SMART_TOY,
         initially_expanded=False,
         content_controls=[

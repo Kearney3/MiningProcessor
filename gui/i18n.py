@@ -119,8 +119,8 @@ def t(key: str, **kwargs: Any) -> str:
     """翻译函数：按 key 查找翻译文本，支持格式化参数。
 
     用法:
-        t("common:process")             → "处理"
-        t("logic:fileCount", count=10)  → "共 10 个文件"
+        t("components:modules.process") → "处理"
+        t("logSystem:items", count=10)  → "共 10 个文件"
     """
     global _initialized
     if not _initialized:

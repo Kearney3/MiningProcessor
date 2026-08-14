@@ -36,7 +36,7 @@ def _diagnose(message: str, ex: BaseException | None = None) -> None:
 
     suffix = f": {ex}" if ex is not None else ""
     try:
-        print(t("logSystem:[GUI日志系统]_e7af", message=message, suffix=suffix), file=sys.__stderr__)
+        print(t("logSystem:message", message=message, suffix=suffix), file=sys.__stderr__)
     except Exception:
         pass
 
@@ -149,7 +149,7 @@ class LogSystem:
             with self._schedule_lock:
                 self._flush_scheduled = False
                 self._flush_future = None
-            _diagnose(t("logSystem:无法调度页面日志刷新_382c"), ex)
+            _diagnose(t("logSystem:unableToSchedulePageLogRefresh"), ex)
             return
         with self._schedule_lock:
             if self._flush_scheduled:
@@ -192,7 +192,7 @@ class LogSystem:
                         levelno=logging.WARNING,
                         levelname="WARNING",
                         logger_name=__name__,
-                        message=t("logSystem:[WARNING]日志流量过高_a134", dropped=dropped),
+                        message=t("logSystem:logThroughputIsHighOmittedItemsearlierRecords", dropped=dropped),
                     )
                     self._log_records.append(synthetic)
                     if self._passes_filter(synthetic):
@@ -214,7 +214,7 @@ class LogSystem:
 
                 if changed:
                     if self._count_text is not None:
-                        self._count_text.value = t("logSystem:条_dda0", count=self._visible_count)
+                        self._count_text.value = t("logSystem:items", count=self._visible_count)
                         self._count_text.update()
                     self._log_list.update()
                     if self._follow_tail:
@@ -234,7 +234,7 @@ class LogSystem:
         except asyncio.CancelledError:
             raise
         except Exception as ex:
-            _diagnose(t("logSystem:页面日志刷新失败_3494"), ex)
+            _diagnose(t("logSystem:pageLogRefreshFailed"), ex)
         finally:
             should_reschedule = False
             with self._schedule_lock:
@@ -305,7 +305,7 @@ class LogSystem:
         self._follow_tail = enabled
         self._follow_status.visible = not enabled
         self._scroll_bottom_button.tooltip = (
-            t("logSystem:滚动到底部_4190") if enabled else t("logSystem:滚动到底部并恢复自动跟随_97bd")
+            t("logSystem:scrollToBottom") if enabled else t("logSystem:scrollToBottomlog")
         )
         self._scroll_bottom_button.icon_color = (
             theme.TEXT_SECONDARY if enabled else theme.PRIMARY
@@ -318,7 +318,7 @@ class LogSystem:
 
     async def _export_logs(self, _e: ft.ControlEvent) -> None:
         path = await self._log_export_picker.save_file(
-            dialog_title=t("logSystem:导出日志_609e"),
+            dialog_title=t("logSystem:exportLogs"),
             file_name=f"logs-{local_now().strftime('%Y-%m-%d')}.txt",
             allowed_extensions=["txt", "log"],
             initial_directory=_last_directory[0] or None,
@@ -334,9 +334,9 @@ class LogSystem:
                 encoding="utf-8",
             )
         except OSError as ex:
-            logging.getLogger(__name__).error(t("logSystem:日志导出失败:_8484"), ex)
+            logging.getLogger(__name__).error(t("logSystem:logExportFailedS"), ex)
             return
-        logging.getLogger(__name__).info(t("logSystem:日志已导出:_d315"), path)
+        logging.getLogger(__name__).info(t("logSystem:logExportedS"), path)
 
     def _clamp_log_height(self, next_height: int) -> int:
         return max(MIN_LOG_HEIGHT, min(MAX_LOG_HEIGHT, next_height))

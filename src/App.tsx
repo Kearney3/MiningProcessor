@@ -61,7 +61,7 @@ function App() {
           </svg>
           </span>
           <span className="text-sm font-semibold text-slate-800">
-            {t("app:矿山数据处理_ece7")}
+            {t("app:miningData")}
           </span>
         </div>
 

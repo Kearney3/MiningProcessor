@@ -9,10 +9,10 @@ const IconModel = () => (
   </svg>
 );
 
-const config: LedgerPageConfig = {
-  title: "型号台账",
+type LedgerBackendConfig = Omit<LedgerPageConfig, "title" | "standardColumns" | "emptyMessage">;
+
+const config: LedgerBackendConfig = {
   icon: <IconModel />,
-  standardColumns: ["标准设备编号", "标准公司名称", "所有权", "设备型号", "设备类型", "内部分类"],
   loadDataMethod: "get_model_ledger_data",
   importMethod: "import_model_ledger",
   loadFileColumnsMethod: "load_model_ledger_file_columns",
@@ -23,7 +23,6 @@ const config: LedgerPageConfig = {
   setDefaultMethod: "set_default_model_ledger",
   cancelDefaultMethod: "cancel_default_model_ledger",
   clearMethod: "clear_model_ledger",
-  emptyMessage: "暂无型号台账数据，请先导入型号台账 Excel",
 };
 
 export function ModelLedgerPage({ bridge }: { bridge: BridgeProp }) {
@@ -31,18 +30,17 @@ export function ModelLedgerPage({ bridge }: { bridge: BridgeProp }) {
 
   const translatedConfig: LedgerPageConfig = {
     ...config,
-    title: t("pages:ModelLedgerPage.型号台账_3e0b"),
+    title: t("pages:ModelLedgerPage.modelLedger"),
     standardColumns: [
-      t("pages:ModelLedgerPage.标准设备编号_d45a"),
-      t("pages:ModelLedgerPage.标准公司名称_907e"),
-      t("pages:ModelLedgerPage.所有权_ed84"),
-      t("pages:ModelLedgerPage.设备型号_5858"),
-      t("pages:ModelLedgerPage.设备类型_02f4"),
-      t("pages:ModelLedgerPage.内部分类_b310"),
+      t("pages:ModelLedgerPage.standardEquipmentId"),
+      t("pages:ModelLedgerPage.standardCompanyName"),
+      t("pages:ModelLedgerPage.ownership"),
+      t("pages:ModelLedgerPage.equipmentModel"),
+      t("pages:ModelLedgerPage.equipmentType"),
+      t("pages:ModelLedgerPage.internalCategory"),
     ],
-    emptyMessage: t("pages:ModelLedgerPage.暂无型号台账数据，请先导入型号_2bfc"),
+    emptyMessage: t("pages:ModelLedgerPage.noModelLedgerDataImportAModelLedgerExcelFileFirst"),
   };
 
   return <LedgerPage bridge={bridge} config={translatedConfig} />;
 }
-

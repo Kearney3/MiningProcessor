@@ -37,9 +37,9 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
 
     config_table = ft.DataTable(
         columns=[
-            ft.DataColumn(ft.Text(t("components:config.选择_153f"))),
-            ft.DataColumn(ft.Text(t("components:config.设备型号_5858"))),
-            ft.DataColumn(ft.Text(t("components:config.装载量(方)_e3d9"))),
+            ft.DataColumn(ft.Text(t("components:config.select"))),
+            ft.DataColumn(ft.Text(t("components:config.equipmentModel"))),
+            ft.DataColumn(ft.Text(t("components:config.itemItem"))),
         ],
         rows=[],
         show_checkbox_column=False,
@@ -47,10 +47,10 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
 
     config_page_label = ft.Text("0 / 0", size=12, color=theme.TEXT_SECONDARY)
     config_prev_btn = ft.IconButton(
-        icon=ft.Icons.CHEVRON_LEFT, tooltip=t("components:config.上一页_f4f8"), icon_size=18, disabled=True,
+        icon=ft.Icons.CHEVRON_LEFT, tooltip=t("components:config.previous"), icon_size=18, disabled=True,
     )
     config_next_btn = ft.IconButton(
-        icon=ft.Icons.CHEVRON_RIGHT, tooltip=t("components:config.下一页_b4e1"), icon_size=18, disabled=True,
+        icon=ft.Icons.CHEVRON_RIGHT, tooltip=t("components:config.next"), icon_size=18, disabled=True,
     )
     config_pagination = ft.Row(
         [config_prev_btn, config_page_label, config_next_btn],
@@ -59,8 +59,8 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
 
     _config_empty_state = theme.empty_state(
         ft.Icons.INVENTORY_2_OUTLINED,
-        t("components:config.暂无设备配置_b508"),
-        t("components:config.点击「添加设备」或「导入配置」_a00c"),
+        t("components:config.noEquipmentConfiguration"),
+        t("components:config.clickAddEquipmentOrImportConfigurationToBegin"),
     )
 
     def _config_total_pages():
@@ -84,7 +84,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
             device_field = ft.TextField(
                 value=row_state["device"],
                 text_size=13,
-                hint_text=t("components:config.设备型号_5858") if not row_state["device"] else None,
+                hint_text=t("components:config.equipmentModel") if not row_state["device"] else None,
                 border_color=ft.Colors.TRANSPARENT,
                 focused_border_color=theme.PRIMARY,
                 color=theme.TEXT_PRIMARY,
@@ -94,7 +94,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
                 value=str(row_state["capacity"]),
                 text_size=13,
                 width=80,
-                hint_text=t("components:config.装载量(方)_e3d9") if not str(row_state["capacity"]).strip() else None,
+                hint_text=t("components:config.itemItem") if not str(row_state["capacity"]).strip() else None,
                 border_color=ft.Colors.TRANSPARENT,
                 focused_border_color=theme.PRIMARY,
                 color=theme.TEXT_PRIMARY,
@@ -178,16 +178,16 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
         try:
             device_map = config_loader.get_device_load_map(new_ver)
         except Exception:
-            logging.getLogger(__name__).warning(t("components:config.加载配置失败_49fd"), exc_info=True)
+            logging.getLogger(__name__).warning(t("components:config.failedToLoadConfiguration"), exc_info=True)
             device_map = {}
         set_config_state(_device_map_to_rows(device_map))
-        _log_message(log, t("components:config.已切换到装载量配置_1f57", version=t("components:config.旧版_6b10") if new_ver == 'old' else t("components:config.新版_1f09")))
+        _log_message(log, t("components:config.switchedToLoadCapacityConfiguration", version=t("components:config.old") if new_ver == 'old' else t("components:config.new")))
 
     version_toggle = ft.SegmentedButton(
         selected=["new"] if _current_version[0] == "new" else ["old"],
         segments=[
-            ft.Segment(value="new", label=ft.Text(t("components:config.新版配置_2a40"))),
-            ft.Segment(value="old", label=ft.Text(t("components:config.旧版配置_5b9e"))),
+            ft.Segment(value="new", label=ft.Text(t("components:config.newVersion"))),
+            ft.Segment(value="old", label=ft.Text(t("components:config.oldVersion"))),
         ],
         on_change=_on_version_change,
         allow_empty_selection=False,
@@ -201,7 +201,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
         try:
             device_map = config_loader.get_device_load_map(ver)
         except Exception:
-            logging.getLogger(__name__).warning(t("components:config.加载配置失败，使用空配置_1236"), exc_info=True)
+            logging.getLogger(__name__).warning(t("components:config.failedToLoadConfigurationUseEmptyConfiguration"), exc_info=True)
             device_map = {}
         set_config_state(_device_map_to_rows(device_map))
 
@@ -215,7 +215,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
             try:
                 device_load_map[device] = int(cap_text)
             except (TypeError, ValueError):
-                _log_message(log, t("components:config.''不是有效数字，跳过_8ebd", cap_text=cap_text, device=device), level=logging.WARNING)
+                _log_message(log, t("components:config.invalidNumberSkipped", cap_text=cap_text, device=device), level=logging.WARNING)
         return device_load_map
 
     def load_default_config_file(path):
@@ -238,7 +238,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
     async def save_config(e: ft.ControlEvent):
         picker = ft.FilePicker()
         path = await picker.save_file(
-            dialog_title=t("components:config.保存配置文件_098d"),
+            dialog_title=t("components:config.saveConfigurationFile"),
             file_name="device-load-map.json",
             allowed_extensions=["json"],
             initial_directory=_last_directory[0] or None,
@@ -248,9 +248,9 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
         _update_last_directory(path)
         try:
             save_config_to_path(path)
-            _log_message(log, t("components:config.配置已另存为:_a25b", path=path))
+            _log_message(log, t("components:config.configurationSavedAs", path=path))
         except Exception as ex:
-            _log_message(log, t("components:config.保存配置失败:_b80a", ex=ex), level=logging.ERROR)
+            _log_message(log, t("components:config.saveConfigurationfailed", ex=ex), level=logging.ERROR)
 
     def _restore_version(version: str, label: str):
         """执行恢复指定版本的默认配置"""
@@ -259,28 +259,28 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
             try:
                 device_map = config_loader.get_default_load_map(version)
                 set_config_state(_device_map_to_rows(device_map))
-                _log_message(log, t("components:config.已恢复_161d", label=label))
+                _log_message(log, t("components:config.restored", label=label))
             except Exception as ex:
-                _log_message(log, t("components:config.恢复默认配置失败:_7906", ex=ex), level=logging.ERROR)
+                _log_message(log, t("components:config.failedToRestoreDefaultConfiguration", ex=ex), level=logging.ERROR)
         return handler
 
     def restore_default_config(e: ft.ControlEvent):
         version_dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text(t("components:config.选择默认配置版本_1bfc")),
+            title=ft.Text(t("components:config.selectDefaultConfigurationVersion")),
             content=ft.Column(
                 [
-                    ft.Text(t("components:config.请选择要恢复的设备装载量配置版_29c7")),
-                    ft.Text(t("components:config.新版：当前在用的装载量标准_7b21"), size=12, color=theme.TEXT_SECONDARY),
-                    ft.Text(t("components:config.旧版：历史使用的装载量标准_98cf"), size=12, color=theme.TEXT_SECONDARY),
+                    ft.Text(t("components:config.selectconfigurationequipmentconfigurationconfigurationconfiguration")),
+                    ft.Text(t("components:config.newVersionCurrentActiveLoadCapacityStandard"), size=12, color=theme.TEXT_SECONDARY),
+                    ft.Text(t("components:config.oldVersionPreviouslyUsedLoadCapacityStandard"), size=12, color=theme.TEXT_SECONDARY),
                 ],
                 spacing=8,
                 tight=True,
             ),
             actions=[
-                ft.TextButton(t("components:config.取消_625f"), on_click=lambda e: page.pop_dialog()),
-                ft.TextButton(t("components:config.旧版配置_5b9e"), on_click=_restore_version("old", t("components:config.旧版默认配置_24ce"))),
-                ft.TextButton(t("components:config.新版配置_2a40"), on_click=_restore_version("new", t("components:config.新版默认配置_5da5")),
+                ft.TextButton(t("components:config.cancel"), on_click=lambda e: page.pop_dialog()),
+                ft.TextButton(t("components:config.oldVersion"), on_click=_restore_version("old", t("components:config.oldVersionDefaults"))),
+                ft.TextButton(t("components:config.newVersion"), on_click=_restore_version("new", t("components:config.newVersionDefaults")),
                               style=ft.ButtonStyle(color=theme.PRIMARY)),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
@@ -292,9 +292,9 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
             device_load_map = build_device_load_map()
             config_loader.apply_device_load_map(device_load_map, _current_version[0])
             config_loader.update_device_load_map(device_load_map, _current_version[0])
-            _log_message(log, t("components:config.当前配置已应用并保存_960e", version=t("components:config.旧版_6b10") if _current_version[0] == 'old' else t("components:config.新版_1f09")))
+            _log_message(log, t("components:config.configurationConfigurationappliedconfigurationsave", version=t("components:config.old") if _current_version[0] == 'old' else t("components:config.new")))
         except Exception as ex:
-            _log_message(log, t("components:config.应用当前配置失败:_5450", ex=ex), level=logging.ERROR)
+            _log_message(log, t("components:config.failedToApplyCurrentConfiguration", ex=ex), level=logging.ERROR)
 
     def add_device(e: ft.ControlEvent):
         append_row()
@@ -302,26 +302,26 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
     def _do_remove(e=None):
         page.pop_dialog()
         remove_selected_rows()
-        _log_message(log, t("components:config.已删除选中设备配置_a226"))
+        _log_message(log, t("components:config.selectedEquipmentConfigurationDeleted"))
 
     confirm_dialog = create_confirm_dialog(
-        page, t("components:config.确认删除_631c"),
-        t("components:config.确定要删除选中的设备配置吗？此_5bb3"),
-        _do_remove, confirm_text=t("components:config.确认删除_631c"),
+        page, t("components:config.confirmDelete"),
+        t("components:config.configurationequipmentconfigurationconfigurationThisActionCannotBeUndone"),
+        _do_remove, confirm_text=t("components:config.confirmDelete"),
     )
 
     def remove_selected(e: ft.ControlEvent):
         selected_count = sum(1 for row in config_state if row["selected"])
         if selected_count == 0:
-            _log_message(log, t("components:config.未选中任何设备_1306"), level=logging.WARNING)
+            _log_message(log, t("components:config.noEquipmentSelected"), level=logging.WARNING)
             return
-        confirm_dialog.content = ft.Text(t("components:config.确定要删除选中的条设备配置吗？_1145", selected_count=selected_count))
+        confirm_dialog.content = ft.Text(t("components:config.configurationItemsequipmentconfigurationconfigurationThisActionCannotBeUndone", selected_count=selected_count))
         page.show_dialog(confirm_dialog)
 
     async def import_config(e: ft.ControlEvent):
         picker = ft.FilePicker()
         files = await picker.pick_files(
-            dialog_title=t("components:config.导入配置文件_70bf"),
+            dialog_title=t("components:config.importConfigurationFile"),
             allowed_extensions=["json"],
             initial_directory=_last_directory[0] or None,
         )
@@ -334,19 +334,19 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
                 data = json.load(f)
             imported = data.get("device_load_map", {})
             if not imported:
-                _log_message(log, t("components:config.文件不含device_load_c753"), level=logging.WARNING)
+                _log_message(log, t("components:config.fileDoesNotContainDeviceLoadMap"), level=logging.WARNING)
                 return
             set_config_state(_device_map_to_rows(imported))
-            _log_message(log, t("components:config.已导入条设备装载量配置_7b6e", count=len(imported)))
+            _log_message(log, t("components:config.importedEquipmentLoadCapacityConfigurations", count=len(imported)))
         except Exception as ex:
-            _log_message(log, t("components:config.导入配置失败:_cfd6", ex=ex), level=logging.ERROR)
+            _log_message(log, t("components:config.importConfigurationfailed", ex=ex), level=logging.ERROR)
 
-    _btn_add = theme.primary_btn(t("components:config.添加设备_93d6"), icon=ft.Icons.ADD, on_click=add_device)
-    _btn_import = theme.secondary_btn(t("components:config.导入配置_0452"), icon=ft.Icons.FILE_UPLOAD, on_click=import_config)
-    _btn_save = theme.secondary_btn(t("components:config.保存配置_ed75"), icon=ft.Icons.SAVE, on_click=save_config)
-    _btn_apply = theme.accent_btn(t("components:config.应用当前配置_a495"), icon=ft.Icons.CHECK_CIRCLE, on_click=apply_current_config)
-    _btn_reset = theme.secondary_btn(t("components:config.恢复默认_7468"), icon=ft.Icons.RESTART_ALT, on_click=restore_default_config)
-    _btn_delete = theme.destructive_btn(t("components:config.删除选中_cd0b"), icon=ft.Icons.DELETE, on_click=remove_selected)
+    _btn_add = theme.primary_btn(t("components:config.addEquipment"), icon=ft.Icons.ADD, on_click=add_device)
+    _btn_import = theme.secondary_btn(t("components:config.importConfiguration"), icon=ft.Icons.FILE_UPLOAD, on_click=import_config)
+    _btn_save = theme.secondary_btn(t("components:config.saveConfig"), icon=ft.Icons.SAVE, on_click=save_config)
+    _btn_apply = theme.accent_btn(t("components:config.applyCurrentConfiguration"), icon=ft.Icons.CHECK_CIRCLE, on_click=apply_current_config)
+    _btn_reset = theme.secondary_btn(t("components:config.restoreDefault"), icon=ft.Icons.RESTART_ALT, on_click=restore_default_config)
+    _btn_delete = theme.destructive_btn(t("components:config.deleteSelected"), icon=ft.Icons.DELETE, on_click=remove_selected)
 
     action_buttons = [_btn_add, _btn_import, _btn_save, _btn_apply, _btn_reset, _btn_delete]
     action_button_rows = [
@@ -362,7 +362,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
     container = ft.Container(
         content=ft.Column(
             [
-                theme.section_title(t("components:config.设备装载量配置_c7aa")),
+                theme.section_title(t("components:config.equipmentloadCapacityConfiguration")),
                 ft.Row([version_toggle], alignment=ft.MainAxisAlignment.START),
                 *action_button_rows,
                 ft.Container(

@@ -105,7 +105,7 @@ def make_browse_handler(
                 path = files[0].path if files else None
         except Exception as ex:
             if log_fn:
-                log_fn(t("components:common.选择失败:_8313", target=t("components:common.文件夹_1f4c") if mode == 'folder' else t("components:common.文件_2a0c"), ex=ex))
+                log_fn(t("components:common.failedToSelect", target=t("components:common.folder") if mode == 'folder' else t("components:common.file"), ex=ex))
             return
         if path:
             target_field.value = path
@@ -127,9 +127,9 @@ def create_confirm_dialog(
 ) -> ft.AlertDialog:
     """标准确认/取消弹窗，确认按钮使用 ERROR 色。"""
     if confirm_text is None:
-        confirm_text = t("components:common.确认_e83a")
+        confirm_text = t("components:common.confirm")
     if cancel_text is None:
-        cancel_text = t("components:common.取消_625f")
+        cancel_text = t("components:common.cancel")
     try:
         from . import theme
     except ImportError:
@@ -171,12 +171,12 @@ class HeaderModeConfig:
         on_toggle_extra=None,
     ):
         if label is None:
-            label = t("components:common.表头修改_6f3e")
+            label = t("components:common.headerMapping")
         if tooltip is None:
-            tooltip = t("components:common.开启后按配置的映射关系重命名输_539a")
+            tooltip = t("components:common.whenEnabledRenameOutputHeadersUsingTheConfiguredMapping")
         self.toggle = ft.Checkbox(label=label, value=True, tooltip=tooltip)
         self.mode = ChipToggle(
-            options=[("position", t("components:common.按位置_cfd4")), ("name", t("components:common.按列名_4c95"))],
+            options=[("position", t("components:common.byPosition")), ("name", t("components:common.byColumnName"))],
         )
         self.mode.row.visible = self.toggle.value
         self._on_toggle_extra = on_toggle_extra
@@ -278,16 +278,16 @@ def _cell_text(value) -> str:
 
 # 异常值明细表：保留高频定位字段，长说明在单元格内截断并可通过表格滚动查看。
 _ANOMALY_RESULT_COLUMNS = [
-    ("数据类型", "components:common.数据类型_185f", 86),
-    ("行号", "components:common.行号_89c8", 52),
-    ("日期", "components:common.日期_4ff1", 92),
-    ("班次", "components:common.班次_b689", 56),
-    ("设备名称", "components:common.设备名称_9f69", 160),
-    ("设备编号", "components:common.设备编号_cf05", 90),
-    ("异常列", "components:common.异常列_abcd", 100),
-    ("异常值", "components:common.异常值_56c9", 86),
-    ("检测方法", "components:common.检测方法_2b87", 82),
-    ("说明", "components:common.说明_f411", 320),
+    ("数据类型", "components:common.dataType", 86),
+    ("行号", "components:common.row", 52),
+    ("日期", "components:common.date", 92),
+    ("班次", "components:common.shift", 56),
+    ("设备名称", "components:common.equipment", 160),
+    ("设备编号", "components:common.equipmentId", 90),
+    ("异常列", "components:common.anomalyColumn", 100),
+    ("异常值", "components:common.anomalyValue", 86),
+    ("检测方法", "components:common.method", 82),
+    ("说明", "components:common.note", 320),
 ]
 
 
@@ -332,7 +332,7 @@ def create_anomaly_results_table() -> dict:
                     [
                         ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED, color=theme.WARNING, size=17),
                         ft.Text(
-                            t("components:common.异常值明细_c058"),
+                            t("components:common.anomalyDetails"),
                             size=13,
                             weight=ft.FontWeight.W_600,
                             color=theme.WARNING,
@@ -375,7 +375,7 @@ def create_anomaly_results_table() -> dict:
                 )
             table.rows.append(ft.DataRow(cells=cells))
 
-        count_text.value = t("components:common.共条_b91c", count=len(rows))
+        count_text.value = t("components:common.total", count=len(rows))
         container.visible = bool(rows)
         safe_update(container)
 
@@ -399,7 +399,7 @@ def _show_path_confirm(text_field: ft.TextField):
         _original_tooltip = suffix.tooltip
         suffix.icon = ft.Icons.CHECK_CIRCLE
         suffix.icon_color = theme.SUCCESS
-        suffix.tooltip = t("components:common.已选择_f08a")
+        suffix.tooltip = t("components:common.selected")
         safe_update(text_field)
 
         def _restore():
@@ -513,7 +513,7 @@ def create_column_mapping_dialog(
         mapping_controls.append(dd)
 
     skip_header_checkbox = ft.Checkbox(
-        label=t("components:common.第一行为标题行（排除）_b3de"),
+        label=t("components:common.theFirstRowIsTheHeaderExclude"),
         value=True,
     )
 
@@ -532,11 +532,11 @@ def create_column_mapping_dialog(
         on_confirm(mapping, skip_header_checkbox.value)
 
     return ft.AlertDialog(
-        title=ft.Text(t("components:common.列映射配置_50e5")),
+        title=ft.Text(t("components:common.columnMappingConfig")),
         content=ft.Container(
             content=ft.Column(
                 [
-                    ft.Text(t("components:common.请将Excel文件的列映射到标_3fe8"), size=13),
+                    ft.Text(t("components:common.mapExcelColumnsToStandardColumns"), size=13),
                     *mapping_controls,
                     ft.Divider(),
                     skip_header_checkbox,
@@ -548,9 +548,9 @@ def create_column_mapping_dialog(
             height=height,
         ),
         actions=[
-            ft.TextButton(t("components:common.取消_625f"), on_click=on_cancel),
+            ft.TextButton(t("components:common.cancel"), on_click=on_cancel),
             ft.TextButton(
-                t("components:common.确认导入_3e36"),
+                t("components:common.confirmImport"),
                 on_click=on_ok,
                 style=ft.ButtonStyle(bgcolor=ft.Colors.GREEN_700, color="#FFFFFF"),
             ),
@@ -576,18 +576,18 @@ def create_anomaly_controls() -> dict:
     _mode = ["flag"]
 
     anomaly_enabled = ft.Checkbox(
-        label=t("components:common.启用异常值检测_280b"),
+        label=t("components:common.enableAnomalyDetection"),
         value=False,
-        tooltip=t("components:common.开启后对处理的数据进行异常值检_6527"),
+        tooltip=t("components:common.whenEnabledDetectAnomaliesInProcessedData"),
     )
     anomaly_report = ft.Checkbox(
-        label=t("components:common.输出异常报告_82c1"),
+        label=t("components:common.exportAnomalyReport"),
         value=False,
-        tooltip=t("components:common.生成异常报告Excel文件_9e8b"),
+        tooltip=t("components:common.generateAnAnomalyReportExcelFile"),
     )
-    anomaly_flag = ft.Checkbox(label=t("components:common.标记异常值_11d4"), value=True, tooltip=t("components:common.标记但不删除_011a"))
-    anomaly_filter = ft.Checkbox(label=t("components:common.过滤异常值_209e"), value=False, tooltip=t("components:common.移除异常行（与标记互斥）_da0a"))
-    anomaly_handle = ft.Checkbox(label=t("components:common.处理异常值_e5c7"), value=False, tooltip=t("components:common.按配置替换默认值（与标记互斥）_8a47"))
+    anomaly_flag = ft.Checkbox(label=t("components:common.flagAnomalies"), value=True, tooltip=t("components:common.flagWithoutDeleting"))
+    anomaly_filter = ft.Checkbox(label=t("components:common.filterAnomalies"), value=False, tooltip=t("components:common.removeAnomalousRowsMutuallyExclusiveWithFlagging"))
+    anomaly_handle = ft.Checkbox(label=t("components:common.handleAnomalies"), value=False, tooltip=t("components:common.replaceWithConfiguredDefaultsMutuallyExclusiveWithFlagging"))
 
     def _set_mode(mode: str):
         _mode[0] = mode
@@ -715,11 +715,11 @@ def create_sheet_selection_dialog(
         on_confirm(selected[0])
 
     return ft.AlertDialog(
-        title=ft.Text(t("components:common.选择Sheet_0313")),
+        title=ft.Text(t("components:common.selectSheet")),
         content=ft.Container(
             content=ft.Column(
                 [
-                    ft.Text(t("components:common.请选择要导入的Sheet：_112b"), size=13),
+                    ft.Text(t("components:common.selectASheetToImport"), size=13),
                     ft.Container(
                         content=radio_group,
                         expand=True,
@@ -732,9 +732,9 @@ def create_sheet_selection_dialog(
             height=min(len(sheet_names) * 36 + 80, 400),
         ),
         actions=[
-            ft.TextButton(t("components:common.取消_625f"), on_click=on_cancel),
+            ft.TextButton(t("components:common.cancel"), on_click=on_cancel),
             ft.TextButton(
-                t("components:common.下一步_38ce"),
+                t("components:common.next"),
                 on_click=on_ok,
                 style=ft.ButtonStyle(bgcolor=ft.Colors.GREEN_700, color="#FFFFFF"),
             ),

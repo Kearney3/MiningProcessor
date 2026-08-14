@@ -20,11 +20,11 @@ def _create_column_mapping_section(page: ft.Page, log):
     _mapping_state: dict[str, dict[str, str]] = {}  # {data_type: {src: dst}}
     _mapping_data_types = ["work_efficiency", "fuel_consumption", "electricity_consumption", "equipment_operation", "production_record"]
     _mapping_type_labels = {
-        "work_efficiency": t("components:user_config._column_mapping.工作效率_d05d"),
-        "fuel_consumption": t("components:user_config._column_mapping.油耗_75d6"),
-        "electricity_consumption": t("components:user_config._column_mapping.电耗_74d3"),
-        "equipment_operation": t("components:user_config._column_mapping.设备运行_9a39"),
-        "production_record": t("components:user_config._column_mapping.生产数据_9fb6"),
+        "work_efficiency": t("components:user_config._column_mapping.worktimeEfficiency"),
+        "fuel_consumption": t("components:user_config._column_mapping.fuelConsumption"),
+        "electricity_consumption": t("components:user_config._column_mapping.electricalConsumption"),
+        "equipment_operation": t("components:user_config._column_mapping.equipmentOperation"),
+        "production_record": t("components:user_config._column_mapping.productionData"),
     }
     # 每种数据类型对应的 MineBase 目标字段选项（camelCase API 字段名）
     _MINEBASE_FIELD_OPTIONS: dict[str, list[str]] = {
@@ -57,7 +57,7 @@ def _create_column_mapping_section(page: ft.Page, log):
     _mapping_rows: dict[str, list[list[str]]] = {}
 
     mapping_type_dropdown = ft.Dropdown(
-        label=t("components:user_config._column_mapping.数据类型_185f"),
+        label=t("components:user_config._column_mapping.dataType"),
         width=180,
         options=[ft.dropdown.Option(key=k, text=_mapping_type_labels.get(k, k)) for k in _mapping_data_types],
         value=_mapping_data_types[0],
@@ -85,8 +85,8 @@ def _create_column_mapping_section(page: ft.Page, log):
         controls.append(ft.Row(
             [
                 ft.Text("", width=40),
-                ft.Text(t("components:user_config._column_mapping.源列名（Excel列）_ed22"), expand=True, size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
-                ft.Text(t("components:user_config._column_mapping.目标字段（MineBase）_f0bc"), expand=True, size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                ft.Text(t("components:user_config._column_mapping.sourceColumnExcelColumn"), expand=True, size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                ft.Text(t("components:user_config._column_mapping.targetFieldMinebase"), expand=True, size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
                 ft.Text("", width=40),
             ],
             spacing=4,
@@ -114,18 +114,18 @@ def _create_column_mapping_section(page: ft.Page, log):
             options = _MINEBASE_FIELD_OPTIONS.get(dt, [])
             dst_menu = ft.PopupMenuButton(
                 icon=ft.Icons.ARROW_DROP_DOWN,
-                tooltip=t("components:user_config._column_mapping.选择目标字段_b45b"),
+                tooltip=t("components:user_config._column_mapping.selectTargetField"),
                 icon_size=20,
                 disabled=is_excluded,
                 items=[
                     ft.PopupMenuItem(content=ft.Text(v), on_click=_on_menu_select) for v in options
                 ],
             )
-            remove_btn = ft.IconButton(icon=ft.Icons.DELETE_OUTLINE, tooltip=t("components:user_config._column_mapping.删除_2f4a"), icon_size=18, icon_color=theme.ERROR)
+            remove_btn = ft.IconButton(icon=ft.Icons.DELETE_OUTLINE, tooltip=t("components:user_config._column_mapping.delete"), icon_size=18, icon_color=theme.ERROR)
 
             exclude_cb = ft.Checkbox(
                 value=is_excluded,
-                tooltip=t("components:user_config._column_mapping.排除此列（不导入）_1bc9"),
+                tooltip=t("components:user_config._column_mapping.excludeThisColumnDoNotImport"),
                 active_color=theme.WARNING,
             )
 
@@ -201,9 +201,9 @@ def _create_column_mapping_section(page: ft.Page, log):
         try:
             save_minebase_column_mapping(dict(_mapping_state))
         except Exception as ex:
-            mapping_status_text.value = t("components:user_config._column_mapping.保存失败:_0070", ex=ex)
+            mapping_status_text.value = t("components:user_config._column_mapping.saveFailed", ex=ex)
             mapping_status_text.color = theme.ERROR
-            _log_message(log, t("components:user_config._column_mapping.保存列映射配置失败:_d1cc", ex=ex), level=logging.ERROR)
+            _log_message(log, t("components:user_config._column_mapping.saveconfigurationconfigurationfailed", ex=ex), level=logging.ERROR)
             try:
                 page.update()
             except (RuntimeError, AttributeError):
@@ -211,9 +211,9 @@ def _create_column_mapping_section(page: ft.Page, log):
             return
 
         total = sum(len(v) for v in _mapping_state.values())
-        mapping_status_text.value = t("components:user_config._column_mapping.已保存条列映射_afaf", total=total)
+        mapping_status_text.value = t("components:user_config._column_mapping.savedItemscolumnMapping", total=total)
         mapping_status_text.color = theme.TEXT_SECONDARY
-        _log_message(log, t("components:user_config._column_mapping.已保存列映射配置（条）_a061", total=total))
+        _log_message(log, t("components:user_config._column_mapping.savedconfigurationconfigurationItems", total=total))
         try:
             page.update()
         except (RuntimeError, AttributeError):
@@ -222,9 +222,9 @@ def _create_column_mapping_section(page: ft.Page, log):
     def _reset_mapping(e=None):
         reset_minebase_column_mapping()
         _reload_mapping()
-        mapping_status_text.value = t("components:user_config._column_mapping.已恢复默认映射_4590")
+        mapping_status_text.value = t("components:user_config._column_mapping.defaultMappingRestored")
         mapping_status_text.color = theme.TEXT_SECONDARY
-        _log_message(log, t("components:user_config._column_mapping.已恢复默认列映射配置_5351"))
+        _log_message(log, t("components:user_config._column_mapping.configurationdefaultconfigurationconfiguration"))
         _build_mapping_rows()
         try:
             page.update()
@@ -232,15 +232,15 @@ def _create_column_mapping_section(page: ft.Page, log):
             pass
 
     mapping_action_buttons = [
-        theme.primary_btn(t("components:user_config._column_mapping.保存映射_ee41"), icon=ft.Icons.SAVE, on_click=_save_mapping),
-        theme.secondary_btn(t("components:user_config._column_mapping.重新加载_64ca"), icon=ft.Icons.REFRESH, on_click=lambda _: (_reload_mapping(), _build_mapping_rows())),
-        theme.secondary_btn(t("components:user_config._column_mapping.恢复默认_7468"), icon=ft.Icons.RESTART_ALT, on_click=_reset_mapping),
-        theme.accent_btn(t("components:user_config._column_mapping.添加映射_4ecc"), icon=ft.Icons.ADD, on_click=_add_mapping_row),
+        theme.primary_btn(t("components:user_config._column_mapping.saveMapping"), icon=ft.Icons.SAVE, on_click=_save_mapping),
+        theme.secondary_btn(t("components:user_config._column_mapping.reload"), icon=ft.Icons.REFRESH, on_click=lambda _: (_reload_mapping(), _build_mapping_rows())),
+        theme.secondary_btn(t("components:user_config._column_mapping.restoreDefault"), icon=ft.Icons.RESTART_ALT, on_click=_reset_mapping),
+        theme.accent_btn(t("components:user_config._column_mapping.addMapping"), icon=ft.Icons.ADD, on_click=_add_mapping_row),
     ]
 
     mapping_card = theme.make_collapsible(
-        title=t("components:user_config._column_mapping.MineBase列映射配置_b08b"),
-        subtitle=t("components:user_config._column_mapping.配置MiningProcess_80db"),
+        title=t("components:user_config._column_mapping.minebaseConfigurationconfiguration"),
+        subtitle=t("components:user_config._column_mapping.configurationMiningprocessorOutputconfigurationMinebaseConfiguration"),
         icon=ft.Icons.MAP,
         initially_expanded=False,
         content_controls=[

@@ -20,25 +20,25 @@ def _create_minebase_section(page: ft.Page, log):
     """创建 MineBase 连接配置卡片，返回 (card, refs_dict)。"""
 
     mb_mode = ft.Dropdown(
-        label=t("components:user_config._minebase.同步模式_8248"),
+        label=t("components:user_config._minebase.syncMode"),
         width=200,
         options=[
-            ft.dropdown.Option(key="api", text=t("components:user_config._minebase.API模式_6169")),
-            ft.dropdown.Option(key="database", text=t("components:user_config._minebase.直连数据库_8b9a")),
+            ft.dropdown.Option(key="api", text=t("components:user_config._minebase.apiMode")),
+            ft.dropdown.Option(key="database", text=t("components:user_config._minebase.directDb")),
         ],
         value="api",
     )
     # API 配置
-    mb_api_url = ft.TextField(label=t("components:user_config._minebase.API地址_98c1"), hint_text="http://localhost:3000", expand=True, color=theme.TEXT_PRIMARY)
-    mb_api_user = ft.TextField(label=t("components:user_config._minebase.用户名_8197"), expand=True, color=theme.TEXT_PRIMARY)
-    mb_api_pass = ft.TextField(label=t("components:user_config._minebase.密码_a810"), password=True, can_reveal_password=True, expand=True)
+    mb_api_url = ft.TextField(label=t("components:user_config._minebase.apiUrl"), hint_text="http://localhost:3000", expand=True, color=theme.TEXT_PRIMARY)
+    mb_api_user = ft.TextField(label=t("components:user_config._minebase.username"), expand=True, color=theme.TEXT_PRIMARY)
+    mb_api_pass = ft.TextField(label=t("components:user_config._minebase.password"), password=True, can_reveal_password=True, expand=True)
     # 数据库配置
-    mb_db_host = ft.TextField(label=t("components:user_config._minebase.数据库主机_0461"), hint_text="localhost", expand=True, color=theme.TEXT_PRIMARY)
-    mb_db_port = ft.TextField(label=t("components:user_config._minebase.端口_c76c"), value="5432", width=120, max_length=5,
+    mb_db_host = ft.TextField(label=t("components:user_config._minebase.databaseHost"), hint_text="localhost", expand=True, color=theme.TEXT_PRIMARY)
+    mb_db_port = ft.TextField(label=t("components:user_config._minebase.port"), value="5432", width=120, max_length=5,
                               input_filter=ft.InputFilter(allow=True, regex_string=r"^[0-9]*$"))
-    mb_db_name = ft.TextField(label=t("components:user_config._minebase.数据库名_5ccb"), hint_text="minebase", expand=True, color=theme.TEXT_PRIMARY)
-    mb_db_user = ft.TextField(label=t("components:user_config._minebase.用户名_8197"), expand=True, color=theme.TEXT_PRIMARY)
-    mb_db_pass = ft.TextField(label=t("components:user_config._minebase.密码_a810"), password=True, can_reveal_password=True, expand=True)
+    mb_db_name = ft.TextField(label=t("components:user_config._minebase.databaseName"), hint_text="minebase", expand=True, color=theme.TEXT_PRIMARY)
+    mb_db_user = ft.TextField(label=t("components:user_config._minebase.username"), expand=True, color=theme.TEXT_PRIMARY)
+    mb_db_pass = ft.TextField(label=t("components:user_config._minebase.password"), password=True, can_reveal_password=True, expand=True)
 
     from func.secret_store import MINEBASE_PASSWORD_MASK as _MASKED, LLM_KEY_MASK as _LLM_KEY_MASKED
     _api_pass_saved = False  # 是否已有保存的 API 密码
@@ -46,9 +46,9 @@ def _create_minebase_section(page: ft.Page, log):
     _api_pass_raw = ""       # 原始加密密码值
     _db_pass_raw = ""        # 原始加密密码值
     mb_status_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
-    mb_api_test_btn = theme.secondary_btn(t("components:user_config._minebase.测试连接_69e7"), icon=ft.Icons.LAN)
+    mb_api_test_btn = theme.secondary_btn(t("components:user_config._minebase.testConnection"), icon=ft.Icons.LAN)
     mb_api_test_result = ft.Text("", size=13, visible=False)
-    mb_test_btn = theme.secondary_btn(t("components:user_config._minebase.测试连接_69e7"), icon=ft.Icons.LAN)
+    mb_test_btn = theme.secondary_btn(t("components:user_config._minebase.testConnection"), icon=ft.Icons.LAN)
     mb_test_result = ft.Text("", size=13, visible=False)
 
     # API / 数据库字段分组容器，按模式显示
@@ -145,14 +145,14 @@ def _create_minebase_section(page: ft.Page, log):
     def _save_mb_config(_e):
         port_val = int(_normalize_port_text(mb_db_port.value) or "5432")
         if port_val < 0 or port_val > 65535:
-            _sync_port_state(mb_db_port, False, t("components:user_config._minebase.端口必须在0-65535之间_b181"))
-            _log_message(log, t("components:user_config._minebase.保存MineBase配置失败：_49c7"), level=logging.WARNING)
+            _sync_port_state(mb_db_port, False, t("components:user_config._minebase.item065535Item"))
+            _log_message(log, t("components:user_config._minebase.saveMinebaseConfigurationfailedConfiguration"), level=logging.WARNING)
             return
         _sync_port_state(mb_db_port, True)
         cfg = _collect_mb_config()
         config_loader.save_minebase_config(cfg)
-        mb_status_text.value = t("components:user_config._minebase.MineBase连接配置已保存_d734")
-        _log_message(log, t("components:user_config._minebase.已保存MineBase连接配置_b57f"))
+        mb_status_text.value = t("components:user_config._minebase.minebaseConfigurationconfigurationsaved")
+        _log_message(log, t("components:user_config._minebase.savedMinebaseConfigurationconfiguration"))
         try:
             page.update()
         except (RuntimeError, AttributeError):
@@ -162,22 +162,22 @@ def _create_minebase_section(page: ft.Page, log):
         defaults = get_minebase_config_default()
         config_loader.save_minebase_config(defaults)
         _apply_mb_config(defaults)
-        mb_status_text.value = t("components:user_config._minebase.已恢复默认配置_455f")
-        _log_message(log, t("components:user_config._minebase.已恢复MineBase默认连接_62d7"))
+        mb_status_text.value = t("components:user_config._minebase.defaultConfigurationRestored")
+        _log_message(log, t("components:user_config._minebase.defaultMinebaseDefaultdefaultconfiguration"))
         try:
             page.update()
         except (RuntimeError, AttributeError):
             pass
 
     mb_action_buttons = [
-        theme.primary_btn(t("components:user_config._minebase.保存配置_ed75"), icon=ft.Icons.SAVE, on_click=_save_mb_config),
-        theme.secondary_btn(t("components:user_config._minebase.重新加载_64ca"), icon=ft.Icons.REFRESH, on_click=lambda _: _reload_mb_config()),
-        theme.secondary_btn(t("components:user_config._minebase.恢复默认_7468"), icon=ft.Icons.RESTART_ALT, on_click=_reset_mb_config),
+        theme.primary_btn(t("components:user_config._minebase.saveConfig"), icon=ft.Icons.SAVE, on_click=_save_mb_config),
+        theme.secondary_btn(t("components:user_config._minebase.reload"), icon=ft.Icons.REFRESH, on_click=lambda _: _reload_mb_config()),
+        theme.secondary_btn(t("components:user_config._minebase.restoreDefault"), icon=ft.Icons.RESTART_ALT, on_click=_reset_mb_config),
     ]
 
     minebase_card = theme.make_collapsible(
-        title=t("components:user_config._minebase.数据库连接配置_9a50"),
-        subtitle=t("components:user_config._minebase.配置MineBase数据库同步_639a"),
+        title=t("components:user_config._minebase.databaseConnection"),
+        subtitle=t("components:user_config._minebase.configureMinebaseSynchronizationConnectionParametersApiDirectDatabase"),
         icon=ft.Icons.STORAGE,
         initially_expanded=False,
         content_controls=[
