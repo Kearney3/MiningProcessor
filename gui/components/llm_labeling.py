@@ -69,8 +69,8 @@ def _result_presentation(result: dict) -> dict:
         "is_partial": remaining > 0,
         "progress": completed / target if target else 1,
         "summary": (
-            f"{completed}/{target} 条成功"
-            + (f" · {remaining} 条待重试" if remaining else " · 100%")
+            t("components:llm_labeling./条成功_5f11", completed=completed, target=target)
+            + (t("components:llm_labeling.·条待重试_61a8", remaining=remaining) if remaining else " · 100%")
         ),
     }
 
@@ -201,7 +201,7 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
             dropdown.options = [
                 ft.dropdown.Option(
                     key=column,
-                    text=column if column in columns else f"新建输出列：{column}",
+                    text=column if column in columns else t("components:llm_labeling.新建输出列：_ff49", column=column),
                 )
                 for column in choices
             ]
@@ -426,7 +426,7 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                 initial_directory=_get_initial_directory(),
             )
         except Exception as ex:
-            _log_message(page.logger.error, f"选择文件失败: {ex}")
+            _log_message(page.logger.error, t("components:llm_labeling.选择文件失败:_6ca8", ex=ex))
             return
         if result and result[0]:
             picked = result[0]
@@ -445,7 +445,7 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
         path = path_field.value
         if not path:
-            _log_message(page.logger, "请先选择维修明细文件", level=logging.WARNING)
+            _log_message(page.logger, t("components:llm_labeling.请先选择维修明细文件_4baf"), level=logging.WARNING)
             return
         llm_config = config_loader.get_llm_config()
         if not llm_config.get("url") or not llm_config.get("api_key"):
@@ -524,19 +524,24 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                         total = latest_data.get("total", 0)
                         eta = latest_data.get("eta_seconds")
                         eta_text = (
-                            f" · 预计剩余 {max(1, round(float(eta) / 60))} 分钟"
+                            t(
+                                "components:llm_labeling.·预计剩余分钟_9e8b",
+                                eta=max(1, round(float(eta) / 60)),
+                            )
                             if eta else ""
                         )
                         progress_summary.value = (
-                            f"{current}/{total} 条 · "
-                            f"{latest_data.get('percent', 0):.0f}%{eta_text}"
+                            t("components:llm_labeling./条·_fd28", current=current, total=total)
+                            +
+                            f" {latest_data.get('percent', 0):.0f}%{eta_text}"
                         )
-                        progress_metrics.value = (
-                            f"成功 {latest_data.get('succeeded', 0)}  ·  "
-                            f"跳过 {latest_data.get('skipped', 0)}  ·  "
-                            f"失败 {latest_data.get('failed', 0)}  ·  "
-                            f"重试 {latest_data.get('retried', 0)}  ·  "
-                            f"{latest_data.get('rate', 0):.1f} 条/秒"
+                        progress_metrics.value = t(
+                            "components:llm_labeling.progressMetrics",
+                            succeeded=latest_data.get("succeeded", 0),
+                            skipped=latest_data.get("skipped", 0),
+                            failed=latest_data.get("failed", 0),
+                            retried=latest_data.get("retried", 0),
+                            rate=f"{latest_data.get('rate', 0):.1f}",
                         )
                         safe_update(
                             progress_bar,
@@ -576,8 +581,8 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                             return
                         status_text.value = t("components:llm_labeling.任务已取消，当前进度已保留_d49d")
                         result_text.value = (
-                            f"已完成 {partial} 条，剩余 {remaining} 条；"
-                            "再次开始可从断点继续。"
+                            t("components:llm_labeling.已完成条，剩余条；_969f", partial=partial, remaining=remaining)
+                            + t("components:llm_labeling.再次开始可从断点继续。_3722")
                         )
                         result_text.color = ft.Colors.AMBER
                         btn.disabled = False
@@ -598,7 +603,11 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                 target = presentation["target"]
                 remaining = presentation["remaining"]
                 from_checkpoint = result.get("from_checkpoint", 0)
-                mode_label = "汇总统计" if result.get("export_mode") == "statistics" else "标注明细"
+                mode_label = t(
+                    "components:llm_labeling.汇总统计_a23a"
+                    if result.get("export_mode") == "statistics"
+                    else "components:llm_labeling.标注明细_97b2"
+                )
 
                 async def _ok():
                     if not _is_current_run(run_state):
@@ -620,7 +629,7 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                         else theme.TEXT_PRIMARY
                     )
                     btn.disabled = False
-                    btn.text = "开始标注"
+                    btn.text = t("components:llm_labeling.开始标注_7107")
                     cancel_btn.visible = False
                     progress_bar.value = presentation["progress"]
                     progress_summary.value = presentation["summary"]
@@ -639,7 +648,7 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                     if not _is_current_run(run_state):
                         return
                     if run_state.cancel_event.is_set():
-                        status_text.value = "任务已取消，当前进度已保留"
+                        status_text.value = t("components:llm_labeling.任务已取消，当前进度已保留_d49d")
                         result_text.value = t("components:llm_labeling.再次开始可从断点继续未完成记录_3dbe")
                         result_text.color = ft.Colors.AMBER
                     else:
@@ -647,7 +656,7 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                         result_text.value = t("components:llm_labeling.标注失败:_e77a", err_msg=err_msg)
                         result_text.color = ft.Colors.RED
                     btn.disabled = False
-                    btn.text = "开始标注"
+                    btn.text = t("components:llm_labeling.开始标注_7107")
                     cancel_btn.visible = False
                     safe_update(
                         status_text, result_text, btn, cancel_btn,

@@ -411,7 +411,7 @@
     "llm_labeling./条成功_5f11": "{completed}/{target} 条成功",
     "llm_labeling./条·_fd28": "{current}/{total} 条 ·",
     "llm_labeling.·条待重试_61a8": "· {remaining} 条待重试",
-    "llm_labeling.·预计剩余分钟_9e8b": "· 预计剩余 {max(1, round(float(eta) / 60))} 分钟",
+    "llm_labeling.·预计剩余分钟_9e8b": "· 预计剩余 {eta} 分钟",
     "llm_labeling.不能按该列筛选；本次会标注全部_5826": "不能按该列筛选；本次会标注全部记录。",
     "llm_labeling.仅标注明细_b6c3": "仅标注明细",
     "llm_labeling.任务已取消，当前进度已保留_d49d": "任务已取消，当前进度已保留",
@@ -900,7 +900,8 @@
     "llm_labeling.exportMode": "导出方式: {mode_label}\n",
     "modules.去除重复记录_6f2d": "去除重复记录",
     "llm_labeling.ui.intro": "对已处理的维修明细文件进行大模型智能分类标注。\n请先在「用户配置 → LLM 标注配置」中配置接口信息。",
-    "user_config._anomaly.ui.allNumericHint": "使用 {sentinel} 可对所有数值列统一检测。"
+    "user_config._anomaly.ui.allNumericHint": "使用 {sentinel} 可对所有数值列统一检测。",
+    "llm_labeling.progressMetrics": "成功 {succeeded} · 跳过 {skipped} · 失败 {failed} · 重试 {retried} · {rate} 条/秒"
   },
   "nav": {
     "工作区_4fa8": "工作区",

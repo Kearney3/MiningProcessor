@@ -10,7 +10,7 @@ from gui.i18n import t
 
 _OIL_LEDGER_STANDARD_COLS = [
     ("油品名称", t("components:oil_ledger.油品的原始名称（用于匹配）_ac7b")),
-    ("标准油品名称", "标准化后的油品名称"),
+    ("标准油品名称", t("components:oil_ledger.标准化后的油品名称_7f4b")),
 ]
 
 

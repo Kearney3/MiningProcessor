@@ -12,7 +12,7 @@ _MODEL_STANDARD_COLS = [
     ("标准设备编号", t("components:model_ledger.必须与设备台账的标准设备编号一_9408")),
     ("标准公司名称", t("components:model_ledger.型号台账维护的标准公司名称_0cd6")),
     ("所有权", t("components:model_ledger.例如：自有、租赁_afa4")),
-    ("设备型号", "设备型号"),
+    ("设备型号", t("components:model_ledger.设备型号_5858")),
     ("设备类型", t("components:model_ledger.例如：矿卡、挖机_b17f")),
     ("内部分类", t("components:model_ledger.内部统计分类_0ee5")),
 ]

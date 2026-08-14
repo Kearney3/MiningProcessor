@@ -278,16 +278,16 @@ def _cell_text(value) -> str:
 
 # 异常值明细表：保留高频定位字段，长说明在单元格内截断并可通过表格滚动查看。
 _ANOMALY_RESULT_COLUMNS = [
-    ("数据类型", 86),
-    ("行号", 52),
-    ("日期", 92),
-    ("班次", 56),
-    ("设备名称", 160),
-    ("设备编号", 90),
-    ("异常列", 100),
-    ("异常值", 86),
-    ("检测方法", 82),
-    ("说明", 320),
+    ("数据类型", "components:common.数据类型_185f", 86),
+    ("行号", "components:common.行号_89c8", 52),
+    ("日期", "components:common.日期_4ff1", 92),
+    ("班次", "components:common.班次_b689", 56),
+    ("设备名称", "components:common.设备名称_9f69", 160),
+    ("设备编号", "components:common.设备编号_cf05", 90),
+    ("异常列", "components:common.异常列_abcd", 100),
+    ("异常值", "components:common.异常值_56c9", 86),
+    ("检测方法", "components:common.检测方法_2b87", 82),
+    ("说明", "components:common.说明_f411", 320),
 ]
 
 
@@ -302,9 +302,12 @@ def create_anomaly_results_table() -> dict:
     except ImportError:
         import gui.theme as theme
 
-    columns = [name for name, _ in _ANOMALY_RESULT_COLUMNS]
+    columns = [name for name, _, _ in _ANOMALY_RESULT_COLUMNS]
     table = ft.DataTable(
-        columns=[ft.DataColumn(ft.Text(name, size=12, no_wrap=True)) for name in columns],
+        columns=[
+            ft.DataColumn(ft.Text(t(label_key), size=12, no_wrap=True))
+            for _, label_key, _ in _ANOMALY_RESULT_COLUMNS
+        ],
         rows=[],
         column_spacing=12,
         heading_row_height=32,
@@ -354,7 +357,7 @@ def create_anomaly_results_table() -> dict:
         table.rows = []
         for record in rows:
             cells = []
-            for column, width in _ANOMALY_RESULT_COLUMNS:
+            for column, _, width in _ANOMALY_RESULT_COLUMNS:
                 color = theme.ERROR if column == "异常值" else theme.TEXT_PRIMARY
                 if column == "说明":
                     color = theme.TEXT_SECONDARY
@@ -396,7 +399,7 @@ def _show_path_confirm(text_field: ft.TextField):
         _original_tooltip = suffix.tooltip
         suffix.icon = ft.Icons.CHECK_CIRCLE
         suffix.icon_color = theme.SUCCESS
-        suffix.tooltip = "已选择"
+        suffix.tooltip = t("components:common.已选择_f08a")
         safe_update(text_field)
 
         def _restore():
