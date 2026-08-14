@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "矿山数据处理工具",
+  "productName": "Mining Data Processor",
   "version": "2.5.0",
   "identifier": "com.kearney.mining-processor",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "矿山数据处理工具",
+        "title": "Mining Data Processor",
         "width": 1200,
         "height": 950,
         "minWidth": 900,

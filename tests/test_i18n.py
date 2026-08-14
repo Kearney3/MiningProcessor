@@ -17,6 +17,7 @@ PLACEHOLDER_RE = re.compile(r"(?<!\$)\{([A-Za-z_][A-Za-z0-9_]*)\}")
 LEAK_RE = re.compile(
     r"className=|onClick=|latest_data\.get|total\[|join\(|setStatus\(\{|notify\(`|\$\{"
 )
+CJK_RE = re.compile(r"[\u3400-\u9fff]")
 
 
 def _load_catalogs(directory: str) -> dict[str, dict[str, str]]:
@@ -52,6 +53,19 @@ def test_locale_values_do_not_expose_source_fragments(directory: str):
         assert all(isinstance(value, str) and value for value in catalog.values())
         leaked = {key: value for key, value in catalog.items() if LEAK_RE.search(value)}
         assert leaked == {}, f"{directory}/{language}.json contains source fragments: {leaked}"
+
+
+@pytest.mark.parametrize("directory", ("src/locales", "gui/locales"))
+def test_non_default_locales_do_not_leak_cjk_ui_text(directory: str):
+    """EN/MH must not silently fall back to Chinese UI copy."""
+    catalogs = _load_catalogs(directory)
+    for language in ("en", "mn"):
+        leaked = {
+            key: value
+            for key, value in catalogs[language].items()
+            if CJK_RE.search(value)
+        }
+        assert leaked == {}, f"{directory}/{language}.json contains CJK UI text: {leaked}"
 
 
 def test_gui_i18n_normalizes_language_and_supports_namespaces():
