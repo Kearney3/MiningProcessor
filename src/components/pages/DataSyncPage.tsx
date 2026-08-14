@@ -20,14 +20,12 @@ import { localToday, localTodayString, localYesterdayString } from "../../lib/da
 // ═══════════════════════════════════════
 
 const ALL_TYPES = [
-  { id: "fuel", label: "油耗数据", icon: <FuelIcon /> },
-  { id: "production", label: "生产数据", icon: <ProductionIcon /> },
-  { id: "electrical", label: "电力消耗", icon: <ElectricalIcon /> },
-  { id: "work_efficiency", label: "工时数据", icon: <WorktimeIcon /> },
-  { id: "operation", label: "设备运行", icon: <OperationIcon /> },
+  { id: "fuel", labelKey: "fuelData", icon: <FuelIcon /> },
+  { id: "production", labelKey: "productionData", icon: <ProductionIcon /> },
+  { id: "electrical", labelKey: "electricalData", icon: <ElectricalIcon /> },
+  { id: "work_efficiency", labelKey: "worktimeData", icon: <WorktimeIcon /> },
+  { id: "operation", labelKey: "operationData", icon: <OperationIcon /> },
 ] as const;
-
-const TYPE_LABEL_MAP: Record<string, string> = Object.fromEntries(ALL_TYPES.map((type) => [type.id, type.label]));
 
 // ═══════════════════════════════════════
 // Data type checkbox component
@@ -65,6 +63,7 @@ function DataTypeCheckbox({
 export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const { notify } = useToast();
   const { t } = useTranslation();
+  const typeLabel = (id: string) => t(`pages:DataSyncPage.ui.${ALL_TYPES.find((type) => type.id === id)?.labelKey ?? id}`);
   const [inputDir, setInputDir] = useState("");
   const [mode, setMode] = useState<"api" | "database">("api");
   const [conflictPolicy, setConflictPolicy] = useState<"SKIP" | "UPDATE" | "REJECT">("SKIP");
@@ -288,14 +287,14 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
                 {allSelected && <CheckIcon className="w-3 h-3 text-white" />}
                 {someSelected && <MinusIcon />}
               </button>
-              全选
+              {t("pages:DataSyncPage.ui.selectAll")}
             </span>
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1">
             {ALL_TYPES.map((type) => (
               <DataTypeCheckbox
                 key={type.id}
-                label={type.label}
+                label={t(`pages:DataSyncPage.ui.${type.labelKey}`)}
                 icon={type.icon}
                 checked={dataTypes.includes(type.id)}
                 onChange={(checked) => {
@@ -395,14 +394,14 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
               onClick={() => { setDateStart(localYesterdayString()); setDateEnd(localYesterdayString()); }}
               className={btnSecondaryClass}
             >
-              昨日
+              {t("pages:DataSyncPage.ui.yesterday")}
             </button>
             <button
               type="button"
               onClick={() => { setDateStart(""); setDateEnd(""); }}
               className={btnSecondaryClass}
             >
-              清除
+              {t("pages:DataSyncPage.ui.clear")}
             </button>
           </div>
         </div>
@@ -629,7 +628,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
             <span>{t("pages:DataSyncPage.成功_3303")} {totals.success}</span>
             {totals.skipped > 0 && <span>· {t("pages:DataSyncPage.跳过_9263")} {totals.skipped}</span>}
             {totals.failed > 0 && <span>· {t("pages:DataSyncPage.失败_acd5")} {totals.failed}</span>}
-            {totals.warnings > 0 && <span>· 异常 {totals.warnings}</span>}
+            {totals.warnings > 0 && <span>· {t("pages:DataSyncPage.ui.anomalies")} {totals.warnings}</span>}
           </div>
         );
       })()}
@@ -640,7 +639,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
           <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
             <h3 className="text-sm font-medium text-slate-700 flex items-center gap-2">
               <CheckCircleIcon />
-              同步结果
+              {t("pages:DataSyncPage.ui.syncResult")}
             </h3>
           </div>
           <table className="w-full text-sm">
@@ -658,7 +657,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
                 return (
                   <tr key={type} className={`h-9 border-b border-slate-100 hover:bg-slate-50 ${idx % 2 === 0 ? "bg-white" : "bg-slate-50"}`}>
                     <td className="px-4 py-2 text-sm text-slate-700">
-                      {TYPE_LABEL_MAP[type] ?? type}
+                      {typeLabel(type)}
                     </td>
                     <td className="py-2 text-right">
                       <span className="text-xs rounded-md px-2.5 py-1 text-emerald-700 bg-emerald-50">
@@ -693,7 +692,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
           <div className="px-4 py-3 border-b border-cyan-100 bg-cyan-50 flex items-center justify-between">
             <h3 className="text-sm font-medium text-cyan-700 flex items-center gap-2">
               <CheckCircleIcon />
-              预览文件已生成
+              {t("pages:DataSyncPage.ui.previewFileReady")}
             </h3>
             <button
               type="button"
@@ -702,7 +701,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
               title={t("pages:DataSyncPage.打开预览文件_6ae5")}
             >
               <DownloadIcon />
-              打开文件
+              {t("pages:DataSyncPage.ui.openFile")}
             </button>
           </div>
           <div className="px-4 py-3">
@@ -717,7 +716,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
         const allWarnings: { type: string; label: string; w: SyncWarning }[] = [];
         for (const [type, stats] of Object.entries(result.results)) {
           for (const w of stats.warnings ?? []) {
-            allWarnings.push({ type, label: TYPE_LABEL_MAP[type] ?? type, w });
+            allWarnings.push({ type, label: typeLabel(type), w });
           }
         }
         if (allWarnings.length === 0) return null;
@@ -763,7 +762,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
                 title={t("pages:DataSyncPage.导出异常行为Excel文件_1c29")}
               >
                 <DownloadIcon />
-                导出 Excel
+                {t("pages:DataSyncPage.ui.exportExcel")}
               </button>
             </div>
             <div className="max-h-64 overflow-y-auto">

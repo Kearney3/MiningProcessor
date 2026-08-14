@@ -150,7 +150,7 @@ export function DailyReportPage({ bridge }: { bridge: BridgeProp }) {
             <Toggle checked={includeDetailSheets} onChange={setIncludeDetailSheets} label={t("pages:DailyReportPage.输出分项表格_e5fb")} />
           </div>
           <p className="mt-2 text-xs text-slate-400">
-            开启分项表格后，会在日报文件中追加工时、运行、生产、油耗和电耗统计 Sheet。
+            {t("pages:DailyReportPage.ui.detailSheetHint")}
           </p>
         </div>
 

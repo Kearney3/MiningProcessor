@@ -135,10 +135,11 @@ function StyledSelect({
 
 /** Inline validation warning */
 function PathWarning() {
+  const { t } = useTranslation();
   return (
     <div className="mt-1.5 flex items-center gap-1 text-xs text-amber-600">
       <AlertTriangleIcon />
-      请先选择输入路径
+      {t("pages:DataProcessingPage.ui.selectInputPath")}
     </div>
   );
 }
@@ -455,7 +456,7 @@ function ProductionCard({
       {summary && (
         <div className="mt-3 space-y-2">
           <div className="flex items-center gap-3 text-xs text-slate-600">
-            <span>共 {summary.total_files} 个文件，成功 {summary.success_files}，失败 {summary.failed_files}</span>
+            <span>{t("pages:DataProcessingPage.ui.fileSummary", { total: summary.total_files, success: summary.success_files, failed: summary.failed_files })}</span>
           </div>
           {summary.warnings.length > 0 && summary.warnings.map((w, i) => (
             <div key={i} className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 rounded-md px-2.5 py-1.5">
@@ -696,7 +697,7 @@ function WorktimeCard({
               />
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
-              映射规则可在「用户配置 → 工作效率表头映射配置」中编辑
+              {t("pages:DataProcessingPage.ui.headerMappingHint")}
             </p>
           </div>
         )}
@@ -843,7 +844,7 @@ function MergeCard({
             className="flex items-center gap-1 text-xs text-slate-600 hover:text-slate-800 transition-colors"
           >
             <PlusIcon />
-            添加排序规则
+            {t("pages:DataProcessingPage.ui.addSortRule")}
           </button>
         </div>
         {sortConfigs.length > 0 && (
@@ -974,7 +975,7 @@ function MaintenanceCard({
           label={t("pages:DataProcessingPage.启用机器学习辅助识别_0cea")}
         />
         <p className="mt-1 pl-[42px] text-xs leading-5 text-slate-500">
-          仅对规则仍判为"其他/待确认"的记录进行高置信度回填，不覆盖规则结果
+          {t("pages:DataProcessingPage.ui.mlFallbackHint")}
         </p>
       </div>
       <ProcessButton loading={loading} onClick={handleProcess} disabled={path === ""} />

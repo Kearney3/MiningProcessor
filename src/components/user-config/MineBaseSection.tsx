@@ -177,7 +177,7 @@ export function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
               config.mode === "api" ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50"
             }`}
           >
-            API 模式
+            {t("userConfig:MineBaseSection.ui.apiMode")}
           </button>
           <button
             onClick={() => setConfig((p) => ({ ...p, mode: "database" }))}
@@ -185,7 +185,7 @@ export function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
               config.mode === "database" ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50"
             }`}
           >
-            直连数据库
+            {t("userConfig:MineBaseSection.ui.databaseMode")}
           </button>
         </div>
       </div>

@@ -402,7 +402,7 @@ def _create_anomaly_config_section(page: ft.Page, log):
             ft.Text(
                 t("components:user_config._anomaly.检测方法：选择启用的检测策略，_69b0")
                 + t("components:user_config._anomaly.阈值规则对指定列名设置min/_8569")
-                + f"使用 {ALL_NUMERIC_SENTINEL} 可对所有数值列统一检测。"
+                + t("components:user_config._anomaly.ui.allNumericHint", sentinel=ALL_NUMERIC_SENTINEL)
                 + t("components:user_config._anomaly.默认值列仅在启用「处理异常值」_0d3b"),
                 size=12, color=theme.TEXT_SECONDARY,
             ),

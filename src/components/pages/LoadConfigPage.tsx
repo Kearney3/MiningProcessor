@@ -30,6 +30,7 @@ function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
       <div className="bg-white rounded-lg border border-slate-200 p-6 w-[400px] max-w-[90vw]">
@@ -40,13 +41,13 @@ function ConfirmDialog({
             onClick={onCancel}
             className="btn-secondary text-sm px-4 py-1.5"
           >
-            取消
+            {t("pages:LoadConfigPage.ui.cancel")}
           </button>
           <button
             onClick={onConfirm}
             className="btn-danger text-sm px-4 py-1.5"
           >
-            {confirmLabel ?? "确定"}
+            {confirmLabel ?? t("pages:LoadConfigPage.ui.confirm")}
           </button>
         </div>
       </div>
@@ -71,7 +72,7 @@ function RestoreDefaultsDialog({
       <div className="bg-white rounded-lg border border-slate-200 p-6 w-[400px] max-w-[90vw]">
         <h3 className="text-base font-semibold text-slate-800 mb-2">{t("pages:LoadConfigPage.恢复默认配置_3105")}</h3>
         <p className="text-sm text-slate-600 mb-5">
-          选择要恢复的默认版本：
+          {t("pages:LoadConfigPage.ui.chooseDefaultVersion")}
         </p>
         <div className="flex flex-col gap-2 mb-5">
           <button
@@ -94,7 +95,7 @@ function RestoreDefaultsDialog({
             onClick={onCancel}
             className="btn-secondary text-sm px-4 py-1.5"
           >
-            取消
+            {t("pages:LoadConfigPage.ui.cancel")}
           </button>
         </div>
       </div>
@@ -199,7 +200,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
       // non-critical, continue
     }
     loadData(ver);
-    notify(t("pages:LoadConfigPage.已切换到$装载量配置_8f29", { versionLabel: ver === "old" ? "旧版" : "新版" }), "info");
+    notify(t("pages:LoadConfigPage.已切换到$装载量配置_8f29", { versionLabel: ver === "old" ? t("pages:LoadConfigPage.旧版_6b10") : t("pages:LoadConfigPage.新版_1f09") }), "info");
   };
 
   /* ---- sorted & paginated entries -------------------------------- */
@@ -388,7 +389,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
       const defaults = await bridge.call<LoadMap>("get_default_load_map", { version });
       if (defaults && typeof defaults === "object") {
         setLoadMap(defaults);
-        notify(t("pages:LoadConfigPage.已恢复$默认配置（未保存）_9ab7", { versionLabel: version === "new" ? "新版" : "旧版" }), "info");
+        notify(t("pages:LoadConfigPage.已恢复$默认配置（未保存）_9ab7", { versionLabel: version === "new" ? t("pages:LoadConfigPage.新版_1f09") : t("pages:LoadConfigPage.旧版_6b10") }), "info");
       }
     } catch {
       notify(t("pages:LoadConfigPage.获取默认配置失败_0d50"), "error");
@@ -440,7 +441,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
                   : "text-slate-500 hover:bg-slate-50"
               }`}
             >
-              新版
+              {t("pages:LoadConfigPage.新版_1f09")}
             </button>
             <button
               onClick={() => handleVersionSwitch("old")}
@@ -450,7 +451,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
                   : "text-slate-500 hover:bg-slate-50"
               }`}
             >
-              旧版
+              {t("pages:LoadConfigPage.旧版_6b10")}
             </button>
           </div>
         </div>
@@ -459,7 +460,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
         {isDirty ? (
           <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-0.5">
             <AlertTriangleIcon />
-            已修改（未保存）
+            {t("pages:LoadConfigPage.ui.modifiedUnsaved")}
           </span>
         ) : (
           <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-md px-2.5 py-0.5">
@@ -473,11 +474,11 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
       <div className="flex items-center gap-2 mb-4">
         <button onClick={handleImport} className="btn-secondary">
           <ImportIcon />
-          导入
+          {t("pages:LoadConfigPage.ui.import")}
         </button>
         <button onClick={handleExport} className="btn-secondary">
           <ExportIcon />
-          导出
+          {t("pages:LoadConfigPage.ui.export")}
         </button>
 
         {selected.size > 0 && (
@@ -488,21 +489,21 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
               className="btn-danger"
             >
               <TrashIcon />
-              删除选中 ({selected.size})
+              {t("pages:LoadConfigPage.ui.deleteSelected", { count: selected.size })}
             </button>
           </>
         )}
 
         <button onClick={() => setRestoreDialog(true)} className="btn-secondary">
           <RestoreIcon />
-          恢复默认
+          {t("pages:LoadConfigPage.ui.restoreDefault")}
         </button>
 
         <div className="flex-1" />
 
         <button onClick={() => loadData()} className="btn-secondary">
           <RefreshIcon />
-          重载
+          {t("pages:LoadConfigPage.ui.reload")}
         </button>
         <button
           onClick={handleApply}
@@ -510,7 +511,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
           className={`btn-secondary ${applying || !isDirty ? "opacity-50 cursor-not-allowed" : ""}`}
         >
           <ApplyIcon />
-          {applying ? t("pages:LoadConfigPage.应用中..._e596") : "应用"}
+          {applying ? t("pages:LoadConfigPage.应用中..._e596") : t("pages:LoadConfigPage.应用_5b05")}
         </button>
         <button
           onClick={handleSave}
@@ -518,7 +519,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
           className={`btn-primary ${saving || !isDirty ? "opacity-50 cursor-not-allowed" : ""}`}
         >
           <SaveIcon />
-          {saving ? t("pages:LoadConfigPage.保存中..._2a33") : "保存"}
+          {saving ? t("pages:LoadConfigPage.保存中..._2a33") : t("pages:LoadConfigPage.保存_be5f")}
         </button>
       </div>
 
@@ -546,13 +547,13 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
                   />
                 </th>
                 <th className="text-left px-3 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  设备名称
+                  {t("pages:LoadConfigPage.ui.deviceName")}
                 </th>
                 <th className="text-left px-3 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  装载量 (方)
+                  {t("pages:LoadConfigPage.ui.capacity")}
                 </th>
                 <th className="text-right px-3 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider w-20">
-                  操作
+                  {t("pages:LoadConfigPage.ui.actions")}
                 </th>
               </tr>
             </thead>
@@ -595,10 +596,10 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
                     <td className="px-3 text-right">
                       <button
                         onClick={() => handleDelete(name)}
-                        className="inline-flex items-center gap-1 text-xs text-slate-600 hover:text-red-600 px-1.5 py-1 rounded hover:bg-red-50 transition-colors"
+                        className="inline-flex items-center gap-1 text-xs text-red-700 hover:text-red-800 px-1.5 py-1 rounded hover:bg-red-50 transition-colors"
                       >
                         <TrashIcon />
-                        删除
+                        {t("pages:LoadConfigPage.ui.delete")}
                       </button>
                     </td>
                   </tr>
@@ -650,7 +651,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
                       className="btn-primary"
                     >
                       <PlusIcon />
-                      添加
+                      {t("pages:LoadConfigPage.ui.add")}
                     </button>
                   </div>
                 </td>
@@ -661,7 +662,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
 
         {/* ---- footer: pagination + count -------------------------- */}
         <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100">
-          <span className="text-xs text-slate-500">共 {entries.length} 台设备</span>
+          <span className="text-xs text-slate-500">{t("pages:LoadConfigPage.ui.deviceCount", { count: entries.length })}</span>
 
           {totalPages > 1 && (
             <div className="flex items-center gap-2">
@@ -671,7 +672,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
                 className="text-xs text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-0.5"
               >
                 <ChevronLeftIcon />
-                上一页
+                {t("pages:LoadConfigPage.ui.previousPage")}
               </button>
               <span className="text-xs text-slate-500 min-w-[4rem] text-center">
                 {safePage + 1} / {totalPages}
@@ -681,7 +682,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
                 disabled={safePage >= totalPages - 1}
                 className="text-xs text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-0.5"
               >
-                下一页
+                {t("pages:LoadConfigPage.ui.nextPage")}
                 <ChevronRightIcon />
               </button>
             </div>
@@ -695,7 +696,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
           title={t("pages:LoadConfigPage.确认删除_631c")}
           body={
             <span>
-              确定要删除选中的 <strong>{selected.size}</strong> 条设备记录吗？此操作需要点击"保存"后才会持久化。
+              {t("pages:LoadConfigPage.ui.deleteConfirm", { count: selected.size })}
             </span>
           }
           confirmLabel={t("pages:LoadConfigPage.删除$条_1084", { count: selected.size })}

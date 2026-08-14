@@ -273,9 +273,7 @@ export function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
     >
       {/* 说明文字 */}
       <p className="text-xs text-slate-500 mb-3">
-        检测方法：选择启用的检测策略，关闭的策略不会应用。
-        阈值规则对指定列名设置 min/max 范围；使用 <code className="text-xs bg-slate-100 px-1 rounded">{ALL_NUMERIC}</code> 可对所有数值列统一检测。
-        默认值列仅在启用「处理异常值」模式时生效。
+        {t("userConfig:AnomalyConfigSection.ui.detectionHint", { sentinel: ALL_NUMERIC })}
       </p>
 
       {/* 检测方法开关 */}
@@ -410,7 +408,7 @@ export function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
             />
             <button
               onClick={() => removeRow(activeType, idx)}
-              className="w-8 h-8 flex items-center justify-center rounded-md text-slate-600 hover:text-red-500 hover:bg-red-50 transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-md text-red-700 hover:text-red-800 hover:bg-red-50 transition-colors"
               title={t("userConfig:AnomalyConfigSection.删除此行_43e8")}
             >
               <CloseIcon />

@@ -34,20 +34,20 @@ type BaseTableType = "fuel" | "worktime";
 // Constants
 // ═══════════════════════════════════════
 
-const dataTypeConfig: Record<string, { icon: React.ReactNode; label: string }> = {
-  油耗:       { icon: <FuelIcon />,         label: "油耗" },
-  生产:       { icon: <ProductionIcon />,   label: "生产" },
-  电力:       { icon: <ElectricalIcon />,   label: "电力" },
-  工时:       { icon: <WorktimeIcon />,     label: "工时" },
-  production: { icon: <ProductionIcon />,   label: "生产" },
-  fuel:       { icon: <FuelIcon />,         label: "油耗" },
-  electrical: { icon: <ElectricalIcon />,   label: "电力" },
-  worktime:   { icon: <WorktimeIcon />,     label: "工时" },
-  merge:      { icon: <MergeIcon />,        label: "合并" },
+const dataTypeConfig: Record<string, { icon: React.ReactNode; labelKey: string }> = {
+  油耗:       { icon: <FuelIcon />,         labelKey: "fuel" },
+  生产:       { icon: <ProductionIcon />,   labelKey: "production" },
+  电力:       { icon: <ElectricalIcon />,   labelKey: "electrical" },
+  工时:       { icon: <WorktimeIcon />,     labelKey: "worktime" },
+  production: { icon: <ProductionIcon />,   labelKey: "production" },
+  fuel:       { icon: <FuelIcon />,         labelKey: "fuel" },
+  electrical: { icon: <ElectricalIcon />,   labelKey: "electrical" },
+  worktime:   { icon: <WorktimeIcon />,     labelKey: "worktime" },
+  merge:      { icon: <MergeIcon />,        labelKey: "merge" },
 };
 
 function getTypeConfig(type: string) {
-  return dataTypeConfig[type] ?? { icon: <QuestionIcon />, label: type };
+  return dataTypeConfig[type] ?? { icon: <QuestionIcon />, labelKey: "" };
 }
 
 function formatToday(): string {
@@ -97,6 +97,10 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
   // -- Path & scan --
   const { notify } = useToast();
   const { t } = useTranslation();
+  const typeLabel = (type: string) => {
+    const config = getTypeConfig(type);
+    return config.labelKey ? t(`pages:BatchProcessingPage.ui.type.${config.labelKey}`) : type;
+  };
   const { initialDir, saveDir } = useLastDirectory(bridge);
   const [folderPath, setFolderPath] = useState("");
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
@@ -302,12 +306,12 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                 </svg>
-                扫描中...
+                {t("pages:BatchProcessingPage.ui.scanning")}
               </>
             ) : (
               <>
                 <SearchIcon />
-                扫描文件
+                {t("pages:BatchProcessingPage.ui.scanFiles")}
               </>
             )}
           </button>
@@ -322,8 +326,8 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
                 <div key={type} className="flex items-center gap-2 text-sm text-slate-700 py-1">
                   <CheckIcon />
                   <span className="text-slate-500">{cfg.icon}</span>
-                  <span className="text-slate-700">{cfg.label || type}</span>
-                  <span className="text-xs text-slate-400">({(files as string[]).length} 个文件)</span>
+                  <span className="text-slate-700">{typeLabel(type)}</span>
+                  <span className="text-xs text-slate-400">({t("pages:BatchProcessingPage.ui.fileCount", { count: (files as string[]).length })})</span>
                 </div>
               );
             })}
@@ -467,13 +471,13 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
                       onClick={() => setFilterDate(shiftDate(filterDate, -1))}
                       className="text-xs px-3 py-1.5 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
                     >
-                      上一天
+                      {t("pages:BatchProcessingPage.ui.previousDay")}
                     </button>
                     <button
                       onClick={() => setFilterDate(formatToday())}
                       className="text-xs px-3 py-1.5 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
                     >
-                      今天
+                      {t("pages:BatchProcessingPage.ui.today")}
                     </button>
                     <button
                       onClick={() => {
@@ -483,7 +487,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
                       className="text-xs px-3 py-1.5 rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-1"
                     >
                       <CalendarIcon />
-                      选择日期
+                      {t("pages:BatchProcessingPage.ui.chooseDate")}
                     </button>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
@@ -530,7 +534,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
                   </div>
                   
                   <p className="text-xs text-slate-400 leading-relaxed">
-                    映射规则可在「用户配置 &rarr; 工作效率表头映射配置」中编辑
+                    {t("pages:BatchProcessingPage.ui.headerMappingHint")}
                   </p>
                 </div>
               )}
@@ -541,7 +545,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
           <section className="border-t border-slate-100 py-4 xl:border-t-0 xl:pl-5">
             <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
               <span className="text-amber-600"><AlertTriangleIcon /></span>
-              异常值检测
+              {t("pages:BatchProcessingPage.ui.anomalyDetection")}
             </div>
             <AnomalyPanel
               config={anomaly}
@@ -607,7 +611,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
             className="flex items-center gap-1.5 text-sm text-red-600 hover:text-red-700 transition-colors px-3.5 py-1.5"
           >
             <StopCircleIcon />
-            取消
+            {t("pages:BatchProcessingPage.ui.cancel")}
           </button>
         )}
       </div>
@@ -635,7 +639,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
               <div className="flex items-center gap-1.5">
                 <CheckIcon />
                 <span className="text-slate-600">
-                  成功: {summary.success_modules.join("、")}
+                  {t("pages:BatchProcessingPage.ui.success")}: {summary.success_modules.join("、")}
                 </span>
               </div>
             )}
@@ -643,7 +647,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
               <div className="flex items-center gap-1.5">
                 <XIcon />
                 <span className="text-slate-600">
-                  失败: {summary.failed_modules.join("、")}
+                  {t("pages:BatchProcessingPage.ui.failure")}: {summary.failed_modules.join("、")}
                 </span>
               </div>
             )}

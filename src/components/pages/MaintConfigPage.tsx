@@ -18,11 +18,11 @@ interface MaintClassConfig {
   reason_rules: Record<string, string>;
 }
 
-const REASON_LABELS: Record<string, string> = {
-  fault: "故障",
-  check_content: "检查内容",
-  non_fault: "非故障",
-  skip: "跳过",
+const REASON_LABEL_KEYS: Record<string, string> = {
+  fault: "pages:MaintConfigPage.ui.fault",
+  check_content: "pages:MaintConfigPage.ui.checkContent",
+  non_fault: "pages:MaintConfigPage.ui.nonFault",
+  skip: "pages:MaintConfigPage.ui.skip",
 };
 
 export function MaintConfigPage({ bridge }: { bridge: BridgeProp }) {
@@ -122,16 +122,16 @@ export function MaintConfigPage({ bridge }: { bridge: BridgeProp }) {
       {/* 操作按钮 */}
       <div className="flex items-center gap-3 flex-wrap">
         <button onClick={handleImport} disabled={loading} className={btnSecondaryClass}>
-          从 Excel 导入
+          {t("pages:MaintConfigPage.ui.importExcel")}
         </button>
         <button onClick={() => handleExportTemplate(false)} disabled={loading} className={btnSecondaryClass}>
-          导出空白模板
+          {t("pages:MaintConfigPage.ui.exportBlankTemplate")}
         </button>
         <button onClick={() => handleExportTemplate(true)} disabled={loading} className={btnSecondaryClass}>
-          导出默认配置
+          {t("pages:MaintConfigPage.ui.exportDefault")}
         </button>
         <button onClick={handleRestore} disabled={loading} className={btnSecondaryClass}>
-          恢复默认配置
+          {t("pages:MaintConfigPage.ui.restoreDefault")}
         </button>
       </div>
 
@@ -213,7 +213,7 @@ export function MaintConfigPage({ bridge }: { bridge: BridgeProp }) {
                   rule === "non_fault" ? "text-green-600" :
                   "text-amber-600"
                 }`}>
-                  {REASON_LABELS[rule] || rule}
+                  {REASON_LABEL_KEYS[rule] ? t(REASON_LABEL_KEYS[rule]) : rule}
                 </span>
               </div>
             ))}
