@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { invoke } from "@tauri-apps/api/core";
 import type { BridgeProp, BatchProgress } from "../../lib/types";
 import { useToast } from "../Toast";
@@ -43,7 +44,7 @@ function StepIndicator({ current, labels }: { current: number; labels: string[] 
             {i > 0 && <div className={`w-8 h-px mx-1 ${done ? "bg-blue-500" : "bg-slate-200"}`} />}
             <div className="flex items-center gap-1.5">
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                done ? "bg-blue-500 text-white" : active ? "bg-blue-100 text-blue-700 ring-2 ring-blue-300" : "bg-slate-100 text-slate-400"
+                done ? "bg-blue-500 text-white" : active ? "bg-blue-100 text-blue-700 ring-2 ring-blue-300" : "bg-slate-100 text-blue-700"
               }`}>{done ? "✓" : idx}</div>
               <span className={`text-xs ${active ? "text-blue-700 font-medium" : done ? "text-slate-600" : "text-slate-400"}`}>{label}</span>
             </div>
@@ -85,6 +86,7 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
   setProgress: (p: BatchProgress | null) => void;
 }) {
   const { notify } = useToast();
+  const { t } = useTranslation();
   const { initialDir } = useLastDirectory(bridge);
 
   // Clear stale progress on mount
@@ -142,7 +144,7 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
       }
     } catch (e) {
       setPreview(null);
-      notify(`预览失败: ${e}`, "error");
+      notify(t("pages:LLMLabelingPage.预览失败:$_5b95", { error: String(e) }), "error");
     } finally {
       setLoadingPreview(false);
     }
@@ -164,7 +166,7 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
         loadPreview(path, defaultSheet);
       }
     } catch (e) {
-      notify(`读取 Sheet 列表失败: ${e}`, "error");
+      notify(t("pages:LLMLabelingPage.读取Sheet列表失败:$_6a8a", { error: String(e) }), "error");
     }
   }, [bridge.call, loadPreview, notify]);
 
@@ -198,12 +200,12 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
     if (!loading || cancelling) return;
     setCancelling(true);
     // Give immediate feedback even if the native command is slow to resolve.
-    notify("正在取消...", "info");
+    notify(t("pages:LLMLabelingPage.正在取消..._deb5"), "info");
     try {
       await invoke("cancel_task");
     } catch (e) {
       setCancelling(false);
-      notify(`取消失败: ${String(e)}`, "error");
+      notify(t("pages:LLMLabelingPage.cancelError", { error: String(e) }), "error");
     }
   };
 
@@ -234,23 +236,23 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
         export_mode: exportMode,
       });
       if (res.cancelled) {
-        setError(`已取消，已完成 ${res.llm_completed} 条（可断点续跑）`);
+        setError(t("pages:LLMLabelingPage.已取消，已完成$条（可断点续跑_6ccf", { completed: res.llm_completed }));
         setStep(4);
       } else {
         setResult(res);
         setStep(4);
-        notify("LLM 标注完成", "success");
+        notify(t("pages:LLMLabelingPage.LLM标注完成_7d7a"), "success");
       }
     } catch (e) {
       const msg = String(e);
       if (msg.includes("Task cancelled") || msg.includes("cancel")) {
-        setError("已取消（可断点续跑）");
+        setError(t("pages:LLMLabelingPage.已取消（可断点续跑）_df21"));
         setStep(4);
-        notify("已取消标注任务", "info");
+        notify(t("pages:LLMLabelingPage.已取消标注任务_e3de"), "info");
       } else {
         setError(msg);
         setStep(4);
-        notify(`LLM 标注失败: ${msg}`, "error");
+        notify(t("pages:LLMLabelingPage.LLM标注失败:$_2179", { error: msg }), "error");
       }
     } finally {
       setLoading(false);
@@ -266,24 +268,24 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
     <div className="max-w-4xl mx-auto space-y-5">
       <div>
         <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-          <BotIcon /> LLM 标注
+          <BotIcon /> {t("pages:LLMLabelingPage.LLM标注_8529")}
         </h2>
-        <p className="text-sm text-slate-500 mt-0.5">对维修明细进行大模型智能分类标注</p>
+        <p className="text-sm text-slate-500 mt-0.5">{t("pages:LLMLabelingPage.对维修明细进行大模型智能分类标_1804")}</p>
       </div>
 
-      <StepIndicator current={step} labels={["选择文件", "列映射", "筛选与导出", "执行标注"]} />
+      <StepIndicator current={step} labels={["选择文件", t("pages:LLMLabelingPage.列映射_c5a2"), t("pages:LLMLabelingPage.筛选与导出_f946"), t("pages:LLMLabelingPage.执行标注_2adf")]} />
 
       {/* ── Step 1: File Selection ── */}
       <div className={`bg-white rounded-lg border p-4 ${step === 1 ? "border-blue-200" : "border-slate-200"}`}>
-        <h3 className="text-sm font-medium text-slate-700 mb-3">1. 选择文件</h3>
+        <h3 className="text-sm font-medium text-slate-700 mb-3">{t("pages:LLMLabelingPage.1.选择文件_a7e0")}</h3>
         <PathInput value={filePath} onChange={setFilePath} placeholder="选择维修明细 Excel 文件..."
           defaultPath={initialDir} onFileSelected={handleFileSelected} />
         {filePath === "" && (
-          <div className="mt-1.5 flex items-center gap-1 text-xs text-amber-600"><AlertTriangleIcon /> 请先选择输入文件</div>
+          <div className="mt-1.5 flex items-center gap-1 text-xs text-amber-600"><AlertTriangleIcon /> {t("pages:LLMLabelingPage.请先选择输入文件_b349")}</div>
         )}
         {sheets.length > 0 && (
           <div className="mt-3">
-            <label className="text-xs font-medium text-slate-500 mb-1.5 block">选择 Sheet</label>
+            <label className="text-xs font-medium text-slate-500 mb-1.5 block">{t("pages:LLMLabelingPage.选择Sheet_0313")}</label>
             <div className="flex gap-2 items-center">
               <div className="relative flex-1 max-w-xs">
                 <select value={sheetName} onChange={(e) => handleSheetChange(e.target.value)}
@@ -294,7 +296,7 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
               </div>
               <button onClick={() => filePath && sheetName && loadPreview(filePath, sheetName)}
                 disabled={!filePath || !sheetName || loadingPreview} className={`${btnSecondaryClass} text-xs`}>
-                {loadingPreview ? "加载中..." : "刷新预览"}
+                {loadingPreview ? t("pages:LLMLabelingPage.加载中..._26b5") : t("pages:LLMLabelingPage.刷新预览_3674")}
               </button>
             </div>
           </div>
@@ -307,7 +309,7 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
           </div>
         )}
         {preview && step === 1 && (
-          <button onClick={() => setStep(2)} className={`${btnPrimaryClass} mt-3`}>下一步：列映射</button>
+          <button onClick={() => setStep(2)} className={`${btnPrimaryClass} mt-3`}>{t("pages:LLMLabelingPage.下一步：列映射_d98b")}</button>
         )}
       </div>
 
@@ -315,24 +317,24 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
       {step >= 2 && (
         <div className={`bg-white rounded-lg border p-4 ${step === 2 ? "border-blue-200" : "border-slate-200"}`}>
           <h3 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
-            <ColumnsIcon /> 2. 列映射
+            <ColumnsIcon /> {t("pages:LLMLabelingPage.列映射_c5a2")}
           </h3>
-          <p className="text-xs text-slate-500 mb-3">指定各列的用途，系统已自动识别常见列名</p>
+          <p className="text-xs text-slate-500 mb-3">{t("pages:LLMLabelingPage.指定各列的用途，系统已自动识别_6af5")}</p>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">维修内容列 *</label>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">{t("pages:LLMLabelingPage.维修内容列*_635d")}</label>
               <StyledSelect value={contentCol} onChange={setContentCol} options={colOptions} />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">大类列</label>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">{t("pages:LLMLabelingPage.大类列_b1b1")}</label>
               <StyledSelect value={categoryCol} onChange={setCategoryCol} options={colOptions} />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">小类列</label>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">{t("pages:LLMLabelingPage.小类列_aa19")}</label>
               <StyledSelect value={minorCol} onChange={setMinorCol} options={colOptions} />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">分类方式列</label>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">{t("pages:LLMLabelingPage.分类方式列_4266")}</label>
               <StyledSelect value={statusCol} onChange={setStatusCol} options={colOptions} />
             </div>
           </div>
@@ -361,8 +363,8 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
             </div>
           )}
           <div className="mt-3 flex gap-2">
-            <button onClick={() => setStep(1)} className={btnSecondaryClass}>上一步</button>
-            <button onClick={() => setStep(3)} className={btnPrimaryClass}>下一步：筛选与导出</button>
+            <button onClick={() => setStep(1)} className={btnSecondaryClass}>{t("pages:LLMLabelingPage.上一步_eeb6")}</button>
+            <button onClick={() => setStep(3)} className={btnPrimaryClass}>{t("pages:LLMLabelingPage.下一步：筛选与导出_afae")}</button>
           </div>
         </div>
       )}
@@ -371,7 +373,7 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
       {step >= 3 && (
         <div className={`bg-white rounded-lg border p-4 ${step === 3 ? "border-blue-200" : "border-slate-200"}`}>
           <h3 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
-            <FilterIcon /> 3. 筛选与导出
+            <FilterIcon /> {t("pages:LLMLabelingPage.筛选与导出_f946")}
           </h3>
 
           {/* Filter values */}
@@ -379,17 +381,17 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
             <label className="text-xs font-medium text-slate-500 mb-1.5 block">
               用于 LLM 标注的「{statusCol}」值
             </label>
-            <p className="text-xs text-slate-400 mb-2">只有分类方式匹配这些值的记录会被发送给 LLM 标注，留空则标注所有记录</p>
+            <p className="text-xs text-slate-400 mb-2">{t("pages:LLMLabelingPage.只有分类方式匹配这些值的记录会_dd90")}</p>
             <div className="flex gap-2 mb-2">
               <input type="text" value={filterInput} onChange={(e) => setFilterInput(e.target.value)}
-                placeholder='输入值，如"待确认"，多个用逗号分隔'
+                placeholder={t("pages:LLMLabelingPage.输入值，如\"待确认\"，多个用逗_b48c")}
                 className={`${inputClass} flex-1`}
                 onKeyDown={(e) => e.key === "Enter" && handleAddFilter()} />
               <button onClick={handleAddFilter} className={btnSecondaryClass}>添加</button>
             </div>
             {statusValues.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
-                <span className="text-xs text-slate-400">检测到的值：</span>
+                <span className="text-xs text-slate-400">{t("pages:LLMLabelingPage.检测到的值：_b82c")}</span>
                 {statusValues.map((v) => (
                   <button key={v} onClick={() => {
                     if (!filterValues.includes(v)) setFilterValues((prev) => [...prev, v]);
@@ -411,35 +413,35 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
                   <button onClick={() => handleRemoveFilter(v)} className="text-blue-400 hover:text-blue-600">&times;</button>
                 </span>
               ))}
-              {filterValues.length === 0 && <span className="text-xs text-slate-400">将标注所有记录</span>}
+              {filterValues.length === 0 && <span className="text-xs text-slate-400">{t("pages:LLMLabelingPage.将标注所有记录_a7f5")}</span>}
             </div>
           </div>
 
           {/* Export mode */}
           <div>
-            <label className="text-xs font-medium text-slate-500 mb-1.5 block">导出方式</label>
+            <label className="text-xs font-medium text-slate-500 mb-1.5 block">{t("pages:LLMLabelingPage.导出方式_8441")}</label>
             <div className="space-y-2">
               <label className="flex items-start gap-2.5 cursor-pointer p-2 rounded-md border border-slate-200 hover:border-blue-200 transition-colors">
                 <input type="radio" name="export" value="details" checked={exportMode === "details"}
                   onChange={() => setExportMode("details")} className="mt-0.5" />
                 <div>
-                  <span className="text-sm text-slate-700 font-medium">导出标注明细</span>
-                  <p className="text-xs text-slate-500 mt-0.5">只输出标注后的维修明细 Excel（含 LLM 大类、小类、置信度、理由列）</p>
+                  <span className="text-sm text-slate-700 font-medium">{t("pages:LLMLabelingPage.导出标注明细_3cc6")}</span>
+                  <p className="text-xs text-slate-500 mt-0.5">{t("pages:LLMLabelingPage.只输出标注后的维修明细Exce_78bf")}</p>
                 </div>
               </label>
               <label className="flex items-start gap-2.5 cursor-pointer p-2 rounded-md border border-slate-200 hover:border-blue-200 transition-colors">
                 <input type="radio" name="export" value="statistics" checked={exportMode === "statistics"}
                   onChange={() => setExportMode("statistics")} className="mt-0.5" />
                 <div>
-                  <span className="text-sm text-slate-700 font-medium">导出汇总统计</span>
-                  <p className="text-xs text-slate-500 mt-0.5">输出包含维修明细 + 按大类/小类/设备/月份统计的完整报告</p>
+                  <span className="text-sm text-slate-700 font-medium">{t("pages:LLMLabelingPage.导出汇总统计_8995")}</span>
+                  <p className="text-xs text-slate-500 mt-0.5">{t("pages:LLMLabelingPage.输出包含维修明细+按大类/小类_7a97")}</p>
                 </div>
               </label>
             </div>
           </div>
 
           <div className="mt-4 flex gap-2">
-            <button onClick={() => setStep(2)} className={btnSecondaryClass}>上一步</button>
+            <button onClick={() => setStep(2)} className={btnSecondaryClass}>{t("pages:LLMLabelingPage.上一步_eeb6")}</button>
             <button onClick={handleExecute} disabled={loading || !filePath}
               className={`${btnPrimaryClass} flex items-center gap-2`}>
               {loading ? (
@@ -451,13 +453,13 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
                   标注中...
                 </>
               ) : (
-                <><PlayIcon /> 开始标注</>
+                <><PlayIcon /> {t("pages:LLMLabelingPage.开始标注_7107")}</>
               )}
             </button>
             {loading && (
               <button onClick={handleCancel} disabled={cancelling} aria-busy={cancelling}
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">
-                {cancelling ? "取消中..." : "取消"}
+                {cancelling ? t("pages:LLMLabelingPage.取消中..._e2a0") : t("pages:LLMLabelingPage.取消_625f")}
               </button>
             )}
           </div>
@@ -467,7 +469,7 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
             <div className="mt-3 space-y-1.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-slate-600 font-medium">
-                  {progress.stage === "llm_labeling" ? "LLM 标注" : progress.stage}
+                  {progress.stage === "llm_labeling" ? t("pages:LLMLabelingPage.LLM标注_8529") : progress.stage}
                 </span>
                 <span className="text-slate-500 tabular-nums">
                   {progress.current}/{progress.total} 条 ({progress.percent}%)
@@ -490,7 +492,7 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
       {/* ── Step 4: Results ── */}
       {step >= 4 && (
         <div className={`bg-white rounded-lg border p-4 ${result ? "border-emerald-200" : error ? "border-red-200" : "border-slate-200"}`}>
-          <h3 className="text-sm font-medium text-slate-700 mb-3">4. 标注结果</h3>
+          <h3 className="text-sm font-medium text-slate-700 mb-3">{t("pages:LLMLabelingPage.4.标注结果_14d1")}</h3>
           {result && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 rounded-md px-3 py-2">
@@ -507,7 +509,7 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
                   <p className="text-slate-800 font-medium text-lg">{result.target_rows}</p>
                 </div>
                 <div className="bg-blue-50 rounded-md px-3 py-2">
-                  <span className="text-blue-600">LLM 标注成功</span>
+                  <span className="text-blue-600">{t("pages:LLMLabelingPage.LLM标注成功_f4ed")}</span>
                   <p className="text-blue-800 font-medium text-lg">{result.llm_completed}</p>
                 </div>
                 <div className="bg-amber-50 rounded-md px-3 py-2">

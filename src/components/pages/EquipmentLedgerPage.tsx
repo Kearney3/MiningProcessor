@@ -1,4 +1,5 @@
 import { LedgerPage, type LedgerPageConfig } from "./LedgerPage";
+import { useTranslation } from "react-i18next";
 import type { BridgeProp } from "../../lib/types";
 
 const IconTruck = () => (
@@ -34,5 +35,21 @@ const config: LedgerPageConfig = {
 };
 
 export function EquipmentLedgerPage({ bridge }: { bridge: BridgeProp }) {
-  return <LedgerPage bridge={bridge} config={config} />;
+  const { t } = useTranslation();
+
+  const translatedConfig: LedgerPageConfig = {
+    ...config,
+    title: t("pages:EquipmentLedgerPage.设备台账_e6a7"),
+    standardColumns: [
+      t("pages:EquipmentLedgerPage.设备名称_9f69"),
+      t("pages:EquipmentLedgerPage.设备编号_cf05"),
+      t("pages:EquipmentLedgerPage.公司_4171"),
+      t("pages:EquipmentLedgerPage.标准设备名称_7494"),
+      t("pages:EquipmentLedgerPage.标准设备编号_d45a"),
+      t("pages:EquipmentLedgerPage.标准公司名称_907e"),
+    ],
+    emptyMessage: t("pages:EquipmentLedgerPage.暂无设备台账数据，请先导入设备_ccd7"),
+  };
+
+  return <LedgerPage bridge={bridge} config={translatedConfig} />;
 }

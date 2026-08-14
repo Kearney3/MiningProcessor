@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ChevronDownIcon,
   SaveIcon,
@@ -71,6 +72,7 @@ export function ActionButtons({
   onExtra?: () => void;
   extraLabel?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex gap-2 flex-wrap mt-4 pt-3 border-t border-slate-100">
       <button
@@ -81,7 +83,7 @@ export function ActionButtons({
         }`}
       >
         <SaveIcon />
-        {saving ? "保存中..." : "保存"}
+        {saving ? t("userConfig:_shared.保存中..._2a33") : t("userConfig:_shared.保存_be5f")}
       </button>
       <button
         onClick={onReload}
@@ -150,6 +152,7 @@ export function KeywordChipInput({
   placeholder: string;
   onChange: (items: string[]) => void;
 }) {
+  const { t } = useTranslation();
   const [inputValue, setInputValue] = useState("");
 
   const addItem = () => {
@@ -179,7 +182,7 @@ export function KeywordChipInput({
             key={`${kw}-${i}`}
             className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-sky-50 text-sky-700 cursor-pointer hover:bg-sky-100 transition-colors"
             onClick={() => removeItem(i)}
-            title="点击删除"
+            title={t("userConfig:_shared.点击删除_4239")}
           >
             {kw}
             <svg className="w-3 h-3 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -201,7 +204,7 @@ export function KeywordChipInput({
           type="button"
           onClick={addItem}
           className="btn btn-ghost px-2 text-teal-600 hover:text-teal-700"
-          title="添加关键字"
+          title={t("userConfig:_shared.添加关键字_f1cc")}
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />

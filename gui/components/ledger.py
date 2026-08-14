@@ -5,15 +5,16 @@ import func.equipment_ledger as equipment_ledger
 from func.equipment_ledger import LEDGER_COLUMNS
 
 from .ledger_base import LedgerConfig, create_ledger_section_factory
+from gui.i18n import t
 
 
 _LEDGER_STANDARD_COLS = [
-    ("设备名称", "设备的原始名称（用于匹配）"),
-    ("设备编号", "设备的原始编号"),
-    ("公司", "设备所属公司"),
-    ("标准设备名称", "标准化后的设备名称"),
-    ("标准设备编号", "标准化后的设备编号"),
-    ("标准公司名称", "标准化后的公司名称"),
+    ("设备名称", t("components:ledger.设备的原始名称（用于匹配）_9a53")),
+    ("设备编号", t("components:ledger.设备的原始编号_502f")),
+    ("公司", t("components:ledger.设备所属公司_a154")),
+    ("标准设备名称", t("components:ledger.标准化后的设备名称_deab")),
+    ("标准设备编号", t("components:ledger.标准化后的设备编号_f5ca")),
+    ("标准公司名称", t("components:ledger.标准化后的公司名称_8559")),
 ]
 
 
@@ -22,12 +23,12 @@ def create_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
     from func import config_loader
 
     cfg = LedgerConfig(
-        section_title="设备台账",
-        label_prefix="台账",
+        section_title=t("components:ledger.设备台账_e6a7"),
+        label_prefix=t("components:ledger.台账_4d78"),
         empty_icon=ft.Icons.INVENTORY_2_OUTLINED,
-        empty_text="暂无设备台账数据",
-        template_filename="设备台账模板.xlsx",
-        dialog_title="导入设备台账",
+        empty_text=t("components:ledger.暂无设备台账数据_b7fb"),
+        template_filename=t("components:ledger.设备台账模板.xlsx_f258"),
+        dialog_title=t("components:ledger.导入设备台账_ecdf"),
         dialog_height=400,
         backend_module=equipment_ledger,
         backend_class_name="EquipmentLedger",

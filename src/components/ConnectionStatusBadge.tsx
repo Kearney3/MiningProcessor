@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { BridgeInfo, ConnectionLog, ConnectionStatus } from "../lib/types";
 
 interface ConnectionStatusBadgeProps {
@@ -11,26 +12,26 @@ interface ConnectionStatusBadgeProps {
 
 const STATUS_CONFIG: Record<
   ConnectionStatus,
-  { dot: string; label: string; ring: string }
+  { dot: string; labelKey: string; ring: string }
 > = {
   connecting: {
     dot: "bg-amber-400 animate-pulse",
-    label: "连接中...",
+    labelKey: "components:ConnectionStatusBadge.连接中..._afbc",
     ring: "ring-amber-100",
   },
   connected: {
     dot: "bg-green-500",
-    label: "已连接",
+    labelKey: "components:ConnectionStatusBadge.已连接_c5ea",
     ring: "ring-green-50",
   },
   disconnected: {
     dot: "bg-red-500",
-    label: "已断开",
+    labelKey: "components:ConnectionStatusBadge.已断开_3842",
     ring: "ring-red-50",
   },
   error: {
     dot: "bg-red-500",
-    label: "错误",
+    labelKey: "components:ConnectionStatusBadge.错误_7030",
     ring: "ring-red-50",
   },
 };
@@ -49,6 +50,7 @@ export function ConnectionStatusBadge({
   bridgeInfo,
   onReconnect,
 }: ConnectionStatusBadgeProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const cfg = STATUS_CONFIG[status];
@@ -69,27 +71,28 @@ export function ConnectionStatusBadge({
     <div ref={containerRef} className="relative">
       {/* Badge 触发器 */}
       <button
+        type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-haspopup="dialog"
         className="flex min-h-8 items-center gap-1.5 cursor-pointer rounded-md px-2 hover:bg-slate-50 transition-colors"
       >
         <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-        <span className="text-xs text-slate-500">{cfg.label}</span>
+        <span className="text-xs text-slate-500">{t(cfg.labelKey)}</span>
       </button>
 
       {/* Popover 浮层 */}
       {open && (
         <div
           role="dialog"
-          aria-label="处理引擎连接状态"
+          aria-label={t("components:ConnectionStatusBadge.处理引擎连接状态_4d38")}
           className={`absolute top-full left-0 mt-1.5 w-80 bg-white rounded-lg shadow-lg border border-slate-200 z-50 ring-1 ${cfg.ring}`}
         >
           {/* 状态头部 */}
           <div className="px-3.5 py-2.5 border-b border-slate-100">
             <div className="flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full ${cfg.dot}`} />
-              <span className="text-sm font-medium text-slate-700">{cfg.label}</span>
+              <span className="text-sm font-medium text-slate-700">{t(cfg.labelKey)}</span>
             </div>
 
             {/* 桥接信息 */}
@@ -97,7 +100,8 @@ export function ConnectionStatusBadge({
               <div className="mt-1.5 space-y-0.5 text-xs text-slate-500">
                 {bridgeInfo.mode && (
                   <div>
-                    模式: <span className="text-slate-700">{bridgeInfo.mode}</span>
+                    {t("components:ConnectionStatusBadge.mode")}:{" "}
+                    <span className="text-slate-700">{bridgeInfo.mode}</span>
                   </div>
                 )}
                 {bridgeInfo.pid != null && (
@@ -107,7 +111,8 @@ export function ConnectionStatusBadge({
                 )}
                 {bridgeInfo.command && (
                   <div className="truncate" title={bridgeInfo.command}>
-                    命令: <span className="font-mono text-slate-700">{bridgeInfo.command}</span>
+                    {t("components:ConnectionStatusBadge.command")}:{" "}
+                    <span className="font-mono text-slate-700">{bridgeInfo.command}</span>
                   </div>
                 )}
               </div>
@@ -125,7 +130,7 @@ export function ConnectionStatusBadge({
           <div className="max-h-48 overflow-y-auto thin-scrollbar">
             {logs.length === 0 ? (
               <div className="px-3.5 py-4 text-center text-xs text-slate-400">
-                暂无连接日志
+                {t("components:ConnectionStatusBadge.noLogs")}
               </div>
             ) : (
               <div className="px-3.5 py-1.5">
@@ -149,13 +154,14 @@ export function ConnectionStatusBadge({
           {status !== "connected" && (
             <div className="px-3.5 py-2 border-t border-slate-100">
               <button
+                type="button"
                 onClick={() => {
                   onReconnect();
                 }}
                 disabled={status === "connecting"}
                 className="w-full text-xs px-3 py-1.5 rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {status === "connecting" ? "正在连接..." : "重新连接"}
+                {status === "connecting" ? t("components:ConnectionStatusBadge.正在连接..._37eb") : t("components:ConnectionStatusBadge.重新连接_671b")}
               </button>
             </div>
           )}

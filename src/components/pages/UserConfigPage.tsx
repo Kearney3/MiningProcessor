@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import type { BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
 import {
@@ -27,6 +28,7 @@ function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-lg shadow-xl max-w-sm w-full mx-4 p-5">
@@ -50,7 +52,7 @@ function ConfirmDialog({
             onClick={onConfirm}
             className="px-3 py-1.5 text-xs text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
           >
-            确认还原
+            {t("pages:UserConfigPage.确认还原_f1bf")}
           </button>
         </div>
       </div>
@@ -64,6 +66,7 @@ function ConfirmDialog({
 
 export function UserConfigPage({ bridge }: { bridge: BridgeProp }) {
   const { notify } = useToast();
+  const { t } = useTranslation();
   const [resetKey, setResetKey] = useState(0);
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -71,9 +74,9 @@ export function UserConfigPage({ bridge }: { bridge: BridgeProp }) {
     try {
       await bridge.call("reset_user_config");
       setResetKey((k) => k + 1);
-      notify("已还原所有用户配置为默认值", "success");
+      notify(t("pages:UserConfigPage.已还原所有用户配置为默认值_c205"), "success");
     } catch (e) {
-      notify(`还原失败: ${e}`, "error");
+      notify(t("pages:UserConfigPage.还原失败:$_5a84", { error: String(e) }), "error");
     }
     setShowConfirm(false);
   }, [bridge.call, notify]);
@@ -82,15 +85,15 @@ export function UserConfigPage({ bridge }: { bridge: BridgeProp }) {
     <div>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h2 className="text-base font-semibold text-slate-800">用户配置</h2>
-          <p className="text-xs text-slate-500 mt-0.5">管理与业务处理无关的个人偏好设置</p>
+          <h2 className="text-base font-semibold text-slate-800">{t("pages:UserConfigPage.用户配置_dd1e")}</h2>
+          <p className="text-xs text-slate-500 mt-0.5">{t("pages:UserConfigPage.管理与业务处理无关的个人偏好设_a426")}</p>
         </div>
         <button
           onClick={() => setShowConfirm(true)}
           className="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-700 px-3 py-1.5 rounded-md border border-red-200 hover:bg-red-50 transition-colors"
         >
           <RestoreIcon />
-          还原为默认配置
+          {t("pages:UserConfigPage.restoreDefault")}
         </button>
       </div>
 
@@ -106,8 +109,8 @@ export function UserConfigPage({ bridge }: { bridge: BridgeProp }) {
 
       {showConfirm && (
         <ConfirmDialog
-          title="确认还原"
-          message={"将清除所有用户自定义配置，恢复为系统默认值。\n此操作不可撤销，是否继续？"}
+          title={t("pages:UserConfigPage.确认还原_f1bf")}
+          message={t("pages:UserConfigPage.将清除所有用户自定义配置，恢复_7bee")}
           onConfirm={handleResetAll}
           onCancel={() => setShowConfirm(false)}
         />

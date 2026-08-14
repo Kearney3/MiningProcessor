@@ -1,4 +1,5 @@
 import { LedgerPage, type LedgerPageConfig } from "./LedgerPage";
+import { useTranslation } from "react-i18next";
 import type { BridgeProp } from "../../lib/types";
 
 const IconDroplet = () => (
@@ -30,5 +31,17 @@ const config: LedgerPageConfig = {
 };
 
 export function OilLedgerPage({ bridge }: { bridge: BridgeProp }) {
-  return <LedgerPage bridge={bridge} config={config} />;
+  const { t } = useTranslation();
+
+  const translatedConfig: LedgerPageConfig = {
+    ...config,
+    title: t("pages:OilLedgerPage.油品台账_53fa"),
+    standardColumns: [
+      t("pages:OilLedgerPage.油品名称_4031"),
+      t("pages:OilLedgerPage.标准油品名称_d013"),
+    ],
+    emptyMessage: t("pages:OilLedgerPage.暂无油品台账数据，请先导入油品_ea21"),
+  };
+
+  return <LedgerPage bridge={bridge} config={translatedConfig} />;
 }

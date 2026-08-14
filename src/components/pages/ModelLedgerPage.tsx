@@ -1,4 +1,5 @@
 import { LedgerPage, type LedgerPageConfig } from "./LedgerPage";
+import { useTranslation } from "react-i18next";
 import type { BridgeProp } from "../../lib/types";
 
 const IconModel = () => (
@@ -26,6 +27,22 @@ const config: LedgerPageConfig = {
 };
 
 export function ModelLedgerPage({ bridge }: { bridge: BridgeProp }) {
-  return <LedgerPage bridge={bridge} config={config} />;
+  const { t } = useTranslation();
+
+  const translatedConfig: LedgerPageConfig = {
+    ...config,
+    title: t("pages:ModelLedgerPage.型号台账_3e0b"),
+    standardColumns: [
+      t("pages:ModelLedgerPage.标准设备编号_d45a"),
+      t("pages:ModelLedgerPage.标准公司名称_907e"),
+      t("pages:ModelLedgerPage.所有权_ed84"),
+      t("pages:ModelLedgerPage.设备型号_5858"),
+      t("pages:ModelLedgerPage.设备类型_02f4"),
+      t("pages:ModelLedgerPage.内部分类_b310"),
+    ],
+    emptyMessage: t("pages:ModelLedgerPage.暂无型号台账数据，请先导入型号_2bfc"),
+  };
+
+  return <LedgerPage bridge={bridge} config={translatedConfig} />;
 }
 

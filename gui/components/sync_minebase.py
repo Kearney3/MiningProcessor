@@ -18,6 +18,7 @@ from .common import (
     month_options,
 )
 from func.time_utils import local_today
+from gui.i18n import t
 
 try:
     from . import theme
@@ -38,15 +39,15 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     # --- 目录路径 ---
     sync_path = ft.TextField(
-        label="输出目录",
-        hint_text="选择 MiningProcessor 输出目录...",
+        label=t("components:sync_minebase.输出目录_0d81"),
+        hint_text=t("components:sync_minebase.选择MiningProcess_3a7d"),
         expand=True,
         read_only=False,
         color=theme.TEXT_PRIMARY,
         value=_get_initial_directory(),
         suffix=ft.IconButton(
             icon=ft.Icons.FOLDER_OPEN,
-            tooltip="浏览",
+            tooltip=t("components:sync_minebase.浏览_9c5c"),
         ),
     )
 
@@ -56,7 +57,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     page.services.append(_save_warnings_picker)
 
     async def on_browse(e):
-        result = await _browse_picker.get_directory_path(dialog_title="选择输出目录")
+        result = await _browse_picker.get_directory_path(dialog_title=t("components:sync_minebase.选择输出目录_c690"))
         if result:
             sync_path.value = result
             _update_last_directory(result, is_dir=True)
@@ -67,13 +68,13 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     # --- 同步模式 ---
     mode_toggle = ChipToggle(
-        options=[("api", "API 模式"), ("database", "直连数据库")],
+        options=[("api", t("components:sync_minebase.API模式_6169")), ("database", t("components:sync_minebase.直连数据库_8b9a"))],
         initial=get_minebase_mode(),
     )
 
     # --- 冲突策略 ---
     conflict_policy = ChipToggle(
-        options=[("SKIP", "跳过重复"), ("UPDATE", "覆盖更新"), ("REJECT", "拒绝全部")],
+        options=[("SKIP", t("components:sync_minebase.跳过重复_5cd1")), ("UPDATE", t("components:sync_minebase.覆盖更新_db4f")), ("REJECT", t("components:sync_minebase.拒绝全部_ecc4"))],
         initial="SKIP",
     )
 
@@ -87,7 +88,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         )
 
     select_all = ft.Checkbox(
-        label="全选",
+        label=t("components:sync_minebase.全选_66ee"),
         value=True,
         active_color=theme.PRIMARY,
     )
@@ -109,56 +110,56 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     # --- 预览模式 ---
     dry_run_check = ft.Checkbox(
-        label="预览模式（不实际推送）",
+        label=t("components:sync_minebase.预览模式（不实际推送）_bb8f"),
         value=False,
         active_color=theme.PRIMARY,
     )
 
     # --- 工时表头映射 & 台账匹配 ---
     _sync_hmc = HeaderModeConfig(
-        label="应用工时表头映射",
-        tooltip="对工作效率表应用列名映射配置",
+        label=t("components:sync_minebase.应用工时表头映射_e047"),
+        tooltip=t("components:sync_minebase.对工作效率表应用列名映射配置_0b8b"),
     )
 
     equipment_ledger_check = ft.Checkbox(
-        label="设备台账匹配",
+        label=t("components:sync_minebase.设备台账匹配_5a23"),
         value=False,
         active_color=theme.PRIMARY,
-        tooltip="使用设备台账标准化设备名称",
+        tooltip=t("components:sync_minebase.使用设备台账标准化设备名称_f03f"),
     )
     oil_ledger_check = ft.Checkbox(
-        label="油品台账匹配",
+        label=t("components:sync_minebase.油品台账匹配_8663"),
         value=True,
         active_color=theme.PRIMARY,
-        tooltip="使用油品台账标准化油品名称",
+        tooltip=t("components:sync_minebase.使用油品台账标准化油品名称_3659"),
     )
     skip_hidden_rows_check = ft.Checkbox(
-        label="跳过隐藏行",
+        label=t("components:sync_minebase.跳过隐藏行_bc25"),
         value=True,
         active_color=theme.PRIMARY,
-        tooltip="勾选后，Excel 中被隐藏的行将不会被读取",
+        tooltip=t("components:sync_minebase.勾选后，Excel中被隐藏的行_ecd7"),
     )
     skip_hidden_cols_check = ft.Checkbox(
-        label="跳过隐藏列",
+        label=t("components:sync_minebase.跳过隐藏列_3ed3"),
         value=False,
         active_color=theme.PRIMARY,
-        tooltip="勾选后，Excel 中被隐藏的列将不会被读取",
+        tooltip=t("components:sync_minebase.勾选后，Excel中被隐藏的列_398b"),
     )
 
     # --- 过滤开关 ---
-    filter_zero_hours = ft.Checkbox(label="过滤零小时数", value=True, active_color=theme.PRIMARY)
-    filter_zero_work_hours = ft.Checkbox(label="过滤零运行小时数", value=False, active_color=theme.PRIMARY)
-    filter_zero_hours_meter = ft.Checkbox(label="过滤零小时仪表", value=True, active_color=theme.PRIMARY)
-    filter_zero_km_meter = ft.Checkbox(label="过滤零公里仪表", value=True, active_color=theme.PRIMARY)
-    filter_zero_run_hours = ft.Checkbox(label="过滤零运行小时数", value=False, active_color=theme.PRIMARY)
-    filter_zero_run_km = ft.Checkbox(label="过滤零运行里程", value=False, active_color=theme.PRIMARY)
+    filter_zero_hours = ft.Checkbox(label=t("components:sync_minebase.过滤零小时数_549f"), value=True, active_color=theme.PRIMARY)
+    filter_zero_work_hours = ft.Checkbox(label=t("components:sync_minebase.过滤零运行小时数_eaf1"), value=False, active_color=theme.PRIMARY)
+    filter_zero_hours_meter = ft.Checkbox(label=t("components:sync_minebase.过滤零小时仪表_99e8"), value=True, active_color=theme.PRIMARY)
+    filter_zero_km_meter = ft.Checkbox(label=t("components:sync_minebase.过滤零公里仪表_2e3c"), value=True, active_color=theme.PRIMARY)
+    filter_zero_run_hours = ft.Checkbox(label=t("components:sync_minebase.过滤零运行小时数_eaf1"), value=False, active_color=theme.PRIMARY)
+    filter_zero_run_km = ft.Checkbox(label=t("components:sync_minebase.过滤零运行里程_d55d"), value=False, active_color=theme.PRIMARY)
 
     # --- 异常值检测 ---
     _anomaly = create_anomaly_controls()
 
     # --- 年份/月份 ---
     year_dropdown = ft.Dropdown(
-        label="年份",
+        label=t("components:sync_minebase.年份_8f30"),
         options=_YEAR_OPTIONS,
         value=str(local_today().year),
         width=120,
@@ -166,7 +167,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     )
 
     month_dropdown = ft.Dropdown(
-        label="月份",
+        label=t("components:sync_minebase.月份_8190"),
         options=_MONTH_OPTIONS,
         value=str(local_today().month),
         width=100,
@@ -175,8 +176,8 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     # --- 表头起始行 ---
     header_row_field = ft.TextField(
-        label="表头起始行",
-        hint_text="自动检测",
+        label=t("components:sync_minebase.表头起始行_7c63"),
+        hint_text=t("components:sync_minebase.自动检测_ac65"),
         width=120,
         dense=True,
         keyboard_type=ft.KeyboardType.NUMBER,
@@ -187,10 +188,10 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     yesterday = today - timedelta(days=1)
 
     date_filter_check = ft.Checkbox(
-        label="日期范围过滤",
+        label=t("components:sync_minebase.日期范围过滤_a6a9"),
         value=True,
         active_color=theme.PRIMARY,
-        tooltip="开启后只同步所选日期范围内的数据",
+        tooltip=t("components:sync_minebase.开启后只同步所选日期范围内的数_d174"),
     )
 
     class _DateValue:
@@ -209,8 +210,8 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     )
 
     def _update_displays():
-        _start_display.value = _date_start_val.value or "未设置"
-        _end_display.value = _date_end_val.value or "未设置"
+        _start_display.value = _date_start_val.value or t("components:sync_minebase.未设置_fe2d")
+        _end_display.value = _date_end_val.value or t("components:sync_minebase.未设置_fe2d")
         try:
             _start_display.update()
             _end_display.update()
@@ -237,12 +238,12 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         return _on_pick
 
     _pick_start_btn = theme.secondary_btn(
-        "选择", icon=ft.Icons.CALENDAR_MONTH, height=32,
+        t("components:sync_minebase.选择_153f"), icon=ft.Icons.CALENDAR_MONTH, height=32,
     )
     _pick_start_btn.on_click = _make_on_pick(_date_start_val)
 
     _pick_end_btn = theme.secondary_btn(
-        "选择", icon=ft.Icons.CALENDAR_MONTH, height=32,
+        t("components:sync_minebase.选择_153f"), icon=ft.Icons.CALENDAR_MONTH, height=32,
     )
     _pick_end_btn.on_click = _make_on_pick(_date_end_val)
 
@@ -252,7 +253,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         _update_displays()
 
     yesterday_btn = ft.Button(
-        "昨日",
+        t("components:sync_minebase.昨日_23c9"),
         icon=ft.Icons.CALENDAR_TODAY,
         on_click=on_yesterday_click,
         style=ft.ButtonStyle(
@@ -266,7 +267,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         _update_displays()
 
     clear_date_btn = ft.Button(
-        "清除",
+        t("components:sync_minebase.清除_4403"),
         icon=ft.Icons.CLEAR_ALL,
         on_click=on_clear_date,
         style=ft.ButtonStyle(
@@ -277,11 +278,11 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     date_range_row = ft.ResponsiveRow(
         [
             ft.Container(
-                ft.Row([ft.Text("起始", size=12, color=theme.TEXT_SECONDARY), _start_display, _pick_start_btn], spacing=6),
+                ft.Row([ft.Text(t("components:sync_minebase.起始_859e"), size=12, color=theme.TEXT_SECONDARY), _start_display, _pick_start_btn], spacing=6),
                 col={"xs": 12, "md": 6},
             ),
             ft.Container(
-                ft.Row([ft.Text("结束", size=12, color=theme.TEXT_SECONDARY), _end_display, _pick_end_btn], spacing=6),
+                ft.Row([ft.Text(t("components:sync_minebase.结束_12f1"), size=12, color=theme.TEXT_SECONDARY), _end_display, _pick_end_btn], spacing=6),
                 col={"xs": 12, "md": 6},
             ),
             ft.Container(
@@ -305,7 +306,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     date_filter_check.on_change = _on_date_filter_toggle
 
     # --- 同步按钮 ---
-    sync_btn = theme.primary_btn("同步到 MineBase", icon=ft.Icons.CLOUD_UPLOAD)
+    sync_btn = theme.primary_btn(t("components:sync_minebase.同步到MineBase_59e0"), icon=ft.Icons.CLOUD_UPLOAD)
 
     # --- 结果显示 ---
     result_text = ft.Text(
@@ -317,7 +318,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     # --- 异常行表格 ---
     warnings_count_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
-    export_warnings_btn = theme.secondary_btn("导出 Excel", icon=ft.Icons.DOWNLOAD, height=28)
+    export_warnings_btn = theme.secondary_btn(t("components:sync_minebase.导出Excel_7d57"), icon=ft.Icons.DOWNLOAD, height=28)
     warnings_list = ft.Column([], spacing=2, scroll=ft.ScrollMode.AUTO, height=200)
     warnings_container = ft.Container(
         visible=False,
@@ -326,7 +327,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
                 ft.Row(
                     [
                         ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED, color=theme.WARNING, size=16),
-                        ft.Text("异常行", size=13, weight=ft.FontWeight.W_500, color=theme.WARNING),
+                        ft.Text(t("components:sync_minebase.异常行_6c1c"), size=13, weight=ft.FontWeight.W_500, color=theme.WARNING),
                         warnings_count_text,
                         ft.Container(expand=True),
                         export_warnings_btn,
@@ -355,14 +356,14 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     container = ft.Container(
         content=ft.Column(
             [
-                theme.section_title("MineBase 数据同步"),
+                theme.section_title(t("components:sync_minebase.MineBase数据同步_cf2d")),
 
                 # ── 目录 + 同步模式 + 冲突策略 ──
                 theme.module_card([
                     ft.Row([sync_path], spacing=8),
                     mode_toggle.row,
                     conflict_policy.row,
-                ], label="目录与模式"),
+                ], label=t("components:sync_minebase.目录与模式_b3cf")),
 
                 # ── 日期参数 ──
                 theme.module_card([
@@ -376,12 +377,12 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
                     ),
                     date_filter_check,
                     date_range_row,
-                ], label="日期参数"),
+                ], label=t("components:sync_minebase.日期参数_6ee8")),
 
                 # ── 数据类型 ──
                 theme.module_card([
                     type_row,
-                ], label="数据类型"),
+                ], label=t("components:sync_minebase.数据类型_185f")),
 
                 # ── 处理选项 ──
                 theme.module_card([
@@ -397,11 +398,11 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
                         ],
                         run_spacing=4,
                     ),
-                ], label="处理选项"),
+                ], label=t("components:sync_minebase.处理选项_6ad1")),
 
                 # ── 数据过滤 ──
                 theme.module_card([
-                    ft.Text("油耗处理", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                    ft.Text(t("components:sync_minebase.油耗处理_1a41"), size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
                     ft.ResponsiveRow(
                         [
                             ft.Container(filter_zero_hours, col={"xs": 6}),
@@ -410,7 +411,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
                         run_spacing=4,
                     ),
                     ft.Divider(height=1, color=theme.BORDER),
-                    ft.Text("生产数据", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                    ft.Text(t("components:sync_minebase.生产数据_9fb6"), size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
                     ft.ResponsiveRow(
                         [
                             ft.Container(filter_zero_hours_meter, col={"xs": 6}),
@@ -420,12 +421,12 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
                         ],
                         run_spacing=4,
                     ),
-                ], label="数据过滤"),
+                ], label=t("components:sync_minebase.数据过滤_8626")),
 
                 # ── 异常值检测 ──
                 theme.module_card([
                     _anomaly["container"],
-                ], label="异常值检测"),
+                ], label=t("components:sync_minebase.异常值检测_699f")),
 
                 # ── 操作 + 结果 ──
                 ft.Row(

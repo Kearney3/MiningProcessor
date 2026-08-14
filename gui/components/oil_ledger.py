@@ -5,10 +5,11 @@ import func.oil_ledger as oil_ledger
 from func.oil_ledger import OIL_LEDGER_COLUMNS
 
 from .ledger_base import LedgerConfig, create_ledger_section_factory
+from gui.i18n import t
 
 
 _OIL_LEDGER_STANDARD_COLS = [
-    ("油品名称", "油品的原始名称（用于匹配）"),
+    ("油品名称", t("components:oil_ledger.油品的原始名称（用于匹配）_ac7b")),
     ("标准油品名称", "标准化后的油品名称"),
 ]
 
@@ -18,12 +19,12 @@ def create_oil_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
     from func import config_loader
 
     cfg = LedgerConfig(
-        section_title="油品台账",
-        label_prefix="油品台账",
+        section_title=t("components:oil_ledger.油品台账_53fa"),
+        label_prefix=t("components:oil_ledger.油品台账_53fa"),
         empty_icon=ft.Icons.OIL_BARREL_OUTLINED,
-        empty_text="暂无油品台账数据",
-        template_filename="油品台账模板.xlsx",
-        dialog_title="导入油品台账",
+        empty_text=t("components:oil_ledger.暂无油品台账数据_bfb2"),
+        template_filename=t("components:oil_ledger.油品台账模板.xlsx_c6d2"),
+        dialog_title=t("components:oil_ledger.导入油品台账_6923"),
         dialog_height=300,
         backend_module=oil_ledger,
         backend_class_name="OilLedger",

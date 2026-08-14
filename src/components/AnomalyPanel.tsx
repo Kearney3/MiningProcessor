@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+
 export interface AnomalyConfig {
   enabled: boolean;
   report: boolean;
@@ -10,10 +12,10 @@ export const DEFAULT_ANOMALY_CONFIG: AnomalyConfig = {
   mode: "flag",
 };
 
-const MODE_OPTIONS = [
-  { label: "标记异常值", value: "flag" as const, desc: "标记但不删除" },
-  { label: "过滤异常值", value: "filter" as const, desc: "移除异常行" },
-  { label: "处理异常值", value: "handle" as const, desc: "按配置替换默认值" },
+const getModeOptions = (t: (k: string) => string) => [
+  { label: t("components:AnomalyPanel.标记异常值_11d4"), value: "flag" as const, desc: t("components:AnomalyPanel.标记但不删除_011a") },
+  { label: t("components:AnomalyPanel.过滤异常值_209e"), value: "filter" as const, desc: t("components:AnomalyPanel.移除异常行_067b") },
+  { label: t("components:AnomalyPanel.处理异常值_e5c7"), value: "handle" as const, desc: t("components:AnomalyPanel.按配置替换默认值_1db9") },
 ];
 
 export function AnomalyPanel({
@@ -25,6 +27,8 @@ export function AnomalyPanel({
   onChange: (c: AnomalyConfig) => void;
   embedded?: boolean;
 }) {
+  const { t } = useTranslation();
+  const MODE_OPTIONS = getModeOptions(t);
   return (
     <div className={embedded ? "space-y-2" : "rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2"}>
       <label className="flex items-center gap-2.5 cursor-pointer select-none">
@@ -42,7 +46,7 @@ export function AnomalyPanel({
             }`}
           />
         </button>
-        <span className="text-sm text-slate-700">启用异常值检测</span>
+        <span className="text-sm text-slate-700">{t("components:AnomalyPanel.启用异常值检测_280b")}</span>
       </label>
       {config.enabled && (
         <div className="ml-6 space-y-2">
@@ -53,10 +57,10 @@ export function AnomalyPanel({
               onChange={(e) => onChange({ ...config, report: e.target.checked })}
               className="rounded border-slate-300"
             />
-            <span className="text-sm text-slate-700">输出异常报告</span>
+            <span className="text-sm text-slate-700">{t("components:AnomalyPanel.输出异常报告_82c1")}</span>
           </label>
           <div className="flex items-center gap-2 text-sm text-slate-600">
-            <span>处理方式：</span>
+            <span>{t("components:AnomalyPanel.处理方式：_6e09")}</span>
             <div className="inline-flex rounded-md border border-slate-200 overflow-hidden">
               {MODE_OPTIONS.map((o) => (
                 <button

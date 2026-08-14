@@ -8,6 +8,7 @@ import logging
 import flet as ft
 
 from .common import _log_message
+from gui.i18n import t
 
 try:
     from . import theme
@@ -32,10 +33,10 @@ def _build_rules_display(rules: dict) -> ft.Column:
 
     # ── 统计概览 ──
     stats = [
-        (str(len(grouped)), "大类"),
-        (str(len(classifications)), "小类"),
-        (str(len(noise_exact)), "精确噪声"),
-        (str(len(noise_patterns)), "正则噪声"),
+        (str(len(grouped)), t("components:maint_config.大类_d196")),
+        (str(len(classifications)), t("components:maint_config.小类_7f69")),
+        (str(len(noise_exact)), t("components:maint_config.精确噪声_d680")),
+        (str(len(noise_patterns)), t("components:maint_config.正则噪声_bd0e")),
     ]
     stat_items = []
     for val, label in stats:
@@ -66,7 +67,7 @@ def _build_rules_display(rules: dict) -> ft.Column:
     sections.append(ft.Container(height=12))
 
     # ── 分类规则列表 ──
-    sections.append(theme.section_title("分类规则"))
+    sections.append(theme.section_title(t("components:maint_config.分类规则_be84")))
     sections.append(ft.Container(height=4))
 
     for major, entries in grouped.items():
@@ -105,7 +106,7 @@ def _build_rules_display(rules: dict) -> ft.Column:
             content=ft.Row(
                 [
                     ft.Text(major, size=13, weight=ft.FontWeight.W_600, color=theme.TEXT_PRIMARY),
-                    ft.Text(f"{len(entries)} 个小类", size=11, color=theme.TEXT_SECONDARY),
+                    ft.Text(t("components:maint_config.个小类_c614", count=len(entries)), size=11, color=theme.TEXT_SECONDARY),
                 ],
                 alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
             ),
@@ -126,10 +127,10 @@ def _build_rules_display(rules: dict) -> ft.Column:
     # ── 原因规则 ──
     if reason_rules:
         sections.append(ft.Container(height=4))
-        sections.append(theme.section_title("原因规则"))
+        sections.append(theme.section_title(t("components:maint_config.原因规则_f475")))
         sections.append(ft.Container(height=4))
 
-        _REASON_LABELS = {"fault": "故障", "check_content": "检查内容", "non_fault": "非故障", "skip": "跳过"}
+        _REASON_LABELS = {"fault": t("components:maint_config.故障_4af5"), "check_content": t("components:maint_config.检查内容_4f46"), "non_fault": t("components:maint_config.非故障_8f40"), "skip": t("components:maint_config.跳过_9263")}
         _REASON_COLORS = {"fault": ft.Colors.RED_600, "check_content": ft.Colors.AMBER_600, "non_fault": ft.Colors.GREEN_600, "skip": ft.Colors.GREY_400}
 
         reason_items: list[ft.Control] = []
@@ -163,8 +164,8 @@ def _build_desc_text() -> ft.Text:
     defs = get_default_classifications()
     num_majors = len({c["major"] for c in defs["classifications"]})
     return ft.Text(
-        "管理维修记录的故障分类规则。支持从 Excel 导入自定义配置，"
-        f"或使用系统默认的 {num_majors} 大类分类体系。",
+        t("components:maint_config.管理维修记录的故障分类规则。支_2bfc")
+        + t("components:maint_config.或使用系统默认的大类分类体系。_0702", num_majors=num_majors),
         size=13,
         color=theme.TEXT_SECONDARY,
     )
@@ -184,7 +185,7 @@ def create_maint_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]
     _num_majors = len({c["major"] for c in _defs["classifications"]})
     _num_minors = len(_defs["classifications"])
     status_text = ft.Text(
-        f"使用默认分类配置（{_num_majors} 大类 × {_num_minors} 小类）",
+        t("components:maint_config.使用默认分类配置（大类×小类）_84c0", num_majors=_num_majors, num_minors=_num_minors),
         size=13,
         color=theme.TEXT_SECONDARY,
     )
@@ -198,12 +199,12 @@ def create_maint_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]
             rules = config_loader.get_maintenance_classifications()
             count = len(rules.get("classifications", []))
             noise_count = len(rules.get("noise_exact", set())) + len(rules.get("noise_patterns", []))
-            status_text.value = f"当前配置: {count} 条分类规则, {noise_count} 条噪声规则"
+            status_text.value = t("components:maint_config.当前配置:条分类规则,条噪声规_9724", count=count, noise_count=noise_count)
             status_text.color = theme.TEXT_PRIMARY
             # 更新规则展示
             rules_container.content = _build_rules_display(rules)
         except Exception:
-            status_text.value = "使用默认分类配置"
+            status_text.value = t("components:maint_config.使用默认分类配置_b5b5")
             status_text.color = theme.TEXT_SECONDARY
         try:
             status_text.update()
@@ -214,22 +215,22 @@ def create_maint_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]
     # --- 导入 ---
     _import_picker = ft.FilePicker()
     page.services.append(_import_picker)
-    import_btn = theme.secondary_btn("从 Excel 导入", icon=ft.Icons.UPLOAD_FILE)
+    import_btn = theme.secondary_btn(t("components:maint_config.从Excel导入_83a5"), icon=ft.Icons.UPLOAD_FILE)
 
     async def _on_import_click(_):
         files = await _import_picker.pick_files(
             allowed_extensions=["xlsx", "xls"],
-            dialog_title="选择维修分类配置 Excel",
+            dialog_title=t("components:maint_config.选择维修分类配置Excel_b949"),
         )
         if not files:
             return
         filepath = files[0].path
         try:
             config_loader.import_maintenance_classifications(filepath)
-            _log_message(log, f"分类配置已从 {filepath} 导入")
+            _log_message(log, t("components:maint_config.分类配置已从导入_81ee", filepath=filepath))
             _refresh_status()
         except Exception as ex:
-            _log_message(log, f"导入失败: {ex}", level=logging.ERROR)
+            _log_message(log, t("components:maint_config.导入失败:_dfe2", ex=ex), level=logging.ERROR)
 
     import_btn.on_click = _on_import_click
 
@@ -238,23 +239,23 @@ def create_maint_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]
     page.services.append(_export_picker)
 
     async def _do_export(with_defaults: bool):
-        label = "含默认数据" if with_defaults else "空白模板"
+        label = t("components:maint_config.含默认数据_9ecb") if with_defaults else t("components:maint_config.空白模板_87bb")
         path = await _export_picker.save_file(
-            dialog_title=f"保存分类配置 ({label})",
-            file_name="维修分类配置模板.xlsx",
+            dialog_title=t("components:maint_config.保存分类配置()_742e", label=label),
+            file_name=t("components:maint_config.维修分类配置模板.xlsx_c2d8"),
             allowed_extensions=["xlsx"],
         )
         if not path:
             return
         try:
             config_loader.export_maintenance_classification_template(path, with_defaults=with_defaults)
-            _log_message(log, f"分类配置模板已导出 ({label}): {path}")
+            _log_message(log, t("components:maint_config.分类配置模板已导出():_760a", label=label, path=path))
         except Exception as ex:
-            _log_message(log, f"导出失败: {ex}", level=logging.ERROR)
+            _log_message(log, t("components:maint_config.导出失败:_0f9c", ex=ex), level=logging.ERROR)
 
-    export_template_btn = theme.secondary_btn("导出空白模板", icon=ft.Icons.FILE_DOWNLOAD)
+    export_template_btn = theme.secondary_btn(t("components:maint_config.导出空白模板_904c"), icon=ft.Icons.FILE_DOWNLOAD)
 
-    export_default_btn = theme.secondary_btn("导出默认配置", icon=ft.Icons.FILE_DOWNLOAD)
+    export_default_btn = theme.secondary_btn(t("components:maint_config.导出默认配置_f9dc"), icon=ft.Icons.FILE_DOWNLOAD)
 
     async def _on_export_template(e):
         await _do_export(with_defaults=False)
@@ -272,10 +273,10 @@ def create_maint_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]
                 from func.maintenance_classification import get_default_classifications
                 defaults = get_default_classifications()
                 config_loader.update_maintenance_classifications(defaults)
-                _log_message(log, "已恢复默认分类配置")
+                _log_message(log, t("components:maint_config.已恢复默认分类配置_f4e7"))
                 _refresh_status()
             except Exception as ex:
-                _log_message(log, f"恢复失败: {ex}", level=logging.ERROR)
+                _log_message(log, t("components:maint_config.恢复失败:_3068", ex=ex), level=logging.ERROR)
             dialog.open = False
             page.update()
 
@@ -288,25 +289,25 @@ def create_maint_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]
         num_majors = len({c["major"] for c in defs["classifications"]})
         num_minors = len(defs["classifications"])
         dialog = ft.AlertDialog(
-            title=ft.Text("确认恢复默认"),
-            content=ft.Text(f"将恢复为系统默认的 {num_majors} 大类 × {num_minors} 小类分类规则，自定义配置将丢失。"),
+            title=ft.Text(t("components:maint_config.确认恢复默认_88f2")),
+            content=ft.Text(t("components:maint_config.将恢复为系统默认的大类×小类分_dc94", num_majors=num_majors, num_minors=num_minors)),
             actions=[
-                ft.TextButton("取消", on_click=cancel),
-                ft.TextButton("确认恢复", on_click=confirm),
+                ft.TextButton(t("components:maint_config.取消_625f"), on_click=cancel),
+                ft.TextButton(t("components:maint_config.确认恢复_841e"), on_click=confirm),
             ],
         )
         page.overlay.append(dialog)
         dialog.open = True
         page.update()
 
-    restore_btn = theme.secondary_btn("恢复默认配置", icon=ft.Icons.RESTORE)
+    restore_btn = theme.secondary_btn(t("components:maint_config.恢复默认配置_3105"), icon=ft.Icons.RESTORE)
     restore_btn.on_click = on_restore
 
     # --- 布局 ---
     container = ft.Container(
         content=ft.Column(
             [
-                theme.section_title("维修分类配置"),
+                theme.section_title(t("components:maint_config.维修分类配置_4ee9")),
                 _build_desc_text(),
                 ft.Container(height=8),
                 # 状态
@@ -326,7 +327,7 @@ def create_maint_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]
                 ),
                 ft.Container(height=12),
                 # 操作按钮
-                theme.section_title("操作"),
+                theme.section_title(t("components:maint_config.操作_2b6b")),
                 ft.Container(height=4),
                 ft.Row(
                     [import_btn, export_template_btn, export_default_btn, restore_btn],
@@ -341,13 +342,13 @@ def create_maint_config_section(page: ft.Page, log) -> tuple[ft.Container, dict]
                 ft.Container(
                     content=ft.Column(
                         [
-                            ft.Text("配置说明", size=13, weight=ft.FontWeight.BOLD, color=theme.TEXT_PRIMARY),
-                            ft.Text("• 从 Excel 导入：选择包含「分类规则」「噪声过滤」「原因规则」sheet 的 Excel 文件", size=12, color=theme.TEXT_SECONDARY),
-                            ft.Text("• 导出空白模板：导出仅有表头的模板，供手动填写", size=12, color=theme.TEXT_SECONDARY),
-                            ft.Text("• 导出默认配置：导出包含系统默认分类规则的完整配置", size=12, color=theme.TEXT_SECONDARY),
-                            ft.Text("• 恢复默认配置：将当前配置重置为系统默认值", size=12, color=theme.TEXT_SECONDARY),
-                            ft.Text("• 关键词使用中文顿号「、」分隔", size=12, color=theme.TEXT_SECONDARY),
-                            ft.Text("• 分类按行顺序匹配，更具体的关键词应放在前面", size=12, color=theme.TEXT_SECONDARY),
+                            ft.Text(t("components:maint_config.配置说明_7b4a"), size=13, weight=ft.FontWeight.BOLD, color=theme.TEXT_PRIMARY),
+                            ft.Text(t("components:maint_config.•从Excel导入：选择包含「_928d"), size=12, color=theme.TEXT_SECONDARY),
+                            ft.Text(t("components:maint_config.•导出空白模板：导出仅有表头的_959f"), size=12, color=theme.TEXT_SECONDARY),
+                            ft.Text(t("components:maint_config.•导出默认配置：导出包含系统默_905f"), size=12, color=theme.TEXT_SECONDARY),
+                            ft.Text(t("components:maint_config.•恢复默认配置：将当前配置重置_0115"), size=12, color=theme.TEXT_SECONDARY),
+                            ft.Text(t("components:maint_config.•关键词使用中文顿号「、」分隔_eb32"), size=12, color=theme.TEXT_SECONDARY),
+                            ft.Text(t("components:maint_config.•分类按行顺序匹配，更具体的关_fe2b"), size=12, color=theme.TEXT_SECONDARY),
                         ],
                         spacing=4,
                     ),
