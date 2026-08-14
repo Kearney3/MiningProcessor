@@ -1,4 +1,5 @@
 import type { JSX } from "react";
+import { useTranslation } from "react-i18next";
 import type { PageId } from "../lib/types";
 
 // --- Inline SVG icons (Lucide-style, 16x16, stroke-width 2) ---
@@ -154,21 +155,21 @@ interface NavItem {
 }
 
 const WORKSPACE_ITEMS: NavItem[] = [
-  { id: "data-processing", label: "数据处理" },
-  { id: "batch-processing", label: "批量处理" },
-  { id: "llm-labeling", label: "LLM 标注" },
-  { id: "data-sync", label: "数据同步" },
-  { id: "ledger-match", label: "台账匹配" },
-  { id: "daily-report", label: "日报导出" },
+  { id: "data-processing", label: "components:Sidebar.数据处理_cfc0" },
+  { id: "batch-processing", label: "components:Sidebar.批量处理_ba72" },
+  { id: "llm-labeling", label: "components:Sidebar.LLM标注_8529" },
+  { id: "data-sync", label: "components:Sidebar.数据同步_9d91" },
+  { id: "ledger-match", label: "components:Sidebar.台账匹配_9897" },
+  { id: "daily-report", label: "components:Sidebar.日报导出_4ed9" },
 ];
 
 const MANAGEMENT_ITEMS: NavItem[] = [
-  { id: "equipment-ledger", label: "设备台账" },
-  { id: "oil-ledger", label: "油品台账" },
-  { id: "model-ledger", label: "型号台账" },
-  { id: "load-config", label: "装载量配置" },
-  { id: "maint-config", label: "维修分类配置" },
-  { id: "user-config", label: "用户配置" },
+  { id: "equipment-ledger", label: "components:Sidebar.设备台账_e6a7" },
+  { id: "oil-ledger", label: "components:Sidebar.油品台账_53fa" },
+  { id: "model-ledger", label: "components:Sidebar.型号台账_3e0b" },
+  { id: "load-config", label: "components:Sidebar.装载量配置_c389" },
+  { id: "maint-config", label: "components:Sidebar.维修分类配置_4ee9" },
+  { id: "user-config", label: "components:Sidebar.用户配置_dd1e" },
 ];
 
 // --- Component ---
@@ -179,10 +180,11 @@ interface SidebarProps {
 }
 
 export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
-  const renderGroup = (title: string, items: NavItem[]) => (
+  const { t } = useTranslation();
+  const renderGroup = (titleKey: string, items: NavItem[]) => (
     <div className="mb-5">
       <div className="px-3 mb-1.5 text-[11px] font-semibold text-slate-500">
-        {title}
+        {t(titleKey)}
       </div>
       <div className="space-y-1 px-2">
         {items.map((item) => {
@@ -209,7 +211,7 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
               }`}>
                 {Icon ? <Icon /> : null}
               </span>
-              <span className="truncate">{item.label}</span>
+              <span className="truncate">{t(item.label)}</span>
             </button>
           );
         })}
@@ -220,16 +222,16 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
   return (
     <aside className="w-52 shrink-0 bg-[#F1F4F8] border-r border-[var(--color-border)] overflow-y-auto flex flex-col">
       {/* Nav sections */}
-      <nav className="py-4 flex-1" aria-label="主导航">
-        {renderGroup("工作区", WORKSPACE_ITEMS)}
-        {renderGroup("管理", MANAGEMENT_ITEMS)}
+      <nav className="py-4 flex-1" aria-label={t("components:Sidebar.主导航_2b2c")}>
+        {renderGroup("components:Sidebar.工作区_4fa8", WORKSPACE_ITEMS)}
+        {renderGroup("components:Sidebar.管理_08b5", MANAGEMENT_ITEMS)}
       </nav>
 
       {/* Footer */}
       <div className="px-4 py-3 border-t border-[var(--color-border)]">
         <span className="flex items-center gap-2 text-[11px] text-slate-500">
           <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-          本地处理引擎
+          {t("components:Sidebar.本地处理引擎_f1a4")}
         </span>
       </div>
     </aside>

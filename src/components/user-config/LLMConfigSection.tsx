@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import type { BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
 import {
@@ -29,6 +30,7 @@ const DEFAULT_LLM_CONFIG: LLMConfig = {
 // ---------------------------------------------------------------------------
 
 export function LLMConfigSection({ bridge }: { bridge: BridgeProp }) {
+  const { t } = useTranslation();
   const { notify } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -89,12 +91,12 @@ export function LLMConfigSection({ bridge }: { bridge: BridgeProp }) {
         model: config.model,
         format: config.format,
       });
-      setStatus({ msg: "LLM 配置已保存", kind: "success" });
-      notify("LLM 配置已保存", "success");
+      setStatus({ msg: t("userConfig:LLMConfigSection.LLM配置已保存_0e52"), kind: "success" });
+      notify(t("userConfig:LLMConfigSection.LLM配置已保存_0e52"), "success");
       setTimeout(() => setStatus({ msg: "", kind: "info" }), 2500);
     } catch (e) {
-      setStatus({ msg: `保存失败: ${String(e)}`, kind: "error" });
-      notify(`保存失败: ${e}`, "error");
+      setStatus({ msg: t("userConfig:LLMConfigSection.保存失败:$_2655", { error: String(e) }), kind: "error" });
+      notify(t("userConfig:LLMConfigSection.保存失败:$_e5b7", { error: String(e) }), "error");
     } finally {
       setSaving(false);
     }
@@ -105,7 +107,7 @@ export function LLMConfigSection({ bridge }: { bridge: BridgeProp }) {
     setModels([]);
     setApiKeySaved(false);
     setFetchResult(null);
-    setStatus({ msg: "已恢复默认配置（需点击保存生效）", kind: "info" });
+    setStatus({ msg: t("userConfig:LLMConfigSection.已恢复默认配置（需点击保存生效_c62f"), kind: "info" });
   };
 
   const fetchModels = async () => {
@@ -120,15 +122,15 @@ export function LLMConfigSection({ bridge }: { bridge: BridgeProp }) {
       if (res.success && Array.isArray(res.models)) {
         setModels(res.models);
         if (res.models.length > 0) {
-          setFetchResult({ msg: `获取到 ${res.models.length} 个模型`, ok: true });
+          setFetchResult({ msg: t("userConfig:LLMConfigSection.获取到$个模型_f769", { count: res.models.length }), ok: true });
         } else {
-          setFetchResult({ msg: res.error || "未返回模型，请手动输入模型名称", ok: true });
+          setFetchResult({ msg: res.error || t("userConfig:LLMConfigSection.未返回模型，请手动输入模型名称_4683"), ok: true });
         }
       } else {
-        setFetchResult({ msg: res.error || "获取模型失败", ok: false });
+        setFetchResult({ msg: res.error || t("userConfig:LLMConfigSection.获取模型失败_803c"), ok: false });
       }
     } catch (e) {
-      setFetchResult({ msg: `请求异常: ${String(e)}`, ok: false });
+      setFetchResult({ msg: t("userConfig:LLMConfigSection.请求异常:$_e019", { error: String(e) }), ok: false });
     } finally {
       setFetchingModels(false);
     }
@@ -136,7 +138,7 @@ export function LLMConfigSection({ bridge }: { bridge: BridgeProp }) {
 
   const verifyConnection = async () => {
     if (!config.url.trim()) {
-      setVerifyResult({ msg: "请先填写接口 URL", ok: false });
+      setVerifyResult({ msg: t("userConfig:LLMConfigSection.请先填写接口URL_fd01"), ok: false });
       return;
     }
     setVerifying(true);
@@ -151,21 +153,21 @@ export function LLMConfigSection({ bridge }: { bridge: BridgeProp }) {
         const selectedModel = config.model.trim();
         if (selectedModel && !res.models.includes(selectedModel)) {
           setVerifyResult({
-            msg: `连接成功，但所选模型「${selectedModel}」不在可用列表中（共 ${res.models.length} 个模型）`,
+            msg: t("userConfig:LLMConfigSection.连接成功，但所选模型「$」不在_452e", { model: selectedModel, count: res.models.length }),
             ok: false,
           });
         } else {
-          const modelInfo = selectedModel ? `，模型「${selectedModel}」可用` : "";
+          const modelInfo = selectedModel ? t("userConfig:LLMConfigSection.，模型「$」可用_5068", { model: selectedModel }) : "";
           setVerifyResult({
-            msg: `✓ 连接成功（${res.models.length} 个模型可用${modelInfo}）`,
+            msg: t("userConfig:LLMConfigSection.✓连接成功（$个模型可用$）_8b01", { count: res.models.length, modelInfo }),
             ok: true,
           });
         }
       } else {
-        setVerifyResult({ msg: `✗ 连接失败: ${res.error}`, ok: false });
+        setVerifyResult({ msg: t("userConfig:LLMConfigSection.✗连接失败:$_f00c", { error: res.error }), ok: false });
       }
     } catch (e) {
-      setVerifyResult({ msg: `请求异常: ${String(e)}`, ok: false });
+      setVerifyResult({ msg: t("userConfig:LLMConfigSection.请求异常:$_e019", { error: String(e) }), ok: false });
     } finally {
       setVerifying(false);
     }
@@ -175,8 +177,8 @@ export function LLMConfigSection({ bridge }: { bridge: BridgeProp }) {
 
   return (
     <SectionCard
-      title="LLM 标注配置"
-      subtitle="配置大模型接口用于维修记录智能标注"
+      title={t("userConfig:LLMConfigSection.LLM标注配置_4aee")}
+      subtitle={t("userConfig:LLMConfigSection.配置大模型接口用于维修记录智能_8504")}
       icon={<LLMIcon />}
       expanded={expanded}
       onToggle={() => setExpanded(!expanded)}
@@ -184,20 +186,20 @@ export function LLMConfigSection({ bridge }: { bridge: BridgeProp }) {
       <div className="space-y-3">
         {/* Format dropdown */}
         <div>
-          <label className="text-xs font-medium text-slate-500 mb-1 block">接口格式</label>
+          <label className="text-xs font-medium text-slate-500 mb-1 block">{t("userConfig:LLMConfigSection.接口格式_3471")}</label>
           <select
             value={config.format}
             onChange={(e) => updateField("format", e.target.value as LLMConfig["format"])}
             className="input w-full"
           >
-            <option value="openai">OpenAI 兼容</option>
+            <option value="openai">{t("userConfig:LLMConfigSection.OpenAI兼容_a2fb")}</option>
             <option value="anthropic">Anthropic</option>
           </select>
         </div>
 
         {/* URL */}
         <div>
-          <label className="text-xs font-medium text-slate-500 mb-1 block">接口 URL</label>
+          <label className="text-xs font-medium text-slate-500 mb-1 block">{t("userConfig:LLMConfigSection.接口URL_71a3")}</label>
           <input
             type="text"
             value={config.url}
@@ -226,7 +228,7 @@ export function LLMConfigSection({ bridge }: { bridge: BridgeProp }) {
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              title={showPassword ? "隐藏" : "显示"}
+              title={showPassword ? t("userConfig:LLMConfigSection.隐藏_dce5") : t("userConfig:LLMConfigSection.显示_4d77")}
             >
               {showPassword ? <EyeOffIcon /> : <EyeIcon />}
             </button>
@@ -235,7 +237,7 @@ export function LLMConfigSection({ bridge }: { bridge: BridgeProp }) {
 
         {/* Model dropdown + fetch button */}
         <div>
-          <label className="text-xs font-medium text-slate-500 mb-1 block">模型</label>
+          <label className="text-xs font-medium text-slate-500 mb-1 block">{t("userConfig:LLMConfigSection.模型_8000")}</label>
           <div className="flex gap-2">
             <div className="relative flex-1">
               <input
@@ -243,7 +245,7 @@ export function LLMConfigSection({ bridge }: { bridge: BridgeProp }) {
                 list="llm-model-list"
                 value={config.model}
                 onChange={(e) => updateField("model", e.target.value)}
-                placeholder="选择或输入模型名称"
+                placeholder={t("userConfig:LLMConfigSection.选择或输入模型名称_d8d7")}
                 className="input w-full"
               />
               <datalist id="llm-model-list">
@@ -259,7 +261,7 @@ export function LLMConfigSection({ bridge }: { bridge: BridgeProp }) {
                 fetchingModels ? "opacity-50 cursor-not-allowed" : ""
               }`}
             >
-              {fetchingModels ? "获取中..." : "获取模型"}
+              {fetchingModels ? t("userConfig:LLMConfigSection.获取中..._4a8d") : t("userConfig:LLMConfigSection.获取模型_9259")}
             </button>
             <button
               onClick={verifyConnection}
@@ -268,7 +270,7 @@ export function LLMConfigSection({ bridge }: { bridge: BridgeProp }) {
                 verifying ? "opacity-50 cursor-not-allowed" : ""
               }`}
             >
-              {verifying ? "验证中..." : "验证连接"}
+              {verifying ? t("userConfig:LLMConfigSection.验证中..._fd31") : t("userConfig:LLMConfigSection.验证连接_c476")}
             </button>
           </div>
           {fetchResult && (

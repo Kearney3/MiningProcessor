@@ -3,6 +3,7 @@ import type { BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
 import { TuneIcon, CloseIcon } from "../../lib/icons";
 import { SectionCard, ActionButtons, StatusMessage } from "./_shared";
+import { useTranslation } from "react-i18next";
 
 // ---------------------------------------------------------------------------
 // Types & Constants
@@ -32,13 +33,13 @@ interface AnomalyConfig {
   handling_rules: Record<string, Record<string, { strategy: string; default?: number }>>;
 }
 
-const DATA_TYPE_OPTIONS: { key: string; label: string }[] = [
-  { key: "fuel", label: "油耗" },
-  { key: "fuel_engine", label: "发动机" },
-  { key: "production_running", label: "运行数据" },
-  { key: "production", label: "生产数据" },
-  { key: "electrical", label: "电力消耗" },
-  { key: "worktime", label: "工时数据" },
+const getDataTypeOptions = (t: (k: string) => string): { key: string; label: string }[] => [
+  { key: "fuel", label: t("userConfig:AnomalyConfigSection.油耗_75d6") },
+  { key: "fuel_engine", label: t("userConfig:AnomalyConfigSection.发动机_9a82") },
+  { key: "production_running", label: t("userConfig:AnomalyConfigSection.运行数据_6644") },
+  { key: "production", label: t("userConfig:AnomalyConfigSection.生产数据_9fb6") },
+  { key: "electrical", label: t("userConfig:AnomalyConfigSection.电力消耗_79c4") },
+  { key: "worktime", label: t("userConfig:AnomalyConfigSection.工时数据_8c32") },
 ];
 
 const ALL_NUMERIC = "__all_numeric__";
@@ -48,7 +49,9 @@ const ALL_NUMERIC = "__all_numeric__";
 // ---------------------------------------------------------------------------
 
 export function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
+  const { t } = useTranslation();
   const { notify } = useToast();
+  const DATA_TYPE_OPTIONS = getDataTypeOptions(t);
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ msg: string; kind: "success" | "error" | "info" }>({ msg: "", kind: "info" });
@@ -234,26 +237,26 @@ export function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
       };
 
       await bridge.call("save_anomaly_config", { updates });
-      setStatus({ msg: "异常值检测配置已保存", kind: "success" });
-      notify("异常值检测配置已保存", "success");
+      setStatus({ msg: t("userConfig:AnomalyConfigSection.异常值检测配置已保存_4f21"), kind: "success" });
+      notify(t("userConfig:AnomalyConfigSection.异常值检测配置已保存_4f21"), "success");
       setTimeout(() => setStatus({ msg: "", kind: "info" }), 2500);
     } catch (e) {
-      setStatus({ msg: `保存失败: ${String(e)}`, kind: "error" });
-      notify(`保存失败: ${e}`, "error");
+      setStatus({ msg: t("userConfig:AnomalyConfigSection.保存失败:$_2655", { error: String(e) }), kind: "error" });
+      notify(t("userConfig:AnomalyConfigSection.保存失败:$_e5b7", { error: String(e) }), "error");
     } finally {
       setSaving(false);
     }
   };
 
   const resetToDefault = async () => {
-    if (!confirm("确定要恢复异常值检测默认配置吗？")) return;
+    if (!confirm(t("userConfig:AnomalyConfigSection.确定要恢复异常值检测默认配置吗_5095"))) return;
     try {
       await bridge.call("save_anomaly_config", { config: {} });
       await reload();
-      setStatus({ msg: "已恢复默认配置", kind: "info" });
-      notify("已恢复异常值检测默认配置", "success");
+      setStatus({ msg: t("userConfig:AnomalyConfigSection.已恢复默认配置_455f"), kind: "info" });
+      notify(t("userConfig:AnomalyConfigSection.已恢复异常值检测默认配置_af9e"), "success");
     } catch (e) {
-      setStatus({ msg: `恢复失败: ${String(e)}`, kind: "error" });
+      setStatus({ msg: t("userConfig:AnomalyConfigSection.恢复失败:$_d844", { error: String(e) }), kind: "error" });
     }
   };
 
@@ -262,8 +265,8 @@ export function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
 
   return (
     <SectionCard
-      title="异常值检测配置"
-      subtitle="配置各数据类型的检测阈值、σ 倍数和百分位范围"
+      title={t("userConfig:AnomalyConfigSection.异常值检测配置_5f46")}
+      subtitle={t("userConfig:AnomalyConfigSection.配置各数据类型的检测阈值、σ倍_3096")}
       icon={<TuneIcon />}
       expanded={expanded}
       onToggle={() => setExpanded(!expanded)}
@@ -279,33 +282,33 @@ export function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
       <div className="flex items-center gap-5 mb-3">
         <label className="flex items-center gap-1.5 text-xs text-slate-600">
           <input type="checkbox" checked={useThreshold} onChange={(e) => setUseThreshold(e.target.checked)} className="w-4 h-4 rounded border-slate-300" />
-          绝对阈值检测
+          {t("userConfig:AnomalyConfigSection.absoluteThreshold")}
         </label>
         <label className="flex items-center gap-1.5 text-xs text-slate-600">
           <input type="checkbox" checked={useSigma} onChange={(e) => setUseSigma(e.target.checked)} className="w-4 h-4 rounded border-slate-300" />
-          σ 异常检测
+          {t("userConfig:AnomalyConfigSection.sigmaDetection")}
         </label>
         <label className="flex items-center gap-1.5 text-xs text-slate-600">
           <input type="checkbox" checked={usePercentile} onChange={(e) => setUsePercentile(e.target.checked)} className="w-4 h-4 rounded border-slate-300" />
-          百分位检测
+          {t("userConfig:AnomalyConfigSection.percentileDetection")}
         </label>
       </div>
 
       <div className="border-t border-slate-100 pt-3 mb-3" />
 
       {/* 统计参数 */}
-      <p className="text-xs font-medium text-slate-500 mb-2">统计参数</p>
+      <p className="text-xs font-medium text-slate-500 mb-2">{t("userConfig:AnomalyConfigSection.统计参数_4f03")}</p>
       <div className="flex gap-3 mb-3">
         <div>
-          <label className="text-xs text-slate-500 mb-1 block">σ 倍数</label>
+          <label className="text-xs text-slate-500 mb-1 block">{t("userConfig:AnomalyConfigSection.σ倍数_c60a")}</label>
           <input type="text" value={sigmaN} onChange={(e) => setSigmaN(e.target.value)} placeholder="3.0" className="input w-28" />
         </div>
         <div>
-          <label className="text-xs text-slate-500 mb-1 block">百分位下限</label>
+          <label className="text-xs text-slate-500 mb-1 block">{t("userConfig:AnomalyConfigSection.百分位下限_d760")}</label>
           <input type="text" value={pctLow} onChange={(e) => setPctLow(e.target.value)} placeholder="1.0" className="input w-28" />
         </div>
         <div>
-          <label className="text-xs text-slate-500 mb-1 block">百分位上限</label>
+          <label className="text-xs text-slate-500 mb-1 block">{t("userConfig:AnomalyConfigSection.百分位上限_2563")}</label>
           <input type="text" value={pctHigh} onChange={(e) => setPctHigh(e.target.value)} placeholder="99.0" className="input w-28" />
         </div>
       </div>
@@ -313,12 +316,12 @@ export function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
       <div className="border-t border-slate-100 pt-3 mb-3" />
 
       {/* 阈值配置 */}
-      <p className="text-xs font-medium text-slate-500 mb-2">阈值配置</p>
+      <p className="text-xs font-medium text-slate-500 mb-2">{t("userConfig:AnomalyConfigSection.阈值配置_35a3")}</p>
 
       {/* 数据类型选项卡 */}
       <div
         role="tablist"
-        aria-label="异常值数据类型"
+        aria-label={t("userConfig:AnomalyConfigSection.异常值数据类型_a684")}
         className="flex gap-1 bg-slate-100 rounded-lg p-0.5 overflow-x-auto mb-3"
       >
         {DATA_TYPE_OPTIONS.map(({ key, label }) => (
@@ -341,13 +344,13 @@ export function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
       {/* 当前数据类型的逐列检测开关 */}
       <div className="flex flex-wrap items-start gap-x-5 gap-y-2 border-b border-slate-100 pb-3 mb-3 px-0.5">
         <div className="shrink-0">
-          <p className="text-xs font-medium text-slate-500">逐列检测</p>
-          <p className="text-xs text-slate-400">关闭后跳过该列的全部检测方法</p>
+          <p className="text-xs font-medium text-slate-500">{t("userConfig:AnomalyConfigSection.逐列检测_b2f0")}</p>
+          <p className="text-xs text-slate-400">{t("userConfig:AnomalyConfigSection.关闭后跳过该列的全部检测方法_bbf0")}</p>
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 pt-0.5">
           {currentColumns.map((col) => {
             const key = `${activeType}:${col}`;
-            const label = col === ALL_NUMERIC ? "全部数值列" : col;
+            const label = col === ALL_NUMERIC ? t("userConfig:AnomalyConfigSection.全部数值列_d28d") : col;
             return (
               <label key={key} className="flex items-center gap-1.5 cursor-pointer select-none">
                 <input
@@ -365,10 +368,10 @@ export function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
 
       {/* 表头 */}
       <div className="grid grid-cols-[1fr_100px_100px_100px_32px] gap-2 mb-1.5 px-0.5">
-        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">列名 / 标记</span>
-        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">最小值</span>
-        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">最大值</span>
-        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider" title="处理异常值时的替换值">默认值</span>
+        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">{t("userConfig:AnomalyConfigSection.列名/标记_93eb")}</span>
+        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">{t("userConfig:AnomalyConfigSection.最小值_c322")}</span>
+        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">{t("userConfig:AnomalyConfigSection.最大值_5da8")}</span>
+        <span className="text-xs font-medium text-slate-400 uppercase tracking-wider" title={t("userConfig:AnomalyConfigSection.处理异常值时的替换值_27f2")}>{t("userConfig:AnomalyConfigSection.默认值_225f")}</span>
         <span />
       </div>
 
@@ -387,14 +390,14 @@ export function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
               type="text"
               value={row.min}
               onChange={(e) => updateRow(activeType, idx, "min", e.target.value)}
-              placeholder="无下限"
+              placeholder={t("userConfig:AnomalyConfigSection.无下限_3696")}
               className="input w-full"
             />
             <input
               type="text"
               value={row.max}
               onChange={(e) => updateRow(activeType, idx, "max", e.target.value)}
-              placeholder="无上限"
+              placeholder={t("userConfig:AnomalyConfigSection.无上限_1891")}
               className="input w-full"
             />
             <input
@@ -402,20 +405,20 @@ export function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
               value={row.default}
               onChange={(e) => updateRow(activeType, idx, "default", e.target.value)}
               placeholder="0"
-              title="选择「处理异常值」时替换为此值"
+              title={t("userConfig:AnomalyConfigSection.选择「处理异常值」时替换为此值_2288")}
               className="input w-full"
             />
             <button
               onClick={() => removeRow(activeType, idx)}
               className="w-8 h-8 flex items-center justify-center rounded-md text-slate-600 hover:text-red-500 hover:bg-red-50 transition-colors"
-              title="删除此行"
+              title={t("userConfig:AnomalyConfigSection.删除此行_43e8")}
             >
               <CloseIcon />
             </button>
           </div>
         ))}
         {currentRows.length === 0 && (
-          <div className="text-center py-4 text-xs text-slate-400">暂无阈值配置</div>
+          <div className="text-center py-4 text-xs text-slate-400">{t("userConfig:AnomalyConfigSection.暂无阈值配置_3a7a")}</div>
         )}
       </div>
 
@@ -425,7 +428,7 @@ export function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
         onReload={reload}
         onReset={resetToDefault}
         onExtra={addRow}
-        extraLabel="添加阈值"
+        extraLabel={t("userConfig:AnomalyConfigSection.添加阈值_a2ce")}
       />
       <StatusMessage message={status.msg} kind={status.kind} />
     </SectionCard>

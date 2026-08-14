@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from "../lib/icons";
@@ -17,10 +18,12 @@ export interface DatePickerProps {
 export function DatePicker({
   value,
   onChange,
-  placeholder = "选择日期",
+  placeholder,
   label,
   className = "",
 }: DatePickerProps) {
+  const { t } = useTranslation();
+  const effectivePlaceholder = placeholder ?? t("components:DatePicker.选择日期_2beb");
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const selected = parseLocalDate(value);
@@ -64,7 +67,7 @@ export function DatePicker({
       >
         <CalendarIcon className="w-4 h-4 shrink-0 text-slate-400" />
         <span className="flex-1 text-left truncate">
-          {value || placeholder}
+          {value || effectivePlaceholder}
         </span>
       </button>
 

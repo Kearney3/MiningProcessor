@@ -18,6 +18,7 @@ from func.time_utils import local_now
 
 
 from gui.utils import _log_message
+from gui.i18n import t
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +64,9 @@ _LOADING_STYLE = ft.ButtonStyle(bgcolor="#CBD5E1", color="#64748B")
 # 模块类型中文标签（扩展自 func.excel_batch 的公共标签）
 _MODULE_LABELS = {
     **MODULE_LABELS,
-    "merge": "文件合并",
-    "maint": "维修记录",
-    "batch": "批量处理",
+    "merge": t("logic:文件合并_798c"),
+    "maint": t("logic:维修记录_21c4"),
+    "batch": t("logic:批量处理_ba72"),
 }
 
 
@@ -137,7 +138,7 @@ def _hide_snackbar() -> None:
     _snackbar_mgr.hide()
 
 
-def set_btn_state(btn: ft.Button, enabled: bool, label: str = "处理"):
+def set_btn_state(btn: ft.Button, enabled: bool, label: str = t("logic:处理_7b1d")):
     """设置按钮状态：禁用时置灰并显示加载态文字，恢复时还原原始样式"""
     btn.disabled = not enabled
     btn.text = label
@@ -196,8 +197,8 @@ def _execute_task(module_type: str, path: str, cancel_event: threading.Event | N
         cancel_event: 可选的取消事件，页面关闭或用户取消时置位。
     """
     if _shutdown_event.is_set():
-        logger.info("页面已关闭，跳过任务: module=%s", module_type)
-        return "页面已关闭", None
+        logger.info(t("logic:页面已关闭，跳过任务:modu_7db7", module=module_type))
+        return t("logic:页面已关闭_d496"), None
 
     extra = None
     try:
@@ -228,17 +229,17 @@ async def run_task(page: ft.Page, module_type: str, path: str, log, cancel_event
         cancel_event: 可选的取消事件，页面关闭或用户取消时自动置位。
     """
     label = _MODULE_LABELS.get(module_type, module_type)
-    _log_message(log, f"[{label}] 开始处理...")
+    _log_message(log, f"[{label}] " + t("logic:[]开始处理..._4037", label=label))
     error_message, extra = await asyncio.to_thread(_execute_task, module_type, path, cancel_event, **kwargs)
     if error_message:
         if _shutdown_event.is_set():
-            _log_message(log, f"[{label}] 任务因页面关闭而中止", level=logging.WARNING)
+            _log_message(log, f"[{label}] " + t("logic:[]任务因页面关闭而中止_c0be", label=label), level=logging.WARNING)
         else:
-            _log_message(log, f"[{label}] 处理失败: {error_message}", level=logging.ERROR)
-            _show_snackbar(page, f"{label}处理失败", is_error=True)
+            _log_message(log, f"[{label}] " + t("logic:[]处理失败:_fa31", label=label, error_message=error_message), level=logging.ERROR)
+            _show_snackbar(page, t("logic:处理失败_b42b", label=label), is_error=True)
     else:
-        _log_message(log, f"[{label}] 处理成功")
-        _show_snackbar(page, f"{label}处理完成")
+        _log_message(log, f"[{label}] " + t("logic:[]处理成功_3425", label=label))
+        _show_snackbar(page, t("logic:处理完成_e5e3", label=label))
     return extra
 
 
@@ -259,7 +260,7 @@ async def _safe_run_task(
         return None
     cancel_event = threading.Event()
     register_cancel_event(cancel_event)
-    set_btn_state(btn, False, "处理中...")
+    set_btn_state(btn, False, t("logic:处理中..._2fb9"))
     try:
         return await run_task(page, module_type, path, log, cancel_event=cancel_event, **kwargs)
     finally:
@@ -290,14 +291,14 @@ async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=
     btn = fuel_refs["btn"]
     path = fuel_refs["path"].value
     if not path:
-        _log_message(log, "请先选择文件", level=logging.WARNING)
+        _log_message(log, t("logic:请先选择文件_3c24"), level=logging.WARNING)
         return
     try:
         year = int(fuel_refs["year"].value)
     except (TypeError, ValueError):
-        _log_message(log, "请先选择有效的年份", level=logging.WARNING)
+        _log_message(log, t("logic:请先选择有效的年份_5457"), level=logging.WARNING)
         return
-    extra = await _safe_run_task(page, btn, "处理", path, log, "fuel",
+    extra = await _safe_run_task(page, btn, t("logic:处理_7b1d"), path, log, "fuel",
                          year=year, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger, model_ledger=model_ledger,
                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
                          anomaly_config=anomaly_config, filter_zero_engine_hours=filter_zero_engine_hours,
@@ -320,7 +321,7 @@ def _update_prod_summary(container: ft.Column, summary: dict | None) -> None:
     warnings = summary.get("warnings", [])
 
     # 文件统计行
-    stats_text = f"共 {total} 个文件，成功 {success}，失败 {failed}"
+    stats_text = t("logic:共个文件，成功，失败_dbdc", total=total, success=success, failed=failed)
     stats_color = ft.Colors.RED_700 if failed > 0 else ft.Colors.GREEN_700
     container.controls.append(
         ft.Text(stats_text, size=12, color=stats_color, weight=ft.FontWeight.W_500)
@@ -350,7 +351,7 @@ async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=
     btn = prod_refs["btn"]
     path = prod_refs["path"].value
     if not path:
-        _log_message(log, "请先选择 Excel 文件或文件夹", level=logging.WARNING)
+        _log_message(log, t("logic:请先选择Excel文件或文件夹_2df2"), level=logging.WARNING)
         return
 
     auto_detect_ref = prod_refs.get("auto_detect")
@@ -363,10 +364,10 @@ async def on_prod_process(page: ft.Page, prod_refs: dict, log, equipment_ledger=
             if raw_start < 1:
                 raise ValueError
         except ValueError:
-            _log_message(log, "请输入有效的表头起始行（正整数）", level=logging.WARNING)
+            _log_message(log, t("logic:请输入有效的表头起始行（正整数_0379"), level=logging.WARNING)
             return
 
-    extra = await _safe_run_task(page, btn, "处理", path, log, "production",
+    extra = await _safe_run_task(page, btn, t("logic:处理_7b1d"), path, log, "production",
                          raw_start=raw_start, equipment_ledger=equipment_ledger, oil_ledger=oil_ledger, model_ledger=model_ledger,
                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
                          anomaly_config=anomaly_config,
@@ -392,19 +393,19 @@ async def on_elec_process(page: ft.Page, elec_refs: dict, log, equipment_ledger=
     btn = elec_refs["btn"]
     path = elec_refs["path"].value
     if not path:
-        _log_message(log, "请先选择文件", level=logging.WARNING)
+        _log_message(log, t("logic:请先选择文件_3c24"), level=logging.WARNING)
         return
 
     year_text = elec_refs["year"].value
     try:
         year = int(year_text)
     except (TypeError, ValueError):
-        _log_message(log, "请输入有效的年份", level=logging.WARNING)
+        _log_message(log, t("logic:请输入有效的年份_3ad1"), level=logging.WARNING)
         return
 
     add_shift = elec_refs.get("add_shift")
     default_shift_ref = elec_refs.get("default_shift")
-    extra = await _safe_run_task(page, btn, "处理", path, log, "electrical",
+    extra = await _safe_run_task(page, btn, t("logic:处理_7b1d"), path, log, "electrical",
                          year=year,
                          add_shift_column=add_shift.value if add_shift else False,
                          default_shift=default_shift_ref.value if default_shift_ref else "Day",
@@ -420,13 +421,13 @@ async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=
     btn = work_refs["btn"]
     path = work_refs["path"].value
     if not path:
-        _log_message(log, "请先选择文件", level=logging.WARNING)
+        _log_message(log, t("logic:请先选择文件_3c24"), level=logging.WARNING)
         return
     try:
         year = int(work_refs["year"].value)
         month = int(work_refs["month"].value)
     except (TypeError, ValueError):
-        _log_message(log, "请先选择有效的年份和月份", level=logging.WARNING)
+        _log_message(log, t("logic:请先选择有效的年份和月份_5ef7"), level=logging.WARNING)
         return
     # 表头映射：根据开关状态决定是否传入
     header_mapping = None
@@ -437,7 +438,7 @@ async def on_work_process(page: ft.Page, work_refs: dict, log, equipment_ledger=
         header_mapping = build_worktime_header_mapping(
             mode=header_mode.value if header_mode else None,
         )
-    extra = await _safe_run_task(page, btn, "处理", path, log, "worktime",
+    extra = await _safe_run_task(page, btn, t("logic:处理_7b1d"), path, log, "worktime",
                          year=year, month=month,
                          equipment_ledger=equipment_ledger, oil_ledger=oil_ledger, model_ledger=model_ledger,
                          header_mapping=header_mapping,
@@ -452,11 +453,11 @@ async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledge
     btn = merge_refs["btn"]
     path = merge_refs["path"].value
     if not path:
-        _log_message(log, "请先选择文件夹", level=logging.WARNING)
+        _log_message(log, t("logic:请先选择文件夹_a068"), level=logging.WARNING)
         return
     keyword = (merge_refs["keyword"].value or "").strip()
     if not keyword:
-        _log_message(log, "请输入文件名关键字", level=logging.WARNING)
+        _log_message(log, t("logic:请输入文件名关键字_8cdc"), level=logging.WARNING)
         return
     # 收集排序配置
     sort_configs = []
@@ -467,7 +468,7 @@ async def on_merge_process(page: ft.Page, merge_refs: dict, log, equipment_ledge
     strip_time = bool(merge_refs["strip_time"].value)
     tolerant_header = bool(merge_refs.get("tolerant_header") and merge_refs["tolerant_header"].value)
     dedup = bool(merge_refs.get("dedup") and merge_refs["dedup"].value)
-    extra = await _safe_run_task(page, btn, "合并", path, log, "merge",
+    extra = await _safe_run_task(page, btn, t("logic:合并_bd81"), path, log, "merge",
                          keyword=keyword, strip_time=strip_time, sort_configs=sort_configs,
                          equipment_ledger=equipment_ledger, oil_ledger=oil_ledger, model_ledger=model_ledger,
                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
@@ -481,14 +482,14 @@ async def on_maint_process(page: ft.Page, maint_refs: dict, log, equipment_ledge
     btn = maint_refs["btn"]
     path = maint_refs["path"].value
     if not path:
-        _log_message(log, "请先选择出勤统计表文件或文件夹", level=logging.WARNING)
+        _log_message(log, t("logic:请先选择出勤统计表文件或文件夹_79ce"), level=logging.WARNING)
         return
     split_by_year = bool(maint_refs.get("split_year") and maint_refs["split_year"].value)
     details_only = bool(maint_refs.get("details_only") and maint_refs["details_only"].value)
     use_ml_fallback = bool(
         maint_refs.get("use_ml") is None or maint_refs["use_ml"].value
     )
-    extra = await _safe_run_task(page, btn, "处理", path, log, "maint",
+    extra = await _safe_run_task(page, btn, t("logic:处理_7b1d"), path, log, "maint",
                          equipment_ledger=equipment_ledger, oil_ledger=oil_ledger, model_ledger=model_ledger,
                          skip_hidden_rows=skip_hidden_rows, skip_hidden_cols=skip_hidden_cols,
                          split_by_year=split_by_year, details_only=details_only,
@@ -576,18 +577,18 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
     _update_anomaly_results(batch_refs, [])
     path = batch_refs["path"].value
     if not path:
-        _log_message(log, "请先选择文件夹", level=logging.WARNING)
+        _log_message(log, t("logic:请先选择文件夹_a068"), level=logging.WARNING)
         return
 
     btn = batch_refs["btn"]
-    set_btn_state(btn, False, "扫描中...")
+    set_btn_state(btn, False, t("logic:扫描中..._e6c2"))
 
     try:
         year = int(batch_refs["year"].value)
         month = int(batch_refs["month"].value)
     except (TypeError, ValueError):
-        _log_message(log, "请先选择有效的年份和月份", level=logging.WARNING)
-        set_btn_state(btn, True, "批量处理")
+        _log_message(log, t("logic:请先选择有效的年份和月份_5ef7"), level=logging.WARNING)
+        set_btn_state(btn, True, t("logic:批量处理_ba72"))
         return
     if batch_refs["auto_detect"].value:
         raw_start = -1
@@ -598,8 +599,8 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
             if raw_start != -1 and raw_start < 1:
                 raise ValueError
         except ValueError:
-            _log_message(log, "请输入有效的 raw_start（正整数或-1【自动检测行】）", level=logging.WARNING)
-            set_btn_state(btn, True, "开始处理")
+            _log_message(log, t("logic:请输入有效的raw_start_14fd"), level=logging.WARNING)
+            set_btn_state(btn, True, t("logic:开始处理_a18f"))
             return
     merge_output = bool(batch_refs["merge"].value)
 
@@ -635,12 +636,14 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
         try:
             matched, missing = await asyncio.to_thread(scan_files, path)
         except Exception as ex:
-            _log_message(log, f"文件扫描失败: {ex}", level=logging.ERROR)
+            _log_message(log, t("logic:文件扫描失败:_1aa2", ex=ex), level=logging.ERROR)
             return
 
         found_labels = [MODULE_LABELS.get(k, k) for k in matched]
         missing_labels = [MODULE_LABELS.get(k, k) for k in missing]
-        _log_message(log, f"扫描完成 — 已找到: {', '.join(found_labels) or '无'}; 未找到: {', '.join(missing_labels) or '无'}")
+        _log_message(log, t("logic:扫描完成—已找到:;未找到:_36f5",
+                            found_labels=", ".join(found_labels) or t("logic:（空）_27c4"),
+                            missing_labels=", ".join(missing_labels) or t("logic:（空）_27c4")))
 
         # ── 第二阶段：表内合并基准表验证 & 缺失确认弹窗 ──
         if table_merge_config:
@@ -649,7 +652,7 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
             required_for_base = "fuel" if base_type == "fuel" else "worktime"
             if required_for_base not in matched:
                 base_label = MODULE_LABELS.get(required_for_base, required_for_base)
-                _log_message(log, f"表内合并需要{base_label}数据，但未找到对应文件", level=logging.ERROR)
+                _log_message(log, t("logic:表内合并需要数据，但未找到对应_c81e", base_label=base_label), level=logging.ERROR)
                 return
 
         if missing:
@@ -669,16 +672,16 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
 
             missing_text = "、".join(missing_labels)
             if table_merge_config:
-                msg = f"以下类型的数据文件未在文件夹中检测到：\n\n{missing_text}\n\n表内合并将跳过缺失部分，是否继续？"
+                msg = t("logic:以下类型的数据文件未在文件夹中_f655", missing_text=missing_text)
             else:
-                msg = f"以下类型的数据文件未在文件夹中检测到：\n\n{missing_text}\n\n是否继续处理已找到的数据？"
+                msg = t("logic:以下类型的数据文件未在文件夹中_46ae", missing_text=missing_text)
             dialog = ft.AlertDialog(
                 modal=True,
-                title=ft.Text("部分数据文件未找到"),
+                title=ft.Text(t("logic:部分数据文件未找到_e94e")),
                 content=ft.Text(msg),
                 actions=[
-                    ft.TextButton("继续处理", on_click=_on_confirm),
-                    ft.TextButton("取消", on_click=_on_cancel),
+                    ft.TextButton(t("logic:继续处理_a53f"), on_click=_on_confirm),
+                    ft.TextButton(t("logic:取消_625f"), on_click=_on_cancel),
                 ],
                 actions_alignment=ft.MainAxisAlignment.END,
             )
@@ -687,7 +690,7 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
             # 等待用户操作（带超时防死锁）
             confirmed = await asyncio.to_thread(event.wait, 300)
             if not confirmed or not should_continue[0]:
-                _log_message(log, "用户取消了批量处理", level=logging.WARNING)
+                _log_message(log, t("logic:用户取消了批量处理_b519"), level=logging.WARNING)
                 return
 
         # 日期筛选参数
@@ -708,7 +711,7 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
         # ── 第三阶段：执行处理 ──
         params = collect_processing_params(batch_refs)
 
-        set_btn_state(btn, False, "处理中...")
+        set_btn_state(btn, False, t("logic:处理中..._2fb9"))
         done_flag = asyncio.Event()
         progress_poller = asyncio.create_task(
             _poll_batch_progress_queue(progress_queue, progress_bar, progress_text, done_flag)
@@ -739,21 +742,21 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
             if "error" in thread_result:
                 raise thread_result["error"]
             if cancel_event is not None and cancel_event.is_set():
-                _log_message(log, "用户取消了批量处理", level=logging.WARNING)
-                _show_snackbar(page, "批量处理已取消")
+                _log_message(log, t("logic:用户取消了批量处理_b519"), level=logging.WARNING)
+                _show_snackbar(page, t("logic:批量处理已取消_2424"))
             else:
                 summary = thread_result.get("summary", {})
                 _update_anomaly_results(batch_refs, summary.get("anomalies", []))
                 warnings = summary.get("warnings", [])
                 success_mods = summary.get("success_modules", [])
                 failed_mods = summary.get("failed_modules", [])
-                msg = f"批量处理完成 — 成功: {', '.join(success_mods) or '无'}"
+                msg = t("logic:批量处理完成—成功:_8e9d", success_mods=", ".join(success_mods) or t("logic:（空）_27c4"))
                 if failed_mods:
-                    msg += f"; 失败: {', '.join(failed_mods)}"
+                    msg += t("logic:;失败:_2db7", failed_mods=", ".join(failed_mods))
                 _log_message(log, msg)
                 for w in warnings:
                     _log_message(log, w, level=logging.WARNING)
-                _show_snackbar(page, "批量处理完成")
+                _show_snackbar(page, t("logic:批量处理完成_7518"))
         except Exception as ex:
             # Ensure poller is cancelled on error to prevent task leak
             done_flag.set()
@@ -763,8 +766,8 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
                     await progress_poller
                 except asyncio.CancelledError:
                     pass
-            _log_message(log, f"批量处理失败: {ex}", level=logging.ERROR)
-            _show_snackbar(page, f"批量处理失败: {ex}", is_error=True)
+            _log_message(log, t("logic:批量处理失败:_1f96", ex=ex), level=logging.ERROR)
+            _show_snackbar(page, t("logic:批量处理失败:_1f96", ex=ex), is_error=True)
 
     finally:
         # 确保所有路径（包括早期返回）都清理进度条和按钮状态
@@ -772,7 +775,7 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
             unregister_cancel_event(cancel_event)
         _hide_batch_progress(progress_row, progress_bar, progress_text, cancel_btn)
         if not _shutdown_event.is_set():
-            set_btn_state(btn, True, "批量处理")
+            set_btn_state(btn, True, t("logic:批量处理_ba72"))
 
 
 # ---------------------------------------------------------------------------
@@ -817,22 +820,22 @@ def _get_ledgers_from_refs(
     if eq_toggle and eq_toggle.value:
         eq = ledger_refs.get("get_ledger", lambda: None)()
         if eq is None:
-            logging.warning("设备台账匹配已启用，但设备台账未加载")
+            logging.warning(t("logic:设备台账匹配已启用，但设备台账_f934"))
 
     oil = None
     if oil_toggle and oil_toggle.value:
         oil = oil_ledger_refs.get("get_oil", lambda: None)()
         if oil is None:
-            logging.warning("油品台账匹配已启用，但油品台账未加载")
+            logging.warning(t("logic:油品台账匹配已启用，但油品台账_866e"))
 
     model = None
     if model_toggle and model_toggle.value:
         if eq is None:
-            logging.warning("型号台账匹配需要同时启用设备台账匹配")
+            logging.warning(t("logic:型号台账匹配需要同时启用设备台_3096"))
         else:
             model = (model_ledger_refs or {}).get("get_model_ledger", lambda: None)()
         if model is None:
-            logging.warning("型号台账匹配已启用，但型号台账未加载")
+            logging.warning(t("logic:型号台账匹配已启用，但型号台账_62ca"))
     return eq, oil, model
 
 
@@ -935,8 +938,8 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
     """MineBase 同步按钮回调"""
     path = sync_refs["path"].value
     if not path:
-        _log_message(log, "[数据同步] 请先选择输出目录", level=logging.WARNING)
-        _show_snackbar(page, "请选择输出目录", is_error=True)
+        _log_message(log, t("logic:[数据同步]请先选择输出目录_8888"), level=logging.WARNING)
+        _show_snackbar(page, t("logic:请选择输出目录_d6f6"), is_error=True)
         return
 
     mode_toggle = sync_refs["mode"]
@@ -945,8 +948,8 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
     type_checks = sync_refs["types"]
     selected_types = [k for k, cb in type_checks.items() if cb.value]
     if not selected_types:
-        _log_message(log, "[数据同步] 请至少选择一种数据类型", level=logging.WARNING)
-        _show_snackbar(page, "请选择数据类型", is_error=True)
+        _log_message(log, t("logic:[数据同步]请至少选择一种数据_e81d"), level=logging.WARNING)
+        _show_snackbar(page, t("logic:请选择数据类型_86ec"), is_error=True)
         return
 
     dry_run = sync_refs["dry_run"].value
@@ -987,7 +990,7 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
     conflict_policy_val = sync_refs.get("conflict_policy")
     conflict_policy = conflict_policy_val.value if conflict_policy_val else "SKIP"
 
-    set_btn_state(btn, False, "同步中...")
+    set_btn_state(btn, False, t("logic:同步中..._f787"))
     result_text.visible = False
     result_text.update()
 
@@ -1026,9 +1029,9 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
         results = await asyncio.to_thread(_do_sync)
 
         if not results:
-            _log_message(log, "[数据同步] 未找到可同步的文件", level=logging.WARNING)
-            _show_snackbar(page, "未找到可同步的文件", is_error=True)
-            result_text.value = "未找到可同步的文件"
+            _log_message(log, t("logic:[数据同步]未找到可同步的文件_ac69"), level=logging.WARNING)
+            _show_snackbar(page, t("logic:未找到可同步的文件_74f4"), is_error=True)
+            result_text.value = t("logic:未找到可同步的文件_74f4")
             result_text.color = "#F59E0B"
             result_text.visible = True
             result_text.update()
@@ -1047,26 +1050,27 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
             for k in total:
                 total[k] += r.get(k, 0)
 
-        summary = f"成功: {total['success']}  跳过: {total['skipped']}  失败: {total['failed']}"
-        _log_message(log, f"[数据同步] 同步完成 — {summary}")
+        summary = t("logic:成功:跳过:失败:_86d9",
+                     success=total['success'], skipped=total['skipped'], failed=total['failed'])
+        _log_message(log, t("logic:[数据同步]同步完成—_8911", summary=summary))
 
         if total["failed"] > 0:
             result_text.value = summary
             result_text.color = "#EF4444"
-            _show_snackbar(page, f"同步完成（有 {total['failed']} 行失败）", is_error=True)
+            _show_snackbar(page, t("logic:同步完成（有行失败）_8f4e", failed=total['failed']), is_error=True)
         elif dry_run:
-            preview_msg = f"[预览] {summary}"
+            preview_msg = t("logic:[预览]_489b", summary=summary)
             if dry_run_file:
-                preview_msg += f"\n预览文件: {dry_run_file}"
+                preview_msg += t("logic:previewFile", dry_run_file=dry_run_file)
             result_text.value = preview_msg
             result_text.color = "#0891B2"
-            _show_snackbar(page, "预览完成")
+            _show_snackbar(page, t("logic:预览完成_f4ff"))
             if dry_run_file:
-                _log_message(log, f"[数据同步] 预览文件已保存至: {dry_run_file}")
+                _log_message(log, t("logic:[数据同步]预览文件已保存至:_bad3", dry_run_file=dry_run_file))
         else:
             result_text.value = summary
             result_text.color = "#10B981"
-            _show_snackbar(page, "同步完成")
+            _show_snackbar(page, t("logic:同步完成_02f6"))
 
         result_text.visible = True
         result_text.update()
@@ -1090,7 +1094,7 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
                 for dt_key, w in all_warnings:
                     dt_label = _dt_label_map.get(dt_key, dt_key)
                     val = w.get("value")
-                    val_str = str(val) if val is not None and str(val).strip() != "" else "（空）"
+                    val_str = str(val) if val is not None and str(val).strip() != "" else t("logic:（空）_27c4")
                     warnings_list.controls.append(
                         ft.Row(
                             [
@@ -1104,7 +1108,7 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
                         ),
                     )
                 if warnings_count_text:
-                    warnings_count_text.value = f"共 {len(all_warnings)} 条"
+                    warnings_count_text.value = t("logic:共条_aefa", count=len(all_warnings))
 
                 export_btn = sync_refs.get("export_warnings_btn")
                 save_picker = sync_refs.get("save_warnings_picker")
@@ -1115,28 +1119,28 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
                         target_path = None
                         if save_picker:
                             res = await save_picker.save_file(
-                                dialog_title="选择导出异常行保存位置",
-                                file_name=f"异常行明细_{ts}.xlsx",
+                                dialog_title=t("logic:选择导出异常行保存位置_5efd"),
+                                file_name=t("logic:异常行明细_.xlsx_75f1", ts=ts),
                                 allowed_extensions=["xlsx"],
                             )
                             if not res:
                                 return
                             target_path = res
                         out_path = export_warnings_to_excel(all_warnings, output_path=target_path, input_dir=path)
-                        _log_message(log, f"[数据同步] 异常行已导出至: {out_path}")
-                        _show_snackbar(page, f"异常行已导出至: {out_path}")
+                        _log_message(log, t("logic:[数据同步]异常行已导出至:_448a", out_path=out_path))
+                        _show_snackbar(page, t("logic:异常行已导出至:_7c8c", out_path=out_path))
                     export_btn.on_click = _on_export_click
 
                 warnings_container.visible = True
-                _log_message(log, f"[数据同步] 发现 {len(all_warnings)} 条异常记录", level=logging.WARNING)
+                _log_message(log, t("logic:[数据同步]发现条异常记录_029b", count=len(all_warnings)), level=logging.WARNING)
             else:
                 warnings_container.visible = False
             warnings_container.update()
 
     except Exception as ex:
-        _log_message(log, f"[数据同步] 同步失败: {ex}", level=logging.ERROR)
-        _show_snackbar(page, "同步失败", is_error=True)
-        result_text.value = f"失败: {ex}"
+        _log_message(log, t("logic:[数据同步]同步失败:_23a2", ex=ex), level=logging.ERROR)
+        _show_snackbar(page, t("logic:同步失败_d610"), is_error=True)
+        result_text.value = t("logic:失败:_b403", ex=ex)
         result_text.color = "#EF4444"
         result_text.visible = True
         result_text.update()
@@ -1146,7 +1150,7 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
             wc.update()
     finally:
         if not _shutdown_event.is_set():
-            set_btn_state(btn, True, "同步到 MineBase")
+            set_btn_state(btn, True, t("logic:同步到MineBase_59e0"))
 
 
 def wire_sync_button(sync_refs: dict, page: ft.Page, log, module_refs: dict | None = None):
@@ -1174,7 +1178,7 @@ async def _run_connection_test(
         saved_cfg = saved_config_loader()
         password = saved_cfg.get("password", "")
         if not password:
-            _show_snackbar(page, "未找到已保存的密码，请先输入密码并保存", is_error=True)
+            _show_snackbar(page, t("logic:未找到已保存的密码，请先输入密_205e"), is_error=True)
             return
 
     # 输入校验
@@ -1183,7 +1187,7 @@ async def _run_connection_test(
         _show_snackbar(page, error, is_error=True)
         return
 
-    set_btn_state(btn, False, "测试中...")
+    set_btn_state(btn, False, t("logic:测试中..._6c50"))
     result.visible = False
     result.update()
 
@@ -1194,17 +1198,17 @@ async def _run_connection_test(
         result.visible = True
         result.update()
 
-        _log_message(log, f"{label}连接测试: {msg}", level=logging.INFO if success else logging.WARNING)
-        _show_snackbar(page, "连接成功" if success else "连接失败", is_error=not success)
+        _log_message(log, t("logic:连接测试:_aad7", label=label, msg=msg), level=logging.INFO if success else logging.WARNING)
+        _show_snackbar(page, t("logic:连接成功_b331") if success else t("logic:连接失败_0745"), is_error=not success)
     except Exception as exc:
         result.value = str(exc)[:200]
         result.color = "#EF4444"
         result.visible = True
         result.update()
-        _show_snackbar(page, "测试异常", is_error=True)
+        _show_snackbar(page, t("logic:测试异常_141d"), is_error=True)
     finally:
         if not _shutdown_event.is_set():
-            set_btn_state(btn, True, "测试连接")
+            set_btn_state(btn, True, t("logic:测试连接_69e7"))
 
 
 async def on_test_db_connection(page: ft.Page, config_refs: dict, log):
@@ -1223,7 +1227,7 @@ async def on_test_db_connection(page: ft.Page, config_refs: dict, log):
 
     def _validate(pwd):
         if not port_str.isdigit():
-            return "端口必须是数字"
+            return t("logic:端口必须是数字_6ec4")
         return None
 
     def _test(pwd):
@@ -1232,7 +1236,7 @@ async def on_test_db_connection(page: ft.Page, config_refs: dict, log):
     await _run_connection_test(
         config_refs["mb_test_btn"], config_refs["mb_test_result"],
         password, get_minebase_db_config, _validate, _test,
-        page, log, "数据库",
+        page, log, t("logic:数据库_6805"),
     )
 
 
@@ -1257,7 +1261,7 @@ async def on_test_api_connection(page: ft.Page, config_refs: dict, log):
 
     def _validate(pwd):
         if not url:
-            return "请填写 API 地址"
+            return t("logic:请填写API地址_8fff")
         return None
 
     def _test(pwd):

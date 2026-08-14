@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
 import { SettingsIcon } from "../../lib/icons";
@@ -34,6 +35,7 @@ function cloneDefault(): DailyReportConfig {
 }
 
 export function DailyReportConfigSection({ bridge }: { bridge: BridgeProp }) {
+  const { t } = useTranslation();
   const { notify } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -51,7 +53,7 @@ export function DailyReportConfigSection({ bridge }: { bridge: BridgeProp }) {
       });
       setStatus({ msg: "", kind: "info" });
     } catch (error) {
-      setStatus({ msg: `加载日报设置失败: ${String(error)}`, kind: "error" });
+      setStatus({ msg: t("userConfig:DailyReportConfigSection.加载日报设置失败:$_287a", { error: String(error) }), kind: "error" });
     }
   }, [bridge.call]);
 
@@ -76,15 +78,18 @@ export function DailyReportConfigSection({ bridge }: { bridge: BridgeProp }) {
       if (!validation.valid) {
         const message = Object.entries(validation.errors).map(([key, value]) => `${key}：${value}`).join("；");
         setStatus({ msg: message, kind: "error" });
-        notify("日报公式校验失败", "error");
+        notify(t("userConfig:DailyReportConfigSection.日报公式校验失败_6ca2"), "error");
         return;
       }
       await bridge.call("save_daily_report_config", { config });
-      setStatus({ msg: "日报导出设置已保存", kind: "success" });
-      notify("日报导出设置已保存", "success");
+      setStatus({ msg: t("userConfig:DailyReportConfigSection.日报导出设置已保存_7ab0"), kind: "success" });
+      notify(t("userConfig:DailyReportConfigSection.日报导出设置已保存_7ab0"), "success");
     } catch (error) {
-      setStatus({ msg: `保存失败: ${String(error)}`, kind: "error" });
-      notify(`日报设置保存失败: ${String(error)}`, "error");
+      setStatus({
+        msg: t("userConfig:DailyReportConfigSection.saveError", { error: String(error) }),
+        kind: "error",
+      });
+      notify(t("userConfig:DailyReportConfigSection.日报设置保存失败:$_8490", { error: String(error) }), "error");
     } finally {
       setSaving(false);
     }
@@ -92,21 +97,21 @@ export function DailyReportConfigSection({ bridge }: { bridge: BridgeProp }) {
 
   const reset = () => {
     setConfig(cloneDefault());
-    setStatus({ msg: "已恢复默认值（需点击保存生效）", kind: "info" });
+    setStatus({ msg: t("userConfig:DailyReportConfigSection.已恢复默认值（需点击保存生效）_9afb"), kind: "info" });
   };
 
   return (
     <SectionCard
-      title="日报导出设置"
-      subtitle="日报页只选择日期和数据来源，统计口径在这里统一维护"
+      title={t("userConfig:DailyReportConfigSection.日报导出设置_9b48")}
+      subtitle={t("userConfig:DailyReportConfigSection.日报页只选择日期和数据来源，统_c351")}
       icon={<SettingsIcon />}
       expanded={expanded}
       onToggle={() => setExpanded(!expanded)}
     >
       <div className="space-y-4">
         <div>
-          <p className="text-xs text-slate-500 mb-1">物料统计配置</p>
-          <p className="text-xs text-slate-400 mb-3">物料类型无需配置，会自动展开全部源物料；统计分类按行顺序关键字匹配，每条生产记录只命中一次。</p>
+          <p className="text-xs text-slate-500 mb-1">{t("userConfig:DailyReportConfigSection.物料统计配置_7257")}</p>
+          <p className="text-xs text-slate-400 mb-3">{t("userConfig:DailyReportConfigSection.物料类型无需配置，会自动展开全_f4d2")}</p>
           <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
             {Object.entries(config.material_statistics).map(([target, keywords]) => (
               <div key={target} className="px-3 py-3 grid grid-cols-[7rem_1fr] gap-3 items-start">
@@ -114,7 +119,7 @@ export function DailyReportConfigSection({ bridge }: { bridge: BridgeProp }) {
                 <KeywordChipInput
                   label=""
                   items={keywords}
-                  placeholder="输入关键字后回车添加"
+                  placeholder={t("userConfig:DailyReportConfigSection.输入关键字后回车添加_fafd")}
                   onChange={(items) => updateMaterial(target, items)}
                 />
               </div>
@@ -123,8 +128,8 @@ export function DailyReportConfigSection({ bridge }: { bridge: BridgeProp }) {
         </div>
 
         <div>
-          <p className="text-xs text-slate-500 mb-1">延迟、待机与利用率公式</p>
-          <p className="text-xs text-slate-400 mb-3">保存时校验公式语法和字段名，导出前再按实际工时表头复核字段是否存在；支持四则运算、比较和三元表达式。</p>
+          <p className="text-xs text-slate-500 mb-1">{t("userConfig:DailyReportConfigSection.延迟、待机与利用率公式_4693")}</p>
+          <p className="text-xs text-slate-400 mb-3">{t("userConfig:DailyReportConfigSection.保存时校验公式语法和字段名，导_45f3")}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {FORMULA_KEYS.map((key) => (
               <label key={key} className="text-xs text-slate-500">
@@ -133,7 +138,7 @@ export function DailyReportConfigSection({ bridge }: { bridge: BridgeProp }) {
                   className="input mt-1 w-full"
                   value={config.formulas[key] ?? ""}
                   onChange={(e) => updateFormula(key, e.target.value)}
-                  aria-label={`${key}公式`}
+                  aria-label={t("userConfig:DailyReportConfigSection.$公式_b1eb", { key })}
                 />
               </label>
             ))}

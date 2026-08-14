@@ -1,3 +1,5 @@
+import i18n from "../i18n";
+
 const COLUMN_HINTS: Record<string, string[]> = {
   content_column: ["维修内容", "维修描述", "故障描述", "内容", "维修记录"],
   category_column: ["大类", "分类", "故障大类", "系统分类"],
@@ -27,18 +29,18 @@ export function validateColumnMapping(
   statusColumn: string,
 ): string | null {
   const entries = [
-    ["维修内容列", contentColumn],
-    ["大类列", categoryColumn],
-    ["小类列", minorColumn],
-    ["分类方式列", statusColumn],
+    [i18n.t("lib:llm-labeling.维修内容列_6809"), contentColumn],
+    [i18n.t("lib:llm-labeling.大类列_b1b1"), categoryColumn],
+    [i18n.t("lib:llm-labeling.小类列_aa19"), minorColumn],
+    [i18n.t("lib:llm-labeling.分类方式列_4266"), statusColumn],
   ];
   const rolesByColumn = new Map<string, string[]>();
   for (const [role, column] of entries) {
-    if (!column) return `${role}不能为空`;
+    if (!column) return i18n.t("lib:llm-labeling.$不能为空_0c87", { role });
     rolesByColumn.set(column, [...(rolesByColumn.get(column) || []), role]);
   }
   const conflict = [...rolesByColumn.entries()].find(([, roles]) => roles.length > 1);
   return conflict
-    ? `列映射冲突：“${conflict[0]}”同时用于${conflict[1].join("、")}`
+    ? i18n.t("lib:llm-labeling.columnConflict", { column: conflict[0], roles: conflict[1].join(", ") })
     : null;
 }

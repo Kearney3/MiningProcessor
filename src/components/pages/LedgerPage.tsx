@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import type { BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
@@ -151,6 +152,7 @@ function ColumnMappingModal({
   onConfirm: (mapping: Record<string, string>) => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   const [mapping, setMapping] = useState<Record<string, string>>({});
 
   // Auto-detect: if a file column matches a standard column name, pre-fill
@@ -198,7 +200,7 @@ function ColumnMappingModal({
                 }
                 className="input flex-1"
               >
-                <option value="">-- 跳过 --</option>
+                <option value="">{t("pages:LedgerPage.--跳过--_ce58")}</option>
                 {fileColumns.map((fc) => (
                   <option key={fc} value={fc} disabled={usedFileCols.has(fc) && mapping[stdCol] !== fc}>
                     {fc}
@@ -290,6 +292,7 @@ function ConfirmDialog({
 
 export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: LedgerPageConfig }) {
   const { notify } = useToast();
+  const { t } = useTranslation();
   const { initialDir, saveDir } = useLastDirectory(bridge);
   const [rows, setRows] = useState<LedgerRow[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
@@ -453,10 +456,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
         sheet_name: pendingSheetName || undefined,
       });
       await loadData();
-      notify("导入成功", "success");
+      notify(t("pages:LedgerPage.导入成功_b6d1"), "success");
     } catch (e) {
       setError(String(e));
-      notify(`导入失败: ${e}`, "error");
+      notify(t("pages:LedgerPage.导入失败:$_d39c", { error: String(e) }), "error");
     } finally {
       setImporting(false);
       setPendingFilePath("");
@@ -473,10 +476,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
       });
       if (!filePath) return;
       await bridge.call(config.exportTemplateMethod, { output_path: filePath });
-      notify("模板导出成功", "success");
+      notify(t("pages:LedgerPage.模板导出成功_fb39"), "success");
     } catch (e) {
       setError(String(e));
-      notify(`模板导出失败: ${e}`, "error");
+      notify(t("pages:LedgerPage.模板导出失败:$_d8e9", { error: String(e) }), "error");
     }
   };
 
@@ -492,10 +495,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
         data_type: config.exportDataType,
         output_path: filePath,
       });
-      notify("台账导出成功", "success");
+      notify(t("pages:LedgerPage.台账导出成功_f447"), "success");
     } catch (e) {
       setError(String(e));
-      notify(`台账导出失败: ${e}`, "error");
+      notify(t("pages:LedgerPage.台账导出失败:$_79fd", { error: String(e) }), "error");
     }
   };
 
@@ -504,10 +507,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
     try {
       await bridge.call(config.setDefaultMethod);
       setIsDefault(true);
-      notify("已设为默认", "success");
+      notify(t("pages:LedgerPage.已设为默认_fc66"), "success");
     } catch (e) {
       setError(String(e));
-      notify(`设为默认失败: ${e}`, "error");
+      notify(t("pages:LedgerPage.设为默认失败:$_bc62", { error: String(e) }), "error");
     }
   };
 
@@ -516,10 +519,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
     try {
       await bridge.call(config.cancelDefaultMethod);
       setIsDefault(false);
-      notify("已取消默认", "success");
+      notify(t("pages:LedgerPage.已取消默认_a97f"), "success");
     } catch (e) {
       setError(String(e));
-      notify(`取消默认失败: ${e}`, "error");
+      notify(t("pages:LedgerPage.取消默认失败:$_9790", { error: String(e) }), "error");
     }
   };
 
@@ -529,10 +532,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
       await bridge.call(config.clearMethod);
       setRows([]);
       setColumns([]);
-      notify("已清空台账", "success");
+      notify(t("pages:LedgerPage.已清空台账_2768"), "success");
     } catch (e) {
       setError(String(e));
-      notify(`清空失败: ${e}`, "error");
+      notify(t("pages:LedgerPage.清空失败:$_99f0", { error: String(e) }), "error");
     }
   };
 
@@ -545,7 +548,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
-        <span className="text-sm">加载中...</span>
+        <span className="text-sm">{t("pages:LedgerPage.加载中..._26b5")}</span>
       </div>
     );
   }
@@ -579,7 +582,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
               type="text"
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
-              placeholder="搜索..."
+              placeholder={t("pages:LedgerPage.搜索..._64e3")}
               className="input text-sm w-44 border-slate-300"
               style={{ paddingLeft: "2.25rem", paddingRight: "0.75rem" }}
             />
@@ -597,7 +600,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
             onClick={handleImport}
             disabled={importing}
             className="btn-secondary"
-            title="导入台账"
+            title={t("pages:LedgerPage.导入台账_21be")}
           >
             <ImportIcon />
             <span className="hidden sm:inline">导入</span>
@@ -607,10 +610,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           <button
             onClick={handleExportTemplate}
             className="btn-secondary"
-            title="导出模板"
+            title={t("pages:LedgerPage.导出模板_0d2c")}
           >
             <ExportIcon />
-            <span className="hidden sm:inline">导出模板</span>
+            <span className="hidden sm:inline">{t("pages:LedgerPage.导出模板_0d2c")}</span>
           </button>
 
           {/* Export data */}
@@ -618,10 +621,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
             <button
               onClick={handleExportData}
               className="btn-secondary"
-              title="导出台账"
+              title={t("pages:LedgerPage.导出台账_b15c")}
             >
               <ExportIcon />
-              <span className="hidden sm:inline">导出台账</span>
+              <span className="hidden sm:inline">{t("pages:LedgerPage.导出台账_b15c")}</span>
             </button>
           )}
 
@@ -632,19 +635,19 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
             <button
               onClick={() => setShowCancelDefaultDialog(true)}
               className="btn-secondary"
-              title="取消默认"
+              title={t("pages:LedgerPage.取消默认_533f")}
             >
               <StarFilledIcon />
-              <span className="hidden sm:inline">取消默认</span>
+              <span className="hidden sm:inline">{t("pages:LedgerPage.取消默认_533f")}</span>
             </button>
           ) : (
             <button
               onClick={() => setShowSetDefaultDialog(true)}
               className="btn-secondary"
-              title="设为默认"
+              title={t("pages:LedgerPage.设为默认_1af3")}
             >
               <StarIcon />
-              <span className="hidden sm:inline">设为默认</span>
+              <span className="hidden sm:inline">{t("pages:LedgerPage.设为默认_1af3")}</span>
             </button>
           )}
 
@@ -652,7 +655,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           <button
             onClick={() => setShowClearDialog(true)}
             className="btn-danger"
-            title="清空台账"
+            title={t("pages:LedgerPage.清空台账_d9ca")}
           >
             <TrashIcon />
             <span className="hidden sm:inline">清空</span>
@@ -688,14 +691,14 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
       {rows.length === 0 ? (
         <div className="bg-white rounded-lg border border-slate-200 p-16 text-center">
           <TableIcon />
-          <p className="text-slate-400 text-sm mt-4 mb-1">暂无数据</p>
+          <p className="text-slate-400 text-sm mt-4 mb-1">{t("pages:LedgerPage.暂无数据_21ef")}</p>
           <p className="text-slate-400 text-xs mb-6">{config.emptyMessage}</p>
           <button
             onClick={handleImport}
             className="btn-primary inline-flex items-center gap-2 text-sm px-5 py-2"
           >
             <ImportIcon />
-            导入台账
+            {t("pages:LedgerPage.导入台账_21be")}
           </button>
         </div>
       ) : (
@@ -752,10 +755,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           {/* Pagination */}
           <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 shrink-0">
             <span className="text-xs text-slate-500">
-              {searchTerm ? `${displayRows.length} / ${rows.length} 条` : `共 ${rows.length} 条`}
+              {searchTerm ? t("pages:LedgerPage.$/$条_9b29", { shown: displayRows.length, total: rows.length }) : t("pages:LedgerPage.共$条_cd74", { total: rows.length })}
               {sort && (
                 <span className="ml-2 text-slate-400">
-                  {sort.column} {sort.direction === "asc" ? "升序" : "降序"}
+                  {sort.column} {sort.direction === "asc" ? t("pages:LedgerPage.升序_a4ac") : t("pages:LedgerPage.降序_d05d")}
                 </span>
               )}
             </span>
@@ -804,8 +807,8 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
       {/* Confirm dialogs */}
       <ConfirmDialog
         open={showClearDialog}
-        title="清空台账"
-        message={`确定要清空所有${config.title}数据吗？此操作不可撤销。`}
+        title={t("pages:LedgerPage.清空台账_d9ca")}
+        message={t("pages:LedgerPage.确定要清空所有$数据吗？此操作_7290", { title: config.title })}
         confirmLabel="清空"
         danger
         onConfirm={handleClear}
@@ -813,15 +816,15 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
       />
       <ConfirmDialog
         open={showSetDefaultDialog}
-        title="设为默认"
-        message={`将当前${config.title}设为默认，后续处理将自动使用此台账。`}
+        title={t("pages:LedgerPage.设为默认_1af3")}
+        message={t("pages:LedgerPage.将当前$设为默认，后续处理将自_c832", { title: config.title })}
         onConfirm={handleSetDefault}
         onCancel={() => setShowSetDefaultDialog(false)}
       />
       <ConfirmDialog
         open={showCancelDefaultDialog}
-        title="取消默认"
-        message={`取消当前${config.title}的默认状态。`}
+        title={t("pages:LedgerPage.取消默认_533f")}
+        message={t("pages:LedgerPage.取消当前$的默认状态。_5324", { title: config.title })}
         onConfirm={handleCancelDefault}
         onCancel={() => setShowCancelDefaultDialog(false)}
       />
@@ -834,7 +837,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
-            <span className="text-sm text-slate-600">正在导入...</span>
+            <span className="text-sm text-slate-600">{t("pages:LedgerPage.正在导入..._3ada")}</span>
           </div>
         </div>
       )}

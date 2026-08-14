@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { BridgeProp, BatchProgress, ScanResult, BatchSummary, AnomalyRecord } from "../../lib/types";
 import { useToast } from "../Toast";
@@ -95,6 +96,7 @@ function ProgressBar({ percent, stage, detail }: { percent: number; stage: strin
 export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
   // -- Path & scan --
   const { notify } = useToast();
+  const { t } = useTranslation();
   const { initialDir, saveDir } = useLastDirectory(bridge);
   const [folderPath, setFolderPath] = useState("");
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
@@ -227,16 +229,16 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
         setSummary(res.summary);
         setAnomalies(res.summary.anomalies ?? []);
       }
-      setResult("批量处理完成");
-      notify("批量处理完成", "success");
+      setResult(t("pages:BatchProcessingPage.批量处理完成_7518"));
+      notify(t("pages:BatchProcessingPage.批量处理完成_7518"), "success");
     } catch (e) {
       const msg = String(e);
       if (msg.includes("cancel")) {
-        setResult("已取消");
-        notify("批量处理已取消", "info");
+        setResult(t("pages:BatchProcessingPage.已取消_2111"));
+        notify(t("pages:BatchProcessingPage.批量处理已取消_2424"), "info");
       } else {
         setError(msg);
-        notify(`批量处理失败: ${msg}`, "error");
+        notify(t("pages:BatchProcessingPage.批量处理失败:$_596c", { msg }), "error");
       }
     } finally {
       setProcessing(false);
@@ -265,8 +267,8 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-slate-800">批量处理</h2>
-          <p className="text-sm text-slate-500">扫描文件夹并批量处理多种报表</p>
+          <h2 className="text-lg font-semibold text-slate-800">{t("pages:BatchProcessingPage.批量处理_ba72")}</h2>
+          <p className="text-sm text-slate-500">{t("pages:BatchProcessingPage.扫描文件夹并批量处理多种报表_d8f0")}</p>
         </div>
       </div>
 
@@ -279,10 +281,10 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
             type="text"
             value={folderPath}
             onChange={(e) => { setFolderPath(e.target.value); setScanResult(null); }}
-            placeholder="选择包含报表的文件夹"
+            placeholder={t("pages:BatchProcessingPage.选择包含报表的文件夹_53e9")}
             className={`${inputClass} flex-1 ${folderPath === "" ? "border-amber-300 bg-amber-50/30" : ""}`}
           />
-          <button onClick={browse} className={btnSecondaryClass} title="选择文件夹">
+          <button onClick={browse} className={btnSecondaryClass} title={t("pages:BatchProcessingPage.选择文件夹_aaa4")}>
             <FolderIcon />
           </button>
           <button
@@ -330,7 +332,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
                 <XIcon />
                 <QuestionIcon />
                 <span className="text-slate-500">{type}</span>
-                <span className="text-xs text-slate-400">未找到</span>
+                <span className="text-xs text-slate-400">{t("pages:BatchProcessingPage.未找到_c465")}</span>
               </div>
             ))}
           </div>
@@ -343,37 +345,37 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
       <div className="bg-white rounded-lg border border-slate-200 p-4">
         <h3 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
           <SettingsIcon />
-          参数配置
+          {t("pages:BatchProcessingPage.parameterConfig")}
         </h3>
 
         {/* ── Basic params grid ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
-            <label className="text-xs text-slate-500 mb-1 block">年份</label>
+            <label className="text-xs text-slate-500 mb-1 block">{t("pages:BatchProcessingPage.年份_8f30")}</label>
             <select
               value={year}
               onChange={(e) => setYear(e.target.value)}
               className={`${inputClass} h-9`}
             >
               {Array.from({ length: 61 }, (_, i) => localToday().getFullYear() - 30 + i).map((y) => (
-                <option key={y} value={y}>{y}年</option>
+                <option key={y} value={y}>{t("pages:DataProcessingPage.$年_b668", { y })}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="text-xs text-slate-500 mb-1 block">月份</label>
+            <label className="text-xs text-slate-500 mb-1 block">{t("pages:BatchProcessingPage.月份_8190")}</label>
             <select
               value={month}
               onChange={(e) => setMonth(e.target.value)}
               className={`${inputClass} h-9`}
             >
               {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                <option key={m} value={m}>{m}月</option>
+                <option key={m} value={m}>{t("pages:DataProcessingPage.$月_d5bf", { m })}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="text-xs text-slate-500 mb-1 block">表头起始行</label>
+            <label className="text-xs text-slate-500 mb-1 block">{t("pages:BatchProcessingPage.表头起始行_7c63")}</label>
             <input
               type="number"
               value={rawStart}
@@ -385,23 +387,23 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
 
         <div className="mt-3 space-y-3">
           <div>
-            <p className="text-xs font-medium text-slate-500 mb-2">台账匹配</p>
+            <p className="text-xs font-medium text-slate-500 mb-2">{t("pages:BatchProcessingPage.台账匹配_9897")}</p>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
-              <Toggle checked={useEquipmentLedger} onChange={setUseEquipmentLedger} label="设备台账匹配" />
-              <Toggle checked={useOilLedger} onChange={setUseOilLedger} label="油品台账匹配" />
-              <Toggle checked={useModelLedger} onChange={setUseModelLedger} label="型号台账匹配" />
+              <Toggle checked={useEquipmentLedger} onChange={setUseEquipmentLedger} label={t("pages:BatchProcessingPage.设备台账匹配_5a23")} />
+              <Toggle checked={useOilLedger} onChange={setUseOilLedger} label={t("pages:BatchProcessingPage.油品台账匹配_8663")} />
+              <Toggle checked={useModelLedger} onChange={setUseModelLedger} label={t("pages:BatchProcessingPage.型号台账匹配_135c")} />
             </div>
           </div>
           <div className="border-t border-slate-100 pt-3">
-            <p className="text-xs font-medium text-slate-500 mb-2">Excel 选项</p>
+            <p className="text-xs font-medium text-slate-500 mb-2">{t("pages:BatchProcessingPage.Excel选项_104b")}</p>
             <div className="flex flex-wrap gap-x-4 gap-y-1">
-              <Toggle checked={skipHiddenRows} onChange={setSkipHiddenRows} label="跳过隐藏行" />
-              <Toggle checked={skipHiddenCols} onChange={setSkipHiddenCols} label="跳过隐藏列" />
+              <Toggle checked={skipHiddenRows} onChange={setSkipHiddenRows} label={t("pages:BatchProcessingPage.跳过隐藏行_bc25")} />
+              <Toggle checked={skipHiddenCols} onChange={setSkipHiddenCols} label={t("pages:BatchProcessingPage.跳过隐藏列_3ed3")} />
             </div>
           </div>
         </div>
 
-        <SectionDivider label="输出方式" />
+        <SectionDivider label={t("pages:BatchProcessingPage.输出方式_71ab")} />
 
         {/* ── Table merge mode ── */}
         <div className="space-y-3">
@@ -409,20 +411,20 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
             value={tableMergeMode}
             onChange={(v) => setTableMergeMode(v as TableMergeMode)}
             options={[
-              { label: "分表输出", value: "split", tip: "每个报表类型输出独立文件" },
-              { label: "合并输出", value: "merge", tip: "所有结果合并为一个文件" },
-              { label: "表内合并", value: "table_merge", tip: "以某类表为基准合并数据" },
+              { label: t("pages:BatchProcessingPage.分表输出_76b1"), value: "split", tip: t("pages:BatchProcessingPage.每个报表类型输出独立文件_6e1c") },
+              { label: t("pages:BatchProcessingPage.合并输出_6a20"), value: "merge", tip: t("pages:BatchProcessingPage.所有结果合并为一个文件_bb18") },
+              { label: t("pages:BatchProcessingPage.表内合并_2283"), value: "table_merge", tip: t("pages:BatchProcessingPage.以某类表为基准合并数据_38a3") },
             ]}
           />
           {tableMergeMode === "table_merge" && (
             <div className="flex items-center gap-3 pl-1">
-              <span className="text-xs text-slate-500">基准表</span>
+              <span className="text-xs text-slate-500">{t("pages:BatchProcessingPage.基准表_a229")}</span>
               <ChipToggle
                 value={baseTableType}
                 onChange={(v) => setBaseTableType(v as BaseTableType)}
                 options={[
-                  { label: "油耗", value: "fuel" },
-                  { label: "工时", value: "worktime" },
+                  { label: t("pages:BatchProcessingPage.油耗_75d6"), value: "fuel" },
+                  { label: t("pages:BatchProcessingPage.工时_e8c0"), value: "worktime" },
                 ]}
               />
             </div>
@@ -434,13 +436,13 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
           Section 3: Consolidated advanced options
           ════════════════════════════════════ */}
       <Collapsible
-        title="高级选项"
+        title={t("pages:BatchProcessingPage.高级选项_1083")}
         icon={<SettingsIcon />}
         summary={
           <span className="mr-1 text-xs font-normal text-slate-500">
             {dateFilterEnabled || useHeaderMapping || anomaly.enabled
-              ? `${Number(dateFilterEnabled) + Number(useHeaderMapping) + Number(anomaly.enabled)} 项已启用`
-              : "使用默认设置"}
+              ? t("pages:BatchProcessingPage.$项已启用_ee73", { count: Number(dateFilterEnabled) + Number(useHeaderMapping) + Number(anomaly.enabled) })
+              : t("pages:BatchProcessingPage.使用默认设置_af8d")}
           </span>
         }
       >
@@ -449,13 +451,13 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
           <section className="py-4 xl:pr-5">
             <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
               <span className="text-slate-500"><CalendarIcon /></span>
-              日期过滤
+              {t("pages:BatchProcessingPage.dateFilter")}
             </div>
             <div className="space-y-3">
               <Toggle
                 checked={dateFilterEnabled}
                 onChange={setDateFilterEnabled}
-                label="按日期过滤"
+                label={t("pages:BatchProcessingPage.按日期过滤_e159")}
               />
 
               {dateFilterEnabled && (
@@ -485,7 +487,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
                     </button>
                   </div>
                   <div className="flex flex-wrap items-center gap-3">
-                    <label className="text-xs text-slate-500" htmlFor="batch-filter-date">日期</label>
+                    <label className="text-xs text-slate-500" htmlFor="batch-filter-date">{t("pages:BatchProcessingPage.日期_4ff1")}</label>
                     <input
                       id="batch-filter-date"
                       type="date"
@@ -504,25 +506,25 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
           <section className="border-t border-slate-100 py-4 xl:border-t-0 xl:pl-5">
             <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
               <span className="text-slate-500"><RulerIcon /></span>
-              工时表头映射
+              {t("pages:BatchProcessingPage.headerMapping")}
             </div>
             <div className="space-y-3">
               <Toggle
                 checked={useHeaderMapping}
                 onChange={setUseHeaderMapping}
-                label="启用表头映射"
+                label={t("pages:BatchProcessingPage.启用表头映射_453a")}
               />
 
               {useHeaderMapping && (
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-xs text-slate-500">映射模式</span>
+                    <span className="text-xs text-slate-500">{t("pages:BatchProcessingPage.映射模式_2ba8")}</span>
                     <ChipToggle
                       value={headerMode}
                       onChange={setHeaderMode}
                       options={[
-                        { label: "位置映射", value: "position" },
-                        { label: "名称映射", value: "name" },
+                        { label: t("pages:BatchProcessingPage.位置映射_51c1"), value: "position" },
+                        { label: t("pages:BatchProcessingPage.名称映射_817c"), value: "name" },
                       ]}
                     />
                   </div>
@@ -552,23 +554,23 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
           <section className="border-t border-slate-100 py-4 xl:border-t-0 xl:pl-5">
             <div className="mb-3 flex items-center gap-2 text-sm font-medium text-slate-700">
               <span className="text-slate-500"><FilterIcon /></span>
-              数据过滤
+              {t("pages:BatchProcessingPage.dataFilter")}
             </div>
             <div className="space-y-3">
               <div>
-                <p className="text-xs font-medium text-slate-500 mb-2">油耗处理</p>
+                <p className="text-xs font-medium text-slate-500 mb-2">{t("pages:BatchProcessingPage.油耗处理_1a41")}</p>
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
-                  <Toggle checked={filterZeroEngineHours} onChange={setFilterZeroEngineHours} label="过滤零小时数" />
-                  <Toggle checked={filterZeroWorkHours} onChange={setFilterZeroWorkHours} label="过滤零运行小时数" />
+                  <Toggle checked={filterZeroEngineHours} onChange={setFilterZeroEngineHours} label={t("pages:BatchProcessingPage.过滤零小时数_549f")} />
+                  <Toggle checked={filterZeroWorkHours} onChange={setFilterZeroWorkHours} label={t("pages:BatchProcessingPage.过滤零运行小时数_eaf1")} />
                 </div>
               </div>
               <div className="border-t border-slate-100 pt-3">
-                <p className="text-xs font-medium text-slate-500 mb-2">生产数据</p>
+                <p className="text-xs font-medium text-slate-500 mb-2">{t("pages:BatchProcessingPage.生产数据_9fb6")}</p>
                 <div className="flex flex-wrap gap-x-4 gap-y-1">
-                  <Toggle checked={filterZeroHoursMeter} onChange={setFilterZeroHoursMeter} label="过滤零小时仪表" />
-                  <Toggle checked={filterZeroKmMeter} onChange={setFilterZeroKmMeter} label="过滤零公里仪表" />
-                  <Toggle checked={filterZeroRunHours} onChange={setFilterZeroRunHours} label="过滤零运行小时数" />
-                  <Toggle checked={filterZeroRunKm} onChange={setFilterZeroRunKm} label="过滤零运行里程" />
+                  <Toggle checked={filterZeroHoursMeter} onChange={setFilterZeroHoursMeter} label={t("pages:BatchProcessingPage.过滤零小时仪表_99e8")} />
+                  <Toggle checked={filterZeroKmMeter} onChange={setFilterZeroKmMeter} label={t("pages:BatchProcessingPage.过滤零公里仪表_2e3c")} />
+                  <Toggle checked={filterZeroRunHours} onChange={setFilterZeroRunHours} label={t("pages:BatchProcessingPage.过滤零运行小时数_eaf1")} />
+                  <Toggle checked={filterZeroRunKm} onChange={setFilterZeroRunKm} label={t("pages:BatchProcessingPage.过滤零运行里程_d55d")} />
                 </div>
               </div>
             </div>
@@ -597,7 +599,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
           className={`${btnPrimaryClass} flex items-center gap-2`}
         >
           {!processing && <PlayIcon />}
-          {processing ? "处理中..." : "开始批量处理"}
+          {processing ? t("pages:BatchProcessingPage.处理中..._2fb9") : t("pages:BatchProcessingPage.开始批量处理_1a4f")}
         </button>
         {processing && (
           <button
@@ -627,7 +629,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
       {/* ── Batch Summary ── */}
       {summary && (
         <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-3">
-          <h3 className="text-sm font-medium text-slate-700">处理汇总</h3>
+          <h3 className="text-sm font-medium text-slate-700">{t("pages:BatchProcessingPage.处理汇总_c45e")}</h3>
           <div className="flex items-center gap-4 text-xs">
             {summary.success_modules.length > 0 && (
               <div className="flex items-center gap-1.5">
@@ -669,11 +671,11 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
           ════════════════════════════════════ */}
       {showConfirm && scanResult && (
         <ConfirmDialog
-          title="部分文件缺失"
-          message="扫描发现以下报表类型未找到对应文件，继续处理将仅处理已有数据。是否继续？"
+          title={t("pages:BatchProcessingPage.部分文件缺失_4034")}
+          message={t("pages:BatchProcessingPage.扫描发现以下报表类型未找到对应_0aac")}
           details={scanResult.missing}
-          confirmLabel="继续处理"
-          cancelLabel="返回"
+          confirmLabel={t("pages:BatchProcessingPage.继续处理_a53f")}
+          cancelLabel={t("pages:BatchProcessingPage.返回_5f41")}
           onConfirm={() => { setShowConfirm(false); doProcess(); }}
           onCancel={() => setShowConfirm(false)}
         />

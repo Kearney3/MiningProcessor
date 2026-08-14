@@ -16,6 +16,7 @@ except ImportError:
     import gui.theme as theme
 
 from ._helpers import _create_keyword_input
+from gui.i18n import t
 
 
 def _create_daily_report_config_section(page: ft.Page, log):
@@ -39,7 +40,7 @@ def _create_daily_report_config_section(page: ft.Page, log):
         material_rows.clear()
         for target, keywords in mapping.items():
             kw_column, kw_get, kw_set = _create_keyword_input(
-                page, "", "输入关键字后回车添加",
+                page, "", t("components:user_config._daily_report.输入关键字后回车添加_fafd"),
             )
             kw_set(keywords if isinstance(keywords, list) else [])
             target_field = ft.TextField(
@@ -51,7 +52,7 @@ def _create_daily_report_config_section(page: ft.Page, log):
                 ft.Container(
                     content=ft.Row(
                         [
-                            ft.Text("统计列", width=48, size=11, color=theme.TEXT_SECONDARY),
+                            ft.Text(t("components:user_config._daily_report.统计列_a20b"), width=48, size=11, color=theme.TEXT_SECONDARY),
                             target_field,
                             ft.Container(content=kw_column, expand=True),
                         ],
@@ -115,7 +116,7 @@ def _create_daily_report_config_section(page: ft.Page, log):
         if errors:
             message = "；".join(f"{key}：{value}" for key, value in errors.items())
             _set_status(message, theme.ERROR)
-            _log_message(log, f"日报公式校验失败：{message}", level=logging.WARNING)
+            _log_message(log, t("components:user_config._daily_report.日报公式校验失败：_32c1", message=message), level=logging.WARNING)
             try:
                 page.update()
             except (RuntimeError, AttributeError):
@@ -128,11 +129,11 @@ def _create_daily_report_config_section(page: ft.Page, log):
         }
         try:
             config_loader.save_daily_report_config(report_config)
-            _set_status("日报导出设置已保存", theme.SUCCESS)
-            _log_message(log, "已保存日报导出设置")
+            _set_status(t("components:user_config._daily_report.日报导出设置已保存_7ab0"), theme.SUCCESS)
+            _log_message(log, t("components:user_config._daily_report.已保存日报导出设置_6bfa"))
         except Exception as exc:
             _set_status(str(exc), theme.ERROR)
-            _log_message(log, f"日报导出设置保存失败：{exc}", level=logging.ERROR)
+            _log_message(log, t("components:user_config._daily_report.日报导出设置保存失败：_fca9", exc=exc), level=logging.ERROR)
 
     def _reset(e=None):
         _rebuild_material_rows(deepcopy(config_loader.DEFAULT_DAILY_REPORT_CONFIG["material_statistics"]))
@@ -140,7 +141,7 @@ def _create_daily_report_config_section(page: ft.Page, log):
         for key, field in formula_fields.items():
             field.value = defaults["formulas"].get(key, "")
             field.error_text = None
-        _set_status("已恢复默认值（请点击保存生效）", theme.TEXT_SECONDARY)
+        _set_status(t("components:user_config._daily_report.已恢复默认值（请点击保存生效）_729d"), theme.TEXT_SECONDARY)
         try:
             page.update()
         except (RuntimeError, AttributeError):
@@ -148,9 +149,9 @@ def _create_daily_report_config_section(page: ft.Page, log):
 
     material_header = ft.Row(
         [
-            ft.Text("统计列", width=48, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
-            ft.Text("目标名称", width=115, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
-            ft.Text("关键字（名称匹配，按顺序只命中一次）", expand=True, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
+            ft.Text(t("components:user_config._daily_report.统计列_a20b"), width=48, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
+            ft.Text(t("components:user_config._daily_report.目标名称_0ae8"), width=115, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
+            ft.Text(t("components:user_config._daily_report.关键字（名称匹配，按顺序只命中_f235"), expand=True, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
         ],
         spacing=8,
     )
@@ -160,26 +161,26 @@ def _create_daily_report_config_section(page: ft.Page, log):
         border_radius=8,
     )
     formula_hint = ft.Text(
-        "保存时校验公式语法和字段名，导出前再按实际工时表头复核字段是否存在；支持四则运算、比较和三元表达式。",
+        t("components:user_config._daily_report.保存时校验公式语法和字段名，导_45f3"),
         size=11, color=theme.TEXT_SECONDARY,
     )
     action_row = ft.Row(
         [
-            theme.primary_btn("保存", icon=ft.Icons.SAVE, on_click=_save),
-            theme.secondary_btn("重新加载", icon=ft.Icons.REFRESH, on_click=_reload, height=34),
-            theme.secondary_btn("恢复默认", icon=ft.Icons.RESTART_ALT, on_click=_reset, height=34),
+            theme.primary_btn(t("components:user_config._daily_report.保存_be5f"), icon=ft.Icons.SAVE, on_click=_save),
+            theme.secondary_btn(t("components:user_config._daily_report.重新加载_64ca"), icon=ft.Icons.REFRESH, on_click=_reload, height=34),
+            theme.secondary_btn(t("components:user_config._daily_report.恢复默认_7468"), icon=ft.Icons.RESTART_ALT, on_click=_reset, height=34),
         ], spacing=8, wrap=True,
     )
     card = theme.make_collapsible(
-        title="日报导出设置",
-        subtitle="日报导出页只选择日期和数据来源，统计口径在这里统一维护",
+        title=t("components:user_config._daily_report.日报导出设置_9b48"),
+        subtitle=t("components:user_config._daily_report.日报导出页只选择日期和数据来源_315e"),
         icon=getattr(ft.Icons, "SUMMARIZE", ft.Icons.DESCRIPTION),
         initially_expanded=False,
         content_controls=[
-            ft.Text("物料类型无需配置，日报会自动展开源数据中出现的全部物料类型。统计分类按配置行顺序进行关键字匹配，每条记录只归入第一个命中类别。", size=12, color=theme.TEXT_SECONDARY),
-            theme.module_card([material_box], label="物料统计配置"),
+            ft.Text(t("components:user_config._daily_report.物料类型无需配置，日报会自动展_24f6"), size=12, color=theme.TEXT_SECONDARY),
+            theme.module_card([material_box], label=t("components:user_config._daily_report.物料统计配置_7257")),
             formula_hint,
-            theme.module_card([formula_column], label="延迟、待机与利用率公式"),
+            theme.module_card([formula_column], label=t("components:user_config._daily_report.延迟、待机与利用率公式_4693")),
             action_row,
             status_text,
         ],

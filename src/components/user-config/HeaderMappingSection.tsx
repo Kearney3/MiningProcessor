@@ -5,6 +5,7 @@ import {
   TableHeaderIcon, SaveIcon, RefreshIcon, RestoreIcon, PlusIcon, CloseIcon,
 } from "../../lib/icons";
 import { SectionCard, StatusMessage, KeywordChipInput } from "./_shared";
+import { useTranslation } from "react-i18next";
 
 // ---------------------------------------------------------------------------
 // Types & Defaults
@@ -57,6 +58,7 @@ const DEFAULT_HEADER_MAPPING: HeaderMappingConfig = {
 // ---------------------------------------------------------------------------
 
 export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
+  const { t } = useTranslation();
   const { notify } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -91,10 +93,10 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
     const seen: Record<number, number> = {};
     for (let i = 0; i < entries.length; i++) {
       const e = entries[i];
-      if (!e.new.trim()) return `第 ${i + 1} 行：新列名不能为空`;
+      if (!e.new.trim()) return t("userConfig:HeaderMappingSection.第$行：新列名不能为空_3d11", { row: i + 1 });
       if (e.index !== null) {
         if (seen[e.index] !== undefined) {
-          return `行号 ${e.index} 重复（第 ${seen[e.index]} 行和第 ${i + 1} 行）`;
+          return t("userConfig:HeaderMappingSection.行号$重复（第$行和第$行）_e259", { index: e.index, first: seen[e.index], second: i + 1 });
         }
         seen[e.index] = i + 1;
       }
@@ -125,15 +127,15 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
       const posCount = cleanEntries.filter((e) => e.index !== undefined).length;
       const kwCount = cleanEntries.filter((e) => Array.isArray(e.keywords)).length;
       const hints: string[] = [];
-      if (posCount) hints.push(`${posCount} 条按位置匹配`);
-      if (kwCount) hints.push(`${kwCount} 条按关键字匹配`);
+      if (posCount) hints.push(t("userConfig:HeaderMappingSection.$条按位置匹配_43d3", { count: posCount }));
+      if (kwCount) hints.push(t("userConfig:HeaderMappingSection.$条按关键字匹配_21f7", { count: kwCount }));
       const hintText = hints.length ? `（${hints.join("；")}）` : "";
-      setStatus({ msg: `已保存 ${cleanEntries.length} 条表头映射${hintText}`, kind: "success" });
-      notify(`已保存 ${cleanEntries.length} 条表头映射`, "success");
+      setStatus({ msg: t("userConfig:HeaderMappingSection.已保存$条表头映射$_74b8", { count: cleanEntries.length, hint: hintText }), kind: "success" });
+      notify(t("userConfig:HeaderMappingSection.已保存$条表头映射_7bcf", { count: cleanEntries.length }), "success");
       setTimeout(() => setStatus({ msg: "", kind: "info" }), 2500);
     } catch (e) {
-      setStatus({ msg: `保存失败: ${String(e)}`, kind: "error" });
-      notify(`保存失败: ${e}`, "error");
+      setStatus({ msg: t("userConfig:HeaderMappingSection.保存失败:$_2655", { error: String(e) }), kind: "error" });
+      notify(t("userConfig:HeaderMappingSection.保存失败:$_e5b7", { error: String(e) }), "error");
     } finally {
       setSaving(false);
     }
@@ -142,7 +144,7 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
   const resetToDefault = () => {
     setEntries(DEFAULT_HEADER_MAPPING.entries.map((e) => ({ ...e })));
     setExpandedRows(new Set());
-    setStatus({ msg: "已恢复默认配置（需点击保存生效）", kind: "info" });
+    setStatus({ msg: t("userConfig:HeaderMappingSection.已恢复默认配置（需点击保存生效_c62f"), kind: "info" });
   };
 
   const addRow = () => {
@@ -187,8 +189,8 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
 
   return (
     <SectionCard
-      title="工时表头映射"
-      subtitle="配置列号（位置匹配）或关键字（名称匹配）到新列名的映射"
+      title={t("userConfig:HeaderMappingSection.工时表头映射_b8a9")}
+      subtitle={t("userConfig:HeaderMappingSection.配置列号（位置匹配）或关键字（_afad")}
       icon={<TableHeaderIcon />}
       expanded={expanded}
       onToggle={() => setExpanded(!expanded)}
@@ -203,7 +205,7 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="搜索列名或关键字..."
+            placeholder={t("userConfig:HeaderMappingSection.搜索列名或关键字..._a031")}
             className="input w-full pl-8"
           />
         </div>
@@ -213,7 +215,7 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
           className={`inline-flex items-center gap-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-md transition-colors ${saving ? "opacity-50 cursor-not-allowed" : ""}`}
         >
           <SaveIcon />
-          {saving ? "保存中..." : "保存"}
+          {saving ? t("userConfig:HeaderMappingSection.保存中..._2a33") : t("userConfig:HeaderMappingSection.保存_be5f")}
         </button>
         <button
           onClick={addRow}
@@ -230,29 +232,29 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
           <RefreshIcon /> 重新加载
         </button>
         <button onClick={resetToDefault} className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors">
-          <RestoreIcon /> 恢复默认
+          <RestoreIcon /> {t("userConfig:HeaderMappingSection.restoreDefault")}
         </button>
         <span className="mx-1 text-slate-200">|</span>
         <button onClick={() => setExpandedRows(new Set(entries.map((_, i) => i)))} className="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded hover:bg-slate-50 transition-colors">
           全部展开
         </button>
         <button onClick={() => setExpandedRows(new Set())} className="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded hover:bg-slate-50 transition-colors">
-          全部折叠
+          {t("userConfig:HeaderMappingSection.collapseAll")}
         </button>
       </div>
 
       {/* Hint text */}
       <p className="text-xs text-slate-400 mb-2">
-        点击行可展开编辑；关键字默认以标签展示。绿色=位置匹配，黄色=关键字匹配。
+        {t("userConfig:HeaderMappingSection.editHint")}
       </p>
 
       {/* Table header */}
       <div className="bg-slate-50 rounded-t-lg border border-slate-200 border-b-0">
         <div className="grid grid-cols-[52px_56px_1fr_140px_36px] gap-1 px-2 py-1.5">
-          <span className="text-xs font-semibold text-slate-500">列号</span>
-          <span className="text-xs font-semibold text-slate-500">匹配</span>
-          <span className="text-xs font-semibold text-slate-500">关键字（名称匹配）</span>
-          <span className="text-xs font-semibold text-slate-500">新列名</span>
+          <span className="text-xs font-semibold text-slate-500">{t("userConfig:HeaderMappingSection.列号_27c2")}</span>
+          <span className="text-xs font-semibold text-slate-500">{t("userConfig:HeaderMappingSection.匹配_f504")}</span>
+          <span className="text-xs font-semibold text-slate-500">{t("userConfig:HeaderMappingSection.关键字（名称匹配）_c92b")}</span>
+          <span className="text-xs font-semibold text-slate-500">{t("userConfig:HeaderMappingSection.新列名_d6e7")}</span>
           <span />
         </div>
       </div>
@@ -261,14 +263,14 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
       <div className="border border-slate-200 border-t-0 rounded-b-lg overflow-hidden max-h-96 overflow-y-auto">
         {filteredEntries.length === 0 && (
           <div className="py-8 text-center text-xs text-slate-400">
-            {entries.length === 0 ? "暂无映射配置，点击「添加映射」开始" : "没有匹配的映射"}
+            {entries.length === 0 ? t("userConfig:HeaderMappingSection.暂无映射配置，点击「添加映射」_2fd0") : t("userConfig:HeaderMappingSection.没有匹配的映射_97b7")}
           </div>
         )}
         {filteredEntries.map(({ entry, idx }, visibleIdx) => {
           const isRowExpanded = expandedRows.has(idx);
           const hasIndex = entry.index !== null;
           const hasKw = entry.keywords.length > 0;
-          const matchMode = hasIndex ? "位置" : hasKw ? "关键字" : "—";
+          const matchMode = hasIndex ? t("userConfig:HeaderMappingSection.位置_d4d2") : hasKw ? t("userConfig:HeaderMappingSection.关键字_cfb5") : "—";
           const badgeCls = hasIndex
             ? "bg-teal-100 text-teal-800"
             : hasKw
@@ -294,7 +296,7 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
                         const v = e.target.value.trim();
                         updateEntry(idx, "index", v ? parseInt(v, 10) : null);
                       }}
-                      placeholder="从1起"
+                      placeholder={t("userConfig:HeaderMappingSection.从1起_ad5f")}
                       className="input w-[52px]"
                     />
                     <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${badgeCls}`}>
@@ -304,14 +306,14 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
                       type="text"
                       value={entry.new}
                       onChange={(e) => updateEntry(idx, "new", e.target.value)}
-                      placeholder="新列名"
+                      placeholder={t("userConfig:HeaderMappingSection.新列名_d6e7")}
                       className="input flex-1"
                     />
                     <div className="flex items-center gap-0.5 ml-auto shrink-0">
                       <button
                         onClick={() => toggleRow(idx)}
                         className="w-7 h-7 flex items-center justify-center rounded text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-                        title="折叠"
+                        title={t("userConfig:HeaderMappingSection.折叠_e082")}
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7" />
@@ -320,7 +322,7 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
                       <button
                         onClick={() => removeRow(idx)}
                         className="w-7 h-7 flex items-center justify-center rounded text-slate-600 hover:text-red-500 hover:bg-red-50 transition-colors"
-                        title="删除此行"
+                        title={t("userConfig:HeaderMappingSection.删除此行_43e8")}
                       >
                         <CloseIcon />
                       </button>
@@ -329,7 +331,7 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
                   <KeywordChipInput
                     label=""
                     items={entry.keywords}
-                    placeholder="输入关键字后回车添加"
+                    placeholder={t("userConfig:HeaderMappingSection.输入关键字后回车添加_fafd")}
                     onChange={(items) => updateEntry(idx, "keywords", items)}
                   />
                 </div>

@@ -8,6 +8,7 @@ except ImportError:
 
 from func import config_loader
 from gui.components.common import _log_message, safe_update
+from gui.i18n import t
 
 
 def _create_anomaly_config_section(page: ft.Page, log):
@@ -17,12 +18,12 @@ def _create_anomaly_config_section(page: ft.Page, log):
 
     # 数据类型选项
     _DATA_TYPE_OPTIONS = [
-        ("fuel", "油耗"),
-        ("fuel_engine", "发动机"),
-        ("production_running", "运行数据"),
-        ("production", "生产数据"),
-        ("electrical", "电力消耗"),
-        ("worktime", "工时数据"),
+        ("fuel", t("components:user_config._anomaly.油耗_75d6")),
+        ("fuel_engine", t("components:user_config._anomaly.发动机_9a82")),
+        ("production_running", t("components:user_config._anomaly.运行数据_6644")),
+        ("production", t("components:user_config._anomaly.生产数据_9fb6")),
+        ("electrical", t("components:user_config._anomaly.电力消耗_79c4")),
+        ("worktime", t("components:user_config._anomaly.工时数据_8c32")),
     ]
 
     # 当前选中的数据类型
@@ -33,40 +34,40 @@ def _create_anomaly_config_section(page: ft.Page, log):
 
     # 全局统计参数
     sigma_field = ft.TextField(
-        label="σ 倍数", value="3.0", width=120,
+        label=t("components:user_config._anomaly.σ倍数_c60a"), value="3.0", width=120,
         text_size=13, color=theme.TEXT_PRIMARY,
-        hint_text="默认 3.0",
+        hint_text=t("components:user_config._anomaly.默认3.0_f9fb"),
     )
     pct_low_field = ft.TextField(
-        label="百分位下限", value="1.0", width=120,
+        label=t("components:user_config._anomaly.百分位下限_d760"), value="1.0", width=120,
         text_size=13, color=theme.TEXT_PRIMARY,
-        hint_text="默认 1.0",
+        hint_text=t("components:user_config._anomaly.默认1.0_e719"),
     )
     pct_high_field = ft.TextField(
-        label="百分位上限", value="99.0", width=120,
+        label=t("components:user_config._anomaly.百分位上限_2563"), value="99.0", width=120,
         text_size=13, color=theme.TEXT_PRIMARY,
-        hint_text="默认 99.0",
+        hint_text=t("components:user_config._anomaly.默认99.0_8254"),
     )
 
     # 检测方法开关
     use_threshold_toggle = ft.Checkbox(
-        label="绝对阈值检测", value=True,
-        tooltip="基于用户配置的 min/max 范围检测",
+        label=t("components:user_config._anomaly.绝对阈值检测_5c7a"), value=True,
+        tooltip=t("components:user_config._anomaly.基于用户配置的min/max范_0313"),
     )
     use_sigma_toggle = ft.Checkbox(
-        label="σ 异常检测", value=True,
-        tooltip="基于标准差的统计离群检测",
+        label=t("components:user_config._anomaly.σ异常检测_bef4"), value=True,
+        tooltip=t("components:user_config._anomaly.基于标准差的统计离群检测_5a35"),
     )
     use_percentile_toggle = ft.Checkbox(
-        label="百分位检测", value=True,
-        tooltip="基于百分位数的极端值检测",
+        label=t("components:user_config._anomaly.百分位检测_2031"), value=True,
+        tooltip=t("components:user_config._anomaly.基于百分位数的极端值检测_8532"),
     )
 
     # --- 逐列检测开关（持久化到用户配置） ---
     _COLUMN_LABELS: dict[str, str] = {
-        "fuel": "油耗", "fuel_engine": "发动机",
-        "production_running": "运行", "production": "生产",
-        "electrical": "电力", "worktime": "工时",
+        "fuel": t("components:user_config._anomaly.油耗_75d6"), "fuel_engine": t("components:user_config._anomaly.发动机_9a82"),
+        "production_running": t("components:user_config._anomaly.运行_4c76"), "production": t("components:user_config._anomaly.生产_ac45"),
+        "electrical": t("components:user_config._anomaly.电力_3f2a"), "worktime": t("components:user_config._anomaly.工时_e8c0"),
     }
     _COLUMN_DEFS: dict[str, dict[str, list[str]]] = {
         "fuel": {"threshold": ["油品消耗"], "statistical": ["油品消耗"]},
@@ -89,7 +90,7 @@ def _create_anomaly_config_section(page: ft.Page, log):
             cbs: list[ft.Control] = []
             for col in all_cols:
                 key = f"{dtype}:{col}"
-                label = "全部数值列" if col == "__all_numeric__" else col
+                label = t("components:user_config._anomaly.全部数值列_d28d") if col == "__all_numeric__" else col
                 cb = ft.Checkbox(
                     label=label,
                     value=True,
@@ -145,15 +146,15 @@ def _create_anomaly_config_section(page: ft.Page, log):
         # 表头
         controls.append(ft.Row(
             [
-                ft.Text("列名 / 标记", expand=True, size=12,
+                ft.Text(t("components:user_config._anomaly.列名/标记_93eb"), expand=True, size=12,
                         weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
-                ft.Text("最小值", width=100, size=12,
+                ft.Text(t("components:user_config._anomaly.最小值_c322"), width=100, size=12,
                         weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
-                ft.Text("最大值", width=100, size=12,
+                ft.Text(t("components:user_config._anomaly.最大值_5da8"), width=100, size=12,
                         weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
-                ft.Text("默认值", width=100, size=12,
+                ft.Text(t("components:user_config._anomaly.默认值_225f"), width=100, size=12,
                         weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY,
-                        tooltip="处理异常值时的替换值"),
+                        tooltip=t("components:user_config._anomaly.处理异常值时的替换值_27f2")),
                 ft.Text("", width=40),
             ],
             spacing=4,
@@ -165,24 +166,24 @@ def _create_anomaly_config_section(page: ft.Page, log):
             col_field = ft.TextField(
                 value=rows[idx][0], expand=True, text_size=13, dense=True,
                 color=theme.TEXT_PRIMARY, border_color=theme.BORDER,
-                hint_text="列名或 __all_numeric__",
+                hint_text=t("components:user_config._anomaly.列名或__all_numeri_79fb"),
             )
             min_field = ft.TextField(
                 value=rows[idx][1], width=100, text_size=13, dense=True,
                 color=theme.TEXT_PRIMARY, border_color=theme.BORDER,
-                hint_text="无下限",
+                hint_text=t("components:user_config._anomaly.无下限_3696"),
             )
             max_field = ft.TextField(
                 value=rows[idx][2], width=100, text_size=13, dense=True,
                 color=theme.TEXT_PRIMARY, border_color=theme.BORDER,
-                hint_text="无上限",
+                hint_text=t("components:user_config._anomaly.无上限_1891"),
             )
             default_field = ft.TextField(
                 value=rows[idx][3] if len(rows[idx]) > 3 else "",
                 width=100, text_size=13, dense=True,
                 color=theme.TEXT_PRIMARY, border_color=theme.BORDER,
                 hint_text="0",
-                tooltip="选择「处理异常值」时替换为此值",
+                tooltip=t("components:user_config._anomaly.选择「处理异常值」时替换为此值_2288"),
             )
 
             def _on_col_change(e, _idx=idx):
@@ -206,7 +207,7 @@ def _create_anomaly_config_section(page: ft.Page, log):
             max_field.on_change = _on_max_change
             default_field.on_change = _on_default_change
             remove_btn = ft.IconButton(
-                icon=ft.Icons.DELETE_OUTLINE, tooltip="删除",
+                icon=ft.Icons.DELETE_OUTLINE, tooltip=t("components:user_config._anomaly.删除_2f4a"),
                 icon_size=18, icon_color=theme.ERROR, on_click=_on_remove,
             )
 
@@ -372,8 +373,8 @@ def _create_anomaly_config_section(page: ft.Page, log):
         updates["thresholds"] = thresholds_out
         updates["statistical_columns"] = stat_cols_out
         config_loader.update_anomaly_detection_config(updates)
-        status_text.value = "异常值检测配置已保存"
-        _log_message(log, "已保存异常值检测配置")
+        status_text.value = t("components:user_config._anomaly.异常值检测配置已保存_4f21")
+        _log_message(log, t("components:user_config._anomaly.已保存异常值检测配置_8970"))
         safe_update(status_text)
 
     def _reset(_e=None):
@@ -381,46 +382,46 @@ def _create_anomaly_config_section(page: ft.Page, log):
         from func.config_loader import DEFAULT_ANOMALY_DETECTION
         config_loader.save_anomaly_detection_config(dict(DEFAULT_ANOMALY_DETECTION))
         _reload()
-        status_text.value = "已恢复默认配置"
-        _log_message(log, "已恢复异常值检测默认配置")
+        status_text.value = t("components:user_config._anomaly.已恢复默认配置_455f")
+        _log_message(log, t("components:user_config._anomaly.已恢复异常值检测默认配置_af9e"))
         safe_update(status_text)
 
     action_buttons = [
-        theme.primary_btn("保存配置", icon=ft.Icons.SAVE, on_click=_collect_and_save),
-        theme.secondary_btn("重新加载", icon=ft.Icons.REFRESH, on_click=lambda _: _reload()),
-        theme.secondary_btn("恢复默认", icon=ft.Icons.RESTART_ALT, on_click=_reset),
-        theme.accent_btn("添加阈值", icon=ft.Icons.ADD, on_click=_add_row),
+        theme.primary_btn(t("components:user_config._anomaly.保存配置_ed75"), icon=ft.Icons.SAVE, on_click=_collect_and_save),
+        theme.secondary_btn(t("components:user_config._anomaly.重新加载_64ca"), icon=ft.Icons.REFRESH, on_click=lambda _: _reload()),
+        theme.secondary_btn(t("components:user_config._anomaly.恢复默认_7468"), icon=ft.Icons.RESTART_ALT, on_click=_reset),
+        theme.accent_btn(t("components:user_config._anomaly.添加阈值_a2ce"), icon=ft.Icons.ADD, on_click=_add_row),
     ]
 
     card = theme.make_collapsible(
-        title="异常值检测配置",
-        subtitle="配置各数据类型的检测阈值、σ 倍数和百分位范围",
+        title=t("components:user_config._anomaly.异常值检测配置_5f46"),
+        subtitle=t("components:user_config._anomaly.配置各数据类型的检测阈值、σ倍_3096"),
         icon=ft.Icons.TUNE,
         initially_expanded=False,
         content_controls=[
             ft.Text(
-                "检测方法：选择启用的检测策略，关闭的策略不会应用。\n"
-                "阈值规则对指定列名设置 min/max 范围；"
-                f"使用 {ALL_NUMERIC_SENTINEL} 可对所有数值列统一检测。"
-                "默认值列仅在启用「处理异常值」模式时生效。",
+                t("components:user_config._anomaly.检测方法：选择启用的检测策略，_69b0")
+                + t("components:user_config._anomaly.阈值规则对指定列名设置min/_8569")
+                + f"使用 {ALL_NUMERIC_SENTINEL} 可对所有数值列统一检测。"
+                + t("components:user_config._anomaly.默认值列仅在启用「处理异常值」_0d3b"),
                 size=12, color=theme.TEXT_SECONDARY,
             ),
             ft.Row([use_threshold_toggle, use_sigma_toggle, use_percentile_toggle], spacing=16),
             ft.Divider(height=1, color=theme.BORDER),
-            ft.Text("统计参数", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+            ft.Text(t("components:user_config._anomaly.统计参数_4f03"), size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
             ft.Row([sigma_field, pct_low_field, pct_high_field], spacing=12),
             ft.Divider(height=1, color=theme.BORDER),
-            ft.Text("数据类型", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+            ft.Text(t("components:user_config._anomaly.数据类型_185f"), size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
             type_segment,
             ft.Divider(height=1, color=theme.BORDER),
-            ft.Text("逐列检测开关", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+            ft.Text(t("components:user_config._anomaly.逐列检测开关_96dd"), size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
             ft.Text(
-                "关闭某列的开关后，该列将不参与任何异常检测（阈值、σ、百分位均跳过）。",
+                t("components:user_config._anomaly.关闭某列的开关后，该列将不参与_c673"),
                 size=11, color=theme.TEXT_SECONDARY,
             ),
             column_toggle_area,
             ft.Divider(height=1, color=theme.BORDER),
-            ft.Text("阈值配置", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+            ft.Text(t("components:user_config._anomaly.阈值配置_35a3"), size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
             rows_column,
             ft.Row(action_buttons, spacing=8, wrap=True, alignment=ft.MainAxisAlignment.START),
             status_text,

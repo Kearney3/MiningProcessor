@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import type { BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
 import {
@@ -64,10 +65,11 @@ function RestoreDefaultsDialog({
   onPick: (version: "new" | "old") => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
       <div className="bg-white rounded-lg border border-slate-200 p-6 w-[400px] max-w-[90vw]">
-        <h3 className="text-base font-semibold text-slate-800 mb-2">恢复默认配置</h3>
+        <h3 className="text-base font-semibold text-slate-800 mb-2">{t("pages:LoadConfigPage.恢复默认配置_3105")}</h3>
         <p className="text-sm text-slate-600 mb-5">
           选择要恢复的默认版本：
         </p>
@@ -76,15 +78,15 @@ function RestoreDefaultsDialog({
             onClick={() => onPick("new")}
             className="w-full text-left text-sm px-4 py-3 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-colors"
           >
-            <span className="font-medium text-slate-700">新版配置</span>
-            <span className="block text-xs text-slate-400 mt-0.5">当前版本的出厂默认值</span>
+            <span className="font-medium text-slate-700">{t("pages:LoadConfigPage.新版配置_2a40")}</span>
+            <span className="block text-xs text-slate-400 mt-0.5">{t("pages:LoadConfigPage.当前版本的出厂默认值_dd70")}</span>
           </button>
           <button
             onClick={() => onPick("old")}
             className="w-full text-left text-sm px-4 py-3 rounded-lg border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-colors"
           >
-            <span className="font-medium text-slate-700">旧版配置</span>
-            <span className="block text-xs text-slate-400 mt-0.5">兼容旧版系统的默认值</span>
+            <span className="font-medium text-slate-700">{t("pages:LoadConfigPage.旧版配置_5b9e")}</span>
+            <span className="block text-xs text-slate-400 mt-0.5">{t("pages:LoadConfigPage.兼容旧版系统的默认值_1f78")}</span>
           </button>
         </div>
         <div className="flex justify-end">
@@ -106,6 +108,7 @@ function RestoreDefaultsDialog({
 
 export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
   const { notify } = useToast();
+  const { t } = useTranslation();
   const [loadMap, setLoadMap] = useState<LoadMap>({});
   const [persistedMap, setPersistedMap] = useState<LoadMap>({});
   const [loading, setLoading] = useState(true);
@@ -196,7 +199,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
       // non-critical, continue
     }
     loadData(ver);
-    notify(`已切换到${ver === "old" ? "旧版" : "新版"}装载量配置`, "info");
+    notify(t("pages:LoadConfigPage.已切换到$装载量配置_8f29", { versionLabel: ver === "old" ? "旧版" : "新版" }), "info");
   };
 
   /* ---- sorted & paginated entries -------------------------------- */
@@ -235,20 +238,20 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
       next.delete(name);
       return next;
     });
-    notify("已删除", "info");
+    notify(t("pages:LoadConfigPage.已删除_5cc2"), "info");
   };
 
   const handleAdd = () => {
     let hasError = false;
     if (!newName.trim()) {
-      setNewNameError("请输入设备名称");
+      setNewNameError(t("pages:LoadConfigPage.请输入设备名称_dd73"));
       hasError = true;
     } else {
       setNewNameError(null);
     }
     const num = parseFloat(newValue);
     if (isNaN(num) || num <= 0) {
-      setNewValueError("请输入有效的装载量");
+      setNewValueError(t("pages:LoadConfigPage.请输入有效的装载量_0ec2"));
       hasError = true;
     } else {
       setNewValueError(null);
@@ -258,7 +261,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
     setLoadMap((prev) => ({ ...prev, [newName.trim()]: num }));
     setNewName("");
     setSetValue("");
-    notify("已添加", "success");
+    notify(t("pages:LoadConfigPage.已添加_b189"), "success");
   };
 
   /* ---- selection ------------------------------------------------- */
@@ -294,7 +297,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
       selected.forEach((k) => delete next[k]);
       return next;
     });
-    notify(`已删除 ${selected.size} 条记录`, "success");
+    notify(t("pages:LoadConfigPage.已删除$条记录_369b", { count: selected.size }), "success");
     setSelected(new Set());
     setConfirmDeleteDialog(false);
   };
@@ -306,10 +309,10 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
     setError(null);
     try {
       await bridge.call("apply_device_load_map", { map_data: loadMap, version: mapVersion });
-      notify("已应用（未保存）", "info");
+      notify(t("pages:LoadConfigPage.已应用（未保存）_84ef"), "info");
     } catch (e) {
       setError(String(e));
-      notify("应用失败", "error");
+      notify(t("pages:LoadConfigPage.应用失败_efaf"), "error");
     } finally {
       setApplying(false);
     }
@@ -321,10 +324,10 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
     try {
       await bridge.call("update_device_load_map", { map_data: loadMap, version: mapVersion });
       setPersistedMap({ ...loadMap });
-      notify("已保存", "success");
+      notify(t("pages:LoadConfigPage.已保存_f8df"), "success");
     } catch (e) {
       setError(String(e));
-      notify("保存失败", "error");
+      notify(t("pages:LoadConfigPage.保存失败_6de9"), "error");
     } finally {
       setSaving(false);
     }
@@ -343,7 +346,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
       const text = await file.text();
       const parsed = JSON.parse(text);
       if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-        throw new Error("JSON 格式不正确，应为 {设备名: 数值} 对象");
+        throw new Error(t("pages:LoadConfigPage.JSON格式不正确，应为对象_daae"));
       }
       const imported: LoadMap = {};
       for (const [k, v] of Object.entries(parsed)) {
@@ -351,11 +354,11 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
         if (!isNaN(num)) imported[k] = num;
       }
       const count = Object.keys(imported).length;
-      if (count === 0) throw new Error("未找到有效记录");
+      if (count === 0) throw new Error(t("pages:LoadConfigPage.未找到有效记录_e359"));
       setLoadMap((prev) => ({ ...prev, ...imported }));
-      notify(`已导入 ${count} 条记录`, "success");
+      notify(t("pages:LoadConfigPage.已导入$条记录_7772", { count }), "success");
     } catch (err) {
-      notify(`导入失败: ${err instanceof Error ? err.message : String(err)}`, "error");
+      notify(t("pages:LoadConfigPage.导入失败:$_137c", { error: err instanceof Error ? err.message : String(err) }), "error");
     } finally {
       // reset so same file can be re-selected
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -374,7 +377,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
     a.download = "device_load_map.json";
     a.click();
     URL.revokeObjectURL(url);
-    notify("已导出配置文件", "success");
+    notify(t("pages:LoadConfigPage.已导出配置文件_46d9"), "success");
   };
 
   /* ---- restore defaults ------------------------------------------ */
@@ -385,10 +388,10 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
       const defaults = await bridge.call<LoadMap>("get_default_load_map", { version });
       if (defaults && typeof defaults === "object") {
         setLoadMap(defaults);
-        notify(`已恢复${version === "new" ? "新版" : "旧版"}默认配置（未保存）`, "info");
+        notify(t("pages:LoadConfigPage.已恢复$默认配置（未保存）_9ab7", { versionLabel: version === "new" ? "新版" : "旧版" }), "info");
       }
     } catch {
-      notify("获取默认配置失败", "error");
+      notify(t("pages:LoadConfigPage.获取默认配置失败_0d50"), "error");
     }
   };
 
@@ -401,7 +404,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
-        <span className="text-sm">加载中...</span>
+        <span className="text-sm">{t("pages:LoadConfigPage.加载中..._26b5")}</span>
       </div>
     );
   }
@@ -425,7 +428,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <SettingsIcon />
-          <h2 className="text-base font-semibold text-slate-800">装载量配置</h2>
+          <h2 className="text-base font-semibold text-slate-800">{t("pages:LoadConfigPage.装载量配置_c389")}</h2>
 
           {/* version toggle */}
           <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden ml-3">
@@ -461,7 +464,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
         ) : (
           <span className="inline-flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-md px-2.5 py-0.5">
             <CheckIcon />
-            已保存
+            {t("pages:LoadConfigPage.已保存_f8df")}
           </span>
         )}
       </div>
@@ -507,7 +510,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
           className={`btn-secondary ${applying || !isDirty ? "opacity-50 cursor-not-allowed" : ""}`}
         >
           <ApplyIcon />
-          {applying ? "应用中..." : "应用"}
+          {applying ? t("pages:LoadConfigPage.应用中..._e596") : "应用"}
         </button>
         <button
           onClick={handleSave}
@@ -515,7 +518,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
           className={`btn-primary ${saving || !isDirty ? "opacity-50 cursor-not-allowed" : ""}`}
         >
           <SaveIcon />
-          {saving ? "保存中..." : "保存"}
+          {saving ? t("pages:LoadConfigPage.保存中..._2a33") : "保存"}
         </button>
       </div>
 
@@ -586,7 +589,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
                         }`}
                       />
                       {invalid && (
-                        <p className="text-red-500 text-xs mt-0.5">数值必须大于 0</p>
+                        <p className="text-red-500 text-xs mt-0.5">{t("pages:LoadConfigPage.数值必须大于0_1bc2")}</p>
                       )}
                     </td>
                     <td className="px-3 text-right">
@@ -606,7 +609,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
               {entries.length === 0 && (
                 <tr>
                   <td colSpan={4} className="text-center py-16">
-                    <p className="text-slate-400 text-sm">暂无配置项</p>
+                    <p className="text-slate-400 text-sm">{t("pages:LoadConfigPage.暂无配置项_67b2")}</p>
                   </td>
                 </tr>
               )}
@@ -622,7 +625,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
                         value={newName}
                         onChange={(e) => { setNewName(e.target.value); setNewNameError(null); }}
                         onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                        placeholder="新设备名称"
+                        placeholder={t("pages:LoadConfigPage.新设备名称_f490")}
                         className={`w-full text-sm border rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 bg-white transition-colors ${
                           newNameError ? "border-red-300" : "border-slate-300 focus:border-blue-500"
                         }`}
@@ -635,7 +638,7 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
                         value={newValue}
                         onChange={(e) => { setSetValue(e.target.value); setNewValueError(null); }}
                         onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                        placeholder="方数"
+                        placeholder={t("pages:LoadConfigPage.方数_a58c")}
                         className={`w-full text-sm border rounded-md px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 bg-white transition-colors ${
                           newValueError ? "border-red-300" : "border-slate-300 focus:border-blue-500"
                         }`}
@@ -689,13 +692,13 @@ export function LoadConfigPage({ bridge }: { bridge: BridgeProp }) {
       {/* ---- dialogs ---------------------------------------------- */}
       {confirmDeleteDialog && (
         <ConfirmDialog
-          title="确认删除"
+          title={t("pages:LoadConfigPage.确认删除_631c")}
           body={
             <span>
               确定要删除选中的 <strong>{selected.size}</strong> 条设备记录吗？此操作需要点击"保存"后才会持久化。
             </span>
           }
-          confirmLabel={`删除 ${selected.size} 条`}
+          confirmLabel={t("pages:LoadConfigPage.删除$条_1084", { count: selected.size })}
           onConfirm={handleBulkDelete}
           onCancel={() => setConfirmDeleteDialog(false)}
         />

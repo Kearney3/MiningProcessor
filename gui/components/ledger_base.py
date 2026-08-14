@@ -16,6 +16,7 @@ from .common import (
     SortState, create_sortable_columns, _cell_text,
     create_column_mapping_dialog, create_sheet_selection_dialog, PAGE_SIZE,
 )
+from gui.i18n import t
 
 try:
     from . import theme
@@ -78,7 +79,7 @@ def create_ledger_section_factory(
     _sort_state = SortState()
 
     # --- 控件 ---
-    path_label = ft.Text(f"未加载{cfg.label_prefix}", size=12, color=ft.Colors.GREY)
+    path_label = ft.Text(t("components:ledger_base.未加载_6463", label_prefix=cfg.label_prefix), size=12, color=ft.Colors.GREY)
 
     table = ft.DataTable(
         columns=[ft.DataColumn(ft.Text(c)) for c in cfg.columns],
@@ -122,7 +123,7 @@ def create_ledger_section_factory(
     empty_hint = theme.empty_state(
         cfg.empty_icon,
         cfg.empty_text,
-        "点击上方「导入台账」开始",
+        t("components:ledger_base.点击上方「导入台账」开始_520c"),
     )
 
     # --- 表格包装器 ---
@@ -138,7 +139,7 @@ def create_ledger_section_factory(
     def build_table():
         if not records:
             table.rows = []
-            table.columns = [ft.DataColumn(ft.Text("暂无数据"))]
+            table.columns = [ft.DataColumn(ft.Text(t("components:ledger_base.暂无数据_21ef")))]
             empty_hint.visible = True
             _update_page_controls()
             page.update()
@@ -202,7 +203,7 @@ def create_ledger_section_factory(
         try:
             file_path = _selected_file[0]
             if not file_path or not os.path.exists(file_path):
-                _log_message(log, "未选择文件")
+                _log_message(log, t("components:ledger_base.未选择文件_46ed"))
                 return
 
             sheet_name = _selected_sheet[0]
@@ -227,7 +228,7 @@ def create_ledger_section_factory(
             _page[0] = 0
 
             # 更新路径标签
-            path_label.value = f"已加载: {Path(file_path).name}"
+            path_label.value = t("components:ledger_base.已加载:_1dff", name=Path(file_path).name)
             path_label.color = ft.Colors.GREEN
 
             # 创建后端实例
@@ -239,9 +240,9 @@ def create_ledger_section_factory(
             _instance[0] = instance
 
             build_table()
-            _log_message(log, f"已加载{cfg.label_prefix}: {file_path}，共 {len(records)} 条记录")
+            _log_message(log, t("components:ledger_base.已加载:，共条记录_e265", label_prefix=cfg.label_prefix, file_path=file_path, count=len(records)))
         except Exception as ex:
-            _log_message(log, f"加载{cfg.label_prefix}失败: {ex}", level=logging.ERROR)
+            _log_message(log, t("components:ledger_base.加载失败:_d880", label_prefix=cfg.label_prefix, ex=ex), level=logging.ERROR)
 
     async def on_import(e):
         """导入按钮点击"""
@@ -272,7 +273,7 @@ def create_ledger_section_factory(
                 page.show_dialog(dialog)
                 page.update()
         except Exception as ex:
-            _log_message(log, f"读取{cfg.label_prefix}文件失败: {ex}", level=logging.ERROR)
+            _log_message(log, t("components:ledger_base.读取文件失败:_df5c", label_prefix=cfg.label_prefix, ex=ex), level=logging.ERROR)
 
     def _show_column_mapping(sheet_name, file_path):
         """选中 sheet 后显示列映射对话框"""
@@ -287,7 +288,7 @@ def create_ledger_section_factory(
             page.show_dialog(dialog)
             page.update()
         except Exception as ex:
-            _log_message(log, f"读取{cfg.label_prefix} sheet 失败: {ex}", level=logging.ERROR)
+            _log_message(log, t("components:ledger_base.读取sheet失败:_1ce2", label_prefix=cfg.label_prefix, ex=ex), level=logging.ERROR)
 
     async def on_export_template(e):
         """导出模板"""
@@ -295,7 +296,7 @@ def create_ledger_section_factory(
             # 使用文件选择器让用户选择保存位置
             picker = ft.FilePicker()
             save_path = await picker.save_file(
-                dialog_title=f"保存{cfg.template_filename}",
+                dialog_title=t("components:ledger_base.保存_bdfc", template_filename=cfg.template_filename),
                 file_name=cfg.template_filename,
                 initial_directory=_last_directory[0] if _last_directory[0] else None,
                 allowed_extensions=["xlsx"],
@@ -311,11 +312,11 @@ def create_ledger_section_factory(
                 # 回退：创建空模板
                 from func.excel_formatter import write_formatted_excel
                 df = pd.DataFrame(columns=cfg.columns)
-                write_formatted_excel(save_path, {"模板": df})
+                write_formatted_excel(save_path, {t("components:ledger_base.模板_59cf"): df})
             _update_last_directory(save_path)
-            _log_message(log, f"已导出模板: {save_path}")
+            _log_message(log, t("components:ledger_base.已导出模板:_8ab1", save_path=save_path))
         except Exception as ex:
-            _log_message(log, f"导出模板失败: {ex}", level=logging.ERROR)
+            _log_message(log, t("components:ledger_base.导出模板失败:_e1a0", ex=ex), level=logging.ERROR)
 
     async def on_export_data(e):
         """导出当前台账数据"""
@@ -324,7 +325,7 @@ def create_ledger_section_factory(
         try:
             picker = ft.FilePicker()
             save_path = await picker.save_file(
-                dialog_title=f"导出{cfg.section_title}",
+                dialog_title=t("components:ledger_base.导出_3c5f", section_title=cfg.section_title),
                 file_name=f"{cfg.section_title}.xlsx",
                 initial_directory=_last_directory[0] if _last_directory[0] else None,
                 allowed_extensions=["xlsx"],
@@ -336,9 +337,9 @@ def create_ledger_section_factory(
             df = pd.DataFrame(records)
             write_formatted_excel(save_path, {cfg.section_title: df})
             _update_last_directory(save_path)
-            _log_message(log, f"已导出{cfg.section_title}: {save_path}，共 {len(records)} 条")
+            _log_message(log, t("components:ledger_base.已导出:，共条_3b61", section_title=cfg.section_title, save_path=save_path, count=len(records)))
         except Exception as ex:
-            _log_message(log, f"导出{cfg.section_title}失败: {ex}", level=logging.ERROR)
+            _log_message(log, t("components:ledger_base.导出失败:_f5e8", section_title=cfg.section_title, ex=ex), level=logging.ERROR)
 
     def _do_clear(e):
         """执行清空"""
@@ -347,18 +348,18 @@ def create_ledger_section_factory(
         records = []
         _instance[0] = None
         _page[0] = 0
-        path_label.value = f"未加载{cfg.label_prefix}"
+        path_label.value = t("components:ledger_base.未加载_6463", label_prefix=cfg.label_prefix)
         path_label.color = ft.Colors.GREY
         build_table()
-        _log_message(log, f"{cfg.label_prefix}已清空")
+        _log_message(log, t("components:ledger_base.已清空_6dbf", label_prefix=cfg.label_prefix))
 
     _clear_confirm_dialog = ft.AlertDialog(
         modal=True,
-        title=ft.Text("确认清空"),
+        title=ft.Text(t("components:ledger_base.确认清空_8452")),
         content=ft.Text(""),
         actions=[
-            ft.TextButton("取消", on_click=lambda e: page.pop_dialog()),
-            ft.TextButton("确认清空", on_click=_do_clear,
+            ft.TextButton(t("components:ledger_base.取消_625f"), on_click=lambda e: page.pop_dialog()),
+            ft.TextButton(t("components:ledger_base.确认清空_8452"), on_click=_do_clear,
                           style=ft.ButtonStyle(color=theme.ERROR)),
         ],
         actions_alignment=ft.MainAxisAlignment.END,
@@ -369,7 +370,7 @@ def create_ledger_section_factory(
         if not records:
             return
         _clear_confirm_dialog.content = ft.Text(
-            f"确定要清空所有 {cfg.label_prefix} 数据吗？\n清空后需重新导入文件并配置列映射。"
+            t("components:ledger_base.确定要清空所有数据吗？\\n清空_c5a9", label_prefix=cfg.label_prefix)
         )
         page.show_dialog(_clear_confirm_dialog)
 
@@ -378,20 +379,20 @@ def create_ledger_section_factory(
         try:
             if records and cfg.save_cache:
                 cfg.save_cache(records)
-                _log_message(log, f"已保存为默认{cfg.label_prefix}")
+                _log_message(log, t("components:ledger_base.已保存为默认_f15f", label_prefix=cfg.label_prefix))
                 _update_default_btn_state()
         except Exception as ex:
-            _log_message(log, f"保存默认{cfg.label_prefix}失败: {ex}", level=logging.ERROR)
+            _log_message(log, t("components:ledger_base.保存默认失败:_55b2", label_prefix=cfg.label_prefix, ex=ex), level=logging.ERROR)
 
     def on_cancel_default(e):
         """取消默认"""
         try:
             if cfg.clear_cache:
                 cfg.clear_cache()
-            _log_message(log, f"已取消默认{cfg.label_prefix}")
+            _log_message(log, t("components:ledger_base.已取消默认_ff3b", label_prefix=cfg.label_prefix))
             _update_default_btn_state()
         except Exception as ex:
-            _log_message(log, f"取消默认{cfg.label_prefix}失败: {ex}", level=logging.ERROR)
+            _log_message(log, t("components:ledger_base.取消默认失败:_607f", label_prefix=cfg.label_prefix, ex=ex), level=logging.ERROR)
 
     def load_from_cache():
         """从缓存加载默认台账"""
@@ -412,24 +413,24 @@ def create_ledger_section_factory(
                         instance._build_search_cache()
                     _instance[0] = instance
 
-                    path_label.value = f"默认{cfg.label_prefix} (缓存)"
+                    path_label.value = t("components:ledger_base.默认(缓存)_2335", label_prefix=cfg.label_prefix)
                     path_label.color = ft.Colors.GREEN
                     build_table()
-                    _log_message(log, f"已自动加载默认{cfg.label_prefix}（缓存），共 {len(records)} 条")
+                    _log_message(log, t("components:ledger_base.已自动加载默认（缓存），共条_742b", label_prefix=cfg.label_prefix, count=len(records)))
         except Exception as ex:
-            _log_message(log, f"加载缓存{cfg.label_prefix}失败: {ex}", level=logging.WARNING)
+            _log_message(log, t("components:ledger_base.加载缓存失败:_fe6b", label_prefix=cfg.label_prefix, ex=ex), level=logging.WARNING)
 
     def get_instance():
         """获取当前后端实例"""
         return _instance[0]
 
     # --- 按钮 ---
-    import_btn = theme.secondary_btn(f"导入{cfg.label_prefix}", icon=ft.Icons.UPLOAD, on_click=on_import)
-    clear_btn = theme.secondary_btn(f"清空{cfg.label_prefix}", icon=ft.Icons.DELETE_SWEEP, on_click=on_clear, disabled=True)
-    export_template_btn = theme.secondary_btn("导出模板", icon=ft.Icons.DOWNLOAD, on_click=on_export_template)
-    export_data_btn = theme.secondary_btn("导出台账", icon=ft.Icons.DOWNLOAD, on_click=on_export_data, disabled=True)
-    save_default_btn = theme.primary_btn("保存为默认", icon=ft.Icons.BOOKMARK, on_click=on_save_default, disabled=True)
-    cancel_default_btn = theme.secondary_btn("取消默认", icon=ft.Icons.BOOKMARK_REMOVE, on_click=on_cancel_default, disabled=not (cfg.has_cache() if cfg.has_cache else False))
+    import_btn = theme.secondary_btn(t("components:ledger_base.导入_d2c9", label_prefix=cfg.label_prefix), icon=ft.Icons.UPLOAD, on_click=on_import)
+    clear_btn = theme.secondary_btn(t("components:ledger_base.清空_57f1", label_prefix=cfg.label_prefix), icon=ft.Icons.DELETE_SWEEP, on_click=on_clear, disabled=True)
+    export_template_btn = theme.secondary_btn(t("components:ledger_base.导出模板_0d2c"), icon=ft.Icons.DOWNLOAD, on_click=on_export_template)
+    export_data_btn = theme.secondary_btn(t("components:ledger_base.导出台账_b15c"), icon=ft.Icons.DOWNLOAD, on_click=on_export_data, disabled=True)
+    save_default_btn = theme.primary_btn(t("components:ledger_base.保存为默认_8a22"), icon=ft.Icons.BOOKMARK, on_click=on_save_default, disabled=True)
+    cancel_default_btn = theme.secondary_btn(t("components:ledger_base.取消默认_533f"), icon=ft.Icons.BOOKMARK_REMOVE, on_click=on_cancel_default, disabled=not (cfg.has_cache() if cfg.has_cache else False))
 
     def _update_default_btn_state():
         has_records = len(records) > 0

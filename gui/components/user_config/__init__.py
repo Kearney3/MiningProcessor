@@ -14,6 +14,7 @@ except ImportError:
 
 from func import config_loader
 from gui.components.common import _log_message
+from gui.i18n import t
 
 from ._keywords import _create_keywords_section
 from ._header_mapping import _create_header_mapping_section
@@ -30,7 +31,7 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
     """创建用户配置页面，返回 (container, refs)。"""
 
     section_hint = ft.Text(
-        "这里用于管理与业务处理无关的个人偏好设置。",
+        t("components:user_config.__init__.这里用于管理与业务处理无关的个_e03b"),
         size=13,
         color=theme.TEXT_SECONDARY,
     )
@@ -61,7 +62,7 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
             page.pop_dialog()
             config_loader.reset_all_user_overrides()
             _reload_all()
-            _log_message(log, "已还原所有用户配置为默认值")
+            _log_message(log, t("components:user_config.__init__.已还原所有用户配置为默认值_c205"))
             try:
                 page.update()
             except (RuntimeError, AttributeError):
@@ -72,18 +73,18 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
 
         dialog = ft.AlertDialog(
             modal=True,
-            title=ft.Text("确认还原"),
-            content=ft.Text("将清除所有用户自定义配置，恢复为系统默认值。\n此操作不可撤销，是否继续？"),
+            title=ft.Text(t("components:user_config.__init__.确认还原_f1bf")),
+            content=ft.Text(t("components:user_config.__init__.将清除所有用户自定义配置，恢复_7bee")),
             actions=[
-                ft.TextButton("确认还原", on_click=_do_reset),
-                ft.TextButton("取消", on_click=_on_cancel),
+                ft.TextButton(t("components:user_config.__init__.确认还原_f1bf"), on_click=_do_reset),
+                ft.TextButton(t("components:user_config.__init__.取消_625f"), on_click=_on_cancel),
             ],
             actions_alignment=ft.MainAxisAlignment.END,
         )
         page.show_dialog(dialog)
 
     reset_all_btn = theme.secondary_btn(
-        "还原为默认配置",
+        t("components:user_config.__init__.还原为默认配置_0a97"),
         icon=ft.Icons.RESTART_ALT,
         on_click=_on_reset_all,
     )
@@ -92,7 +93,7 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserC
         content=ft.Column(
             [
                 ft.Row(
-                    [theme.section_title("用户配置"), reset_all_btn],
+                    [theme.section_title(t("components:user_config.__init__.用户配置_dd1e")), reset_all_btn],
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),

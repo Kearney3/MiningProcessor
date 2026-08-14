@@ -26,6 +26,7 @@ from .common import (
     PAGE_SIZE,
     create_confirm_dialog,
 )
+from gui.i18n import t
 
 try:
     from . import theme
@@ -109,7 +110,7 @@ async def _do_import(page, log, state: MatchState, controls: _MatchControls, on_
     """File import action — thin UI wrapper around func/ledger_match.import_excel."""
     picker = ft.FilePicker()
     files = await picker.pick_files(
-        dialog_title="导入 Excel 文件",
+        dialog_title=t("components:ledger_match.导入Excel文件_9753"),
         allowed_extensions=["xlsx", "xls"],
         initial_directory=_import_dir[0] or None,
     )
@@ -135,9 +136,9 @@ async def _do_import(page, log, state: MatchState, controls: _MatchControls, on_
             import_excel, path, _on_progress, state.import_cancelled,
         )
     except Exception as ex:
-        controls.file_label.value = f"读取失败: {ex}"
+        controls.file_label.value = t("components:ledger_match.读取失败:_b65a", ex=ex)
         controls.file_label.color = theme.ERROR
-        _log_message(log, f"读取文件失败: {ex}", level=logging.ERROR)
+        _log_message(log, t("components:ledger_match.读取文件失败:_8a5b", ex=ex), level=logging.ERROR)
         _hide_import_progress(controls)
         page.update()
         return
@@ -145,7 +146,7 @@ async def _do_import(page, log, state: MatchState, controls: _MatchControls, on_
     _hide_import_progress(controls)
 
     if state.import_cancelled.is_set():
-        _log_message(log, f"导入已取消（已解析 {len(parsed_sheets)}/{len(sheet_names)} 个 sheet）")
+        _log_message(log, t("components:ledger_match.导入已取消（已解析/个shee_b0d5", parsed=len(parsed_sheets), total=len(sheet_names)))
         if not parsed_sheets:
             page.update()
             return
@@ -172,7 +173,7 @@ async def _do_import(page, log, state: MatchState, controls: _MatchControls, on_
     controls.match_btn.disabled = False
     controls.view_segment.disabled = False
     loaded = len(parsed_sheets)
-    _log_message(log, f"已导入: {path} ({loaded}/{len(sheet_names)} 个 sheet)")
+    _log_message(log, t("components:ledger_match.已导入:(/个sheet)_007b", path=path, loaded=loaded, total=len(sheet_names)))
     page.update()
 
 
@@ -183,15 +184,15 @@ async def _do_match(
     """Match action — thin UI wrapper around func/ledger_match.match_sheet."""
     df = get_current_df(state)
     if df is None or df.empty:
-        _log_message(log, "没有数据可匹配", level=logging.WARNING)
+        _log_message(log, t("components:ledger_match.没有数据可匹配_5d71"), level=logging.WARNING)
         return
 
     if not eq_ledger and not oil_ledger:
-        _log_message(log, "请先在设备台账或油品台账页导入台账", level=logging.WARNING)
+        _log_message(log, t("components:ledger_match.请先在设备台账或油品台账页导入_3620"), level=logging.WARNING)
         return
 
     if not name_col and not id_col and not oil_col:
-        _log_message(log, "未启用任何匹配，跳过匹配")
+        _log_message(log, t("components:ledger_match.未启用任何匹配，跳过匹配_d05e"))
         return
 
     # 初始化进度条
@@ -202,7 +203,7 @@ async def _do_match(
 
     # Loading 状态
     controls.match_btn.disabled = True
-    controls.match_btn.text = "匹配中..."
+    controls.match_btn.text = t("components:ledger_match.匹配中..._6296")
     controls.match_btn.icon = ft.Icons.HOURGLASS_TOP
     controls.export_menu.disabled = True
     page.update()
@@ -235,21 +236,21 @@ async def _do_match(
         oil_matched = sum(1 for v in result_df.get(OIL_RESULT_KEY, pd.Series(dtype=str)) if v)
         parts = []
         if eq_ledger and (name_col or id_col):
-            parts.append(f"设备匹配: {matched_count}/{total}")
+            parts.append(t("components:ledger_match.设备匹配:/_c65c", matched_count=matched_count, total=total))
         if oil_ledger and oil_col:
-            parts.append(f"油品匹配: {oil_matched}/{total}")
+            parts.append(t("components:ledger_match.油品匹配:/_ed5e", oil_matched=oil_matched, total=total))
         status_text = "  |  ".join(parts)
         controls.status_label.value = status_text
         _update_match_status(state, controls)
-        _log_message(log, f"匹配完成: {status_text}")
+        _log_message(log, t("components:ledger_match.匹配完成:_bdca", status_text=status_text))
     except Exception as ex:
-        _log_message(log, f"匹配失败: {ex}", level=logging.ERROR)
+        _log_message(log, t("components:ledger_match.匹配失败:_76c1", ex=ex), level=logging.ERROR)
     finally:
         controls.import_progress_bar.visible = False
         controls.import_progress_text.visible = False
         controls.cancel_btn.visible = False
         controls.match_btn.disabled = False
-        controls.match_btn.text = "执行匹配"
+        controls.match_btn.text = t("components:ledger_match.执行匹配_306d")
         controls.match_btn.icon = ft.Icons.SEARCH
         controls.export_menu.disabled = not bool(state.all_sheets)
         page.update()
@@ -262,14 +263,14 @@ async def _do_export(page, log, state: MatchState, controls: _MatchControls, mod
         mode: "current-view" | "current-all" | "all-sheets"
     """
     if not state.all_sheets and not state.matched_sheets and not state.unmatched_sheets:
-        _log_message(log, "没有数据可导出", level=logging.WARNING)
+        _log_message(log, t("components:ledger_match.没有数据可导出_fc30"), level=logging.WARNING)
         return
 
     sheet_label = state.current_sheet or "Sheet"
     picker = ft.FilePicker()
     save_path = await picker.save_file(
-        dialog_title="导出结果",
-        file_name=f"{sheet_label}_匹配结果.xlsx" if mode != "all-sheets" else "匹配结果.xlsx",
+        dialog_title=t("components:ledger_match.导出结果_4c2a"),
+        file_name=f"{sheet_label}_匹配结果.xlsx" if mode != "all-sheets" else t("components:ledger_match.匹配结果.xlsx_42bb"),
         allowed_extensions=["xlsx"],
         initial_directory=_import_dir[0] or None,
     )
@@ -294,7 +295,7 @@ async def _do_export(page, log, state: MatchState, controls: _MatchControls, mod
             # 导出所有已匹配 sheet（每个 sheet 一个 tab）
             export_sheets = state.matched_all_sheets if state.matched_all_sheets else state.all_sheets
             if not export_sheets:
-                _log_message(log, "没有已匹配的 Sheet 可导出")
+                _log_message(log, t("components:ledger_match.没有已匹配的Sheet可导出_3aab"))
                 return
             success = await asyncio.to_thread(
                 export_to_excel, export_sheets, save_path, "全部",
@@ -302,10 +303,10 @@ async def _do_export(page, log, state: MatchState, controls: _MatchControls, mod
                 True, state.date_only,
             )
             if success:
-                _log_message(log, f"已导出: {save_path}（{len(export_sheets)} 个 sheet）")
+                _log_message(log, t("components:ledger_match.已导出:（个sheet）_1699", save_path=save_path, sheet_count=len(export_sheets)))
                 _update_last_directory(save_path)
             else:
-                _log_message(log, "导出已取消")
+                _log_message(log, t("components:ledger_match.导出已取消_e710"))
         else:
             # 导出当前 sheet
             if mode == "current-view":
@@ -315,7 +316,7 @@ async def _do_export(page, log, state: MatchState, controls: _MatchControls, mod
                 df = get_current_df(state)
                 export_data = {state.current_sheet: df} if df is not None else {}
             if not export_data:
-                _log_message(log, "没有数据可导出")
+                _log_message(log, t("components:ledger_match.没有数据可导出_fc30"))
                 return
             success = await asyncio.to_thread(
                 export_to_excel, export_data, save_path, state.current_sheet,
@@ -323,12 +324,12 @@ async def _do_export(page, log, state: MatchState, controls: _MatchControls, mod
                 True, state.date_only,
             )
             if success:
-                _log_message(log, f"已导出: {save_path}")
+                _log_message(log, t("components:ledger_match.已导出:_ea0a", save_path=save_path))
                 _update_last_directory(save_path)
             else:
-                _log_message(log, "导出已取消")
+                _log_message(log, t("components:ledger_match.导出已取消_e710"))
     except Exception as ex:
-        _log_message(log, f"导出失败: {ex}", level=logging.ERROR)
+        _log_message(log, t("components:ledger_match.导出失败:_0f9c", ex=ex), level=logging.ERROR)
     finally:
         controls.import_progress_bar.visible = False
         controls.import_progress_text.visible = False
@@ -349,7 +350,7 @@ def create_ledger_match_section(
     state = MatchState()
 
     # --- 控件 ---
-    file_label = ft.Text("未导入文件", size=12, color=ft.Colors.GREY)
+    file_label = ft.Text(t("components:ledger_match.未导入文件_18a4"), size=12, color=ft.Colors.GREY)
 
     sheet_dropdown = ft.Dropdown(
         label="Sheet",
@@ -359,24 +360,24 @@ def create_ledger_match_section(
     )
 
     name_dropdown = ft.Dropdown(
-        label="设备名称列",
-        hint_text="（可选）",
+        label=t("components:ledger_match.设备名称列_2bb9"),
+        hint_text=t("components:ledger_match.（可选）_fbd9"),
         width=180,
         dense=True,
         options=[],
         disabled=True,
     )
     id_dropdown = ft.Dropdown(
-        label="设备编号列",
-        hint_text="（可选）",
+        label=t("components:ledger_match.设备编号列_3be5"),
+        hint_text=t("components:ledger_match.（可选）_fbd9"),
         width=180,
         dense=True,
         options=[],
         disabled=True,
     )
     oil_dropdown = ft.Dropdown(
-        label="油品列",
-        hint_text="（可选）",
+        label=t("components:ledger_match.油品列_d8f5"),
+        hint_text=t("components:ledger_match.（可选）_fbd9"),
         width=180,
         dense=True,
         options=[],
@@ -384,32 +385,32 @@ def create_ledger_match_section(
     )
 
     name_match_switch = ft.Switch(
-        label="名称匹配", value=False,
+        label=t("components:ledger_match.名称匹配_3288"), value=False,
     )
     id_match_switch = ft.Switch(
-        label="编号匹配", value=False,
+        label=t("components:ledger_match.编号匹配_9b78"), value=False,
     )
     oil_match_switch = ft.Switch(
-        label="油品匹配", value=False,
+        label=t("components:ledger_match.油品匹配_4890"), value=False,
     )
 
-    match_btn = theme.primary_btn("执行匹配", icon=ft.Icons.SEARCH, disabled=True)
+    match_btn = theme.primary_btn(t("components:ledger_match.执行匹配_306d"), icon=ft.Icons.SEARCH, disabled=True)
 
     # Export menu — three options: current view, current sheet all, all sheets
     export_menu = ft.PopupMenuButton(
         icon=ft.Icons.DOWNLOAD,
-        tooltip="导出 Excel",
+        tooltip=t("components:ledger_match.导出Excel_7d57"),
         disabled=True,
         items=[],  # populated dynamically
     )
 
     date_only_switch = ft.Switch(
-        label="日期格式 YYYY-MM-DD",
+        label=t("components:ledger_match.日期格式YYYY-MM-DD_1986"),
         value=False,
-        tooltip="导出时去除时间部分，仅保留日期",
+        tooltip=t("components:ledger_match.导出时去除时间部分，仅保留日期_2484"),
     )
 
-    _VIEW_LABELS = ["全部", "已匹配", "未匹配"]
+    _VIEW_LABELS = [t("components:ledger_match.全部_a8b0"), t("components:ledger_match.已匹配_8e60"), t("components:ledger_match.未匹配_61b8")]
     _VIEW_MODES = ["all", "matched", "unmatched"]
 
     def _on_view_segment_change(e):
@@ -426,9 +427,9 @@ def create_ledger_match_section(
         selected=["all"],
         allow_empty_selection=False,
         segments=[
-            Segment(label=ft.Text("全部"), value="all"),
-            Segment(label=ft.Text("已匹配"), value="matched"),
-            Segment(label=ft.Text("未匹配"), value="unmatched"),
+            Segment(label=ft.Text(t("components:ledger_match.全部_a8b0")), value="all"),
+            Segment(label=ft.Text(t("components:ledger_match.已匹配_8e60")), value="matched"),
+            Segment(label=ft.Text(t("components:ledger_match.未匹配_61b8")), value="unmatched"),
         ],
         on_change=_on_view_segment_change,
         disabled=True,
@@ -442,7 +443,7 @@ def create_ledger_match_section(
     )
     import_progress_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY, visible=False)
     cancel_btn = ft.Button(
-        "取消导入",
+        t("components:ledger_match.取消导入_b7e3"),
         icon=ft.Icons.CANCEL,
         visible=False,
         style=ft.ButtonStyle(bgcolor=theme.ERROR, color="#FFFFFF"),
@@ -451,7 +452,7 @@ def create_ledger_match_section(
 
     # --- 表格 ---
     data_table = ft.DataTable(
-        columns=[ft.DataColumn(ft.Text("等待导入数据..."))],
+        columns=[ft.DataColumn(ft.Text(t("components:ledger_match.等待导入数据..._16c5")))],
         rows=[],
         expand=True,
         sort_column_index=None,
@@ -460,16 +461,16 @@ def create_ledger_match_section(
 
     empty_state = theme.empty_state(
         ft.Icons.TABLE_CHART_OUTLINED,
-        "暂无数据",
-        "点击上方「导入文件」开始",
+        t("components:ledger_match.暂无数据_21ef"),
+        t("components:ledger_match.点击上方「导入文件」开始_e12e"),
     )
 
     page_label = ft.Text("0 / 0", size=12, color=theme.TEXT_SECONDARY)
     prev_btn = ft.IconButton(
-        icon=ft.Icons.CHEVRON_LEFT, tooltip="上一页", icon_size=18, disabled=True,
+        icon=ft.Icons.CHEVRON_LEFT, tooltip=t("components:ledger_match.上一页_f4f8"), icon_size=18, disabled=True,
     )
     next_btn = ft.IconButton(
-        icon=ft.Icons.CHEVRON_RIGHT, tooltip="下一页", icon_size=18, disabled=True,
+        icon=ft.Icons.CHEVRON_RIGHT, tooltip=t("components:ledger_match.下一页_b4e1"), icon_size=18, disabled=True,
     )
 
     # --- Pack controls into a reference object ---
@@ -513,7 +514,7 @@ def create_ledger_match_section(
 
     def _on_cancel_import(e):
         state.import_cancelled.set()
-        _log_message(log, "正在取消导入...")
+        _log_message(log, t("components:ledger_match.正在取消导入..._bfd7"))
 
     cancel_btn.on_click = _on_cancel_import
 
@@ -569,14 +570,14 @@ def create_ledger_match_section(
             else:
                 data_table.sort_column_index = None
         else:
-            data_table.columns = [ft.DataColumn(ft.Text("等待导入数据..."))]
+            data_table.columns = [ft.DataColumn(ft.Text(t("components:ledger_match.等待导入数据..._16c5")))]
 
     def build_table():
         apply_sort(state)
         df = get_view_df(state)
         if df is None or df.empty:
             data_table.rows = []
-            data_table.columns = [ft.DataColumn(ft.Text("等待导入数据..."))]
+            data_table.columns = [ft.DataColumn(ft.Text(t("components:ledger_match.等待导入数据..._16c5")))]
             empty_state.visible = True
             _update_page_controls()
             page.update()
@@ -684,7 +685,7 @@ def create_ledger_match_section(
         state.import_cancelled.clear()  # clear() already calls this but be explicit
         view_segment.selected = ["all"]
         view_segment.disabled = True
-        file_label.value = "未导入文件"
+        file_label.value = t("components:ledger_match.未导入文件_18a4")
         file_label.color = ft.Colors.GREY
         sheet_dropdown.options = []
         sheet_dropdown.value = None
@@ -697,9 +698,9 @@ def create_ledger_match_section(
         match_btn.disabled = True
         export_btn.disabled = True
         status_label.value = ""
-        data_table.columns = [ft.DataColumn(ft.Text("等待导入数据..."))]
+        data_table.columns = [ft.DataColumn(ft.Text(t("components:ledger_match.等待导入数据..._16c5")))]
         data_table.rows = []
-        _log_message(log, "已清空")
+        _log_message(log, t("components:ledger_match.已清空_3683"))
         page.update()
 
     def _do_clear_confirmed(e):
@@ -707,9 +708,9 @@ def create_ledger_match_section(
         _do_clear_impl()
 
     _clear_confirm_dialog = create_confirm_dialog(
-        page, "确认清空",
-        "确定要清空所有已导入数据和匹配结果吗？此操作不可撤销。",
-        _do_clear_confirmed, confirm_text="确认清空",
+        page, t("components:ledger_match.确认清空_8452"),
+        t("components:ledger_match.确定要清空所有已导入数据和匹配_a545"),
+        _do_clear_confirmed, confirm_text=t("components:ledger_match.确认清空_8452"),
     )
 
     def on_clear(e):
@@ -741,11 +742,11 @@ def create_ledger_match_section(
 
         items = [
             ft.PopupMenuItem(
-                content=ft.Row([ft.Text("导出当前视图", size=13)]),
+                content=ft.Row([ft.Text(t("components:ledger_match.导出当前视图_ef1f"), size=13)]),
                 on_click=_make_handler("current-view"),
             ),
             ft.PopupMenuItem(
-                content=ft.Row([ft.Text(f"导出 {state.current_sheet} 全部", size=13)]),
+                content=ft.Row([ft.Text(t("components:ledger_match.导出全部_2c1c", sheet_name=state.current_sheet), size=13)]),
                 on_click=_make_handler("current-all"),
             ),
         ]
@@ -753,7 +754,7 @@ def create_ledger_match_section(
         if matched_count > 1:
             items.append(ft.PopupMenuItem())
             items.append(ft.PopupMenuItem(
-                content=ft.Row([ft.Text(f"导出所有已匹配 Sheet（{matched_count} 个）", size=13)]),
+                content=ft.Row([ft.Text(t("components:ledger_match.导出所有已匹配Sheet（个）_a7c0", matched_count=matched_count), size=13)]),
                 on_click=_make_handler("all-sheets"),
             ))
         export_menu.items = items
@@ -782,8 +783,8 @@ def create_ledger_match_section(
         [
             ft.Row(
                 [
-                    theme.secondary_btn("导入文件", icon=ft.Icons.UPLOAD, on_click=on_import),
-                    theme.destructive_btn("清空", icon=ft.Icons.DELETE_SWEEP, on_click=on_clear),
+                    theme.secondary_btn(t("components:ledger_match.导入文件_7499"), icon=ft.Icons.UPLOAD, on_click=on_import),
+                    theme.destructive_btn(t("components:ledger_match.清空_288f"), icon=ft.Icons.DELETE_SWEEP, on_click=on_clear),
                     file_label,
                 ],
                 spacing=8,
@@ -822,8 +823,8 @@ def create_ledger_match_section(
     )
 
     match_config_collapsible = theme.make_collapsible(
-        title="匹配配置",
-        subtitle="选择设备名称/编号/油品列进行匹配",
+        title=t("components:ledger_match.匹配配置_3358"),
+        subtitle=t("components:ledger_match.选择设备名称/编号/油品列进行_8bb0"),
         icon=ft.Icons.TUNE,
         initially_expanded=True,
         content_controls=[match_config_grid],
@@ -840,9 +841,9 @@ def create_ledger_match_section(
     container = ft.Container(
         content=ft.Column(
             [
-                theme.section_title("台账匹配"),
+                theme.section_title(t("components:ledger_match.台账匹配_9897")),
                 ft.Text(
-                    "导入 Excel 文件后选择匹配列，执行匹配并导出结果。",
+                    t("components:ledger_match.导入Excel文件后选择匹配列_214b"),
                     size=13,
                     color=theme.TEXT_SECONDARY,
                 ),

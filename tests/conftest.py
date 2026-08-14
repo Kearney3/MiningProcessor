@@ -4,6 +4,16 @@ import pandas as pd
 from pathlib import Path
 
 
+@pytest.fixture(autouse=True)
+def _reset_gui_language():
+    """Keep GUI component assertions deterministic regardless of user config."""
+    from gui import i18n
+
+    i18n.init("zh")
+    yield
+    i18n.init("zh")
+
+
 @pytest.fixture
 def sample_equipment_ledger():
     """Create a minimal EquipmentLedger for testing."""

@@ -4,6 +4,7 @@
  * 从各页面文件中提取的通用交互组件，统一维护。
  */
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
 import { FolderIcon, FileIcon, AlertTriangleIcon, ChevronDownIcon } from "./icons";
 import { inputClass, btnSecondaryClass, btnDangerClass } from "./ui-classes";
@@ -119,6 +120,7 @@ export function PathInput({
   defaultPath?: string;
   onFileSelected?: (path: string) => void;
 }) {
+  const { t } = useTranslation();
   const browse = async () => {
     const selected = await open({
       directory,
@@ -144,7 +146,7 @@ export function PathInput({
         placeholder={placeholder}
         className={`${inputClass} flex-1 ${value === "" ? "border-amber-300 bg-amber-50/30" : ""}`}
       />
-      <button onClick={browse} className={btnSecondaryClass} title={directory ? "选择文件夹" : "选择文件"}>
+      <button onClick={browse} className={btnSecondaryClass} title={directory ? t("lib:ui-components.选择文件夹_aaa4") : t("lib:ui-components.选择文件_fd7e")}>
         {directory ? <FolderIcon /> : <FileIcon />}
       </button>
     </div>
@@ -172,6 +174,7 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4 overflow-hidden">
@@ -196,10 +199,10 @@ export function ConfirmDialog({
         </div>
         <div className="flex justify-end gap-2 px-6 py-4 bg-slate-50 border-t border-slate-100">
           <button onClick={onCancel} className={btnSecondaryClass}>
-            {cancelLabel ?? "取消"}
+            {cancelLabel ?? t("lib:ui-components.取消_625f")}
           </button>
           <button onClick={onConfirm} className={btnDangerClass}>
-            {confirmLabel ?? "确定"}
+            {confirmLabel ?? t("lib:ui-components.确定_38cf")}
           </button>
         </div>
       </div>

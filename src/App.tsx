@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { getVersion } from "@tauri-apps/api/app";
+import { useTranslation } from "react-i18next";
 import { usePythonBridge } from "./hooks/usePythonBridge";
 import type { PageId } from "./lib/types";
 import { Sidebar } from "./components/Sidebar";
 import { LogPanel } from "./components/LogPanel";
 import { ToastProvider } from "./components/Toast";
 import { ConnectionStatusBadge } from "./components/ConnectionStatusBadge";
+import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { DataProcessingPage } from "./components/pages/DataProcessingPage";
 import { BatchProcessingPage } from "./components/pages/BatchProcessingPage";
 import { DataSyncPage } from "./components/pages/DataSyncPage";
@@ -20,6 +22,7 @@ import { UserConfigPage } from "./components/pages/UserConfigPage";
 import { LLMLabelingPage } from "./components/pages/LLMLabelingPage";
 
 function App() {
+  const { t } = useTranslation();
   const [currentPage, setCurrentPage] = useState<PageId>("data-processing");
   const [appVersion, setAppVersion] = useState("v2.5.0");
   const bridge = usePythonBridge();
@@ -58,7 +61,7 @@ function App() {
           </svg>
           </span>
           <span className="text-sm font-semibold text-slate-800">
-            矿山数据处理
+            {t("app:矿山数据处理_ece7")}
           </span>
         </div>
 
@@ -76,6 +79,7 @@ function App() {
           <span className="text-xs text-slate-500 ml-auto tabular-nums">
             {appVersion}
           </span>
+          <LanguageSwitcher />
         </div>
       </header>
 

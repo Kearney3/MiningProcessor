@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import type { BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
 import { KeywordsIcon } from "../../lib/icons";
@@ -29,6 +30,7 @@ const DEFAULT_FILE_KEYWORDS: FileKeywords = {
 // ---------------------------------------------------------------------------
 
 export function FileKeywordsSection({ bridge }: { bridge: BridgeProp }) {
+  const { t } = useTranslation();
   const { notify } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -65,12 +67,12 @@ export function FileKeywordsSection({ bridge }: { bridge: BridgeProp }) {
     setSaving(true);
     try {
       await bridge.call("save_config", { data: { file_keywords: keywords }, target: "user" });
-      setStatus({ msg: "文件关键字配置已保存", kind: "success" });
-      notify("文件关键字已保存", "success");
+      setStatus({ msg: t("userConfig:FileKeywordsSection.文件关键字配置已保存_73b3"), kind: "success" });
+      notify(t("userConfig:FileKeywordsSection.文件关键字已保存_6441"), "success");
       setTimeout(() => setStatus({ msg: "", kind: "info" }), 2500);
     } catch (e) {
-      setStatus({ msg: `保存失败: ${String(e)}`, kind: "error" });
-      notify(`保存失败: ${e}`, "error");
+      setStatus({ msg: t("userConfig:FileKeywordsSection.保存失败:$_2655", { error: String(e) }), kind: "error" });
+      notify(t("userConfig:FileKeywordsSection.保存失败:$_e5b7", { error: String(e) }), "error");
     } finally {
       setSaving(false);
     }
@@ -78,21 +80,21 @@ export function FileKeywordsSection({ bridge }: { bridge: BridgeProp }) {
 
   const resetToDefault = () => {
     setKeywords({ ...DEFAULT_FILE_KEYWORDS });
-    setStatus({ msg: "已恢复默认关键字（需点击保存生效）", kind: "info" });
+    setStatus({ msg: t("userConfig:FileKeywordsSection.已恢复默认关键字（需点击保存生_699b"), kind: "info" });
   };
 
   const fields: { key: keyof FileKeywords; label: string; hint: string }[] = [
-    { key: "fuel", label: "油耗关键字", hint: "输入后按回车添加" },
-    { key: "electrical", label: "电力关键字", hint: "输入后按回车添加" },
-    { key: "production", label: "生产关键字", hint: "输入后按回车添加" },
-    { key: "worktime", label: "工时关键字", hint: "输入后按回车添加" },
-    { key: "maintenance", label: "维修关键字", hint: "输入后按回车添加" },
+    { key: "fuel", label: t("userConfig:FileKeywordsSection.油耗关键字_e747"), hint: t("userConfig:FileKeywordsSection.输入后按回车添加_9739") },
+    { key: "electrical", label: t("userConfig:FileKeywordsSection.电力关键字_194b"), hint: t("userConfig:FileKeywordsSection.输入后按回车添加_9739") },
+    { key: "production", label: t("userConfig:FileKeywordsSection.生产关键字_eb36"), hint: t("userConfig:FileKeywordsSection.输入后按回车添加_9739") },
+    { key: "worktime", label: t("userConfig:FileKeywordsSection.工时关键字_c158"), hint: t("userConfig:FileKeywordsSection.输入后按回车添加_9739") },
+    { key: "maintenance", label: t("userConfig:FileKeywordsSection.维修关键字_6729"), hint: t("userConfig:FileKeywordsSection.输入后按回车添加_9739") },
   ];
 
   return (
     <SectionCard
-      title="文件关键字"
-      subtitle="批量处理时用于匹配文件名的关键字，点击标签可删除"
+      title={t("userConfig:FileKeywordsSection.文件关键字_d556")}
+      subtitle={t("userConfig:FileKeywordsSection.批量处理时用于匹配文件名的关键_02e8")}
       icon={<KeywordsIcon />}
       expanded={expanded}
       onToggle={() => setExpanded(!expanded)}

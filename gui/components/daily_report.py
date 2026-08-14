@@ -14,6 +14,7 @@ from gui.components.common import (
     to_local_dt,
 )
 from func.time_utils import local_today
+from gui.i18n import t
 
 try:
     from . import theme
@@ -42,7 +43,7 @@ def _warning_records(warnings: list[dict] | None) -> list[dict]:
 
 def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_ledger_refs: dict) -> tuple[ft.Container, dict]:
     source_path = ft.TextField(
-        hint_text="选择数据目录",
+        hint_text=t("components:daily_report.选择数据目录_e9dd"),
         value=_get_initial_directory(),
         expand=True,
     )
@@ -56,20 +57,20 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
     }
     result_text = ft.Text("", size=13, color=theme.TEXT_SECONDARY, visible=False)
 
-    eq_toggle = ft.Checkbox(label="设备台账匹配", value=True, active_color=theme.PRIMARY)
-    model_toggle = ft.Checkbox(label="型号台账匹配", value=False, active_color=theme.PRIMARY)
-    include_raw_name = ft.Checkbox(label="输出原始设备名称", value=True, active_color=theme.PRIMARY)
-    include_raw_code = ft.Checkbox(label="输出原始设备编号", value=True, active_color=theme.PRIMARY)
-    include_raw_company = ft.Checkbox(label="输出原始公司名称", value=True, active_color=theme.PRIMARY)
-    include_detail_sheets = ft.Checkbox(label="输出分项表格", value=False, active_color=theme.PRIMARY)
-    skip_hidden_rows = ft.Checkbox(label="跳过隐藏行", value=False, active_color=theme.PRIMARY)
-    skip_hidden_cols = ft.Checkbox(label="跳过隐藏列", value=False, active_color=theme.PRIMARY)
-    filter_zero_engine_hours = ft.Checkbox(label="过滤零小时数", value=False, active_color=theme.PRIMARY)
-    filter_zero_work_hours = ft.Checkbox(label="过滤零运行小时数", value=False, active_color=theme.PRIMARY)
-    filter_zero_hours_meter = ft.Checkbox(label="过滤零小时仪表", value=False, active_color=theme.PRIMARY)
-    filter_zero_km_meter = ft.Checkbox(label="过滤零公里仪表", value=False, active_color=theme.PRIMARY)
-    filter_zero_run_hours = ft.Checkbox(label="过滤零运行小时数", value=False, active_color=theme.PRIMARY)
-    filter_zero_run_km = ft.Checkbox(label="过滤零运行里程", value=False, active_color=theme.PRIMARY)
+    eq_toggle = ft.Checkbox(label=t("components:daily_report.设备台账匹配_5a23"), value=True, active_color=theme.PRIMARY)
+    model_toggle = ft.Checkbox(label=t("components:daily_report.型号台账匹配_135c"), value=False, active_color=theme.PRIMARY)
+    include_raw_name = ft.Checkbox(label=t("components:daily_report.输出原始设备名称_7f2b"), value=True, active_color=theme.PRIMARY)
+    include_raw_code = ft.Checkbox(label=t("components:daily_report.输出原始设备编号_5dfd"), value=True, active_color=theme.PRIMARY)
+    include_raw_company = ft.Checkbox(label=t("components:daily_report.输出原始公司名称_fc62"), value=True, active_color=theme.PRIMARY)
+    include_detail_sheets = ft.Checkbox(label=t("components:daily_report.输出分项表格_e5fb"), value=False, active_color=theme.PRIMARY)
+    skip_hidden_rows = ft.Checkbox(label=t("components:daily_report.跳过隐藏行_bc25"), value=False, active_color=theme.PRIMARY)
+    skip_hidden_cols = ft.Checkbox(label=t("components:daily_report.跳过隐藏列_3ed3"), value=False, active_color=theme.PRIMARY)
+    filter_zero_engine_hours = ft.Checkbox(label=t("components:daily_report.过滤零小时数_549f"), value=False, active_color=theme.PRIMARY)
+    filter_zero_work_hours = ft.Checkbox(label=t("components:daily_report.过滤零运行小时数_eaf1"), value=False, active_color=theme.PRIMARY)
+    filter_zero_hours_meter = ft.Checkbox(label=t("components:daily_report.过滤零小时仪表_99e8"), value=False, active_color=theme.PRIMARY)
+    filter_zero_km_meter = ft.Checkbox(label=t("components:daily_report.过滤零公里仪表_2e3c"), value=False, active_color=theme.PRIMARY)
+    filter_zero_run_hours = ft.Checkbox(label=t("components:daily_report.过滤零运行小时数_eaf1"), value=False, active_color=theme.PRIMARY)
+    filter_zero_run_km = ft.Checkbox(label=t("components:daily_report.过滤零运行里程_d55d"), value=False, active_color=theme.PRIMARY)
     anomaly_results = create_anomaly_results_table()
     exporting = False
 
@@ -86,14 +87,14 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
     page.services.append(picker)
 
     async def browse_source(e):
-        selected = await picker.get_directory_path(dialog_title="选择日报数据目录")
+        selected = await picker.get_directory_path(dialog_title=t("components:daily_report.选择日报数据目录_6bac"))
         if selected:
             source_path.value = selected
             source_path.update()
 
     source_path.suffix = ft.IconButton(
         icon=ft.Icons.FOLDER_OPEN,
-        tooltip="选择文件夹",
+        tooltip=t("components:daily_report.选择文件夹_aaa4"),
         on_click=browse_source,
     )
 
@@ -127,7 +128,7 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
                 ft.Text(label, size=12, color=theme.TEXT_SECONDARY, width=42),
                 date_labels[key],
                 theme.secondary_btn(
-                    "选择",
+                    t("components:daily_report.选择_153f"),
                     icon=ft.Icons.CALENDAR_MONTH,
                     height=32,
                     on_click=lambda e, selected_key=key: pick_date(selected_key),
@@ -151,22 +152,22 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
 
         path = (source_path.value or "").strip()
         if not path:
-            result_text.value, result_text.color, result_text.visible = "请选择数据目录", theme.ERROR, True
+            result_text.value, result_text.color, result_text.visible = t("components:daily_report.请选择数据目录_ead0"), theme.ERROR, True
             safe_update(result_text)
             return
         if model_toggle.value and not eq_toggle.value:
-            result_text.value, result_text.color, result_text.visible = "型号台账匹配需要设备台账", theme.ERROR, True
+            result_text.value, result_text.color, result_text.visible = t("components:daily_report.型号台账匹配需要设备台账_de31"), theme.ERROR, True
             safe_update(result_text)
             return
         if selected_dates["end"] < selected_dates["start"]:
-            result_text.value, result_text.color, result_text.visible = "结束日期早于起始日期", theme.ERROR, True
+            result_text.value, result_text.color, result_text.visible = t("components:daily_report.结束日期早于起始日期_c711"), theme.ERROR, True
             safe_update(result_text)
             return
 
-        output = str(Path(path) / f"每日报表_{selected_dates['start']:%Y-%m-%d}_{selected_dates['end']:%Y-%m-%d}.xlsx")
+        output = str(Path(path) / t("components:daily_report.每日报表__.xlsx_91df", start=selected_dates['start'].strftime('%Y-%m-%d'), end=selected_dates['end'].strftime('%Y-%m-%d')))
         exporting = True
         export_btn.disabled = True
-        export_btn.text = "导出中..."
+        export_btn.text = t("components:daily_report.导出中..._4062")
         safe_update(export_btn)
         anomaly_results["update"]([])
         try:
@@ -198,33 +199,33 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
                 },
             )
             anomaly_results["update"](_warning_records(result.warnings))
-            detail_message = f"，分项表 {len(result.detail_sheets)} 个" if result.detail_sheets else ""
-            result_text.value = f"已保存至当前目录，{len(result.report)} 行，警告 {len(result.warnings)} 条{detail_message}"
+            detail_message = t("components:daily_report.，分项表个_56ae", count=len(result.detail_sheets)) if result.detail_sheets else ""
+            result_text.value = t("components:daily_report.已保存至当前目录，行，警告条_8c52", report_count=len(result.report), warnings_count=len(result.warnings), detail_message=detail_message)
             result_text.color = theme.WARNING if result.warnings else theme.SUCCESS
             result_text.visible = True
             log(result_text.value, logging.WARNING if result.warnings else logging.INFO)
             safe_update(result_text)
         except Exception as ex:
-            log(f"日报导出失败: {ex}", logging.ERROR)
-            result_text.value, result_text.color, result_text.visible = f"日报导出失败: {ex}", theme.ERROR, True
+            log(t("components:daily_report.日报导出失败:_2101", ex=ex), logging.ERROR)
+            result_text.value, result_text.color, result_text.visible = t("components:daily_report.日报导出失败:_2101", ex=ex), theme.ERROR, True
             safe_update(result_text)
         finally:
             exporting = False
             export_btn.disabled = False
-            export_btn.text = "导出每日报表"
+            export_btn.text = t("components:daily_report.导出每日报表_34bc")
             safe_update(export_btn)
 
-    export_btn = theme.primary_btn("导出每日报表", icon=ft.Icons.DOWNLOAD)
+    export_btn = theme.primary_btn(t("components:daily_report.导出每日报表_34bc"), icon=ft.Icons.DOWNLOAD)
     export_btn.on_click = export
 
     date_range = ft.ResponsiveRow(
         [
-            ft.Container(date_control("start", "起始"), col={"xs": 12, "md": 6}),
-            ft.Container(date_control("end", "结束"), col={"xs": 12, "md": 6}),
+            ft.Container(date_control("start", t("components:daily_report.起始_859e")), col={"xs": 12, "md": 6}),
+            ft.Container(date_control("end", t("components:daily_report.结束_12f1")), col={"xs": 12, "md": 6}),
             ft.Container(
                 ft.Row(
                     [
-                        theme.secondary_btn("昨日", icon=ft.Icons.CALENDAR_TODAY, height=32, on_click=set_yesterday),
+                        theme.secondary_btn(t("components:daily_report.昨日_23c9"), icon=ft.Icons.CALENDAR_TODAY, height=32, on_click=set_yesterday),
                     ],
                     spacing=8,
                 ),
@@ -256,7 +257,7 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
 
     filters = ft.Column(
         [
-            ft.Text("油耗处理", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+            ft.Text(t("components:daily_report.油耗处理_1a41"), size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
             ft.ResponsiveRow(
                 [
                     ft.Container(filter_zero_engine_hours, col={"xs": 12, "md": 6}),
@@ -265,7 +266,7 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
                 run_spacing=4,
             ),
             ft.Divider(height=1, color=theme.BORDER),
-            ft.Text("运行数据", size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+            ft.Text(t("components:daily_report.运行数据_6644"), size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
             ft.ResponsiveRow(
                 [
                     ft.Container(filter_zero_hours_meter, col={"xs": 12, "md": 6}),
@@ -282,12 +283,12 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
     container = ft.Container(
         content=ft.Column(
             [
-                theme.section_title("每日报表"),
-                theme.module_card([ft.Row([source_path], spacing=8)], label="数据目录"),
-                theme.module_card([date_range], label="日期范围"),
-                theme.module_card([options], label="处理选项"),
-                theme.module_card([output_options], label="输出选项"),
-                theme.module_card([filters], label="数据过滤"),
+                theme.section_title(t("components:daily_report.每日报表_732e")),
+                theme.module_card([ft.Row([source_path], spacing=8)], label=t("components:daily_report.数据目录_0d50")),
+                theme.module_card([date_range], label=t("components:daily_report.日期范围_7866")),
+                theme.module_card([options], label=t("components:daily_report.处理选项_6ad1")),
+                theme.module_card([output_options], label=t("components:daily_report.输出选项_dc62")),
+                theme.module_card([filters], label=t("components:daily_report.数据过滤_8626")),
                 ft.Row(
                     [export_btn, result_text],
                     alignment=ft.MainAxisAlignment.START,
