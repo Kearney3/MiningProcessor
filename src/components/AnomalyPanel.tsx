@@ -79,7 +79,7 @@ export function AnomalyPanel({
             </div>
           </div>
           <p className="text-xs text-slate-400">
-            逐列检测开关请在「用户配置 → 异常值检测配置」中设置
+            {t("components:AnomalyPanel.ui.columnRulesHint")}
           </p>
         </div>
       )}

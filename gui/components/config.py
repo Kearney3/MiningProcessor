@@ -84,7 +84,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
             device_field = ft.TextField(
                 value=row_state["device"],
                 text_size=13,
-                hint_text="设备型号" if not row_state["device"] else None,
+                hint_text=t("components:config.设备型号_5858") if not row_state["device"] else None,
                 border_color=ft.Colors.TRANSPARENT,
                 focused_border_color=theme.PRIMARY,
                 color=theme.TEXT_PRIMARY,
@@ -94,7 +94,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
                 value=str(row_state["capacity"]),
                 text_size=13,
                 width=80,
-                hint_text="方" if not str(row_state["capacity"]).strip() else None,
+                hint_text=t("components:config.装载量(方)_e3d9") if not str(row_state["capacity"]).strip() else None,
                 border_color=ft.Colors.TRANSPARENT,
                 focused_border_color=theme.PRIMARY,
                 color=theme.TEXT_PRIMARY,

@@ -222,21 +222,21 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
           className="inline-flex items-center gap-1 text-xs font-medium text-teal-700 bg-teal-50 hover:bg-teal-100 px-3 py-1.5 rounded-md transition-colors"
         >
           <PlusIcon />
-          添加映射
+          {t("userConfig:HeaderMappingSection.ui.addMapping")}
         </button>
       </div>
 
       {/* Secondary actions */}
       <div className="flex items-center gap-1.5 mb-3">
         <button onClick={reload} className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded hover:bg-slate-50 transition-colors">
-          <RefreshIcon /> 重新加载
+          <RefreshIcon /> {t("userConfig:HeaderMappingSection.ui.reload")}
         </button>
         <button onClick={resetToDefault} className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700 px-2 py-1 rounded hover:bg-red-50 transition-colors">
           <RestoreIcon /> {t("userConfig:HeaderMappingSection.restoreDefault")}
         </button>
         <span className="mx-1 text-slate-200">|</span>
         <button onClick={() => setExpandedRows(new Set(entries.map((_, i) => i)))} className="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded hover:bg-slate-50 transition-colors">
-          全部展开
+          {t("userConfig:HeaderMappingSection.ui.expandAll")}
         </button>
         <button onClick={() => setExpandedRows(new Set())} className="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded hover:bg-slate-50 transition-colors">
           {t("userConfig:HeaderMappingSection.collapseAll")}
@@ -321,7 +321,7 @@ export function HeaderMappingSection({ bridge }: { bridge: BridgeProp }) {
                       </button>
                       <button
                         onClick={() => removeRow(idx)}
-                        className="w-7 h-7 flex items-center justify-center rounded text-slate-600 hover:text-red-500 hover:bg-red-50 transition-colors"
+                        className="w-7 h-7 flex items-center justify-center rounded text-red-700 hover:text-red-800 hover:bg-red-50 transition-colors"
                         title={t("userConfig:HeaderMappingSection.删除此行_43e8")}
                       >
                         <CloseIcon />

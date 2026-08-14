@@ -71,6 +71,7 @@ function SheetSelectionModal({
   onCancel: () => void;
 }) {
   const [selected, setSelected] = useState(sheets[0] || "");
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (isOpen && sheets.length > 0) {
@@ -86,10 +87,10 @@ function SheetSelectionModal({
         <div className="px-5 py-4 border-b border-slate-100">
           <h3 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
             <TableIcon />
-            选择 Sheet
+            {t("pages:LedgerPage.ui.selectSheet")}
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            请选择要导入的 Sheet
+            {t("pages:LedgerPage.ui.selectSheetHint")}
           </p>
         </div>
 
@@ -121,13 +122,13 @@ function SheetSelectionModal({
             onClick={onCancel}
             className="btn-secondary text-sm px-4 py-1.5"
           >
-            取消
+            {t("pages:LedgerPage.ui.cancel")}
           </button>
           <button
             onClick={() => onConfirm(selected)}
             className="btn-primary text-sm px-4 py-1.5"
           >
-            下一步
+            {t("pages:LedgerPage.ui.next")}
           </button>
         </div>
       </div>
@@ -179,10 +180,10 @@ function ColumnMappingModal({
             <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" />
             </svg>
-            列映射
+            {t("pages:LedgerPage.ui.columnMapping")}
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            将文件中的列映射到台账标准列
+            {t("pages:LedgerPage.ui.columnMappingHint")}
           </p>
         </div>
 
@@ -216,7 +217,7 @@ function ColumnMappingModal({
             onClick={onCancel}
             className="btn-secondary text-sm px-4 py-1.5"
           >
-            取消
+            {t("pages:LedgerPage.ui.cancel")}
           </button>
           <button
             onClick={() => {
@@ -229,7 +230,7 @@ function ColumnMappingModal({
             }}
             className="btn-primary text-sm px-4 py-1.5"
           >
-            确认导入
+            {t("pages:LedgerPage.ui.confirmImport")}
           </button>
         </div>
       </div>
@@ -245,7 +246,7 @@ function ConfirmDialog({
   open: isOpen,
   title,
   message,
-  confirmLabel = "确认",
+  confirmLabel,
   danger = false,
   onConfirm,
   onCancel,
@@ -258,6 +259,7 @@ function ConfirmDialog({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useTranslation();
   if (!isOpen) return null;
 
   return (
@@ -272,13 +274,13 @@ function ConfirmDialog({
             onClick={onCancel}
             className="btn-secondary text-sm px-4 py-1.5"
           >
-            取消
+            {t("pages:LedgerPage.ui.cancel")}
           </button>
           <button
             onClick={onConfirm}
             className={`${danger ? "btn-danger" : "btn-primary"} text-sm px-4 py-1.5`}
           >
-            {confirmLabel}
+            {confirmLabel ?? t("pages:LedgerPage.ui.confirm")}
           </button>
         </div>
       </div>
@@ -566,7 +568,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           <h2 className="text-base font-semibold text-slate-800">{config.title}</h2>
           {isDefault && (
             <span className="text-xs bg-slate-100 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-md inline-flex items-center gap-1">
-              <StarFilledIcon /> 默认
+              <StarFilledIcon /> {t("pages:LedgerPage.ui.default")}
             </span>
           )}
         </div>
@@ -603,7 +605,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
             title={t("pages:LedgerPage.导入台账_21be")}
           >
             <ImportIcon />
-            <span className="hidden sm:inline">导入</span>
+            <span className="hidden sm:inline">{t("pages:LedgerPage.ui.import")}</span>
           </button>
 
           {/* Export template */}
@@ -658,14 +660,14 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
             title={t("pages:LedgerPage.清空台账_d9ca")}
           >
             <TrashIcon />
-            <span className="hidden sm:inline">清空</span>
+            <span className="hidden sm:inline">{t("pages:LedgerPage.ui.clear")}</span>
           </button>
 
           {/* Refresh */}
           <button
             onClick={loadData}
             className="btn-secondary"
-            title="刷新"
+            title={t("pages:LedgerPage.ui.refresh")}
           >
             <RefreshIcon />
           </button>
@@ -769,7 +771,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
                 className="text-xs text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-0.5"
               >
                 <ChevronLeftIcon />
-                上一页
+                {t("pages:LedgerPage.ui.previousPage")}
               </button>
               <span className="text-xs text-slate-500 min-w-[4rem] text-center">
                 {safePage + 1} / {totalPages}
@@ -779,7 +781,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
                 onClick={() => setPage((p) => p + 1)}
                 className="text-xs text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-0.5"
               >
-                下一页
+                {t("pages:LedgerPage.ui.nextPage")}
                 <ChevronRightIcon />
               </button>
             </div>
@@ -809,7 +811,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
         open={showClearDialog}
         title={t("pages:LedgerPage.清空台账_d9ca")}
         message={t("pages:LedgerPage.确定要清空所有$数据吗？此操作_7290", { title: config.title })}
-        confirmLabel="清空"
+        confirmLabel={t("pages:LedgerPage.ui.clear")}
         danger
         onConfirm={handleClear}
         onCancel={() => setShowClearDialog(false)}

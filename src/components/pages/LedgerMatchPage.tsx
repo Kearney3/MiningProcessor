@@ -531,7 +531,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
           >
             <UploadCloudIcon />
             <p className="text-sm text-slate-500 mt-2">
-              拖拽 Excel 文件到此处，或点击选择
+              {t("pages:LedgerMatchPage.ui.dropFile")}
             </p>
             <p className="text-xs text-slate-400 mt-0.5">{t("pages:LedgerMatchPage.支持.xlsx/.xls格式_10a3")}</p>
           </div>
@@ -543,10 +543,10 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
               type="text"
               value={filePath}
               onChange={(e) => setFilePath(e.target.value)}
-              placeholder="选择 Excel 文件"
+              placeholder={t("pages:LedgerMatchPage.ui.selectExcelFile")}
               className={`${inputClass} flex-1`}
             />
-            <button onClick={browseFile} className={btnSecondaryClass} title="选择文件">
+            <button onClick={browseFile} className={btnSecondaryClass} title={t("pages:LedgerMatchPage.ui.selectFile")}>
               <FileIcon />
             </button>
             <button
@@ -554,7 +554,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
               className="flex items-center gap-1.5 text-red-600 text-sm px-3 py-1.5 rounded-md hover:bg-red-50 transition-colors"
             >
               <TrashIcon />
-              清空
+              {t("pages:LedgerMatchPage.ui.clear")}
             </button>
           </div>
         )}
@@ -589,7 +589,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
             </div>
             {matchedSheetCount > 0 && (
               <span className="text-xs text-emerald-600 ml-2 shrink-0">
-                {matchedSheetCount}/{availableSheets.length} 已匹配
+                {matchedSheetCount}/{availableSheets.length} {t("pages:LedgerMatchPage.ui.matched")}
               </span>
             )}
           </div>
@@ -601,7 +601,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
         <div className="bg-white rounded-lg border border-slate-200 p-4 mb-4">
           <h3 className="text-sm font-medium text-slate-700 mb-3 flex items-center gap-2">
             <span className="text-slate-400"><SearchIcon /></span>
-            匹配配置
+            {t("pages:LedgerMatchPage.ui.matchConfig")}
             {sheetName && (
               <span className="text-xs text-slate-400 font-normal">— {sheetName}</span>
             )}
@@ -624,7 +624,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 disabled={!currentConfig.nameToggle.enabled}
                 className={`${inputClass} text-xs disabled:opacity-40 disabled:cursor-not-allowed w-40`}
               >
-                <option value="">选择列</option>
+                <option value="">{t("pages:LedgerMatchPage.ui.selectColumn")}</option>
                 {currentState?.raw.columns.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
@@ -646,7 +646,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 disabled={!currentConfig.idToggle.enabled}
                 className={`${inputClass} text-xs disabled:opacity-40 disabled:cursor-not-allowed w-40`}
               >
-                <option value="">选择列</option>
+                <option value="">{t("pages:LedgerMatchPage.ui.selectColumn")}</option>
                 {currentState?.raw.columns.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
@@ -660,7 +660,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 onChange={(v) => updateOilToggle({ enabled: v })}
               />
               <span className={`text-sm ${currentConfig.oilToggle.enabled ? "text-slate-800 font-medium" : "text-slate-500"}`}>
-                <span className="inline-flex items-center gap-1"><DropletIcon /> 油品</span>
+                <span className="inline-flex items-center gap-1"><DropletIcon /> {t("pages:LedgerMatchPage.ui.oil")}</span>
               </span>
               <select
                 value={currentConfig.oilToggle.column}
@@ -668,7 +668,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 disabled={!currentConfig.oilToggle.enabled}
                 className={`${inputClass} text-xs disabled:opacity-40 disabled:cursor-not-allowed w-40`}
               >
-                <option value="">选择列</option>
+                <option value="">{t("pages:LedgerMatchPage.ui.selectColumn")}</option>
                 {currentState?.raw.columns.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
@@ -688,7 +688,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 <span>{t("pages:LedgerMatchPage.挖机列:_9d71")} <code className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-xs">{currentConfig.dualExcavatorCol}</code></span>
               </div>
               <p className="text-xs text-slate-400 mt-1">
-                匹配结果将生成 "标准设备名称（矿卡）" 和 "标准设备名称（挖机）" 两列
+                {t("pages:LedgerMatchPage.ui.dualColumnHint")}
               </p>
             </div>
           )}
@@ -701,12 +701,12 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 onChange={setDateOnly}
               />
               <span className={`text-sm ${dateOnly ? "text-slate-800 font-medium" : "text-slate-500"}`}>
-                日期格式 YYYY-MM-DD
+                {t("pages:LedgerMatchPage.ui.dateFormat")}
               </span>
             </div>
             {matchedSheetCount > 1 && (
               <span className="text-xs text-emerald-600">
-                已匹配 {matchedSheetCount} 个 sheet，导出时将作为独立工作表
+                {t("pages:LedgerMatchPage.ui.matchedSheets", { count: matchedSheetCount })}
               </span>
             )}
           </div>
@@ -741,9 +741,9 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
           {/* Segmented control */}
           <div className="inline-flex bg-slate-100 rounded-md p-0.5">
             {([
-              { id: "all" as ViewMode, label: "全部", count: viewCounts.all },
-              { id: "matched" as ViewMode, label: "已匹配", count: viewCounts.matched },
-              { id: "unmatched" as ViewMode, label: "未匹配", count: viewCounts.unmatched },
+              { id: "all" as ViewMode, label: t("pages:LedgerMatchPage.ui.all"), count: viewCounts.all },
+              { id: "matched" as ViewMode, label: t("pages:LedgerMatchPage.ui.matched"), count: viewCounts.matched },
+              { id: "unmatched" as ViewMode, label: t("pages:LedgerMatchPage.ui.unmatched"), count: viewCounts.unmatched },
             ]).map((v) => (
               <button
                 key={v.id}
@@ -768,27 +768,27 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 className={btnSecondaryClass}
               >
                 <DownloadIcon />
-                导出 Excel
+                {t("pages:LedgerMatchPage.ui.exportExcel")}
                 <ChevronDownIcon />
               </button>
               {showExportMenu && (
                 <div className="absolute right-0 mt-1.5 w-56 bg-white border border-slate-200 rounded-md z-20 py-1">
                   <div className="px-3 py-1 text-[10px] font-medium text-slate-400 uppercase tracking-wider">
-                    当前 Sheet：{sheetName}
+                    {t("pages:LedgerMatchPage.ui.currentSheet")}: {sheetName}
                   </div>
                   <button
                     onMouseDown={() => handleExport("current-view")}
                     className="w-full text-left px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center justify-between transition-colors"
                   >
-                    导出当前视图
-                    <span className="text-xs text-slate-400 tabular-nums">{sorted.length} 行</span>
+                    {t("pages:LedgerMatchPage.ui.exportCurrentView")}
+                    <span className="text-xs text-slate-400 tabular-nums">{t("pages:LedgerMatchPage.ui.rowCount", { count: sorted.length })}</span>
                   </button>
                   <button
                     onMouseDown={() => handleExport("current-all")}
                     className="w-full text-left px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center justify-between transition-colors"
                   >
-                    导出该 Sheet 全部
-                    <span className="text-xs text-slate-400 tabular-nums">{displayData.rows.length} 行</span>
+                    {t("pages:LedgerMatchPage.ui.exportSheetAll")}
+                    <span className="text-xs text-slate-400 tabular-nums">{t("pages:LedgerMatchPage.ui.rowCount", { count: displayData.rows.length })}</span>
                   </button>
                   {matchedSheetCount > 1 && (
                     <>
@@ -797,8 +797,8 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                         onMouseDown={() => handleExport("all-sheets")}
                         className="w-full text-left px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-50 flex items-center justify-between transition-colors"
                       >
-                        导出所有已匹配 Sheet
-                        <span className="text-xs text-emerald-600 tabular-nums">{matchedSheetCount} 个</span>
+                        {t("pages:LedgerMatchPage.ui.exportAllMatched")}
+                        <span className="text-xs text-emerald-600 tabular-nums">{t("pages:LedgerMatchPage.ui.sheetCount", { count: matchedSheetCount })}</span>
                       </button>
                     </>
                   )}
@@ -883,7 +883,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
 
           {/* Pagination */}
           <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 shrink-0">
-            <span className="text-xs text-slate-500">共 {sorted.length} 条</span>
+            <span className="text-xs text-slate-500">{t("pages:LedgerMatchPage.ui.totalRows", { count: sorted.length })}</span>
             <div className="flex items-center gap-2">
               <button
                 disabled={page === 0}
@@ -891,7 +891,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 className="text-xs text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-0.5"
               >
                 <ChevronLeftIcon />
-                上一页
+                {t("pages:LedgerMatchPage.ui.previousPage")}
               </button>
               <span className="text-xs text-slate-500 min-w-[4rem] text-center tabular-nums">
                 {page + 1} / {totalPages || 1}
@@ -901,7 +901,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 onClick={() => setPage((p) => p + 1)}
                 className="text-xs text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-0.5"
               >
-                下一页
+                {t("pages:LedgerMatchPage.ui.nextPage")}
                 <ChevronRightIcon />
               </button>
             </div>
@@ -937,7 +937,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
             <div className="px-5 py-5">
               <h3 className="text-sm font-semibold text-slate-800">{t("pages:LedgerMatchPage.确认清空_8452")}</h3>
               <p className="text-sm text-slate-500 mt-2">
-                清空后将移除所有已加载的数据和匹配结果，此操作不可撤销。
+                {t("pages:LedgerMatchPage.ui.clearWarning")}
               </p>
             </div>
             <div className="px-5 py-3 border-t border-slate-100 flex justify-end gap-2">
@@ -945,7 +945,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 onClick={() => setShowClearDialog(false)}
                 className={btnSecondaryClass}
               >
-                取消
+                {t("pages:LedgerMatchPage.ui.cancel")}
               </button>
               <button
                 onClick={handleClear}

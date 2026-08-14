@@ -90,14 +90,14 @@ export function ActionButtons({
         className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 px-2.5 py-1.5 rounded-md hover:bg-slate-50 transition-colors"
       >
         <RefreshIcon />
-        重新加载
+        {t("userConfig:_shared.ui.reload")}
       </button>
       <button
         onClick={onReset}
         className="inline-flex items-center gap-1 text-xs text-red-600 hover:text-red-700 px-2.5 py-1.5 rounded-md hover:bg-red-50 transition-colors"
       >
         <RestoreIcon />
-        恢复默认
+        {t("userConfig:_shared.ui.restoreDefault")}
       </button>
       {onExtra && extraLabel && (
         <button

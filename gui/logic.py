@@ -998,7 +998,7 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
         if _shutdown_event.is_set():
             return
 
-        _log_message(log, f"[数据同步] 开始同步 (模式={mode}, 类型={selected_types}, 预览={dry_run}, 年={year}, 月={month}, 日期={date_start}~{date_end})")
+        _log_message(log, t("logic:syncStarted", mode=mode, types=selected_types, preview=dry_run, year=year, month=month, date_start=date_start, date_end=date_end))
 
         def _do_sync():
             return sync_to_minebase(
@@ -1099,7 +1099,7 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
                         ft.Row(
                             [
                                 ft.Text(dt_label, size=11, color="#64748B", width=70),
-                                ft.Text(f"行{w.get('row', '?')}", size=11, color="#64748B", width=50),
+                                ft.Text(t("logic:rowNumber", row=w.get("row", "?")), size=11, color="#64748B", width=50),
                                 ft.Text(w.get("field", ""), size=11, width=100),
                                 ft.Text(val_str, size=11, color="#EF4444", width=80),
                                 ft.Text(w.get("message", ""), size=11, color="#64748B", expand=True),

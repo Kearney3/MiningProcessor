@@ -182,7 +182,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
         tooltip=t("components:modules.勾选后，表头不一致的文件也会合_4a49"),
     )
     merge_dedup = ft.Checkbox(
-        label="去除重复记录",
+        label=t("components:modules.去除重复记录_6f2d"),
         value=False,
         tooltip=t("components:modules.勾选后，合并结果中完全重复的行_2e26"),
     )

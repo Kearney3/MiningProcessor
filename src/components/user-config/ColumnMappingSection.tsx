@@ -230,7 +230,7 @@ export function ColumnMappingSection({ bridge }: { bridge: BridgeProp }) {
                 {currentEntries.length === 0 && (
                   <tr>
                     <td colSpan={5} className="px-3 py-6 text-center text-xs text-slate-400">
-                      暂无映射配置
+                      {t("userConfig:ColumnMappingSection.ui.empty")}
                     </td>
                   </tr>
                 )}

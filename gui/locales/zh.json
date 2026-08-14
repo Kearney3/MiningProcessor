@@ -93,7 +93,9 @@
     "页面已关闭，跳过任务:modu_7db7": "页面已关闭，跳过任务: {module}",
     "预览完成_f4ff": "预览完成",
     "（空）_27c4": "（空）",
-    "previewFile": "\n预览文件: {dry_run_file}"
+    "previewFile": "\n预览文件: {dry_run_file}",
+    "syncStarted": "[数据同步] 开始同步（模式={mode}，类型={types}，预览={preview}，年={year}，月={month}，日期={date_start}~{date_end}）",
+    "rowNumber": "行 {row}"
   },
   "app": {
     "中文_a7ba": "中文",
@@ -895,7 +897,10 @@
     "llm_labeling.successCount": "成功标注: {completed}/{target} 条\n",
     "llm_labeling.retryCount": "待重试: {remaining} 条\n",
     "llm_labeling.checkpointCount": "断点复用: {from_checkpoint} 条\n",
-    "llm_labeling.exportMode": "导出方式: {mode_label}\n"
+    "llm_labeling.exportMode": "导出方式: {mode_label}\n",
+    "modules.去除重复记录_6f2d": "去除重复记录",
+    "llm_labeling.ui.intro": "对已处理的维修明细文件进行大模型智能分类标注。\n请先在「用户配置 → LLM 标注配置」中配置接口信息。",
+    "user_config._anomaly.ui.allNumericHint": "使用 {sentinel} 可对所有数值列统一检测。"
   },
   "nav": {
     "工作区_4fa8": "工作区",

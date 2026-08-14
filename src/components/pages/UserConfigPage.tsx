@@ -46,7 +46,7 @@ function ConfirmDialog({
             onClick={onCancel}
             className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
           >
-            取消
+            {t("pages:UserConfigPage.ui.cancel")}
           </button>
           <button
             onClick={onConfirm}

@@ -95,7 +95,7 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
         expand=True,
         read_only=False,
         color=theme.TEXT_PRIMARY,
-        suffix=ft.IconButton(icon=ft.Icons.FOLDER_OPEN, tooltip="浏览"),
+        suffix=ft.IconButton(icon=ft.Icons.FOLDER_OPEN, tooltip=t("components:llm_labeling.浏览_9c5c")),
     )
     sheet_dropdown = ft.Dropdown(
         label="Sheet",
@@ -679,8 +679,7 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
     # ── 布局 ──
 
     hints = ft.Text(
-        "对已处理的维修明细文件进行大模型智能分类标注。\n"
-        "请先在「用户配置 → LLM 标注配置」中配置接口信息。",
+        t("components:llm_labeling.ui.intro"),
         size=12, color=theme.TEXT_SECONDARY,
     )
 
