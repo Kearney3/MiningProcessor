@@ -23,7 +23,7 @@ export function DatePicker({
   className = "",
 }: DatePickerProps) {
   const { t } = useTranslation();
-  const effectivePlaceholder = placeholder ?? t("components:DatePicker.选择日期_2beb");
+  const effectivePlaceholder = placeholder ?? t("components:DatePicker.selectDate");
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const selected = parseLocalDate(value);

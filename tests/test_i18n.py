@@ -18,6 +18,9 @@ LEAK_RE = re.compile(
     r"className=|onClick=|latest_data\.get|total\[|join\(|setStatus\(\{|notify\(`|\$\{"
 )
 CJK_RE = re.compile(r"[\u3400-\u9fff]")
+LEGACY_HASH_KEY_RE = re.compile(r"_[0-9a-f]{4,}$")
+I18N_LITERAL_RE = re.compile(r"([\"'`])((?:\\.|(?!\1).)*?)\1")
+I18N_CALL_RE = re.compile(r"(?:i18n\.t|(?<![\w.])t)\(\s*[\"']([^\"']+)[\"']")
 
 
 def _load_catalogs(directory: str) -> dict[str, dict[str, str]]:
@@ -68,6 +71,50 @@ def test_non_default_locales_do_not_leak_cjk_ui_text(directory: str):
         assert leaked == {}, f"{directory}/{language}.json contains CJK UI text: {leaked}"
 
 
+@pytest.mark.parametrize("directory", ("src/locales", "gui/locales"))
+def test_locale_keys_do_not_use_legacy_hash_suffixes(directory: str):
+    """Namespace keys remain stable semantic identifiers after the migration."""
+    catalogs = _load_catalogs(directory)
+    legacy = sorted(key for key in catalogs["zh"] if LEGACY_HASH_KEY_RE.search(key.rsplit(":", 1)[-1]))
+    assert legacy == []
+    assert all(not CJK_RE.search(key.rsplit(":", 1)[-1]) for key in catalogs["zh"])
+
+
+def test_source_i18n_literals_do_not_use_legacy_hash_suffixes():
+    """Literal Flet/Tauri references must use the renamed semantic keys too."""
+    legacy = []
+    for source_root in (ROOT / "src", ROOT / "gui"):
+        for path in source_root.rglob("*"):
+            if path.suffix not in {".ts", ".tsx", ".py"}:
+                continue
+            for match in I18N_LITERAL_RE.finditer(path.read_text(encoding="utf-8")):
+                literal = match.group(2)
+                if ":" in literal and LEGACY_HASH_KEY_RE.search(literal.rsplit(":", 1)[-1]):
+                    legacy.append(f"{path}:{literal}")
+    assert legacy == []
+
+
+@pytest.mark.parametrize("app", ("src", "gui"))
+def test_source_i18n_calls_are_namespaced_and_resolvable(app: str):
+    """Every production literal call must use namespace:key and exist in the app catalog."""
+    catalogs = _load_catalogs(f"{app}/locales")
+    catalog_keys = set(catalogs["zh"])
+    unnamespaced: list[str] = []
+    missing: list[str] = []
+    source_root = ROOT / app
+    for path in source_root.rglob("*"):
+        if path.suffix not in {".ts", ".tsx", ".py"} or "/test" in str(path):
+            continue
+        for match in I18N_CALL_RE.finditer(path.read_text(encoding="utf-8")):
+            key = match.group(1)
+            if ":" not in key:
+                unnamespaced.append(f"{path}:{key}")
+            elif key not in catalog_keys:
+                missing.append(f"{path}:{key}")
+    assert unnamespaced == []
+    assert missing == []
+
+
 def test_gui_i18n_normalizes_language_and_supports_namespaces():
     original = i18n.get_language()
     try:
@@ -78,7 +125,8 @@ def test_gui_i18n_normalizes_language_and_supports_namespaces():
         i18n.init("en-US")
         assert i18n.get_language() == "en"
         assert i18n.t("common:ok") == "OK"
-        assert i18n.t("logic:成功:跳过:失败:_86d9", success=1, skipped=2, failed=3) == (
+        assert "pending review" in i18n.t("components:llm_labeling.inputValuesHint")
+        assert i18n.t("logic:successSkippedFailed", success=1, skipped=2, failed=3) == (
             "Success: 1  Skipped: 2  Failed: 3"
         )
         assert "preview.xlsx" in i18n.t("logic:previewFile", dry_run_file="preview.xlsx")

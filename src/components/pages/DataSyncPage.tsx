@@ -167,13 +167,13 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
         { success: 0, skipped: 0, failed: 0 },
       );
       if (total.failed > 0) {
-        notify(t("pages:DataSyncPage.同步完成:成功=$,跳过=$,_a13b", { success: total.success, skipped: total.skipped, failed: total.failed }), "error");
+        notify(t("pages:DataSyncPage.syncCompletedSucceededSkipFailed", { success: total.success, skipped: total.skipped, failed: total.failed }), "error");
       } else {
-        notify(t("pages:DataSyncPage.同步完成:成功=$,跳过=$_e5c3", { success: total.success, skipped: total.skipped }), "success");
+        notify(t("pages:DataSyncPage.syncCompletedSucceededSkip", { success: total.success, skipped: total.skipped }), "success");
       }
     } catch (e) {
       setError(String(e));
-      notify(t("pages:DataSyncPage.同步失败:$_7d92", { error: e }), "error");
+      notify(t("pages:DataSyncPage.syncFailed", { error: e }), "error");
     } finally {
       setLoading(false);
     }
@@ -191,23 +191,23 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   return (
     <div className="w-full space-y-5">
       <div>
-        <h2 className="text-lg font-semibold text-slate-800">{t("pages:DataSyncPage.数据同步_9d91")}</h2>
-        <p className="text-sm text-slate-500">{t("pages:DataSyncPage.将处理后的数据同步至MineB_077d")}</p>
+        <h2 className="text-lg font-semibold text-slate-800">{t("pages:DataSyncPage.dataSync")}</h2>
+        <p className="text-sm text-slate-500">{t("pages:DataSyncPage.dataprocessingdatadataSyncdataMinebase")}</p>
       </div>
 
       <div className="bg-white rounded-lg border border-slate-200 p-4 space-y-5">
         {/* Path */}
         <div>
-          <label className="text-xs font-medium text-slate-500 mb-1.5 block">{t("pages:DataSyncPage.数据目录_0d50")}</label>
+          <label className="text-xs font-medium text-slate-500 mb-1.5 block">{t("pages:DataSyncPage.dataDirectory")}</label>
           <div className="flex gap-2">
             <input
               type="text"
               value={inputDir}
               onChange={(e) => setInputDir(e.target.value)}
-              placeholder={t("pages:DataSyncPage.选择包含已处理数据的文件夹_7a98")}
+              placeholder={t("pages:DataSyncPage.selectTheFolderContainingProcessedData")}
               className={`${inputClass} flex-1`}
             />
-            <button onClick={browse} className={btnSecondaryClass} title={t("pages:DataSyncPage.选择文件夹_aaa4")}>
+            <button onClick={browse} className={btnSecondaryClass} title={t("pages:DataSyncPage.selectFolder")}>
               <FolderIcon />
             </button>
           </div>
@@ -215,11 +215,11 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
 
         {/* Sync mode — restrained segmented control */}
         <div>
-          <label className="text-xs font-medium text-slate-500 mb-1.5 block">{t("pages:DataSyncPage.同步模式_8248")}</label>
+          <label className="text-xs font-medium text-slate-500 mb-1.5 block">{t("pages:DataSyncPage.syncMode")}</label>
           <div className="inline-flex rounded-md bg-slate-100 p-0.5 gap-0.5">
             {([
-              { value: "api" as const, label: t("pages:DataSyncPage.API模式_6169"), desc: t("pages:DataSyncPage.HTTP推送_5fa3"), icon: <GlobeIcon /> },
-              { value: "database" as const, label: t("pages:DataSyncPage.数据库模式_20e5"), desc: t("pages:DataSyncPage.直连写入_8f48"), icon: <DatabaseIcon /> },
+              { value: "api" as const, label: t("pages:DataSyncPage.apiMode"), desc: t("pages:DataSyncPage.httpPush"), icon: <GlobeIcon /> },
+              { value: "database" as const, label: t("pages:DataSyncPage.databaseMode"), desc: t("pages:DataSyncPage.directDatabaseWrite"), icon: <DatabaseIcon /> },
             ]).map((m) => (
               <button
                 key={m.value}
@@ -239,12 +239,12 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
 
         {/* Conflict policy — segmented control */}
         <div>
-          <label className="text-xs font-medium text-slate-500 mb-1.5 block">{t("pages:DataSyncPage.冲突策略_3f75")}</label>
+          <label className="text-xs font-medium text-slate-500 mb-1.5 block">{t("pages:DataSyncPage.conflictPolicy")}</label>
           <div className="inline-flex rounded-md bg-slate-100 p-0.5 gap-0.5">
             {([
-              { value: "SKIP" as const, label: t("pages:DataSyncPage.跳过重复_5cd1") },
-              { value: "UPDATE" as const, label: t("pages:DataSyncPage.覆盖更新_db4f") },
-              { value: "REJECT" as const, label: t("pages:DataSyncPage.拒绝全部_ecc4") },
+              { value: "SKIP" as const, label: t("pages:DataSyncPage.skipDuplicates") },
+              { value: "UPDATE" as const, label: t("pages:DataSyncPage.overwriteExisting") },
+              { value: "REJECT" as const, label: t("pages:DataSyncPage.rejectAll") },
             ]).map((p) => (
               <button
                 key={p.value}
@@ -260,16 +260,16 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
             ))}
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            {conflictPolicy === "SKIP" && t("pages:DataSyncPage.遇到重复记录时跳过，保留已有数_4356")}
-            {conflictPolicy === "UPDATE" && t("pages:DataSyncPage.遇到重复记录时用新数据覆盖旧数_e66d")}
-            {conflictPolicy === "REJECT" && t("pages:DataSyncPage.存在重复记录时整个批次拒绝_2df3")}
+            {conflictPolicy === "SKIP" && t("pages:DataSyncPage.skipDuplicateRecordsAndKeepExistingData")}
+            {conflictPolicy === "UPDATE" && t("pages:DataSyncPage.overwriteExistingDataWhenDuplicateRecordsAreFound")}
+            {conflictPolicy === "REJECT" && t("pages:DataSyncPage.rejectTheEntireBatchWhenDuplicateRecordsAreFound")}
           </p>
         </div>
 
         {/* Data type checkboxes */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="text-xs font-medium text-slate-500">{t("pages:DataSyncPage.数据类型_185f")}</label>
+            <label className="text-xs font-medium text-slate-500">{t("pages:DataSyncPage.dataType")}</label>
             <span className="flex items-center gap-2 text-sm text-slate-500 select-none">
               <button
                 type="button"
@@ -326,17 +326,17 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
             />
           </button>
           <div>
-            <div className="text-sm text-slate-700">{t("pages:DataSyncPage.试运行_3e5c")}</div>
-            <div className="text-xs text-slate-400 mt-0.5">{t("pages:DataSyncPage.仅预览同步内容，不实际推送到M_7e92")}</div>
+            <div className="text-sm text-slate-700">{t("pages:DataSyncPage.dryRun")}</div>
+            <div className="text-xs text-slate-400 mt-0.5">{t("pages:DataSyncPage.previewOnlyDoNotPushToMinebase")}</div>
           </div>
         </div>
 
         {/* Processing params — year / month / header row */}
         <div className="border-t border-slate-100 pt-4">
-          <label className="text-xs font-medium text-slate-500 mb-2 block">{t("pages:DataSyncPage.处理参数_fdbb")}</label>
+          <label className="text-xs font-medium text-slate-500 mb-2 block">{t("pages:DataSyncPage.processingParameters")}</label>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">{t("pages:DataSyncPage.年份_8f30")}</label>
+              <label className="text-xs text-slate-400 mb-1 block">{t("pages:DataSyncPage.year")}</label>
               <select
                 value={year}
                 onChange={(e) => setYear(e.target.value)}
@@ -348,24 +348,24 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
               </select>
             </div>
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">{t("pages:DataSyncPage.月份_8190")}</label>
+              <label className="text-xs text-slate-400 mb-1 block">{t("pages:DataSyncPage.month")}</label>
               <select
                 value={month}
                 onChange={(e) => setMonth(e.target.value)}
                 className={`${inputClass} w-full h-9`}
               >
                 {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-                  <option key={m} value={m}>{t("pages:DataProcessingPage.$月_d5bf", { m })}</option>
+                  <option key={m} value={m}>{t("pages:DataProcessingPage.month", { m })}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">{t("pages:DataSyncPage.表头起始行_7c63")}</label>
+              <label className="text-xs text-slate-400 mb-1 block">{t("pages:DataSyncPage.headerStartRow")}</label>
               <input
                 type="number"
                 value={headerRow}
                 onChange={(e) => setHeaderRow(e.target.value)}
-                placeholder={t("pages:DataSyncPage.自动检测_ac65")}
+                placeholder={t("pages:DataSyncPage.autoDetect")}
                 min="1"
                 className={`${inputClass} w-full h-9`}
               />
@@ -375,16 +375,16 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
 
         {/* Date range filter */}
         <div className="border-t border-slate-100 pt-4">
-          <label className="text-xs font-medium text-slate-500 mb-2 block">{t("pages:DataSyncPage.日期范围过滤_a6a9")}</label>
+          <label className="text-xs font-medium text-slate-500 mb-2 block">{t("pages:DataSyncPage.dateRangeFilter")}</label>
           <div className="flex items-end gap-3">
             <DatePicker
-              label={t("pages:DataSyncPage.起始日期_2343")}
+              label={t("pages:DataSyncPage.startDate")}
               value={dateStart}
               onChange={setDateStart}
               className="flex-1"
             />
             <DatePicker
-              label={t("pages:DataSyncPage.结束日期_1d46")}
+              label={t("pages:DataSyncPage.endDate")}
               value={dateEnd}
               onChange={setDateEnd}
               className="flex-1"
@@ -409,7 +409,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
         {/* Sync options */}
         <div className="border-t border-slate-100 pt-4 space-y-3">
           <div>
-            <p className="text-xs text-slate-400 mb-2">{t("pages:DataSyncPage.表头映射_feb6")}</p>
+            <p className="text-xs text-slate-400 mb-2">{t("pages:DataSyncPage.headerMapping")}</p>
             <label className="flex items-center gap-2.5 cursor-pointer select-none">
               <button
                 role="switch"
@@ -423,24 +423,24 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
                   applyHeaderMapping ? "translate-x-4" : "translate-x-0.5"
                 }`} />
               </button>
-              <span className="text-sm text-slate-700">{t("pages:DataSyncPage.应用工时表头映射_e047")}</span>
+              <span className="text-sm text-slate-700">{t("pages:DataSyncPage.applyWorktimeHeaderMapping")}</span>
             </label>
             {applyHeaderMapping && (
               <div className="flex items-center gap-2 pl-10 mt-1.5">
-                <span className="text-xs text-slate-500">{t("pages:DataSyncPage.映射模式_2ba8")}</span>
+                <span className="text-xs text-slate-500">{t("pages:DataSyncPage.mappingMode")}</span>
                 <ChipToggle
                   value={headerMode}
                   onChange={setHeaderMode}
                   options={[
-                    { label: t("pages:DataSyncPage.按位置_cfd4"), value: "position" },
-                    { label: t("pages:DataSyncPage.按列名_4c95"), value: "name" },
+                    { label: t("pages:DataSyncPage.byPosition"), value: "position" },
+                    { label: t("pages:DataSyncPage.byColumnName"), value: "name" },
                   ]}
                 />
               </div>
             )}
           </div>
           <div className="border-t border-slate-100 pt-3">
-            <p className="text-xs text-slate-400 mb-2">{t("pages:DataSyncPage.台账匹配_9897")}</p>
+            <p className="text-xs text-slate-400 mb-2">{t("pages:DataSyncPage.ledgerMatch")}</p>
             <div className="flex flex-wrap gap-x-6 gap-y-2">
               <label className="flex items-center gap-2.5 cursor-pointer select-none">
                 <button
@@ -455,7 +455,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
                     useEquipmentLedger ? "translate-x-4" : "translate-x-0.5"
                   }`} />
                 </button>
-                <span className="text-sm text-slate-700">{t("pages:DataSyncPage.设备台账匹配_5a23")}</span>
+                <span className="text-sm text-slate-700">{t("pages:DataSyncPage.equipmentLedgerMatch")}</span>
               </label>
               <label className="flex items-center gap-2.5 cursor-pointer select-none">
                 <button
@@ -470,12 +470,12 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
                     useOilLedger ? "translate-x-4" : "translate-x-0.5"
                   }`} />
                 </button>
-                <span className="text-sm text-slate-700">{t("pages:DataSyncPage.油品台账匹配_8663")}</span>
+                <span className="text-sm text-slate-700">{t("pages:DataSyncPage.oilLedgerMatch")}</span>
               </label>
             </div>
           </div>
           <div className="border-t border-slate-100 pt-3">
-            <p className="text-xs text-slate-400 mb-2">{t("pages:DataSyncPage.Excel选项_104b")}</p>
+            <p className="text-xs text-slate-400 mb-2">{t("pages:DataSyncPage.excelOptions")}</p>
             <div className="flex flex-wrap gap-x-6 gap-y-2">
               <label className="flex items-center gap-2.5 cursor-pointer select-none">
                 <button
@@ -490,7 +490,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
                     skipHiddenRows ? "translate-x-4" : "translate-x-0.5"
                   }`} />
                 </button>
-                <span className="text-sm text-slate-700">{t("pages:DataSyncPage.跳过隐藏行_bc25")}</span>
+                <span className="text-sm text-slate-700">{t("pages:DataSyncPage.skipHiddenRows")}</span>
               </label>
               <label className="flex items-center gap-2.5 cursor-pointer select-none">
                 <button
@@ -505,7 +505,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
                     skipHiddenCols ? "translate-x-4" : "translate-x-0.5"
                   }`} />
                 </button>
-                <span className="text-sm text-slate-700">{t("pages:DataSyncPage.跳过隐藏列_3ed3")}</span>
+                <span className="text-sm text-slate-700">{t("pages:DataSyncPage.skipHiddenColumns")}</span>
               </label>
             </div>
           </div>
@@ -519,7 +519,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
           onClick={() => setAdvancedOpen(!advancedOpen)}
           className="w-full flex items-center justify-between px-4 py-3 text-xs font-medium text-slate-500 hover:bg-slate-50 transition-colors"
         >
-          <span>{t("pages:DataSyncPage.高级选项_1083")}</span>
+          <span>{t("pages:DataSyncPage.advancedOptions")}</span>
           <svg
             className={`w-3.5 h-3.5 transition-transform ${advancedOpen ? "rotate-90" : ""}`}
             fill="none" stroke="currentColor" viewBox="0 0 24 24"
@@ -536,14 +536,14 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
 
             {/* Data filters */}
             <div className="border-t border-slate-100 pt-3">
-              <p className="text-xs font-medium text-slate-500 mb-3">{t("pages:DataSyncPage.数据过滤_8626")}</p>
+              <p className="text-xs font-medium text-slate-500 mb-3">{t("pages:DataSyncPage.dataFilters")}</p>
               <div className="space-y-3">
                 <div>
-                  <p className="text-xs text-slate-400 mb-2">{t("pages:DataSyncPage.油耗处理_1a41")}</p>
+                  <p className="text-xs text-slate-400 mb-2">{t("pages:DataSyncPage.fuelProcessing")}</p>
                   <div className="flex flex-wrap gap-x-6 gap-y-2">
                     {[
-                      { checked: filterZeroEngineHours, onChange: setFilterZeroEngineHours, label: t("pages:DataSyncPage.过滤零小时数_549f") },
-                      { checked: filterZeroWorkHours, onChange: setFilterZeroWorkHours, label: t("pages:DataSyncPage.过滤零运行小时数_eaf1") },
+                      { checked: filterZeroEngineHours, onChange: setFilterZeroEngineHours, label: t("pages:DataSyncPage.filterZeroEngineHours") },
+                      { checked: filterZeroWorkHours, onChange: setFilterZeroWorkHours, label: t("pages:DataSyncPage.filterZeroOperatingHours") },
                     ].map((item) => (
                       <label key={item.label} className="flex items-center gap-2.5 cursor-pointer select-none">
                         <button
@@ -564,13 +564,13 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
                   </div>
                 </div>
                 <div className="border-t border-slate-100 pt-3">
-                  <p className="text-xs text-slate-400 mb-2">{t("pages:DataSyncPage.生产数据_9fb6")}</p>
+                  <p className="text-xs text-slate-400 mb-2">{t("pages:DataSyncPage.productionData")}</p>
                   <div className="flex flex-wrap gap-x-6 gap-y-2">
                     {[
-                      { checked: filterZeroHoursMeter, onChange: setFilterZeroHoursMeter, label: t("pages:DataSyncPage.过滤零小时仪表_99e8") },
-                      { checked: filterZeroKmMeter, onChange: setFilterZeroKmMeter, label: t("pages:DataSyncPage.过滤零公里仪表_2e3c") },
-                      { checked: filterZeroRunHours, onChange: setFilterZeroRunHours, label: t("pages:DataSyncPage.过滤零运行小时数_eaf1") },
-                      { checked: filterZeroRunKm, onChange: setFilterZeroRunKm, label: t("pages:DataSyncPage.过滤零运行里程_d55d") },
+                      { checked: filterZeroHoursMeter, onChange: setFilterZeroHoursMeter, label: t("pages:DataSyncPage.filterZeroHoursMeter") },
+                      { checked: filterZeroKmMeter, onChange: setFilterZeroKmMeter, label: t("pages:DataSyncPage.filterZeroKilometerMeter") },
+                      { checked: filterZeroRunHours, onChange: setFilterZeroRunHours, label: t("pages:DataSyncPage.filterZeroOperatingHours") },
+                      { checked: filterZeroRunKm, onChange: setFilterZeroRunKm, label: t("pages:DataSyncPage.filterZeroOperatingDistance") },
                     ].map((item) => (
                       <label key={item.label} className="flex items-center gap-2.5 cursor-pointer select-none">
                         <button
@@ -604,7 +604,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
           className={`${btnPrimaryClass} flex items-center gap-2`}
         >
           {!loading && <PlayIcon />}
-          {loading ? t("pages:DataSyncPage.同步中..._f787") : t("pages:DataSyncPage.开始同步_932a")}
+          {loading ? t("pages:DataSyncPage.syncing") : t("pages:DataSyncPage.startSync")}
         </button>
       </div>
 
@@ -625,9 +625,9 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
             hasError ? "text-red-700 bg-red-50" : "text-emerald-700 bg-emerald-50"
           }`}>
             {hasError ? <XCircleIcon /> : <CheckCircleIcon />}
-            <span>{t("pages:DataSyncPage.成功_3303")} {totals.success}</span>
-            {totals.skipped > 0 && <span>· {t("pages:DataSyncPage.跳过_9263")} {totals.skipped}</span>}
-            {totals.failed > 0 && <span>· {t("pages:DataSyncPage.失败_acd5")} {totals.failed}</span>}
+            <span>{t("pages:DataSyncPage.success")} {totals.success}</span>
+            {totals.skipped > 0 && <span>· {t("pages:DataSyncPage.skipped")} {totals.skipped}</span>}
+            {totals.failed > 0 && <span>· {t("pages:DataSyncPage.failure")} {totals.failed}</span>}
             {totals.warnings > 0 && <span>· {t("pages:DataSyncPage.ui.anomalies")} {totals.warnings}</span>}
           </div>
         );
@@ -645,10 +645,10 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 text-left">
-                <th className="px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">{t("pages:DataSyncPage.数据类型_185f")}</th>
-                <th className="py-2 text-xs font-medium text-slate-500 uppercase tracking-wider text-right">{t("pages:DataSyncPage.成功_3303")}</th>
-                <th className="py-2 text-xs font-medium text-slate-500 uppercase tracking-wider text-right">{t("pages:DataSyncPage.跳过_9263")}</th>
-                <th className="py-2 pr-4 text-xs font-medium text-slate-500 uppercase tracking-wider text-right">{t("pages:DataSyncPage.失败_acd5")}</th>
+                <th className="px-4 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider">{t("pages:DataSyncPage.dataType")}</th>
+                <th className="py-2 text-xs font-medium text-slate-500 uppercase tracking-wider text-right">{t("pages:DataSyncPage.success")}</th>
+                <th className="py-2 text-xs font-medium text-slate-500 uppercase tracking-wider text-right">{t("pages:DataSyncPage.skipped")}</th>
+                <th className="py-2 pr-4 text-xs font-medium text-slate-500 uppercase tracking-wider text-right">{t("pages:DataSyncPage.failure")}</th>
               </tr>
             </thead>
             <tbody>
@@ -698,7 +698,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
               type="button"
               onClick={() => openPath(result.dry_run_file!)}
               className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-cyan-700 bg-cyan-100 hover:bg-cyan-200 rounded-md transition-colors"
-              title={t("pages:DataSyncPage.打开预览文件_6ae5")}
+              title={t("pages:DataSyncPage.openPreviewFile")}
             >
               <DownloadIcon />
               {t("pages:DataSyncPage.ui.openFile")}
@@ -706,7 +706,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
           </div>
           <div className="px-4 py-3">
             <p className="text-xs text-slate-500 font-mono break-all">{result.dry_run_file}</p>
-            <p className="text-xs text-slate-400 mt-2">{t("pages:DataSyncPage.各数据类型分别保存在独立She_67d0")}</p>
+            <p className="text-xs text-slate-400 mt-2">{t("pages:DataSyncPage.eachDataTypeIsSavedInASeparateSheetSoAllRecordsCanBeReviewedBeforeSyncing")}</p>
           </div>
         </div>
       )}
@@ -725,7 +725,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
           try {
             const today = localTodayString();
             const savePath = await save({
-              defaultPath: t("pages:DataSyncPage.异常行明细_$.xlsx_2a5a", { today }),
+              defaultPath: t("pages:DataSyncPage.anomalyDetailsXlsx", { today }),
               filters: [{ name: "Excel", extensions: ["xlsx"] }],
             });
             if (!savePath) return;
@@ -741,9 +741,9 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
               warnings: rawWarnings,
               output_path: savePath,
             });
-            notify(t("pages:DataSyncPage.异常行已导出至:$_986c", { path: res.output_file }), "success");
+            notify(t("pages:DataSyncPage.anomalyRowsExportedTo", { path: res.output_file }), "success");
           } catch (e) {
-            notify(t("pages:DataSyncPage.导出失败:$_d4b1", { error: e }), "error");
+            notify(t("pages:DataSyncPage.exportFailed", { error: e }), "error");
           }
         };
 
@@ -752,14 +752,14 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
             <div className="px-4 py-3 border-b border-amber-100 bg-amber-50 flex items-center justify-between">
               <h3 className="text-sm font-medium text-amber-700 flex items-center gap-2">
                 <AlertTriangleIcon />
-                {t("pages:DataSyncPage.异常行_7ec5")}
-                <span className="text-xs text-amber-500">{t("pages:DataSyncPage.共条_f10d", { count: allWarnings.length })}</span>
+                {t("pages:DataSyncPage.anomalies")}
+                <span className="text-xs text-amber-500">{t("pages:DataSyncPage.total", { count: allWarnings.length })}</span>
               </h3>
               <button
                 type="button"
                 onClick={handleExportWarnings}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-md transition-colors"
-                title={t("pages:DataSyncPage.导出异常行为Excel文件_1c29")}
+                title={t("pages:DataSyncPage.exportanomalyfileExcelFile")}
               >
                 <DownloadIcon />
                 {t("pages:DataSyncPage.ui.exportExcel")}
@@ -769,11 +769,11 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
               <table className="w-full text-sm">
                 <thead className="sticky top-0">
                   <tr className="bg-amber-50 text-left">
-                    <th className="px-4 py-2 text-xs font-medium text-amber-600 uppercase tracking-wider">{t("pages:DataSyncPage.数据类型_185f")}</th>
-                    <th className="py-2 text-xs font-medium text-amber-600 uppercase tracking-wider">{t("pages:DataSyncPage.行号_89c8")}</th>
-                    <th className="py-2 text-xs font-medium text-amber-600 uppercase tracking-wider">{t("pages:DataSyncPage.字段_9cae")}</th>
-                    <th className="py-2 text-xs font-medium text-amber-600 uppercase tracking-wider">{t("pages:DataSyncPage.原始值_1832")}</th>
-                    <th className="py-2 pr-4 text-xs font-medium text-amber-600 uppercase tracking-wider">{t("pages:DataSyncPage.问题_5dc9")}</th>
+                    <th className="px-4 py-2 text-xs font-medium text-amber-600 uppercase tracking-wider">{t("pages:DataSyncPage.dataType")}</th>
+                    <th className="py-2 text-xs font-medium text-amber-600 uppercase tracking-wider">{t("pages:DataSyncPage.row")}</th>
+                    <th className="py-2 text-xs font-medium text-amber-600 uppercase tracking-wider">{t("pages:DataSyncPage.field")}</th>
+                    <th className="py-2 text-xs font-medium text-amber-600 uppercase tracking-wider">{t("pages:DataSyncPage.originalValue")}</th>
+                    <th className="py-2 pr-4 text-xs font-medium text-amber-600 uppercase tracking-wider">{t("pages:DataSyncPage.issue")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -782,7 +782,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
                       <td className="px-4 py-2 text-sm text-slate-700">{item.label}</td>
                       <td className="py-2 text-sm text-slate-500">{item.w.row}</td>
                       <td className="py-2 text-sm text-slate-700">{item.w.field}</td>
-                      <td className="py-2 text-sm text-red-600 font-mono">{item.w.value || t("pages:DataSyncPage.（空）_27c4")}</td>
+                      <td className="py-2 text-sm text-red-600 font-mono">{item.w.value || t("pages:DataSyncPage.empty")}</td>
                       <td className="py-2 pr-4 text-sm text-slate-500">{item.w.message}</td>
                     </tr>
                   ))}

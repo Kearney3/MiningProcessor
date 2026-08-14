@@ -56,9 +56,9 @@ export function MaintConfigPage({ bridge }: { bridge: BridgeProp }) {
         path: selected as string,
       });
       setConfig(data);
-      notify(t("pages:MaintConfigPage.分类配置已导入_c8a0"), "success");
+      notify(t("pages:MaintConfigPage.categoryconfigurationImported"), "success");
     } catch (e) {
-      notify(t("pages:MaintConfigPage.导入失败:$_d39c", { error: String(e) }), "error");
+      notify(t("pages:MaintConfigPage.importFailed", { error: String(e) }), "error");
     } finally {
       setLoading(false);
     }
@@ -66,23 +66,23 @@ export function MaintConfigPage({ bridge }: { bridge: BridgeProp }) {
 
   const handleExportTemplate = async (withDefaults: boolean) => {
     const path = await save({
-      defaultPath: withDefaults ? t("pages:MaintConfigPage.维修分类配置_默认.xlsx_23f6") : t("pages:MaintConfigPage.维修分类配置模板.xlsx_c2d8"),
+      defaultPath: withDefaults ? t("pages:MaintConfigPage.maintenanceClassificationConfigurationDefaultXlsx") : t("pages:MaintConfigPage.maintenanceClassificationConfigurationTemplateXlsx"),
       filters: [{ name: "Excel", extensions: ["xlsx"] }],
     });
     if (!path) return;
     setLoading(true);
     try {
       await bridge.call("export_maintenance_template", { path, with_defaults: withDefaults });
-      notify(t("pages:MaintConfigPage.模板已导出:$_9238", { path }), "success");
+      notify(t("pages:MaintConfigPage.templateitemexport", { path }), "success");
     } catch (e) {
-      notify(t("pages:MaintConfigPage.导出失败:$_d4b1", { error: String(e) }), "error");
+      notify(t("pages:MaintConfigPage.exportFailed", { error: String(e) }), "error");
     } finally {
       setLoading(false);
     }
   };
 
   const handleRestore = async () => {
-    if (!confirm(t("pages:MaintConfigPage.将恢复为系统默认分类规则，自定_04c3"))) return;
+    if (!confirm(t("pages:MaintConfigPage.restoreTheSystemDefaultClassificationRulesCustomConfigurationWillBeLostContinue"))) return;
     setLoading(true);
     try {
       await bridge.call("update_maintenance_classifications", {
@@ -94,9 +94,9 @@ export function MaintConfigPage({ bridge }: { bridge: BridgeProp }) {
         },
       });
       await loadConfig();
-      notify(t("pages:MaintConfigPage.已恢复默认分类配置_f4e7"), "success");
+      notify(t("pages:MaintConfigPage.configurationdefaultclassificationconfiguration"), "success");
     } catch (e) {
-      notify(t("pages:MaintConfigPage.恢复失败:$_e447", { error: String(e) }), "error");
+      notify(t("pages:MaintConfigPage.restoreFailed", { error: String(e) }), "error");
     } finally {
       setLoading(false);
     }
@@ -115,8 +115,8 @@ export function MaintConfigPage({ bridge }: { bridge: BridgeProp }) {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-lg font-semibold text-slate-800">{t("pages:MaintConfigPage.维修分类配置_4ee9")}</h2>
-        <p className="text-sm text-slate-500">{t("pages:MaintConfigPage.管理维修记录的故障分类规则_c92e")}</p>
+        <h2 className="text-lg font-semibold text-slate-800">{t("pages:MaintConfigPage.maintenanceConfig")}</h2>
+        <p className="text-sm text-slate-500">{t("pages:MaintConfigPage.manageFaultClassificationRulesForMaintenanceRecords")}</p>
       </div>
 
       {/* 操作按钮 */}
@@ -144,24 +144,24 @@ export function MaintConfigPage({ bridge }: { bridge: BridgeProp }) {
               <path d="M12 16v-4" />
               <path d="M12 8h.01" />
             </svg>
-            <h3 className="text-sm font-medium text-slate-700">{t("pages:MaintConfigPage.当前配置概览_1419")}</h3>
+            <h3 className="text-sm font-medium text-slate-700">{t("pages:MaintConfigPage.currentConfigurationOverview")}</h3>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
             <div className="bg-slate-50 rounded-md p-3">
               <div className="text-2xl font-bold text-slate-800">{grouped ? Object.keys(grouped).length : 0}</div>
-              <div className="text-xs text-slate-500">{t("pages:MaintConfigPage.大类_d196")}</div>
+              <div className="text-xs text-slate-500">{t("pages:MaintConfigPage.category")}</div>
             </div>
             <div className="bg-slate-50 rounded-md p-3">
               <div className="text-2xl font-bold text-slate-800">{config.classifications.length}</div>
-              <div className="text-xs text-slate-500">{t("pages:MaintConfigPage.小类_7f69")}</div>
+              <div className="text-xs text-slate-500">{t("pages:MaintConfigPage.subcategory")}</div>
             </div>
             <div className="bg-slate-50 rounded-md p-3">
               <div className="text-2xl font-bold text-slate-800">{config.noise_exact.length}</div>
-              <div className="text-xs text-slate-500">{t("pages:MaintConfigPage.精确噪声_d680")}</div>
+              <div className="text-xs text-slate-500">{t("pages:MaintConfigPage.exactNoise")}</div>
             </div>
             <div className="bg-slate-50 rounded-md p-3">
               <div className="text-2xl font-bold text-slate-800">{config.noise_patterns.length}</div>
-              <div className="text-xs text-slate-500">{t("pages:MaintConfigPage.正则噪声_bd0e")}</div>
+              <div className="text-xs text-slate-500">{t("pages:MaintConfigPage.regexNoise")}</div>
             </div>
           </div>
         </div>
@@ -170,13 +170,13 @@ export function MaintConfigPage({ bridge }: { bridge: BridgeProp }) {
       {/* 分类规则详情 */}
       {grouped && (
         <div className="bg-white rounded-lg border border-slate-200 p-4">
-          <h3 className="text-sm font-medium text-slate-700 mb-3">{t("pages:MaintConfigPage.分类规则_be84")}</h3>
+          <h3 className="text-sm font-medium text-slate-700 mb-3">{t("pages:MaintConfigPage.classificationRules")}</h3>
           <div className="space-y-4">
             {Object.entries(grouped).map(([major, entries]) => (
               <div key={major} className="border border-slate-100 rounded-md">
                 <div className="px-3 py-2 bg-slate-50 rounded-t-md flex items-center justify-between">
                   <span className="text-sm font-medium text-slate-700">{major}</span>
-                  <span className="text-xs text-slate-400">{entries.length} {t("pages:MaintConfigPage.小类_7f69")}</span>
+                  <span className="text-xs text-slate-400">{entries.length} {t("pages:MaintConfigPage.subcategory")}</span>
                 </div>
                 <div className="divide-y divide-slate-50">
                   {entries.map((entry, i) => (
@@ -201,7 +201,7 @@ export function MaintConfigPage({ bridge }: { bridge: BridgeProp }) {
       {/* 原因规则 */}
       {config && Object.keys(config.reason_rules).length > 0 && (
         <div className="bg-white rounded-lg border border-slate-200 p-4">
-          <h3 className="text-sm font-medium text-slate-700 mb-3">{t("pages:MaintConfigPage.原因规则_f475")}</h3>
+          <h3 className="text-sm font-medium text-slate-700 mb-3">{t("pages:MaintConfigPage.reasonRules")}</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {Object.entries(config.reason_rules).map(([reason, rule]) => (
               <div key={reason} className="flex items-center gap-2 text-sm">
@@ -223,14 +223,14 @@ export function MaintConfigPage({ bridge }: { bridge: BridgeProp }) {
 
       {/* 配置说明 */}
       <div className="bg-white rounded-lg border border-slate-200 p-4">
-        <h3 className="text-sm font-medium text-slate-700 mb-2">{t("pages:MaintConfigPage.配置说明_7b4a")}</h3>
+        <h3 className="text-sm font-medium text-slate-700 mb-2">{t("pages:MaintConfigPage.configurationNotes")}</h3>
         <ul className="text-xs text-slate-500 space-y-1">
-          <li>{t("pages:MaintConfigPage.•从Excel导入：选择包含「_928d")}</li>
-          <li>{t("pages:MaintConfigPage.•导出空白模板：导出仅有表头的_959f")}</li>
-          <li>{t("pages:MaintConfigPage.•导出默认配置：导出包含系统默_905f")}</li>
-          <li>{t("pages:MaintConfigPage.•恢复默认配置：将当前配置重置_0115")}</li>
-          <li>{t("pages:MaintConfigPage.•关键词使用中文顿号「、」分隔_eb32")}</li>
-          <li>{t("pages:MaintConfigPage.•分类按行顺序匹配，更具体的关_fe2b")}</li>
+          <li>{t("pages:MaintConfigPage.importFromExcelChooseAnExcelFileContainingTheClassificationRulesNoiseFiltersAndR")}</li>
+          <li>{t("pages:MaintConfigPage.exportBlankTemplateExportAHeaderOnlyTemplateForManualEntry")}</li>
+          <li>{t("pages:MaintConfigPage.exportDefaultConfigurationExportTheCompleteSystemClassificationRules")}</li>
+          <li>{t("pages:MaintConfigPage.restoreDefaultsResetTheCurrentConfigurationToSystemDefaults")}</li>
+          <li>{t("pages:MaintConfigPage.separateKeywordsWithTheChineseEnumerationComma")}</li>
+          <li>{t("pages:MaintConfigPage.rulesMatchInRowOrderPutMoreSpecificKeywordsFirst")}</li>
         </ul>
       </div>
     </div>

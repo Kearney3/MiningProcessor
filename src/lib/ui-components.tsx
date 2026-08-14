@@ -146,7 +146,7 @@ export function PathInput({
         placeholder={placeholder}
         className={`${inputClass} flex-1 ${value === "" ? "border-amber-300 bg-amber-50/30" : ""}`}
       />
-      <button onClick={browse} className={btnSecondaryClass} title={directory ? t("lib:ui-components.选择文件夹_aaa4") : t("lib:ui-components.选择文件_fd7e")}>
+      <button onClick={browse} className={btnSecondaryClass} title={directory ? t("lib:ui-components.selectFolder") : t("lib:ui-components.selectFile")}>
         {directory ? <FolderIcon /> : <FileIcon />}
       </button>
     </div>
@@ -199,10 +199,10 @@ export function ConfirmDialog({
         </div>
         <div className="flex justify-end gap-2 px-6 py-4 bg-slate-50 border-t border-slate-100">
           <button onClick={onCancel} className={btnSecondaryClass}>
-            {cancelLabel ?? t("lib:ui-components.取消_625f")}
+            {cancelLabel ?? t("lib:ui-components.cancel")}
           </button>
           <button onClick={onConfirm} className={btnDangerClass}>
-            {confirmLabel ?? t("lib:ui-components.确定_38cf")}
+            {confirmLabel ?? t("lib:ui-components.ok")}
           </button>
         </div>
       </div>

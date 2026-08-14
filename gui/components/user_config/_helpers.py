@@ -65,7 +65,7 @@ def _create_keyword_input(page: ft.Page, label: str, hint_text: str):
                 border_radius=12,
                 padding=ft.Padding.symmetric(horizontal=8, vertical=4),
                 on_click=_on_delete,
-                tooltip=t("components:user_config._helpers.点击删除_4239"),
+                tooltip=t("components:user_config._helpers.clickToDelete"),
             )
             chips_row.controls.append(chip)
         safe_update(chips_row)
@@ -82,7 +82,7 @@ def _create_keyword_input(page: ft.Page, label: str, hint_text: str):
     input_field.on_submit = _on_add
     add_btn = ft.IconButton(
         icon=ft.Icons.ADD_CIRCLE_OUTLINE,
-        tooltip=t("components:user_config._helpers.添加关键字_f1cc"),
+        tooltip=t("components:user_config._helpers.addKeyword"),
         icon_size=22,
         icon_color=theme.PRIMARY,
         on_click=_on_add,

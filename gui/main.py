@@ -96,7 +96,7 @@ def main(page: ft.Page):
     saved_lang = get_user_config("language", "zh")
     i18n.init(saved_lang)
 
-    page.title = i18n.t("app:矿山数据处理工具_2f4a")
+    page.title = i18n.t("app:miningDataProcessor")
     assets_dir = Path(__file__).resolve().parent.parent / "assets"
     page.assets_dir = str(assets_dir)
     page.fonts={
@@ -208,21 +208,21 @@ def main(page: ft.Page):
 
     # ---- 侧边栏导航（分组） ----
     nav_groups = [
-        (i18n.t("nav:工作区_4fa8"), [
-            (i18n.t("nav:数据处理_cfc0"), ft.Icons.PLAY_ARROW, "modules"),
-            (i18n.t("nav:批量处理_ba72"), ft.Icons.BOLT, "batch"),
-            (i18n.t("nav:LLM标注_8529"), ft.Icons.SMART_TOY, "llm"),
-            (i18n.t("nav:数据同步_9d91"), ft.Icons.CLOUD_SYNC, "sync"),
-            (i18n.t("nav:日报导出_4ed9"), getattr(ft.Icons, "SUMMARIZE", ft.Icons.DESCRIPTION), "daily_report"),
-            (i18n.t("nav:台账匹配_9897"), ft.Icons.MANAGE_SEARCH, "ledger_match"),
+        (i18n.t("nav:workspace"), [
+            (i18n.t("nav:dataProcessing"), ft.Icons.PLAY_ARROW, "modules"),
+            (i18n.t("nav:batchProcessing"), ft.Icons.BOLT, "batch"),
+            (i18n.t("nav:llmLabeling"), ft.Icons.SMART_TOY, "llm"),
+            (i18n.t("nav:dataSync"), ft.Icons.CLOUD_SYNC, "sync"),
+            (i18n.t("nav:dailyReportExport"), getattr(ft.Icons, "SUMMARIZE", ft.Icons.DESCRIPTION), "daily_report"),
+            (i18n.t("nav:ledgerMatch"), ft.Icons.MANAGE_SEARCH, "ledger_match"),
         ]),
-        (i18n.t("nav:管理_08b5"), [
-            (i18n.t("nav:设备台账_e6a7"), ft.Icons.INVENTORY_2, "ledger"),
-            (i18n.t("nav:油品台账_53fa"), ft.Icons.OIL_BARREL, "oil_ledger"),
-            (i18n.t("nav:型号台账_3e0b"), getattr(ft.Icons, "ENGINEERING", ft.Icons.INVENTORY_2), "model_ledger"),
-            (i18n.t("nav:装载量配置_c389"), ft.Icons.TUNE, "config"),
-            (i18n.t("nav:维修分类配置_4ee9"), ft.Icons.CATEGORY, "maint_config"),
-            (i18n.t("nav:用户配置_dd1e"), ft.Icons.SETTINGS, "user_config"),
+        (i18n.t("nav:management"), [
+            (i18n.t("nav:equipmentLedger"), ft.Icons.INVENTORY_2, "ledger"),
+            (i18n.t("nav:oilLedger"), ft.Icons.OIL_BARREL, "oil_ledger"),
+            (i18n.t("nav:modelLedger"), getattr(ft.Icons, "ENGINEERING", ft.Icons.INVENTORY_2), "model_ledger"),
+            (i18n.t("nav:loadConfig"), ft.Icons.TUNE, "config"),
+            (i18n.t("nav:maintenanceConfig"), ft.Icons.CATEGORY, "maint_config"),
+            (i18n.t("nav:userConfig"), ft.Icons.SETTINGS, "user_config"),
         ]),
     ]
     nav_items_data = [item for _, items in nav_groups for item in items]
@@ -328,13 +328,13 @@ def main(page: ft.Page):
                 ft.Column(
                     [
                         ft.Text(
-                            i18n.t("app:矿山数据处理工具_2f4a"),
+                            i18n.t("app:miningDataProcessor"),
                             size=17,
                             weight=ft.FontWeight.W_700,
                             color=theme.TEXT_PRIMARY,
                         ),
                         ft.Text(
-                            i18n.t("app:报表处理与数据管理_d8e1"),
+                            i18n.t("app:reportProcessingDataManagement"),
                             size=11,
                             color=theme.TEXT_SECONDARY,
                         ),
@@ -386,13 +386,13 @@ def main(page: ft.Page):
             [
                 ft.Icon(ft.Icons.TERMINAL, size=16, color=theme.TEXT_SECONDARY),
                 ft.Text(
-                    i18n.t("app:运行日志_a3c7"),
+                    i18n.t("app:runtimeLog"),
                     size=13,
                     weight=ft.FontWeight.W_600,
                     color=theme.TEXT_PRIMARY,
                 ),
                 ft.Text(
-                    i18n.t("app:处理进度和问题原因会显示在这里_b2f9"),
+                    i18n.t("app:processingProgressAndIssuesShownHere"),
                     size=11,
                     color=theme.TEXT_SECONDARY,
                 ),
@@ -429,7 +429,7 @@ def main(page: ft.Page):
 
     # ---- 初始化（放在 page.add 之后） ----
     logic.init(config_refs)
-    log(i18n.t("app:已就绪_c4d6"))
+    log(i18n.t("app:ready"))
 
     # ---- 页面关闭回调：取消所有正在运行的后台任务 ----
     def _on_page_close(e):

@@ -67,12 +67,12 @@ export function FileKeywordsSection({ bridge }: { bridge: BridgeProp }) {
     setSaving(true);
     try {
       await bridge.call("save_config", { data: { file_keywords: keywords }, target: "user" });
-      setStatus({ msg: t("userConfig:FileKeywordsSection.文件关键字配置已保存_73b3"), kind: "success" });
-      notify(t("userConfig:FileKeywordsSection.文件关键字已保存_6441"), "success");
+      setStatus({ msg: t("userConfig:FileKeywordsSection.filenameKeywordConfigurationSaved"), kind: "success" });
+      notify(t("userConfig:FileKeywordsSection.filenameKeywordsSaved"), "success");
       setTimeout(() => setStatus({ msg: "", kind: "info" }), 2500);
     } catch (e) {
-      setStatus({ msg: t("userConfig:FileKeywordsSection.保存失败:$_2655", { error: String(e) }), kind: "error" });
-      notify(t("userConfig:FileKeywordsSection.保存失败:$_e5b7", { error: String(e) }), "error");
+      setStatus({ msg: t("userConfig:FileKeywordsSection.saveFailed", { error: String(e) }), kind: "error" });
+      notify(t("userConfig:FileKeywordsSection.saveFailed", { error: String(e) }), "error");
     } finally {
       setSaving(false);
     }
@@ -80,21 +80,21 @@ export function FileKeywordsSection({ bridge }: { bridge: BridgeProp }) {
 
   const resetToDefault = () => {
     setKeywords({ ...DEFAULT_FILE_KEYWORDS });
-    setStatus({ msg: t("userConfig:FileKeywordsSection.已恢复默认关键字（需点击保存生_699b"), kind: "info" });
+    setStatus({ msg: t("userConfig:FileKeywordsSection.restoreddefaultkeywordClickSaveToApply"), kind: "info" });
   };
 
   const fields: { key: keyof FileKeywords; label: string; hint: string }[] = [
-    { key: "fuel", label: t("userConfig:FileKeywordsSection.油耗关键字_e747"), hint: t("userConfig:FileKeywordsSection.输入后按回车添加_9739") },
-    { key: "electrical", label: t("userConfig:FileKeywordsSection.电力关键字_194b"), hint: t("userConfig:FileKeywordsSection.输入后按回车添加_9739") },
-    { key: "production", label: t("userConfig:FileKeywordsSection.生产关键字_eb36"), hint: t("userConfig:FileKeywordsSection.输入后按回车添加_9739") },
-    { key: "worktime", label: t("userConfig:FileKeywordsSection.工时关键字_c158"), hint: t("userConfig:FileKeywordsSection.输入后按回车添加_9739") },
-    { key: "maintenance", label: t("userConfig:FileKeywordsSection.维修关键字_6729"), hint: t("userConfig:FileKeywordsSection.输入后按回车添加_9739") },
+    { key: "fuel", label: t("userConfig:FileKeywordsSection.fuelConsumptionkeyword"), hint: t("userConfig:FileKeywordsSection.enterAValueAndPressEnterToAdd") },
+    { key: "electrical", label: t("userConfig:FileKeywordsSection.keywordkeywordKeyword"), hint: t("userConfig:FileKeywordsSection.enterAValueAndPressEnterToAdd") },
+    { key: "production", label: t("userConfig:FileKeywordsSection.productionkeyword"), hint: t("userConfig:FileKeywordsSection.enterAValueAndPressEnterToAdd") },
+    { key: "worktime", label: t("userConfig:FileKeywordsSection.worktimekeyword"), hint: t("userConfig:FileKeywordsSection.enterAValueAndPressEnterToAdd") },
+    { key: "maintenance", label: t("userConfig:FileKeywordsSection.keywordkeywordVariant"), hint: t("userConfig:FileKeywordsSection.enterAValueAndPressEnterToAdd") },
   ];
 
   return (
     <SectionCard
-      title={t("userConfig:FileKeywordsSection.文件关键字_d556")}
-      subtitle={t("userConfig:FileKeywordsSection.批量处理时用于匹配文件名的关键_02e8")}
+      title={t("userConfig:FileKeywordsSection.filenameKeyword")}
+      subtitle={t("userConfig:FileKeywordsSection.keywordsUsedToMatchFilenamesDuringBatchProcessingClickATagToDeleteIt")}
       icon={<KeywordsIcon />}
       expanded={expanded}
       onToggle={() => setExpanded(!expanded)}

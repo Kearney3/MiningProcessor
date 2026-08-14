@@ -40,7 +40,7 @@ def _create_daily_report_config_section(page: ft.Page, log):
         material_rows.clear()
         for target, keywords in mapping.items():
             kw_column, kw_get, kw_set = _create_keyword_input(
-                page, "", t("components:user_config._daily_report.输入关键字后回车添加_fafd"),
+                page, "", t("components:user_config._daily_report.enterAKeywordAndPressEnterToAdd"),
             )
             kw_set(keywords if isinstance(keywords, list) else [])
             target_field = ft.TextField(
@@ -52,7 +52,7 @@ def _create_daily_report_config_section(page: ft.Page, log):
                 ft.Container(
                     content=ft.Row(
                         [
-                            ft.Text(t("components:user_config._daily_report.统计列_a20b"), width=48, size=11, color=theme.TEXT_SECONDARY),
+                            ft.Text(t("components:user_config._daily_report.statisticsColumn"), width=48, size=11, color=theme.TEXT_SECONDARY),
                             target_field,
                             ft.Container(content=kw_column, expand=True),
                         ],
@@ -116,7 +116,7 @@ def _create_daily_report_config_section(page: ft.Page, log):
         if errors:
             message = "；".join(f"{key}：{value}" for key, value in errors.items())
             _set_status(message, theme.ERROR)
-            _log_message(log, t("components:user_config._daily_report.日报公式校验失败：_32c1", message=message), level=logging.WARNING)
+            _log_message(log, t("components:user_config._daily_report.dailyReportFormulaValidationFailed", message=message), level=logging.WARNING)
             try:
                 page.update()
             except (RuntimeError, AttributeError):
@@ -129,11 +129,11 @@ def _create_daily_report_config_section(page: ft.Page, log):
         }
         try:
             config_loader.save_daily_report_config(report_config)
-            _set_status(t("components:user_config._daily_report.日报导出设置已保存_7ab0"), theme.SUCCESS)
-            _log_message(log, t("components:user_config._daily_report.已保存日报导出设置_6bfa"))
+            _set_status(t("components:user_config._daily_report.dailyReportExportSettingsSaved"), theme.SUCCESS)
+            _log_message(log, t("components:user_config._daily_report.saveddailyReportExportSettings"))
         except Exception as exc:
             _set_status(str(exc), theme.ERROR)
-            _log_message(log, t("components:user_config._daily_report.日报导出设置保存失败：_fca9", exc=exc), level=logging.ERROR)
+            _log_message(log, t("components:user_config._daily_report.dailyReportExportSettingssaveFailed", exc=exc), level=logging.ERROR)
 
     def _reset(e=None):
         _rebuild_material_rows(deepcopy(config_loader.DEFAULT_DAILY_REPORT_CONFIG["material_statistics"]))
@@ -141,7 +141,7 @@ def _create_daily_report_config_section(page: ft.Page, log):
         for key, field in formula_fields.items():
             field.value = defaults["formulas"].get(key, "")
             field.error_text = None
-        _set_status(t("components:user_config._daily_report.已恢复默认值（请点击保存生效）_729d"), theme.TEXT_SECONDARY)
+        _set_status(t("components:user_config._daily_report.defaultdefaultValueDefaultsavedefault"), theme.TEXT_SECONDARY)
         try:
             page.update()
         except (RuntimeError, AttributeError):
@@ -149,9 +149,9 @@ def _create_daily_report_config_section(page: ft.Page, log):
 
     material_header = ft.Row(
         [
-            ft.Text(t("components:user_config._daily_report.统计列_a20b"), width=48, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
-            ft.Text(t("components:user_config._daily_report.目标名称_0ae8"), width=115, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
-            ft.Text(t("components:user_config._daily_report.关键字（名称匹配，按顺序只命中_f235"), expand=True, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
+            ft.Text(t("components:user_config._daily_report.statisticsColumn"), width=48, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
+            ft.Text(t("components:user_config._daily_report.itemname"), width=115, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
+            ft.Text(t("components:user_config._daily_report.keywordNameMatchingMatching"), expand=True, size=11, weight=ft.FontWeight.W_600, color=theme.TEXT_SECONDARY),
         ],
         spacing=8,
     )
@@ -161,26 +161,26 @@ def _create_daily_report_config_section(page: ft.Page, log):
         border_radius=8,
     )
     formula_hint = ft.Text(
-        t("components:user_config._daily_report.保存时校验公式语法和字段名，导_45f3"),
+        t("components:user_config._daily_report.validateFormulaSyntaxAndFieldNamesWhenSavingVerifyFieldsAgainstActualWorktimeHea"),
         size=11, color=theme.TEXT_SECONDARY,
     )
     action_row = ft.Row(
         [
-            theme.primary_btn(t("components:user_config._daily_report.保存_be5f"), icon=ft.Icons.SAVE, on_click=_save),
-            theme.secondary_btn(t("components:user_config._daily_report.重新加载_64ca"), icon=ft.Icons.REFRESH, on_click=_reload, height=34),
-            theme.secondary_btn(t("components:user_config._daily_report.恢复默认_7468"), icon=ft.Icons.RESTART_ALT, on_click=_reset, height=34),
+            theme.primary_btn(t("components:user_config._daily_report.save"), icon=ft.Icons.SAVE, on_click=_save),
+            theme.secondary_btn(t("components:user_config._daily_report.reload"), icon=ft.Icons.REFRESH, on_click=_reload, height=34),
+            theme.secondary_btn(t("components:user_config._daily_report.restoreDefault"), icon=ft.Icons.RESTART_ALT, on_click=_reset, height=34),
         ], spacing=8, wrap=True,
     )
     card = theme.make_collapsible(
-        title=t("components:user_config._daily_report.日报导出设置_9b48"),
-        subtitle=t("components:user_config._daily_report.日报导出页只选择日期和数据来源_315e"),
+        title=t("components:user_config._daily_report.dailyReportExportSettings"),
+        subtitle=t("components:user_config._daily_report.dailyReportexportdailyReportselectdailyReportdatadailyReportDailyReport"),
         icon=getattr(ft.Icons, "SUMMARIZE", ft.Icons.DESCRIPTION),
         initially_expanded=False,
         content_controls=[
-            ft.Text(t("components:user_config._daily_report.物料类型无需配置，日报会自动展_24f6"), size=12, color=theme.TEXT_SECONDARY),
-            theme.module_card([material_box], label=t("components:user_config._daily_report.物料统计配置_7257")),
+            ft.Text(t("components:user_config._daily_report.configurationtypeconfigurationconfigurationDailyReportconfigurationdataconfigura"), size=12, color=theme.TEXT_SECONDARY),
+            theme.module_card([material_box], label=t("components:user_config._daily_report.materialStatisticsConfiguration")),
             formula_hint,
-            theme.module_card([formula_column], label=t("components:user_config._daily_report.延迟、待机与利用率公式_4693")),
+            theme.module_card([formula_column], label=t("components:user_config._daily_report.delayIdleTimeAndUtilizationFormulas")),
             action_row,
             status_text,
         ],

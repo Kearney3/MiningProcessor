@@ -27,26 +27,26 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     # --- 文件夹选择 ---
     batch_path = ft.TextField(
-        label=t("components:batch.批量处理文件夹_6524"),
-        hint_text=t("components:batch.选择包含待处理Excel文件的_6f7a"),
+        label=t("components:batch.batchFolder"),
+        hint_text=t("components:batch.selectfileprocessingExcelFilefilefolder"),
         expand=True,
         read_only=False,
         color=theme.TEXT_PRIMARY,
         suffix=ft.IconButton(
             icon=ft.Icons.FOLDER_OPEN,
-            tooltip=t("components:batch.浏览_9c5c"),
+            tooltip=t("components:batch.browse"),
         ),
     )
 
     # --- 年份/月份 ---
     batch_year = ft.Dropdown(
-        label=t("components:batch.年份_8f30"),
+        label=t("components:batch.year"),
         width=125,
         options=year_options(),
         value=current_year,
     )
     batch_month = ft.Dropdown(
-        label=t("components:batch.月份_8190"),
+        label=t("components:batch.month"),
         width=125,
         options=month_options(),
         value=current_month,
@@ -54,17 +54,17 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     # --- 生产数据表头自动检测 ---
     batch_auto_detect = ft.Checkbox(
-        label=t("components:batch.生产数据表头自动检测_25ca"),
+        label=t("components:batch.autoDetectHeader"),
         value=True,
-        tooltip=t("components:batch.生产数据表头起始行使用自动检测_82fc"),
+        tooltip=t("components:batch.useAutomaticDetectionForTheProductionHeaderStartRow"),
     )
 
     # --- 表头起始行（仅在取消自动检测时显示） ---
     batch_raw_start = ft.TextField(
-        label=t("components:batch.表头起始行_7c63"),
+        label=t("components:batch.headerStartRow"),
         width=100,
         value="-1",
-        hint_text=t("components:batch.-1（自动检测）_413b"),
+        hint_text=t("components:batch.1AutoDetect"),
         visible=False,
     )
 
@@ -76,66 +76,66 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     # --- 合并输出 ---
     batch_merge = ft.Checkbox(
-        label=t("components:batch.合并输出_6a20"),
+        label=t("components:batch.mergeOutput"),
         value=True,
-        tooltip=t("components:batch.将所有处理结果合并到单个Exc_16c4"),
+        tooltip=t("components:batch.mergeAllProcessingResultsIntoASingleExcelFileSheetWithPrefix"),
     )
 
     # --- 台账匹配开关（设备 / 油品 独立控制） ---
     batch_match_eq = ft.Checkbox(
-        label=t("components:batch.设备台账匹配_5a23"),
+        label=t("components:batch.equipmentLedgerMatch"),
         value=True,
-        tooltip=t("components:batch.批量处理时自动匹配设备台账_ec91"),
+        tooltip=t("components:batch.automaticallyMatchTheEquipmentLedgerDuringBatchProcessing"),
     )
     batch_match_oil = ft.Checkbox(
-        label=t("components:batch.油品台账匹配_8663"),
+        label=t("components:batch.oilLedgerMatch"),
         value=True,
-        tooltip=t("components:batch.批量处理时自动匹配油品台账_8447"),
+        tooltip=t("components:batch.automaticallyMatchTheOilLedgerDuringBatchProcessing"),
     )
     batch_match_model = ft.Checkbox(
-        label=t("components:batch.型号台账匹配_135c"),
+        label=t("components:batch.modelLedgerMatch"),
         value=False,
-        tooltip=t("components:batch.需同时开启设备台账匹配，按标准_6668"),
+        tooltip=t("components:batch.requiresEquipmentLedgerMatchingFillModelAttributesUsingTheStandardEquipmentId"),
     )
     batch_skip_hidden_rows = ft.Checkbox(
-        label=t("components:batch.跳过隐藏行_bc25"),
+        label=t("components:batch.skipHiddenRows"),
         value=False,
-        tooltip=t("components:batch.勾选后，Excel中被隐藏的行_ecd7"),
+        tooltip=t("components:batch.whenSelectedExcelHiddenRowsAreNotRead"),
     )
     batch_skip_hidden_cols = ft.Checkbox(
-        label=t("components:batch.跳过隐藏列_3ed3"),
+        label=t("components:batch.skipHiddenColumns"),
         value=False,
-        tooltip=t("components:batch.勾选后，Excel中被隐藏的列_398b"),
+        tooltip=t("components:batch.whenSelectedExcelHiddenColumnsAreNotRead"),
     )
     batch_filter_zero_hours = ft.Checkbox(
-        label=t("components:batch.过滤零小时数_549f"),
+        label=t("components:batch.filterZeroEngineHours"),
         value=False,
-        tooltip=t("components:batch.勾选后，发动机小时数为0或为空_78cd"),
+        tooltip=t("components:batch.whenSelectedEngineHoursAre0ZeroOrEmptyRecordsAreFiltered"),
     )
     batch_filter_zero_work_hours = ft.Checkbox(
-        label=t("components:batch.过滤零运行小时数_eaf1"),
+        label=t("components:batch.filterZeroOperatingHours"),
         value=False,
-        tooltip=t("components:batch.勾选后，运行小时数为0或为空的_c4ff"),
+        tooltip=t("components:batch.hoursOperatingHourshours0OrEmptyhoursrecordshours"),
     )
     batch_filter_zero_hours_meter = ft.Checkbox(
-        label=t("components:batch.过滤零小时仪表_99e8"),
+        label=t("components:batch.filterZeroHoursMeter"),
         value=False,
-        tooltip=t("components:batch.勾选后，小时数仪表开始或结束为_3b68"),
+        tooltip=t("components:batch.whenSelectedHourMeterStartOrEndIs0ZeroOrEmptyRecordsAreFiltered"),
     )
     batch_filter_zero_km_meter = ft.Checkbox(
-        label=t("components:batch.过滤零公里仪表_2e3c"),
+        label=t("components:batch.filterZeroKilometerMeter"),
         value=False,
-        tooltip=t("components:batch.勾选后，公里数仪表开始或结束为_1e34"),
+        tooltip=t("components:batch.whenSelectedOdometerStartOrEndIs0ZeroOrEmptyRecordsAreFiltered"),
     )
     batch_filter_zero_run_hours = ft.Checkbox(
-        label=t("components:batch.过滤零运行小时数_eaf1"),
+        label=t("components:batch.filterZeroOperatingHours"),
         value=False,
-        tooltip=t("components:batch.勾选后，运行小时数为0或为空的_c4ff"),
+        tooltip=t("components:batch.hoursOperatingHourshours0OrEmptyhoursrecordshours"),
     )
     batch_filter_zero_run_km = ft.Checkbox(
-        label=t("components:batch.过滤零运行里程_d55d"),
+        label=t("components:batch.filterZeroOperatingDistance"),
         value=False,
-        tooltip=t("components:batch.勾选后，运行里程为0或为空的记_3be2"),
+        tooltip=t("components:batch.itemOperatingDistanceitem0OrEmptyitemrecordsitem"),
     )
 
     # --- 异常值检测 ---
@@ -144,22 +144,22 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     # --- 表内合并 ---
     batch_table_merge = ft.Checkbox(
-        label=t("components:batch.表内合并_2283"),
+        label=t("components:batch.mergeWithinSheet"),
         value=False,
-        tooltip=t("components:batch.将所有数据通过左合并聚合到单个_cd85"),
+        tooltip=t("components:batch.aggregateAllDataUsingALeftMergeIntoASingleSheetEnableLedgerMatchingFirst"),
         disabled=not (batch_match_eq.value or batch_match_oil.value or batch_match_model.value),
     )
 
     # ── 基准表芯片切换（表内合并专用） ──
     batch_base_table = ChipToggle(
-        options=[("fuel", t("components:batch.燃油数据_f769")), ("worktime", t("components:batch.工时数据_8c32"))],
+        options=[("fuel", t("components:batch.fuelData")), ("worktime", t("components:batch.worktimeData"))],
     )
     batch_base_table.row.visible = batch_table_merge.value
 
     # --- 工作效率表头修改开关 ---
     _batch_hmc = HeaderModeConfig(
-        label=t("components:batch.工作效率表头修改_d55c"),
-        tooltip=t("components:batch.开启后按配置的映射关系重命名工_11cb"),
+        label=t("components:batch.worktimeHeaderMapping"),
+        tooltip=t("components:batch.whenEnabledRenameWorktimeReportHeadersUsingTheConfiguredMapping"),
     )
 
     # ── 表内合并 / 合并输出 互斥 & 台账依赖 ──
@@ -237,9 +237,9 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
     )
 
     date_filter_toggle = ft.Checkbox(
-        label=t("components:batch.按日期筛选_6410"),
+        label=t("components:batch.filterByDate"),
         value=False,
-        tooltip=t("components:batch.开启后只保留所选日期的数据_a04b"),
+        tooltip=t("components:batch.whenEnabledKeepOnlyDataForTheSelectedDate"),
     )
 
     def _update_date_display():
@@ -276,18 +276,18 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         page.show_dialog(dp)
 
     # --- 处理按钮 ---
-    batch_btn = theme.primary_btn(t("components:batch.批量处理_ba72"), icon=ft.Icons.BOLT, disabled=False)
+    batch_btn = theme.primary_btn(t("components:batch.batchProcessing"), icon=ft.Icons.BOLT, disabled=False)
 
     # --- 进度区 ---
     batch_progress_bar = ft.ProgressBar(value=0.0, visible=False)
     batch_progress_text = ft.Text(value="", size=12, color=theme.TEXT_SECONDARY, visible=False)
-    batch_cancel_btn = theme.secondary_btn(t("components:batch.取消_625f"), icon=ft.Icons.CANCEL, visible=False, height=32)
+    batch_cancel_btn = theme.secondary_btn(t("components:batch.cancel"), icon=ft.Icons.CANCEL, visible=False, height=32)
 
     # --- 浏览按钮 ---
     _batch_picker = ft.FilePicker()
     page.services.append(_batch_picker)
     on_batch_browse = make_browse_handler(
-        _batch_picker, batch_path, batch_btn, t("components:batch.选择批量处理文件夹_ba89"),
+        _batch_picker, batch_path, batch_btn, t("components:batch.selectBatchProcessingFolder"),
         mode="folder",
         log_fn=lambda msg: _log_message(page.logger.error, msg),
     )
@@ -298,9 +298,9 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
     date_nav_row = ft.Row(
         [
             date_display,
-            theme.secondary_btn(t("components:batch.上一天_f8cb"), icon=ft.Icons.ARROW_BACK_IOS, on_click=_on_prev_day, height=32),
-            theme.secondary_btn(t("components:batch.今天_800d"), icon=ft.Icons.CALENDAR_TODAY, on_click=_on_today, height=32),
-            theme.secondary_btn(t("components:batch.选择日期_2beb"), icon=ft.Icons.CALENDAR_MONTH, on_click=_on_pick_date, height=32),
+            theme.secondary_btn(t("components:batch.previousDay"), icon=ft.Icons.ARROW_BACK_IOS, on_click=_on_prev_day, height=32),
+            theme.secondary_btn(t("components:batch.today"), icon=ft.Icons.CALENDAR_TODAY, on_click=_on_today, height=32),
+            theme.secondary_btn(t("components:batch.selectDate"), icon=ft.Icons.CALENDAR_MONTH, on_click=_on_pick_date, height=32),
         ],
         spacing=6,
         vertical_alignment=ft.CrossAxisAlignment.CENTER,
@@ -352,9 +352,9 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
     container = ft.Container(
         content=ft.Column(
             [
-                theme.section_title(t("components:batch.批量处理_ba72")),
+                theme.section_title(t("components:batch.batchProcessing")),
                 ft.Text(
-                    t("components:batch.选择文件夹后自动扫描并处理各类_b57d"),
+                    t("components:batch.selectAFolderToScanAndProcessReportFilesResultsCanBeMergedOrExportedSeparately"),
                     size=13,
                     color=theme.TEXT_SECONDARY,
                 ),
@@ -368,13 +368,13 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
                     date_nav_row,
-                ], label=t("components:batch.目标文件夹_1534")),
+                ], label=t("components:batch.targetFolder")),
 
                 # ── 处理参数 ──
                 theme.module_card([
                     options_grid,
                     ft.Divider(height=1, color=theme.BORDER),
-                    ft.Text(t("components:batch.数据选项_2543"), size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                    ft.Text(t("components:batch.dataOptions"), size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
                     ft.ResponsiveRow(
                         [
                             ft.Container(batch_match_eq, col={"xs": 6}),
@@ -385,11 +385,11 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
                         ],
                         run_spacing=4,
                     ),
-                ], label=t("components:batch.处理参数_fdbb")),
+                ], label=t("components:batch.processingParameters")),
 
                 # ── 数据过滤 ──
                 theme.module_card([
-                    ft.Text(t("components:batch.油耗处理_1a41"), size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                    ft.Text(t("components:batch.fuelProcessing"), size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
                     ft.ResponsiveRow(
                         [
                             ft.Container(batch_filter_zero_hours, col={"xs": 6}),
@@ -398,7 +398,7 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
                         run_spacing=4,
                     ),
                     ft.Divider(height=1, color=theme.BORDER),
-                    ft.Text(t("components:batch.生产数据_9fb6"), size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                    ft.Text(t("components:batch.productionData"), size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
                     ft.ResponsiveRow(
                         [
                             ft.Container(batch_filter_zero_hours_meter, col={"xs": 6}),
@@ -408,17 +408,17 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
                         ],
                         run_spacing=4,
                     ),
-                ], label=t("components:batch.数据过滤_8626")),
+                ], label=t("components:batch.dataFilters")),
 
                 # ── 输出方式 ──
                 theme.module_card([
                     output_grid,
-                ], label=t("components:batch.输出方式_71ab")),
+                ], label=t("components:batch.outputMode")),
 
                 # ── 异常值检测 ──
                 theme.module_card([
                     _anomaly["container"],
-                ], label=t("components:batch.异常值检测_699f")),
+                ], label=t("components:batch.anomalyDetection")),
 
                 # ── 进度 + 操作 ──
                 progress_row,

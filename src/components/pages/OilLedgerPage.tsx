@@ -8,15 +8,10 @@ const IconDroplet = () => (
   </svg>
 );
 
-const OIL_LEDGER_COLUMNS = [
-  "油品名称",
-  "标准油品名称",
-];
+type LedgerBackendConfig = Omit<LedgerPageConfig, "title" | "standardColumns" | "emptyMessage">;
 
-const config: LedgerPageConfig = {
-  title: "油品台账",
+const config: LedgerBackendConfig = {
   icon: <IconDroplet />,
-  standardColumns: OIL_LEDGER_COLUMNS,
   loadDataMethod: "get_oil_ledger_data",
   importMethod: "import_oil_ledger",
   loadFileColumnsMethod: "load_oil_ledger_file_columns",
@@ -27,7 +22,6 @@ const config: LedgerPageConfig = {
   setDefaultMethod: "set_default_oil_ledger",
   cancelDefaultMethod: "cancel_default_oil_ledger",
   clearMethod: "clear_oil_ledger",
-  emptyMessage: "暂无油品台账数据，请先导入油品台账 Excel",
 };
 
 export function OilLedgerPage({ bridge }: { bridge: BridgeProp }) {
@@ -35,12 +29,12 @@ export function OilLedgerPage({ bridge }: { bridge: BridgeProp }) {
 
   const translatedConfig: LedgerPageConfig = {
     ...config,
-    title: t("pages:OilLedgerPage.油品台账_53fa"),
+    title: t("pages:OilLedgerPage.oilLedger"),
     standardColumns: [
-      t("pages:OilLedgerPage.油品名称_4031"),
-      t("pages:OilLedgerPage.标准油品名称_d013"),
+      t("pages:OilLedgerPage.oilName"),
+      t("pages:OilLedgerPage.standardOilName"),
     ],
-    emptyMessage: t("pages:OilLedgerPage.暂无油品台账数据，请先导入油品_ea21"),
+    emptyMessage: t("pages:OilLedgerPage.noOilLedgerDataImportAnOilLedgerExcelFileFirst"),
   };
 
   return <LedgerPage bridge={bridge} config={translatedConfig} />;

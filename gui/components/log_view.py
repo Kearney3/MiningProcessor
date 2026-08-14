@@ -28,7 +28,7 @@ def create_log_view(height: int = DEFAULT_LOG_HEIGHT) -> tuple[ft.Container, Log
         expand=True,
     )
     level_filter = ft.Dropdown(
-        label=t("components:log_view.级别_e78e"),
+        label=t("components:log_view.level"),
         width=130,
         dense=True,
         content_padding=ft.Padding.symmetric(horizontal=8, vertical=6),
@@ -42,27 +42,27 @@ def create_log_view(height: int = DEFAULT_LOG_HEIGHT) -> tuple[ft.Container, Log
     )
     export_button = ft.IconButton(
         icon=ft.Icons.DOWNLOAD,
-        tooltip=t("components:log_view.导出日志_609e"),
+        tooltip=t("components:log_view.exportLogs"),
         icon_size=18,
     )
     clear_button = ft.IconButton(
         icon=ft.Icons.DELETE_SWEEP,
-        tooltip=t("components:log_view.清空日志_a15a"),
+        tooltip=t("components:log_view.clearLogs"),
         icon_size=18,
     )
     scroll_bottom_button = ft.IconButton(
         icon=ft.Icons.VERTICAL_ALIGN_BOTTOM,
-        tooltip=t("components:log_view.滚动到底部_4190"),
+        tooltip=t("components:log_view.scrollToBottom"),
         icon_size=18,
         icon_color=theme.TEXT_SECONDARY,
     )
     follow_status = ft.Text(
-        t("components:log_view.已暂停跟随_130d"),
+        t("components:log_view.logVariant"),
         size=12,
         color=theme.WARNING,
         visible=False,
     )
-    count_text = ft.Text(t("components:log_view.0条_6711"), size=12, color=theme.TEXT_SECONDARY)
+    count_text = ft.Text(t("components:log_view.0Items"), size=12, color=theme.TEXT_SECONDARY)
     resize_handle = ft.GestureDetector(
         content=ft.Container(
             height=12,
@@ -82,13 +82,13 @@ def create_log_view(height: int = DEFAULT_LOG_HEIGHT) -> tuple[ft.Container, Log
                 top=ft.BorderSide(1, theme.BORDER),
                 bottom=ft.BorderSide(1, theme.BORDER),
             ),
-            tooltip=t("components:log_view.上下拖拽调整日志区域高度_7558"),
+            tooltip=t("components:log_view.log"),
         ),
         mouse_cursor=ft.MouseCursor.RESIZE_UP_DOWN,
     )
     collapse_button = ft.IconButton(
         icon=ft.Icons.KEYBOARD_ARROW_DOWN,
-        tooltip=t("components:log_view.折叠日志_c26f"),
+        tooltip=t("components:log_view.collapseLog"),
         icon_size=18,
     )
     toolbar = ft.Row(
@@ -130,7 +130,7 @@ def create_log_view(height: int = DEFAULT_LOG_HEIGHT) -> tuple[ft.Container, Log
             resize_handle.visible = True
             list_container.height = expanded_height[0]
             collapse_button.icon = ft.Icons.KEYBOARD_ARROW_DOWN
-            collapse_button.tooltip = t("components:log_view.折叠日志_c26f")
+            collapse_button.tooltip = t("components:log_view.collapseLog")
             list_container.data["collapsed"] = False
         else:
             expanded_height[0] = int(list_container.height or height)
@@ -138,7 +138,7 @@ def create_log_view(height: int = DEFAULT_LOG_HEIGHT) -> tuple[ft.Container, Log
             resize_handle.visible = False
             list_container.height = 52
             collapse_button.icon = ft.Icons.KEYBOARD_ARROW_UP
-            collapse_button.tooltip = t("components:log_view.展开日志_34c1")
+            collapse_button.tooltip = t("components:log_view.expandLog")
             list_container.data["collapsed"] = True
         safe_update(root)
 

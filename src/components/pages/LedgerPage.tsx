@@ -201,7 +201,7 @@ function ColumnMappingModal({
                 }
                 className="input flex-1"
               >
-                <option value="">{t("pages:LedgerPage.--跳过--_ce58")}</option>
+                <option value="">{t("pages:LedgerPage.skip")}</option>
                 {fileColumns.map((fc) => (
                   <option key={fc} value={fc} disabled={usedFileCols.has(fc) && mapping[stdCol] !== fc}>
                     {fc}
@@ -458,10 +458,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
         sheet_name: pendingSheetName || undefined,
       });
       await loadData();
-      notify(t("pages:LedgerPage.导入成功_b6d1"), "success");
+      notify(t("pages:LedgerPage.importedSuccessfully"), "success");
     } catch (e) {
       setError(String(e));
-      notify(t("pages:LedgerPage.导入失败:$_d39c", { error: String(e) }), "error");
+      notify(t("pages:LedgerPage.importFailed", { error: String(e) }), "error");
     } finally {
       setImporting(false);
       setPendingFilePath("");
@@ -474,14 +474,14 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
     try {
       const filePath = await save({
         filters: [{ name: "Excel", extensions: ["xlsx"] }],
-        defaultPath: `${config.title}模板.xlsx`,
+        defaultPath: t("pages:LedgerPage.templateFilename", { title: config.title }),
       });
       if (!filePath) return;
       await bridge.call(config.exportTemplateMethod, { output_path: filePath });
-      notify(t("pages:LedgerPage.模板导出成功_fb39"), "success");
+      notify(t("pages:LedgerPage.templateExported"), "success");
     } catch (e) {
       setError(String(e));
-      notify(t("pages:LedgerPage.模板导出失败:$_d8e9", { error: String(e) }), "error");
+      notify(t("pages:LedgerPage.templateExportFailed", { error: String(e) }), "error");
     }
   };
 
@@ -497,10 +497,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
         data_type: config.exportDataType,
         output_path: filePath,
       });
-      notify(t("pages:LedgerPage.台账导出成功_f447"), "success");
+      notify(t("pages:LedgerPage.ledgerExported"), "success");
     } catch (e) {
       setError(String(e));
-      notify(t("pages:LedgerPage.台账导出失败:$_79fd", { error: String(e) }), "error");
+      notify(t("pages:LedgerPage.ledgerExportFailed", { error: String(e) }), "error");
     }
   };
 
@@ -509,10 +509,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
     try {
       await bridge.call(config.setDefaultMethod);
       setIsDefault(true);
-      notify(t("pages:LedgerPage.已设为默认_fc66"), "success");
+      notify(t("pages:LedgerPage.setAsDefaultSetAsDefault"), "success");
     } catch (e) {
       setError(String(e));
-      notify(t("pages:LedgerPage.设为默认失败:$_bc62", { error: String(e) }), "error");
+      notify(t("pages:LedgerPage.setAsDefaultfailed", { error: String(e) }), "error");
     }
   };
 
@@ -521,10 +521,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
     try {
       await bridge.call(config.cancelDefaultMethod);
       setIsDefault(false);
-      notify(t("pages:LedgerPage.已取消默认_a97f"), "success");
+      notify(t("pages:LedgerPage.defaultCleared"), "success");
     } catch (e) {
       setError(String(e));
-      notify(t("pages:LedgerPage.取消默认失败:$_9790", { error: String(e) }), "error");
+      notify(t("pages:LedgerPage.clearDefaultfailed", { error: String(e) }), "error");
     }
   };
 
@@ -534,10 +534,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
       await bridge.call(config.clearMethod);
       setRows([]);
       setColumns([]);
-      notify(t("pages:LedgerPage.已清空台账_2768"), "success");
+      notify(t("pages:LedgerPage.ledgerCleared"), "success");
     } catch (e) {
       setError(String(e));
-      notify(t("pages:LedgerPage.清空失败:$_99f0", { error: String(e) }), "error");
+      notify(t("pages:LedgerPage.clearFailed", { error: String(e) }), "error");
     }
   };
 
@@ -550,7 +550,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
         </svg>
-        <span className="text-sm">{t("pages:LedgerPage.加载中..._26b5")}</span>
+        <span className="text-sm">{t("pages:LedgerPage.text")}</span>
       </div>
     );
   }
@@ -584,7 +584,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
               type="text"
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setPage(0); }}
-              placeholder={t("pages:LedgerPage.搜索..._64e3")}
+              placeholder={t("pages:LedgerPage.textVariant")}
               className="input text-sm w-44 border-slate-300"
               style={{ paddingLeft: "2.25rem", paddingRight: "0.75rem" }}
             />
@@ -602,7 +602,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
             onClick={handleImport}
             disabled={importing}
             className="btn-secondary"
-            title={t("pages:LedgerPage.导入台账_21be")}
+            title={t("pages:LedgerPage.importLedger")}
           >
             <ImportIcon />
             <span className="hidden sm:inline">{t("pages:LedgerPage.ui.import")}</span>
@@ -612,10 +612,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           <button
             onClick={handleExportTemplate}
             className="btn-secondary"
-            title={t("pages:LedgerPage.导出模板_0d2c")}
+            title={t("pages:LedgerPage.exportTemplate")}
           >
             <ExportIcon />
-            <span className="hidden sm:inline">{t("pages:LedgerPage.导出模板_0d2c")}</span>
+            <span className="hidden sm:inline">{t("pages:LedgerPage.exportTemplate")}</span>
           </button>
 
           {/* Export data */}
@@ -623,10 +623,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
             <button
               onClick={handleExportData}
               className="btn-secondary"
-              title={t("pages:LedgerPage.导出台账_b15c")}
+              title={t("pages:LedgerPage.exportLedger")}
             >
               <ExportIcon />
-              <span className="hidden sm:inline">{t("pages:LedgerPage.导出台账_b15c")}</span>
+              <span className="hidden sm:inline">{t("pages:LedgerPage.exportLedger")}</span>
             </button>
           )}
 
@@ -637,19 +637,19 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
             <button
               onClick={() => setShowCancelDefaultDialog(true)}
               className="btn-secondary"
-              title={t("pages:LedgerPage.取消默认_533f")}
+              title={t("pages:LedgerPage.clearDefault")}
             >
               <StarFilledIcon />
-              <span className="hidden sm:inline">{t("pages:LedgerPage.取消默认_533f")}</span>
+              <span className="hidden sm:inline">{t("pages:LedgerPage.clearDefault")}</span>
             </button>
           ) : (
             <button
               onClick={() => setShowSetDefaultDialog(true)}
               className="btn-secondary"
-              title={t("pages:LedgerPage.设为默认_1af3")}
+              title={t("pages:LedgerPage.setAsDefaultVariant")}
             >
               <StarIcon />
-              <span className="hidden sm:inline">{t("pages:LedgerPage.设为默认_1af3")}</span>
+              <span className="hidden sm:inline">{t("pages:LedgerPage.setAsDefaultVariant")}</span>
             </button>
           )}
 
@@ -657,7 +657,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           <button
             onClick={() => setShowClearDialog(true)}
             className="btn-danger"
-            title={t("pages:LedgerPage.清空台账_d9ca")}
+            title={t("pages:LedgerPage.clearLedger")}
           >
             <TrashIcon />
             <span className="hidden sm:inline">{t("pages:LedgerPage.ui.clear")}</span>
@@ -693,14 +693,14 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
       {rows.length === 0 ? (
         <div className="bg-white rounded-lg border border-slate-200 p-16 text-center">
           <TableIcon />
-          <p className="text-slate-400 text-sm mt-4 mb-1">{t("pages:LedgerPage.暂无数据_21ef")}</p>
+          <p className="text-slate-400 text-sm mt-4 mb-1">{t("pages:LedgerPage.noData")}</p>
           <p className="text-slate-400 text-xs mb-6">{config.emptyMessage}</p>
           <button
             onClick={handleImport}
             className="btn-primary inline-flex items-center gap-2 text-sm px-5 py-2"
           >
             <ImportIcon />
-            {t("pages:LedgerPage.导入台账_21be")}
+            {t("pages:LedgerPage.importLedger")}
           </button>
         </div>
       ) : (
@@ -757,10 +757,10 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
           {/* Pagination */}
           <div className="flex items-center justify-between px-3 py-2 border-t border-slate-100 shrink-0">
             <span className="text-xs text-slate-500">
-              {searchTerm ? t("pages:LedgerPage.$/$条_9b29", { shown: displayRows.length, total: rows.length }) : t("pages:LedgerPage.共$条_cd74", { total: rows.length })}
+              {searchTerm ? t("pages:LedgerPage.items", { shown: displayRows.length, total: rows.length }) : t("pages:LedgerPage.totalItems", { total: rows.length })}
               {sort && (
                 <span className="ml-2 text-slate-400">
-                  {sort.column} {sort.direction === "asc" ? t("pages:LedgerPage.升序_a4ac") : t("pages:LedgerPage.降序_d05d")}
+                  {sort.column} {sort.direction === "asc" ? t("pages:LedgerPage.asc") : t("pages:LedgerPage.desc")}
                 </span>
               )}
             </span>
@@ -809,8 +809,8 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
       {/* Confirm dialogs */}
       <ConfirmDialog
         open={showClearDialog}
-        title={t("pages:LedgerPage.清空台账_d9ca")}
-        message={t("pages:LedgerPage.确定要清空所有$数据吗？此操作_7290", { title: config.title })}
+        title={t("pages:LedgerPage.clearLedger")}
+        message={t("pages:LedgerPage.datacleardataDatadataThisActionCannotBeUndone", { title: config.title })}
         confirmLabel={t("pages:LedgerPage.ui.clear")}
         danger
         onConfirm={handleClear}
@@ -818,15 +818,15 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
       />
       <ConfirmDialog
         open={showSetDefaultDialog}
-        title={t("pages:LedgerPage.设为默认_1af3")}
-        message={t("pages:LedgerPage.将当前$设为默认，后续处理将自_c832", { title: config.title })}
+        title={t("pages:LedgerPage.setAsDefaultVariant")}
+        message={t("pages:LedgerPage.defaultDefaultdefaultDefaultprocessingdefaultledger", { title: config.title })}
         onConfirm={handleSetDefault}
         onCancel={() => setShowSetDefaultDialog(false)}
       />
       <ConfirmDialog
         open={showCancelDefaultDialog}
-        title={t("pages:LedgerPage.取消默认_533f")}
-        message={t("pages:LedgerPage.取消当前$的默认状态。_5324", { title: config.title })}
+        title={t("pages:LedgerPage.clearDefault")}
+        message={t("pages:LedgerPage.defaultDefaultdefaultdefault", { title: config.title })}
         onConfirm={handleCancelDefault}
         onCancel={() => setShowCancelDefaultDialog(false)}
       />
@@ -839,7 +839,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
-            <span className="text-sm text-slate-600">{t("pages:LedgerPage.正在导入..._3ada")}</span>
+            <span className="text-sm text-slate-600">{t("pages:LedgerPage.textVariant2")}</span>
           </div>
         </div>
       )}

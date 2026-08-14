@@ -52,9 +52,9 @@ def _validate_column_mapping(
 ) -> str | None:
     values = [content, category, minor, status]
     if any(not value for value in values):
-        return t("components:llm_labeling.请完整选择维修内容列和三个输出_78b1")
+        return t("components:llm_labeling.columnselectmaintenanceContentColumncolumnitemsoutputcolumn")
     if len(set(values)) != len(values):
-        return t("components:llm_labeling.列映射冲突：维修内容、大类、小_0ce7")
+        return t("components:llm_labeling.configurationConfigurationcontentCategorySubcategoryconfigurationclassificationM")
     return None
 
 
@@ -69,8 +69,8 @@ def _result_presentation(result: dict) -> dict:
         "is_partial": remaining > 0,
         "progress": completed / target if target else 1,
         "summary": (
-            t("components:llm_labeling./条成功_5f11", completed=completed, target=target)
-            + (t("components:llm_labeling.·条待重试_61a8", remaining=remaining) if remaining else " · 100%")
+            t("components:llm_labeling.succeeded", completed=completed, target=target)
+            + (t("components:llm_labeling.itemsToRetry", remaining=remaining) if remaining else " · 100%")
         ),
     }
 
@@ -90,26 +90,26 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     # ── Step 1: 文件 & Sheet ──
     path_field = ft.TextField(
-        label=t("components:llm_labeling.维修明细文件_ab16"),
-        hint_text=t("components:llm_labeling.选择已处理的维修明细Excel_e82e"),
+        label=t("components:llm_labeling.maintenanceDetailsfile"),
+        hint_text=t("components:llm_labeling.selectfileprocessingfilemaintenanceDetailsExcel"),
         expand=True,
         read_only=False,
         color=theme.TEXT_PRIMARY,
-        suffix=ft.IconButton(icon=ft.Icons.FOLDER_OPEN, tooltip=t("components:llm_labeling.浏览_9c5c")),
+        suffix=ft.IconButton(icon=ft.Icons.FOLDER_OPEN, tooltip=t("components:llm_labeling.browse")),
     )
     sheet_dropdown = ft.Dropdown(
-        label="Sheet",
+        label=t("common:sheet"),
         width=200,
         options=[],
-        hint_text=t("components:llm_labeling.选择文件后加载_7684"),
+        hint_text=t("components:llm_labeling.loadAfterSelectingAFile"),
     )
 
     # ── Step 2: 列映射 ──
     columns_list: list[str] = []
-    col_content = ft.Dropdown(label=t("components:llm_labeling.维修内容列_6809"), width=200, options=[])
-    col_category = ft.Dropdown(label=t("components:llm_labeling.大类列_b1b1"), width=200, options=[])
-    col_minor = ft.Dropdown(label=t("components:llm_labeling.小类列_aa19"), width=200, options=[])
-    col_status = ft.Dropdown(label=t("components:llm_labeling.分类方式列_4266"), width=200, options=[])
+    col_content = ft.Dropdown(label=t("components:llm_labeling.maintenanceContentColumn"), width=200, options=[])
+    col_category = ft.Dropdown(label=t("components:llm_labeling.categoryColumn"), width=200, options=[])
+    col_minor = ft.Dropdown(label=t("components:llm_labeling.subcategoryColumn"), width=200, options=[])
+    col_status = ft.Dropdown(label=t("components:llm_labeling.classificationColumn"), width=200, options=[])
     preview_table = ft.DataTable(
         columns=[ft.DataColumn(ft.Text(""))],
         rows=[],
@@ -126,17 +126,17 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
     filter_chips: list[str] = []
     filter_chip_row = ft.Row(wrap=True, spacing=6)
     filter_input = ft.TextField(
-        label=t("components:llm_labeling.筛选分类方式值_2c39"),
-        hint_text=t("components:llm_labeling.输入值（如\"待确认\"），逗号分_bc74"),
+        label=t("components:llm_labeling.filterClassificationValues"),
+        hint_text=t("components:llm_labeling.inputValuesHint"),
         expand=True,
         dense=True,
         color=theme.TEXT_PRIMARY,
     )
     status_suggestions = ft.Row(wrap=True, spacing=6)
     filter_notice = ft.Text("", size=12, color=ft.Colors.AMBER_700, visible=False)
-    add_filter_btn = ft.Button(t("components:llm_labeling.添加_b58c"))
-    export_details = ft.Radio(value="statistics", label=t("components:llm_labeling.汇总统计（明细+统计表）_8cb3"))
-    export_stats = ft.Radio(value="details", label=t("components:llm_labeling.仅标注明细_b6c3"))
+    add_filter_btn = ft.Button(t("components:llm_labeling.add"))
+    export_details = ft.Radio(value="statistics", label=t("components:llm_labeling.itemItemItem"))
+    export_stats = ft.Radio(value="details", label=t("components:llm_labeling.labelinglabeledDetails"))
     export_group = ft.RadioGroup(
         value="statistics",
         content=ft.Row([export_stats, export_details], spacing=16),
@@ -144,9 +144,9 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
     filter_section = ft.Container(visible=False)
 
     # ── Step 4: 执行 ──
-    btn = theme.primary_btn(t("components:llm_labeling.开始标注_7107"), icon=ft.Icons.SMART_TOY, disabled=True)
+    btn = theme.primary_btn(t("components:llm_labeling.startLabeling"), icon=ft.Icons.SMART_TOY, disabled=True)
     cancel_btn = ft.Button(
-        t("components:llm_labeling.取消_625f"), icon=ft.Icons.STOP, visible=False,
+        t("components:llm_labeling.cancel"), icon=ft.Icons.STOP, visible=False,
         style=ft.ButtonStyle(color=ft.Colors.RED),
     )
     status_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
@@ -201,7 +201,7 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
             dropdown.options = [
                 ft.dropdown.Option(
                     key=column,
-                    text=column if column in columns else t("components:llm_labeling.新建输出列：_ff49", column=column),
+                    text=column if column in columns else t("components:llm_labeling.columnoutputcolumn", column=column),
                 )
                 for column in choices
             ]
@@ -357,7 +357,7 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                     col_minor.value = _auto_detect(columns_list, "minor")
                     col_status.value = _auto_detect(columns_list, "status")
                 _build_preview_table(columns_list, sample_data)
-                preview_info.value = t("components:llm_labeling.共列，前5行预览_d41f", count=len(columns_list)) if columns_list else t("components:llm_labeling.无法读取列_8cf4")
+                preview_info.value = t("components:llm_labeling.columnsFirst5Rows", count=len(columns_list)) if columns_list else t("components:llm_labeling.columnreadcolumn")
                 mapping_section.visible = True
                 filter_section.visible = True if columns_list else False
                 if col_status.value:
@@ -391,8 +391,8 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
         add_filter_btn.disabled = not available
         filter_notice.visible = not available
         filter_notice.value = (
-            t('components:llm_labeling.当前将新建“”列，_eda3', col=col_status.value or t("components:llm_labeling.分类方式_2716"))
-            + t("components:llm_labeling.不能按该列筛选；本次会标注全部_5826")
+            t('components:llm_labeling.columnColumn', col=col_status.value or t("components:llm_labeling.classificationMethod"))
+            + t("components:llm_labeling.columnfilterColumnallrecords")
             if not available else ""
         )
         if not available:
@@ -421,12 +421,12 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
     async def _on_browse(_e):
         try:
             result = await file_picker.pick_files(
-                dialog_title=t("components:llm_labeling.选择维修明细文件_abba"),
+                dialog_title=t("components:llm_labeling.selectMaintenanceDetailsFile"),
                 allowed_extensions=["xlsx", "xls"],
                 initial_directory=_get_initial_directory(),
             )
         except Exception as ex:
-            _log_message(page.logger.error, t("components:llm_labeling.选择文件失败:_6ca8", ex=ex))
+            _log_message(page.logger.error, t("components:llm_labeling.selectFileFailed", ex=ex))
             return
         if result and result[0]:
             picked = result[0]
@@ -445,14 +445,14 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
         path = path_field.value
         if not path:
-            _log_message(page.logger, t("components:llm_labeling.请先选择维修明细文件_4baf"), level=logging.WARNING)
+            _log_message(page.logger, t("components:llm_labeling.pleaseFirstselectMaintenanceDetailsFile"), level=logging.WARNING)
             return
         llm_config = config_loader.get_llm_config()
         if not llm_config.get("url") or not llm_config.get("api_key"):
-            _log_message(page.logger.error, t("components:llm_labeling.请先在用户配置中填写LLM接口_f72e"))
+            _log_message(page.logger.error, t("components:llm_labeling.pleaseFirstconfigurationconfigurationconfigurationLlmConfigurationUrlConfigurati"))
             return
         if not llm_config.get("model"):
-            _log_message(page.logger.error, t("components:llm_labeling.请先在用户配置中选择LLM模型_e733"))
+            _log_message(page.logger.error, t("components:llm_labeling.pleaseFirstconfigurationconfigurationconfigurationselectLlmModel"))
             return
 
         nonlocal current_run
@@ -474,19 +474,19 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
         filters = list(filter_chips) if filter_chips else None
 
         btn.disabled = True
-        btn.text = t("components:llm_labeling.标注中..._2a0f")
+        btn.text = t("components:llm_labeling.labelingVariant")
         cancel_btn.visible = True
         result_text.value = ""
         progress_bar.value = 0
         progress_bar.visible = True
         progress_text.value = ""
         progress_text.visible = True
-        progress_summary.value = t("components:llm_labeling.准备发送标注任务…_f9cd")
+        progress_summary.value = t("components:llm_labeling.labeling")
         progress_summary.visible = True
-        progress_metrics.value = t("components:llm_labeling.成功0·跳过0·失败0·重试0_5976")
+        progress_metrics.value = t("components:llm_labeling.succeeded0Skip0Failed0Item0")
         progress_metrics.visible = True
         task_panel.visible = True
-        status_text.value = t("components:llm_labeling.正在标注（Sheet:）..._ba70", sheet_name=sheet_name)
+        status_text.value = t("components:llm_labeling.labelingSheet", sheet_name=sheet_name)
         safe_update(
             btn, cancel_btn, result_text, status_text, progress_bar,
             progress_text, progress_summary, progress_metrics, task_panel,
@@ -525,13 +525,13 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                         eta = latest_data.get("eta_seconds")
                         eta_text = (
                             t(
-                                "components:llm_labeling.·预计剩余分钟_9e8b",
+                                "components:llm_labeling.minutesRemaining",
                                 eta=max(1, round(float(eta) / 60)),
                             )
                             if eta else ""
                         )
                         progress_summary.value = (
-                            t("components:llm_labeling./条·_fd28", current=current, total=total)
+                            t("components:llm_labeling.items", current=current, total=total)
                             +
                             f" {latest_data.get('percent', 0):.0f}%{eta_text}"
                         )
@@ -579,14 +579,14 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                     async def _cancelled():
                         if not _is_current_run(run_state):
                             return
-                        status_text.value = t("components:llm_labeling.任务已取消，当前进度已保留_d49d")
+                        status_text.value = t("components:llm_labeling.itemcanceledCurrentProgressHasBeenKept")
                         result_text.value = (
-                            t("components:llm_labeling.已完成条，剩余条；_969f", partial=partial, remaining=remaining)
-                            + t("components:llm_labeling.再次开始可从断点继续。_3722")
+                            t("components:llm_labeling.completedItemsRemaining", partial=partial, remaining=remaining)
+                            + t("components:llm_labeling.startAgainToResumeFromTheCheckpoint")
                         )
                         result_text.color = ft.Colors.AMBER
                         btn.disabled = False
-                        btn.text = t("components:llm_labeling.开始标注_7107")
+                        btn.text = t("components:llm_labeling.startLabeling")
                         cancel_btn.visible = False
                         safe_update(
                             status_text, result_text, btn, cancel_btn,
@@ -604,24 +604,24 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                 remaining = presentation["remaining"]
                 from_checkpoint = result.get("from_checkpoint", 0)
                 mode_label = t(
-                    "components:llm_labeling.汇总统计_a23a"
+                    "components:llm_labeling.summaryStatistics"
                     if result.get("export_mode") == "statistics"
-                    else "components:llm_labeling.标注明细_97b2"
+                    else "components:llm_labeling.labeledDetails"
                 )
 
                 async def _ok():
                     if not _is_current_run(run_state):
                         return
                     status_text.value = (
-                        t("components:llm_labeling.部分完成，当前进度已保留_29da")
-                        if presentation["is_partial"] else t("components:llm_labeling.标注完成_75f2")
+                        t("components:llm_labeling.itemCurrentProgressHasBeenKept")
+                        if presentation["is_partial"] else t("components:llm_labeling.labelingComplete")
                     )
                     result_text.value = (
                         t("components:llm_labeling.successCount", completed=completed, target=target)
                         + (t("components:llm_labeling.retryCount", remaining=remaining) if remaining else "")
                         + t("components:llm_labeling.checkpointCount", from_checkpoint=from_checkpoint)
                         + t("components:llm_labeling.exportMode", mode_label=mode_label)
-                        + t("components:llm_labeling.输出:_31e9", output=output)
+                        + t("components:llm_labeling.output", output=output)
                     )
                     result_text.color = (
                         ft.Colors.AMBER
@@ -629,7 +629,7 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                         else theme.TEXT_PRIMARY
                     )
                     btn.disabled = False
-                    btn.text = t("components:llm_labeling.开始标注_7107")
+                    btn.text = t("components:llm_labeling.startLabeling")
                     cancel_btn.visible = False
                     progress_bar.value = presentation["progress"]
                     progress_summary.value = presentation["summary"]
@@ -648,15 +648,15 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                     if not _is_current_run(run_state):
                         return
                     if run_state.cancel_event.is_set():
-                        status_text.value = t("components:llm_labeling.任务已取消，当前进度已保留_d49d")
-                        result_text.value = t("components:llm_labeling.再次开始可从断点继续未完成记录_3dbe")
+                        status_text.value = t("components:llm_labeling.itemcanceledCurrentProgressHasBeenKept")
+                        result_text.value = t("components:llm_labeling.datastartdatarecords")
                         result_text.color = ft.Colors.AMBER
                     else:
-                        status_text.value = t("components:llm_labeling.标注失败，断点进度已保留_66cb")
-                        result_text.value = t("components:llm_labeling.标注失败:_e77a", err_msg=err_msg)
+                        status_text.value = t("components:llm_labeling.labelingfailedLabeling")
+                        result_text.value = t("components:llm_labeling.labelingfailed", err_msg=err_msg)
                         result_text.color = ft.Colors.RED
                     btn.disabled = False
-                    btn.text = t("components:llm_labeling.开始标注_7107")
+                    btn.text = t("components:llm_labeling.startLabeling")
                     cancel_btn.visible = False
                     safe_update(
                         status_text, result_text, btn, cancel_btn,
@@ -678,7 +678,7 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
         if run_state is None:
             return
         run_state.cancel_event.set()
-        status_text.value = t("components:llm_labeling.正在停止新批次，等待已发出的请_651c")
+        status_text.value = t("components:llm_labeling.itemItem")
         cancel_btn.visible = False
         safe_update(status_text, cancel_btn)
 
@@ -695,11 +695,11 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
     container = ft.Container(
         content=ft.Column(
             [
-                theme.section_title(t("components:llm_labeling.LLM标注_8529")),
+                theme.section_title(t("components:llm_labeling.llmLabeling")),
                 hints,
                 # Step 1
                 theme.module_card([
-                    ft.Text(t("components:llm_labeling.选择文件与Sheet_11e6"), size=13, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+                    ft.Text(t("components:llm_labeling.selectFilefileSheet"), size=13, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
                     ft.Row([path_field, sheet_dropdown], spacing=8),
                 ]),
                 # Step 2
@@ -726,8 +726,8 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
     # ── 填充 mapping_section 和 filter_section ──
 
     mapping_section.content = theme.module_card([
-        ft.Text(t("components:llm_labeling.列映射_c5a2"), size=13, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
-        ft.Text(t("components:llm_labeling.系统已自动识别常见列名，请确认_0f66"), size=12, color=theme.TEXT_SECONDARY),
+        ft.Text(t("components:llm_labeling.columnMapping"), size=13, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+        ft.Text(t("components:llm_labeling.columnColumnVariant"), size=12, color=theme.TEXT_SECONDARY),
         ft.Row([col_content, col_category], spacing=8),
         ft.Row([col_minor, col_status], spacing=8),
         mapping_error,
@@ -742,15 +742,15 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
     ])
 
     filter_section.content = theme.module_card([
-        ft.Text(t("components:llm_labeling.筛选与导出_f946"), size=13, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
-        ft.Text(t("components:llm_labeling.选择要进行LLM标注的分类方式_4bb6"), size=12, color=theme.TEXT_SECONDARY),
+        ft.Text(t("components:llm_labeling.filterExport"), size=13, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+        ft.Text(t("components:llm_labeling.selectlabelingLlmLabelingclassificationMethodlabeling"), size=12, color=theme.TEXT_SECONDARY),
         status_suggestions,
         filter_notice,
         ft.Row([filter_input, add_filter_btn], spacing=8),
         filter_chip_row,
-        ft.Text(t("components:llm_labeling.留空则标注所有记录_6c2c"), size=11, color=theme.TEXT_SECONDARY),
+        ft.Text(t("components:llm_labeling.labelingrecords"), size=11, color=theme.TEXT_SECONDARY),
         ft.Divider(),
-        ft.Text(t("components:llm_labeling.导出方式_8441"), size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
+        ft.Text(t("components:llm_labeling.exportModeVariant"), size=12, weight=ft.FontWeight.W_500, color=theme.TEXT_SECONDARY),
         export_group,
     ])
     add_filter_btn.on_click = _add_filter_from_input

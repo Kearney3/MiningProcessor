@@ -16,22 +16,22 @@ const STATUS_CONFIG: Record<
 > = {
   connecting: {
     dot: "bg-amber-400 animate-pulse",
-    labelKey: "components:ConnectionStatusBadge.连接中..._afbc",
+    labelKey: "components:ConnectionStatusBadge.connectingVariant",
     ring: "ring-amber-100",
   },
   connected: {
     dot: "bg-green-500",
-    labelKey: "components:ConnectionStatusBadge.已连接_c5ea",
+    labelKey: "components:ConnectionStatusBadge.connected",
     ring: "ring-green-50",
   },
   disconnected: {
     dot: "bg-red-500",
-    labelKey: "components:ConnectionStatusBadge.已断开_3842",
+    labelKey: "components:ConnectionStatusBadge.disconnected",
     ring: "ring-red-50",
   },
   error: {
     dot: "bg-red-500",
-    labelKey: "components:ConnectionStatusBadge.错误_7030",
+    labelKey: "components:ConnectionStatusBadge.error",
     ring: "ring-red-50",
   },
 };
@@ -85,7 +85,7 @@ export function ConnectionStatusBadge({
       {open && (
         <div
           role="dialog"
-          aria-label={t("components:ConnectionStatusBadge.处理引擎连接状态_4d38")}
+          aria-label={t("components:ConnectionStatusBadge.processingEngineStatus")}
           className={`absolute top-full left-0 mt-1.5 w-80 bg-white rounded-lg shadow-lg border border-slate-200 z-50 ring-1 ${cfg.ring}`}
         >
           {/* 状态头部 */}
@@ -161,7 +161,7 @@ export function ConnectionStatusBadge({
                 disabled={status === "connecting"}
                 className="w-full text-xs px-3 py-1.5 rounded-md bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {status === "connecting" ? t("components:ConnectionStatusBadge.正在连接..._37eb") : t("components:ConnectionStatusBadge.重新连接_671b")}
+                {status === "connecting" ? t("components:ConnectionStatusBadge.connecting") : t("components:ConnectionStatusBadge.reconnect")}
               </button>
             </div>
           )}

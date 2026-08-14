@@ -83,7 +83,7 @@ export function ActionButtons({
         }`}
       >
         <SaveIcon />
-        {saving ? t("userConfig:_shared.保存中..._2a33") : t("userConfig:_shared.保存_be5f")}
+        {saving ? t("userConfig:_shared.text") : t("userConfig:_shared.save")}
       </button>
       <button
         onClick={onReload}
@@ -182,7 +182,7 @@ export function KeywordChipInput({
             key={`${kw}-${i}`}
             className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-sky-50 text-sky-700 cursor-pointer hover:bg-sky-100 transition-colors"
             onClick={() => removeItem(i)}
-            title={t("userConfig:_shared.点击删除_4239")}
+            title={t("userConfig:_shared.clickToDelete")}
           >
             {kw}
             <svg className="w-3 h-3 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -204,7 +204,7 @@ export function KeywordChipInput({
           type="button"
           onClick={addItem}
           className="btn btn-ghost px-2 text-teal-600 hover:text-teal-700"
-          title={t("userConfig:_shared.添加关键字_f1cc")}
+          title={t("userConfig:_shared.addKeyword")}
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />

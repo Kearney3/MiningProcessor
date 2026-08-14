@@ -29,14 +29,14 @@ export function validateColumnMapping(
   statusColumn: string,
 ): string | null {
   const entries = [
-    [i18n.t("lib:llm-labeling.维修内容列_6809"), contentColumn],
-    [i18n.t("lib:llm-labeling.大类列_b1b1"), categoryColumn],
-    [i18n.t("lib:llm-labeling.小类列_aa19"), minorColumn],
-    [i18n.t("lib:llm-labeling.分类方式列_4266"), statusColumn],
+    [i18n.t("lib:llm-labeling.maintenanceContentColumn"), contentColumn],
+    [i18n.t("lib:llm-labeling.categoryColumn"), categoryColumn],
+    [i18n.t("lib:llm-labeling.subcategoryColumn"), minorColumn],
+    [i18n.t("lib:llm-labeling.classificationColumn"), statusColumn],
   ];
   const rolesByColumn = new Map<string, string[]>();
   for (const [role, column] of entries) {
-    if (!column) return i18n.t("lib:llm-labeling.$不能为空_0c87", { role });
+    if (!column) return i18n.t("lib:llm-labeling.item", { role });
     rolesByColumn.set(column, [...(rolesByColumn.get(column) || []), role]);
   }
   const conflict = [...rolesByColumn.entries()].find(([, roles]) => roles.length > 1);

@@ -274,7 +274,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
     if (!rows.length || !currentState) return;
     const cfg = currentConfig;
     if (!cfg.nameToggle.enabled && !cfg.idToggle.enabled && !cfg.oilToggle.enabled) {
-      setError(t("pages:LedgerMatchPage.请至少启用一种匹配方式_3c4c"));
+      setError(t("pages:LedgerMatchPage.enableAtLeastOneMatchingMethod"));
       return;
     }
     setMatching(true);
@@ -353,10 +353,10 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
         };
       });
 
-      notify(t("pages:LedgerMatchPage.匹配完成:$匹配,$未匹配_0748", { matched: totalMatched, unmatched: totalUnmatched }), "success");
+      notify(t("pages:LedgerMatchPage.matchingCompletedMatchingUnmatched", { matched: totalMatched, unmatched: totalUnmatched }), "success");
     } catch (e) {
       setError(String(e));
-      notify(t("pages:LedgerMatchPage.匹配失败:$_775d", { error: String(e) }), "error");
+      notify(t("pages:LedgerMatchPage.matchingFailed", { error: String(e) }), "error");
     } finally {
       setMatching(false);
     }
@@ -375,7 +375,9 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
     setShowExportMenu(false);
     const outputPath = await save({
       filters: [{ name: "Excel", extensions: ["xlsx"] }],
-      defaultPath: mode === "all-sheets" ? "匹配结果.xlsx" : `${sheetName}_匹配结果.xlsx`,
+      defaultPath: mode === "all-sheets"
+        ? t("pages:LedgerMatchPage.matchingResultsXlsx")
+        : t("pages:LedgerMatchPage.matchingResultsFilename", { sheet: sheetName }),
     });
     if (!outputPath) return;
 
@@ -389,7 +391,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
       }
       const sheetKeys = Object.keys(matchedSheets);
       if (sheetKeys.length === 0) {
-        notify(t("pages:LedgerMatchPage.没有已匹配的Sheet可导出_3aab"), "info");
+        notify(t("pages:LedgerMatchPage.noMatchedSheetsToExport"), "info");
         return;
       }
       try {
@@ -398,16 +400,16 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
           output_path: outputPath,
           date_only: dateOnly,
         });
-        notify(t("pages:LedgerMatchPage.导出成功（$个Sheet）_cbb8", { count: sheetKeys.length }), "success");
+        notify(t("pages:LedgerMatchPage.exportSucceededSheets", { count: sheetKeys.length }), "success");
       } catch (e) {
         setError(String(e));
-        notify(t("pages:LedgerMatchPage.导出失败:$_d4b1", { error: String(e) }), "error");
+        notify(t("pages:LedgerMatchPage.exportFailed", { error: String(e) }), "error");
       }
     } else {
       // Export current sheet
       const data = currentState?.matched ?? currentState?.raw;
       if (!data) {
-        notify(t("pages:LedgerMatchPage.没有数据可导出_fc30"), "info");
+        notify(t("pages:LedgerMatchPage.noDataToExport"), "info");
         return;
       }
       const rowsToExport = mode === "current-view" ? filtered : data.rows;
@@ -418,10 +420,10 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
           output_path: outputPath,
           date_only: dateOnly,
         });
-        notify(t("pages:LedgerMatchPage.导出成功_105c"), "success");
+        notify(t("pages:LedgerMatchPage.exportedSuccessfully"), "success");
       } catch (e) {
         setError(String(e));
-        notify(t("pages:LedgerMatchPage.导出失败:$_d4b1", { error: String(e) }), "error");
+        notify(t("pages:LedgerMatchPage.exportFailed", { error: String(e) }), "error");
       }
     }
   };
@@ -497,8 +499,8 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
       {/* Title */}
       <div className="flex items-center gap-2 mb-4">
         <span className="text-slate-500"><LayersIcon /></span>
-        <h2 className="text-base font-semibold text-slate-800">{t("pages:LedgerMatchPage.台账匹配_9897")}</h2>
-        <span className="text-xs text-slate-400 ml-1">{t("pages:LedgerMatchPage.将Excel数据与设备台账进行_2631")}</span>
+        <h2 className="text-base font-semibold text-slate-800">{t("pages:LedgerMatchPage.ledgerMatch")}</h2>
+        <span className="text-xs text-slate-400 ml-1">{t("pages:LedgerMatchPage.ledgerExcelDataledgerequipmentLedgerledgermatching")}</span>
       </div>
 
       {/* ── File Selection Drop Zone ── */}
@@ -533,7 +535,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
             <p className="text-sm text-slate-500 mt-2">
               {t("pages:LedgerMatchPage.ui.dropFile")}
             </p>
-            <p className="text-xs text-slate-400 mt-0.5">{t("pages:LedgerMatchPage.支持.xlsx/.xls格式_10a3")}</p>
+            <p className="text-xs text-slate-400 mt-0.5">{t("pages:LedgerMatchPage.supportedExcelFormats")}</p>
           </div>
         )}
 
@@ -616,7 +618,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 onChange={(v) => updateNameToggle({ enabled: v })}
               />
               <span className={`text-sm ${currentConfig.nameToggle.enabled ? "text-slate-800 font-medium" : "text-slate-500"}`}>
-                <span className="inline-flex items-center gap-1"><TagIcon /> {t("pages:LedgerMatchPage.设备名称_9f69")}</span>
+                <span className="inline-flex items-center gap-1"><TagIcon /> {t("pages:LedgerMatchPage.equipment")}</span>
               </span>
               <select
                 value={currentConfig.nameToggle.column}
@@ -638,7 +640,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 onChange={(v) => updateIdToggle({ enabled: v })}
               />
               <span className={`text-sm ${currentConfig.idToggle.enabled ? "text-slate-800 font-medium" : "text-slate-500"}`}>
-                <span className="inline-flex items-center gap-1"><HashIcon /> {t("pages:LedgerMatchPage.设备编号_cf05")}</span>
+                <span className="inline-flex items-center gap-1"><HashIcon /> {t("pages:LedgerMatchPage.equipmentId")}</span>
               </span>
               <select
                 value={currentConfig.idToggle.column}
@@ -681,11 +683,11 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
             <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-slate-400"><InfoIcon /></span>
-                <span className="text-xs font-medium text-slate-600">{t("pages:LedgerMatchPage.双列生产模式已检测_95f9")}</span>
+                <span className="text-xs font-medium text-slate-600">{t("pages:LedgerMatchPage.dualColumnProductionModeDetected")}</span>
               </div>
               <div className="flex gap-4 text-xs text-slate-500">
-                <span>{t("pages:LedgerMatchPage.矿卡列:_0c28")} <code className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-xs">{currentConfig.dualTruckCol}</code></span>
-                <span>{t("pages:LedgerMatchPage.挖机列:_9d71")} <code className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-xs">{currentConfig.dualExcavatorCol}</code></span>
+                <span>{t("pages:LedgerMatchPage.haulTruckColumn")} <code className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-xs">{currentConfig.dualTruckCol}</code></span>
+                <span>{t("pages:LedgerMatchPage.excavatorColumn")} <code className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-xs">{currentConfig.dualExcavatorCol}</code></span>
               </div>
               <p className="text-xs text-slate-400 mt-1">
                 {t("pages:LedgerMatchPage.ui.dualColumnHint")}
@@ -718,17 +720,17 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
               disabled={!anyToggleEnabled || matching}
               className={btnPrimaryClass}
             >
-              {matching ? <><LoaderIcon /> {t("pages:LedgerMatchPage.匹配中_0c25")}</> : <><PlayIcon /> {t("pages:LedgerMatchPage.开始匹配_44b2")}</>}
+              {matching ? <><LoaderIcon /> {t("pages:LedgerMatchPage.matching")}</> : <><PlayIcon /> {t("pages:LedgerMatchPage.startMatching")}</>}
             </button>
 
             {/* Inline stats — simple text, no card widgets */}
             {matchedCount + unmatchedCount > 0 && (
               <div className="flex items-center gap-4 text-sm text-slate-600 ml-auto">
-                <span className="tabular-nums">{t("pages:LedgerMatchPage.全部:_3cf9")} <strong className="text-slate-800">{matchedCount + unmatchedCount}</strong></span>
+                <span className="tabular-nums">{t("pages:LedgerMatchPage.allVariant")} <strong className="text-slate-800">{matchedCount + unmatchedCount}</strong></span>
                 <span className="text-slate-300">|</span>
-                <span className="tabular-nums">{t("pages:LedgerMatchPage.已匹配:_143f")} <strong className="text-slate-800">{matchedCount}</strong> ({matchRate}%)</span>
+                <span className="tabular-nums">{t("pages:LedgerMatchPage.matchedVariant")} <strong className="text-slate-800">{matchedCount}</strong> ({matchRate}%)</span>
                 <span className="text-slate-300">|</span>
-                <span className="tabular-nums">{t("pages:LedgerMatchPage.未匹配:_2951")} <strong className="text-slate-800">{unmatchedCount}</strong></span>
+                <span className="tabular-nums">{t("pages:LedgerMatchPage.unmatchedVariant")} <strong className="text-slate-800">{unmatchedCount}</strong></span>
               </div>
             )}
           </div>
@@ -814,7 +816,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
         <div className="mb-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-md px-4 py-2.5 flex items-center gap-2">
           <span className="text-red-500"><AlertCircleIcon /></span>
           <span>{error}</span>
-          <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600 text-xs">dismiss</button>
+          <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-600 text-xs">{t("common:dismiss")}</button>
         </div>
       )}
 
@@ -911,8 +913,8 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
         !loading && (
           <div className="bg-white rounded-lg border border-slate-200 p-16 text-center">
             <span className="flex justify-center mb-4 text-slate-300"><TableIcon /></span>
-            <p className="text-sm text-slate-500 mb-1">{t("pages:LedgerMatchPage.暂无数据_21ef")}</p>
-            <p className="text-xs text-slate-400">{t("pages:LedgerMatchPage.请选择Excel文件并加载Sh_4410")}</p>
+            <p className="text-sm text-slate-500 mb-1">{t("pages:LedgerMatchPage.noData")}</p>
+            <p className="text-xs text-slate-400">{t("pages:LedgerMatchPage.fileselectExcelFilefileSheetFileconfigurationmatchingfile")}</p>
           </div>
         )
       )}
@@ -925,7 +927,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
-            <span className="text-sm text-slate-500">{t("pages:LedgerMatchPage.加载中..._26b5")}</span>
+            <span className="text-sm text-slate-500">{t("pages:LedgerMatchPage.text")}</span>
           </div>
         </div>
       )}
@@ -935,7 +937,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setShowClearDialog(false)}>
           <div className="bg-white rounded-lg border border-slate-200 w-full max-w-sm mx-4 overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="px-5 py-5">
-              <h3 className="text-sm font-semibold text-slate-800">{t("pages:LedgerMatchPage.确认清空_8452")}</h3>
+              <h3 className="text-sm font-semibold text-slate-800">{t("pages:LedgerMatchPage.confirmClear")}</h3>
               <p className="text-sm text-slate-500 mt-2">
                 {t("pages:LedgerMatchPage.ui.clearWarning")}
               </p>
@@ -951,7 +953,7 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
                 onClick={handleClear}
                 className="text-sm px-4 py-1.5 rounded-md bg-red-600 hover:bg-red-700 text-white font-medium transition-colors"
               >
-                {t("pages:LedgerMatchPage.确认清空_8452")}
+                {t("pages:LedgerMatchPage.confirmClear")}
               </button>
             </div>
           </div>

@@ -99,7 +99,7 @@ export function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
   };
 
   const validatePort = (port: number): string | null => {
-    if (port < 0 || port > 65535) return t("userConfig:MineBaseSection.端口必须在0-65535之间_b181");
+    if (port < 0 || port > 65535) return t("userConfig:MineBaseSection.item065535Item");
     return null;
   };
 
@@ -121,12 +121,12 @@ export function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
         database: { ...config.database, password: resolvePass(config.database.password, passSaved.db) },
       };
       await bridge.call("save_minebase_config", { config: toSave });
-      setStatus({ msg: t("userConfig:MineBaseSection.MineBase连接配置已保存_d734"), kind: "success" });
-      notify(t("userConfig:MineBaseSection.MineBase配置已保存_29cc"), "success");
+      setStatus({ msg: t("userConfig:MineBaseSection.minebaseConfigurationconfigurationsaved"), kind: "success" });
+      notify(t("userConfig:MineBaseSection.minebaseConfigurationSaved"), "success");
       setTimeout(() => setStatus({ msg: "", kind: "info" }), 2500);
     } catch (e) {
-      setStatus({ msg: t("userConfig:MineBaseSection.保存失败:$_2655", { error: String(e) }), kind: "error" });
-      notify(t("userConfig:MineBaseSection.保存失败:$_e5b7", { error: String(e) }), "error");
+      setStatus({ msg: t("userConfig:MineBaseSection.saveFailed", { error: String(e) }), kind: "error" });
+      notify(t("userConfig:MineBaseSection.saveFailed", { error: String(e) }), "error");
     } finally {
       setSaving(false);
     }
@@ -134,7 +134,7 @@ export function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
 
   const resetToDefault = () => {
     setConfig({ ...DEFAULT_MINEBASE_CONFIG });
-    setStatus({ msg: t("userConfig:MineBaseSection.已恢复默认配置（需点击保存生效_c62f"), kind: "info" });
+    setStatus({ msg: t("userConfig:MineBaseSection.defaultConfigurationRestoredClickSaveToApply"), kind: "info" });
     setTestResult(null);
   };
 
@@ -151,7 +151,7 @@ export function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
       const res = await bridge.call<{ success: boolean; message: string }>("test_minebase_connection", params);
       setTestResult({ msg: res.message, ok: res.success });
     } catch (e) {
-      setTestResult({ msg: t("userConfig:MineBaseSection.测试异常:$_1180", { error: String(e) }), ok: false });
+      setTestResult({ msg: t("userConfig:MineBaseSection.testError", { error: String(e) }), ok: false });
     } finally {
       setTesting(false);
     }
@@ -161,15 +161,15 @@ export function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
 
   return (
     <SectionCard
-      title={t("userConfig:MineBaseSection.MineBase连接配置_59db")}
-      subtitle={t("userConfig:MineBaseSection.配置MineBase数据库同步_160d")}
+      title={t("userConfig:MineBaseSection.minebaseConfigurationconfiguration")}
+      subtitle={t("userConfig:MineBaseSection.configurationMinebaseDatabaseconfiguration")}
       icon={<DatabaseIcon />}
       expanded={expanded}
       onToggle={() => setExpanded(!expanded)}
     >
       {/* Mode toggle */}
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-xs font-medium text-slate-500">{t("userConfig:MineBaseSection.同步模式：_c26b")}</span>
+        <span className="text-xs font-medium text-slate-500">{t("userConfig:MineBaseSection.syncMode")}</span>
         <div className="flex rounded-md border border-slate-200 overflow-hidden">
           <button
             onClick={() => setConfig((p) => ({ ...p, mode: "api" }))}
@@ -194,7 +194,7 @@ export function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
       {config.mode === "api" && (
         <div className="space-y-3">
           <div>
-            <label className="text-xs font-medium text-slate-500 mb-1 block">{t("userConfig:MineBaseSection.API地址_98c1")}</label>
+            <label className="text-xs font-medium text-slate-500 mb-1 block">{t("userConfig:MineBaseSection.apiUrl")}</label>
             <input
               type="text"
               value={config.api.url}
@@ -205,7 +205,7 @@ export function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">{t("userConfig:MineBaseSection.用户名_8197")}</label>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">{t("userConfig:MineBaseSection.username")}</label>
               <input
                 type="text"
                 value={config.api.username}
@@ -214,7 +214,7 @@ export function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">{t("userConfig:MineBaseSection.密码_a810")}</label>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">{t("userConfig:MineBaseSection.password")}</label>
               <div className="relative">
                 <input
                   type={passwordType}
@@ -227,7 +227,7 @@ export function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  title={showPassword ? t("userConfig:MineBaseSection.隐藏_dce5") : t("userConfig:MineBaseSection.显示_4d77")}
+                  title={showPassword ? t("userConfig:MineBaseSection.hidden") : t("userConfig:MineBaseSection.show")}
                 >
                   {showPassword ? <EyeOffIcon /> : <EyeIcon />}
                 </button>
@@ -242,7 +242,7 @@ export function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
         <div className="space-y-3">
           <div className="grid grid-cols-[1fr_120px] gap-3">
             <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">{t("userConfig:MineBaseSection.数据库主机_0461")}</label>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">{t("userConfig:MineBaseSection.databaseHost")}</label>
               <input
                 type="text"
                 value={config.database.host}
@@ -252,7 +252,7 @@ export function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">{t("userConfig:MineBaseSection.端口_c76c")}</label>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">{t("userConfig:MineBaseSection.port")}</label>
               <input
                 type="number"
                 min={0}
@@ -269,7 +269,7 @@ export function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium text-slate-500 mb-1 block">{t("userConfig:MineBaseSection.数据库名_5ccb")}</label>
+            <label className="text-xs font-medium text-slate-500 mb-1 block">{t("userConfig:MineBaseSection.databaseName")}</label>
             <input
               type="text"
               value={config.database.database}
@@ -280,7 +280,7 @@ export function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">{t("userConfig:MineBaseSection.用户名_8197")}</label>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">{t("userConfig:MineBaseSection.username")}</label>
               <input
                 type="text"
                 value={config.database.user}
@@ -289,7 +289,7 @@ export function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-slate-500 mb-1 block">{t("userConfig:MineBaseSection.密码_a810")}</label>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">{t("userConfig:MineBaseSection.password")}</label>
               <div className="relative">
                 <input
                   type={passwordType}
@@ -302,7 +302,7 @@ export function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  title={showPassword ? t("userConfig:MineBaseSection.隐藏_dce5") : t("userConfig:MineBaseSection.显示_4d77")}
+                  title={showPassword ? t("userConfig:MineBaseSection.hidden") : t("userConfig:MineBaseSection.show")}
                 >
                   {showPassword ? <EyeOffIcon /> : <EyeIcon />}
                 </button>
@@ -321,7 +321,7 @@ export function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
             testing ? "opacity-50 cursor-not-allowed" : ""
           }`}
         >
-          {testing ? t("userConfig:MineBaseSection.测试中..._6c50") : t("userConfig:MineBaseSection.测试连接_69e7")}
+          {testing ? t("userConfig:MineBaseSection.testing") : t("userConfig:MineBaseSection.testConnection")}
         </button>
         {testResult && (
           <span className={`text-xs ${testResult.ok ? "text-emerald-600" : "text-red-600"}`}>

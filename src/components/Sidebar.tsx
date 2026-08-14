@@ -155,21 +155,21 @@ interface NavItem {
 }
 
 const WORKSPACE_ITEMS: NavItem[] = [
-  { id: "data-processing", label: "components:Sidebar.数据处理_cfc0" },
-  { id: "batch-processing", label: "components:Sidebar.批量处理_ba72" },
-  { id: "llm-labeling", label: "components:Sidebar.LLM标注_8529" },
-  { id: "data-sync", label: "components:Sidebar.数据同步_9d91" },
-  { id: "ledger-match", label: "components:Sidebar.台账匹配_9897" },
-  { id: "daily-report", label: "components:Sidebar.日报导出_4ed9" },
+  { id: "data-processing", label: "components:Sidebar.dataProcessing" },
+  { id: "batch-processing", label: "components:Sidebar.batchProcessing" },
+  { id: "llm-labeling", label: "components:Sidebar.llmLabeling" },
+  { id: "data-sync", label: "components:Sidebar.dataSync" },
+  { id: "ledger-match", label: "components:Sidebar.ledgerMatch" },
+  { id: "daily-report", label: "components:Sidebar.dailyReportExport" },
 ];
 
 const MANAGEMENT_ITEMS: NavItem[] = [
-  { id: "equipment-ledger", label: "components:Sidebar.设备台账_e6a7" },
-  { id: "oil-ledger", label: "components:Sidebar.油品台账_53fa" },
-  { id: "model-ledger", label: "components:Sidebar.型号台账_3e0b" },
-  { id: "load-config", label: "components:Sidebar.装载量配置_c389" },
-  { id: "maint-config", label: "components:Sidebar.维修分类配置_4ee9" },
-  { id: "user-config", label: "components:Sidebar.用户配置_dd1e" },
+  { id: "equipment-ledger", label: "components:Sidebar.equipmentLedger" },
+  { id: "oil-ledger", label: "components:Sidebar.oilLedger" },
+  { id: "model-ledger", label: "components:Sidebar.modelLedger" },
+  { id: "load-config", label: "components:Sidebar.loadConfig" },
+  { id: "maint-config", label: "components:Sidebar.maintenanceConfig" },
+  { id: "user-config", label: "components:Sidebar.userConfig" },
 ];
 
 // --- Component ---
@@ -222,16 +222,16 @@ export function Sidebar({ currentPage, onNavigate }: SidebarProps) {
   return (
     <aside className="w-52 shrink-0 bg-[#F1F4F8] border-r border-[var(--color-border)] overflow-y-auto flex flex-col">
       {/* Nav sections */}
-      <nav className="py-4 flex-1" aria-label={t("components:Sidebar.主导航_2b2c")}>
-        {renderGroup("components:Sidebar.工作区_4fa8", WORKSPACE_ITEMS)}
-        {renderGroup("components:Sidebar.管理_08b5", MANAGEMENT_ITEMS)}
+      <nav className="py-4 flex-1" aria-label={t("components:Sidebar.mainNavigation")}>
+        {renderGroup("components:Sidebar.workspace", WORKSPACE_ITEMS)}
+        {renderGroup("components:Sidebar.management", MANAGEMENT_ITEMS)}
       </nav>
 
       {/* Footer */}
       <div className="px-4 py-3 border-t border-[var(--color-border)]">
         <span className="flex items-center gap-2 text-[11px] text-slate-500">
           <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-          {t("components:Sidebar.本地处理引擎_f1a4")}
+          {t("components:Sidebar.localProcessingEngine")}
         </span>
       </div>
     </aside>
