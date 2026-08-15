@@ -51,9 +51,17 @@ class MaintRefs(TypedDict):
     split_year: ft.Checkbox
 
 
+class TireRefs(TypedDict):
+    path: ft.TextField
+    btn: ft.Button
+
+
 class ModuleRefs(TypedDict):
     _match_eq_toggle: ft.Checkbox
     _match_oil_toggle: ft.Checkbox
+    _match_model_toggle: ft.Checkbox
+    _skip_hidden_rows_toggle: ft.Checkbox
+    _skip_hidden_cols_toggle: ft.Checkbox
     _anomaly_enabled: ft.Checkbox
     _anomaly_report: ft.Checkbox
     _anomaly_flag: ft.Checkbox
@@ -66,6 +74,7 @@ class ModuleRefs(TypedDict):
     work: WorkRefs
     merge: MergeRefs
     maint: MaintRefs
+    tire: TireRefs
 
 
 class ConfigRefs(TypedDict):

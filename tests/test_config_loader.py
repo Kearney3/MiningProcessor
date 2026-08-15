@@ -455,6 +455,9 @@ class TestAnomalyDetectionConfig:
         """无用户覆盖时应返回 DEFAULT_ANOMALY_DETECTION。"""
         cfg = config_loader.get_anomaly_detection_config()
         assert cfg["enabled"] is False
+        assert cfg["use_threshold"] is True
+        assert cfg["use_sigma"] is False
+        assert cfg["use_percentile"] is False
         assert cfg["sigma_n"] == 3.0
         assert cfg["percentile_low"] == 1.0
         assert cfg["percentile_high"] == 99.0

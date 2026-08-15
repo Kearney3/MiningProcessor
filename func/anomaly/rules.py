@@ -36,8 +36,8 @@ class AnomalyConfig:
         filter_anomalies: bool = False,
         handle_anomalies: bool = False,
         use_threshold: bool = True,
-        use_sigma: bool = True,
-        use_percentile: bool = True,
+        use_sigma: bool = False,
+        use_percentile: bool = False,
         sigma_n: float = 3.0,
         percentile_low: float = 1.0,
         percentile_high: float = 99.0,
@@ -74,8 +74,8 @@ class AnomalyConfig:
             filter_anomalies=ad.get("filter_anomalies", False),
             handle_anomalies=ad.get("handle_anomalies", False),
             use_threshold=ad.get("use_threshold", True),
-            use_sigma=ad.get("use_sigma", True),
-            use_percentile=ad.get("use_percentile", True),
+            use_sigma=ad.get("use_sigma", False),
+            use_percentile=ad.get("use_percentile", False),
             sigma_n=ad.get("sigma_n", 3.0),
             percentile_low=ad.get("percentile_low", 1.0),
             percentile_high=ad.get("percentile_high", 99.0),
@@ -116,8 +116,8 @@ class AnomalyConfig:
             filter_anomalies=(mode == "filter"),
             handle_anomalies=(mode == "handle"),
             use_threshold=ad_config.get("use_threshold", True),
-            use_sigma=ad_config.get("use_sigma", True),
-            use_percentile=ad_config.get("use_percentile", True),
+            use_sigma=ad_config.get("use_sigma", False),
+            use_percentile=ad_config.get("use_percentile", False),
             sigma_n=ad_config.get("sigma_n", 3.0),
             percentile_low=ad_config.get("percentile_low", 1.0),
             percentile_high=ad_config.get("percentile_high", 99.0),
@@ -180,6 +180,10 @@ DEFAULT_THRESHOLDS: dict[str, dict[str, dict[str, float]]] = {
     "worktime": {
         "__all_numeric__": {"min": 0, "max": 720},
     },
+    "tire": {
+        "寿命（时间）": {"min": 0},
+        "寿命（里程）": {"min": 0},
+    },
 }
 
 # 特殊标记：对 DataFrame 中所有数值列应用阈值检测
@@ -198,6 +202,7 @@ _STATISTICAL_COLUMNS: dict[str, list[str]] = {
     "production": ["趟次", "产量"],
     "electrical": ["电力消耗"],
     "worktime": [],  # 工时数据使用 __all_numeric__ 模式，不指定具体列
+    "tire": ["寿命（时间）", "寿命（里程）"],
 }
 
 

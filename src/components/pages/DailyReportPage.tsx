@@ -50,6 +50,7 @@ export function DailyReportPage({ bridge }: { bridge: BridgeProp }) {
     if (!sourceDir) return notify(t("pages:DailyReportPage.selectDailyReportDataDirectory"), "error");
     if (start > end) return notify(t("pages:DailyReportPage.endDateCannotBeEarlierThanStartDate"), "error");
     if (useModel && !useEquipment) return notify(t("pages:DailyReportPage.modelLedgermatchingmatchingequipmentLedgermatching"), "error");
+    bridge.call("save_last_directory", { key: "daily_report_input_dir", path: sourceDir }).catch(() => {});
     const filename = t("pages:DailyReportPage.dailyReportXlsx", { start, end });
     const output = joinPath(sourceDir, filename);
     setLoading(true);

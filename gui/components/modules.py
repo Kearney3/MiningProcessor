@@ -44,6 +44,24 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     )
     fuel_btn = theme.primary_btn(t("components:modules.process"), icon=ft.Icons.PLAY_ARROW, disabled=False)
 
+    # --- Tire life ---
+    tire_path = ft.TextField(
+        label=t("components:modules.tireProcessing"),
+        hint_text=t("components:modules.enterAPathOrUseTheBrowseButton"),
+        expand=2,
+        read_only=False,
+        color=theme.TEXT_PRIMARY,
+        suffix=ft.IconButton(
+            icon=ft.Icons.FOLDER_OPEN,
+            tooltip=t("components:modules.browse"),
+        ),
+    )
+    tire_btn = theme.primary_btn(
+        t("components:modules.process"),
+        icon=ft.Icons.PLAY_ARROW,
+        disabled=False,
+    )
+
     # --- Production ---
     prod_path = ft.TextField(
         label=t("components:modules.productionProcessing"),
@@ -318,6 +336,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
 
     # --- FilePicker instances (must be added to page.overlay to work repeatedly) ---
     _fuel_picker = ft.FilePicker()
+    _tire_picker = ft.FilePicker()
     _prod_file_picker = ft.FilePicker()
     _prod_folder_picker = ft.FilePicker()
     _elec_picker = ft.FilePicker()
@@ -326,7 +345,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     _maint_file_picker = ft.FilePicker()
     _maint_folder_picker = ft.FilePicker()
     page.services.extend([
-        _fuel_picker, _prod_file_picker, _prod_folder_picker,
+        _fuel_picker, _tire_picker, _prod_file_picker, _prod_folder_picker,
         _elec_picker, _work_picker, _merge_picker,
         _maint_file_picker, _maint_folder_picker,
     ])
@@ -334,6 +353,14 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
     on_fuel_browse = make_browse_handler(
         _fuel_picker, fuel_path, fuel_btn, t("components:modules.selectFuelDataFile"),
         extensions=["xlsx", "xls"],
+        log_fn=lambda msg: _log_message(page.logger.error, msg),
+    )
+    on_tire_browse = make_browse_handler(
+        _tire_picker,
+        tire_path,
+        tire_btn,
+        t("components:modules.selectTireDataFile"),
+        extensions=["xlsx"],
         log_fn=lambda msg: _log_message(page.logger.error, msg),
     )
     on_prod_pick_file = make_browse_handler(
@@ -374,6 +401,7 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
 
     # 绑定浏览按钮
     fuel_path.suffix.on_click = on_fuel_browse
+    tire_path.suffix.on_click = on_tire_browse
     prod_file_btn.on_click = on_prod_pick_file
     prod_folder_btn.on_click = on_prod_pick_folder
     elec_path.suffix.on_click = on_elec_browse
@@ -514,6 +542,9 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     ),
                 ]),
+                theme.module_card([
+                    ft.Row([tire_path, tire_btn], spacing=8),
+                ]),
                 anomaly_panel,
                 ft.Row([match_eq_toggle, match_oil_toggle, match_model_toggle,
                         skip_hidden_rows_toggle, skip_hidden_cols_toggle], spacing=8),
@@ -561,5 +592,6 @@ def create_modules_section(page: ft.Page) -> tuple[ft.Container, "ModuleRefs"]:
             "details_only": maint_details_only,
             "use_ml": maint_use_ml,
         },
+        "tire": {"path": tire_path, "btn": tire_btn},
     }
     return container, module_refs

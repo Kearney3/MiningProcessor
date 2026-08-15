@@ -11,6 +11,7 @@ Excel 处理共享工具函数
 
 import logging
 import re
+import warnings
 from pathlib import Path
 
 import pandas as pd
@@ -18,6 +19,37 @@ import pandas as pd
 from func.string_utils import clean_string
 
 logger = logging.getLogger(__name__)
+
+
+# openpyxl can read the cell values from some Excel extension objects, but it
+# emits one UserWarning per extension while parsing them.  Those extensions
+# are not used by the processors and are discarded only if a workbook is
+# later saved by openpyxl.  Keep the suppression scoped to the load call so
+# unrelated warnings remain visible to the caller.
+_OPENPYXL_EXTENSION_WARNING = (
+    r"^(Unknown|Conditional Formatting) extension is not supported "
+    r"and will be removed$"
+)
+
+
+def load_workbook_safely(*args, **kwargs):
+    """Load an Excel workbook without noisy unsupported-extension warnings.
+
+    The warning is emitted by ``openpyxl.worksheet._reader`` for extension
+    objects such as vendor conditional-formatting metadata.  Values and
+    comments needed by the processors are still read normally.
+    """
+    from openpyxl import load_workbook
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message=_OPENPYXL_EXTENSION_WARNING,
+            category=UserWarning,
+            module=r"openpyxl\.worksheet\._reader",
+        )
+        return load_workbook(*args, **kwargs)
+
 
 # ---------------------------------------------------------------------------
 # Filename sanitization (path-traversal prevention)
@@ -86,10 +118,8 @@ def get_hidden_indices(
     if _is_xls(file_path):
         return set(), set()
 
-    from openpyxl import load_workbook
-
     should_close = _workbook is None
-    wb = _workbook if _workbook is not None else load_workbook(
+    wb = _workbook if _workbook is not None else load_workbook_safely(
         file_path, read_only=False, data_only=True,
     )
     try:
@@ -123,8 +153,7 @@ def open_workbook(file_path: str):
     """
     if _is_xls(file_path):
         return None
-    from openpyxl import load_workbook
-    return load_workbook(file_path, read_only=False, data_only=True)
+    return load_workbook_safely(file_path, read_only=False, data_only=True)
 
 
 def get_column_letter(col_idx: int) -> str:
@@ -292,6 +321,8 @@ def get_output_filename(module_type: str, year: int = 2025, month: int = 1) -> s
     """
     if module_type == "worktime":
         return f"{year}{month:02d}_工作效率表.xlsx"
+    if module_type == "tire":
+        return "轮胎寿命统计.xlsx"
     return MODULE_OUTPUT_FILES.get(module_type)
 
 

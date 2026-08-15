@@ -227,7 +227,7 @@ def get_output_path(
     消除两端各自内联计算输出路径的重复代码。
 
     Args:
-        module_type: 模块类型 (fuel/electrical/production/worktime/merge/maint/batch)
+        module_type: 模块类型 (fuel/electrical/production/worktime/tire/merge/maint/batch)
         path: 输入文件或文件夹路径
         year: 年份（fuel/electrical/worktime），默认当前年
         month: 月份（worktime），默认 1
@@ -416,6 +416,18 @@ def process_single(
                 anomaly_config=anomaly_config,
             )
 
+    elif module_type == "tire":
+        from func.excel_tire import process_tire_data
+
+        output = get_output_path("tire", path)
+        process_tire_data(
+            path,
+            output_file=output,
+            skip_hidden_rows=skip_hidden_rows,
+            skip_hidden_cols=skip_hidden_cols,
+            anomaly_config=anomaly_config,
+        )
+
     elif module_type == "merge":
         from func.excel_merger import merge_excel_files
         merge_excel_files(
@@ -463,7 +475,7 @@ def process_single(
     else:
         raise ValueError(f"不支持的模块类型: {module_type}")
 
-    # ── 计算输出文件路径（fuel/production/electrical/worktime/merge）──
+    # ── 计算输出文件路径（fuel/production/electrical/worktime/tire/merge）──
     output_file = get_output_path(
         module_type, path, year=effective_year, month=month, keyword=keyword,
     )

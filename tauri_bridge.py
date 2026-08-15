@@ -377,6 +377,16 @@ def _process_fuel(params: dict) -> dict:
     )
 
 
+@_register("process_tire")
+def _process_tire(params: dict) -> dict:
+    """处理轮胎寿命统计表。"""
+    from func.orchestration import process_single
+
+    safe_path = str(_sanitize_path(params["path"], must_exist=True))
+    common = _extract_common_params(params)
+    return process_single("tire", safe_path, **common)
+
+
 @_register("process_production")
 def _process_production(params: dict) -> dict:
     from func.orchestration import process_single
@@ -540,9 +550,9 @@ def _cancel_llm_labeling(params: dict) -> dict:
 
 @_register("preview_excel_sheets")
 def _preview_excel_sheets(params: dict) -> dict:
-    import openpyxl
+    from func.excel_utils import load_workbook_safely
     safe_path = str(_sanitize_path(params["path"], must_exist=True))
-    wb = openpyxl.load_workbook(safe_path, read_only=True, data_only=True)
+    wb = load_workbook_safely(safe_path, read_only=True, data_only=True)
     sheets = wb.sheetnames
     wb.close()
     return {"sheets": sheets}

@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { AnomalyRecord, BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
-import { ChevronDownIcon, PlayIcon, FolderIcon, FileIcon, PlusIcon, TrashIcon, CheckCircleIcon, XCircleIcon, AlertTriangleIcon, FuelIcon, ProductionIcon, ElectricalIcon, WorktimeIcon, MergeIcon, MaintenanceIcon } from "../../lib/icons";
+import { ChevronDownIcon, PlayIcon, FolderIcon, FileIcon, PlusIcon, TrashIcon, CheckCircleIcon, XCircleIcon, AlertTriangleIcon, FuelIcon, TireIcon, ProductionIcon, ElectricalIcon, WorktimeIcon, MergeIcon, MaintenanceIcon } from "../../lib/icons";
 import { PathInput, StyledToggle, ChipToggle } from "../../lib/ui-components";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { useLastDirectory } from "../../hooks/useLastDirectory";
@@ -300,6 +300,92 @@ function FuelCard({
           {t("pages:DataProcessingPage.filterZeroWorkHours")}
         </label>
       </div>
+      <ProcessButton loading={loading} onClick={handleProcess} disabled={path === ""} />
+      {result && <SuccessBadge message={result} />}
+      {error && <ErrorBadge message={error} />}
+    </ModuleCard>
+  );
+}
+
+// ═══════════════════════════════════════
+// Tire life processing
+// ═══════════════════════════════════════
+function TireCard({
+  bridge,
+  useEquipmentLedger,
+  useOilLedger,
+  useModelLedger,
+  skipHiddenRows,
+  skipHiddenCols,
+  anomaly,
+  onAnomalies,
+  defaultPath,
+  onFileSelected,
+}: {
+  bridge: BridgeProp;
+  useEquipmentLedger: boolean;
+  useOilLedger: boolean;
+  useModelLedger: boolean;
+  skipHiddenRows: boolean;
+  skipHiddenCols: boolean;
+  anomaly: AnomalyConfig;
+  onAnomalies: (records: AnomalyRecord[]) => void;
+  defaultPath?: string;
+  onFileSelected?: (path: string) => void;
+}) {
+  const { t } = useTranslation();
+  const { notify } = useToast();
+  const [path, setPath] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleProcess = async () => {
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    onAnomalies([]);
+    try {
+      const res = await bridge.call<{ output_file?: string; anomalies?: AnomalyRecord[] }>(
+        "process_tire",
+        {
+          path,
+          use_equipment_ledger: useEquipmentLedger,
+          use_oil_ledger: useOilLedger,
+          use_model_ledger: useModelLedger,
+          skip_hidden_rows: skipHiddenRows,
+          skip_hidden_cols: skipHiddenCols,
+          anomaly_enabled: anomaly.enabled,
+          anomaly_report: anomaly.report,
+          anomaly_mode: anomaly.mode,
+        },
+      );
+      onAnomalies(res.anomalies ?? []);
+      setResult(
+        res.output_file
+          ? t("pages:DataProcessingPage.output", { path: res.output_file })
+          : t("pages:DataProcessingPage.processingCompleted"),
+      );
+      notify(t("pages:DataProcessingPage.tireProcessingCompleted"), "success");
+    } catch (e) {
+      setError(String(e));
+      notify(t("pages:DataProcessingPage.tireProcessingFailed", { error: e }), "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <ModuleCard title={t("pages:DataProcessingPage.tireProcessing")} icon={<TireIcon />}>
+      <PathInput
+        value={path}
+        onChange={setPath}
+        placeholder={t("pages:DataProcessingPage.selectTireLifeFile")}
+        fileExtensions={["xlsx"]}
+        defaultPath={defaultPath}
+        onFileSelected={onFileSelected}
+      />
+      {path === "" && <PathWarning />}
       <ProcessButton loading={loading} onClick={handleProcess} disabled={path === ""} />
       {result && <SuccessBadge message={result} />}
       {error && <ErrorBadge message={error} />}
@@ -1047,6 +1133,7 @@ export function DataProcessingPage({ bridge }: { bridge: BridgeProp }) {
         <WorktimeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} useModelLedger={useModelLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomaly} onAnomalies={setAnomalies} defaultPath={initialDir} onFileSelected={saveDir} />
         <MergeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} useModelLedger={useModelLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
         <MaintenanceCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useModelLedger={useModelLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
+        <TireCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} useModelLedger={useModelLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomaly} onAnomalies={setAnomalies} defaultPath={initialDir} onFileSelected={saveDir} />
       </div>
 
       <AnomalyResultsTable records={anomalies} />

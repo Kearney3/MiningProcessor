@@ -14,6 +14,7 @@ import openpyxl
 import xlrd
 
 from func.logger import get_logger
+from func.excel_utils import load_workbook_safely
 from func.maintenance_utils import (
     detect_header_layout,
     parse_comment,
@@ -356,13 +357,13 @@ def extract_all_records(
                 xlrd_book.release_resources()
         else:
             try:
-                wb = openpyxl.load_workbook(filepath)
+                wb = load_workbook_safely(filepath)
             except Exception as e:
                 logger.error("无法打开文件 %s: %s", filepath, e)
                 continue
 
             try:
-                wb_values = openpyxl.load_workbook(filepath, data_only=True)
+                wb_values = load_workbook_safely(filepath, data_only=True)
             except Exception:
                 wb_values = None
 

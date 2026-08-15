@@ -83,6 +83,13 @@ export interface AnomalyRecord {
   班次?: unknown;
   设备名称?: unknown;
   设备编号?: unknown;
+  胎号?: unknown;
+  品牌?: unknown;
+  型号?: unknown;
+  安装车辆?: unknown;
+  安装日期?: unknown;
+  源表?: unknown;
+  源行号?: number | string;
   异常列?: string;
   异常值?: unknown;
   检测方法?: string;

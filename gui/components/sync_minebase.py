@@ -7,7 +7,6 @@ from func.config_loader import get_minebase_mode
 
 from .common import (
     _get_initial_directory,
-    _last_directory,
     _show_path_confirm,
     _update_last_directory,
     ChipToggle,
@@ -44,7 +43,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         expand=True,
         read_only=False,
         color=theme.TEXT_PRIMARY,
-        value=_get_initial_directory(),
+        value=_get_initial_directory("sync_last_input_dir"),
         suffix=ft.IconButton(
             icon=ft.Icons.FOLDER_OPEN,
             tooltip=t("components:sync_minebase.browse"),
@@ -60,7 +59,11 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         result = await _browse_picker.get_directory_path(dialog_title=t("components:sync_minebase.selectoutputDirectory"))
         if result:
             sync_path.value = result
-            _update_last_directory(result, is_dir=True)
+            _update_last_directory(
+                result,
+                is_dir=True,
+                config_key="sync_last_input_dir",
+            )
             _show_path_confirm(sync_path)
             sync_path.update()
 

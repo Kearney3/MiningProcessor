@@ -77,6 +77,9 @@ def _create_daily_report_config_section(page: ft.Page, log):
                 result[target] = keywords
         return result
 
+    def _collect_formulas() -> dict[str, str]:
+        return {key: field.value or "" for key, field in formula_fields.items()}
+
     def _reload(e=None):
         nonlocal config_state
         config_state = config_loader.get_daily_report_config()
@@ -108,19 +111,40 @@ def _create_daily_report_config_section(page: ft.Page, log):
         except (RuntimeError, AttributeError):
             pass
 
-    def _save(e=None):
-        formulas = {key: field.value or "" for key, field in formula_fields.items()}
+    def _validate(e=None, formulas: dict[str, str] | None = None):
+        formulas = formulas if formulas is not None else _collect_formulas()
         errors = validate_daily_report_formulas(formulas)
         for key, field in formula_fields.items():
             field.error_text = errors.get(key)
         if errors:
             message = "；".join(f"{key}：{value}" for key, value in errors.items())
-            _set_status(message, theme.ERROR)
+            _set_status(
+                t(
+                    "components:user_config._daily_report.dailyReportFormulaValidationFailed",
+                    message=message,
+                ),
+                theme.ERROR,
+            )
             _log_message(log, t("components:user_config._daily_report.dailyReportFormulaValidationFailed", message=message), level=logging.WARNING)
             try:
                 page.update()
             except (RuntimeError, AttributeError):
                 pass
+            return errors
+        _set_status(
+            t("components:user_config._daily_report.formulaValidationPassed"),
+            theme.SUCCESS,
+        )
+        try:
+            page.update()
+        except (RuntimeError, AttributeError):
+            pass
+        return {}
+
+    def _save(e=None):
+        formulas = _collect_formulas()
+        errors = _validate(formulas=formulas)
+        if errors:
             return
 
         report_config = {
@@ -166,6 +190,12 @@ def _create_daily_report_config_section(page: ft.Page, log):
     )
     action_row = ft.Row(
         [
+            theme.secondary_btn(
+                t("components:user_config._daily_report.validateFormula"),
+                icon=ft.Icons.CHECK_CIRCLE_OUTLINE,
+                on_click=_validate,
+                height=34,
+            ),
             theme.primary_btn(t("components:user_config._daily_report.save"), icon=ft.Icons.SAVE, on_click=_save),
             theme.secondary_btn(t("components:user_config._daily_report.reload"), icon=ft.Icons.REFRESH, on_click=_reload, height=34),
             theme.secondary_btn(t("components:user_config._daily_report.restoreDefault"), icon=ft.Icons.RESTART_ALT, on_click=_reset, height=34),
@@ -186,4 +216,4 @@ def _create_daily_report_config_section(page: ft.Page, log):
         ],
     )
     _reload()
-    return card, {"reload": _reload, "save": _save, "reset": _reset}
+    return card, {"reload": _reload, "validate": _validate, "save": _save, "reset": _reset}

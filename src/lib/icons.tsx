@@ -77,6 +77,15 @@ export const FuelIcon = () => (
   </svg>
 );
 
+/** Tire icon — tire life processing */
+export const TireIcon = () => (
+  <svg className="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="3" />
+    <path d="M12 3v6M12 15v6M3 12h6M15 12h6" />
+  </svg>
+);
+
 /** Bar-chart-2 icon — production */
 export const ProductionIcon = () => (
   <svg className="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

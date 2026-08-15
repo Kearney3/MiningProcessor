@@ -50,3 +50,39 @@ describe("DataProcessingPage maintenance ML switch", () => {
     });
   });
 });
+
+describe("DataProcessingPage tire life module", () => {
+  it("forwards ledger, hidden row/column, and anomaly options", async () => {
+    const call = vi.fn().mockImplementation((method: string) => {
+      if (method === "get_last_directory") return Promise.resolve({ path: "" });
+      if (method === "process_tire") {
+        return Promise.resolve({ output_file: "/tmp/轮胎寿命统计.xlsx", anomalies: [] });
+      }
+      return Promise.resolve({});
+    });
+    renderPage(call as BridgeProp["call"]);
+
+    const heading = screen.getByText("轮胎寿命处理");
+    const card = heading.closest(".bg-white");
+    expect(card).not.toBeNull();
+    const controls = within(card as HTMLElement);
+    fireEvent.change(
+      controls.getByPlaceholderText("选择轮胎寿命统计表"),
+      { target: { value: "/tmp/tire.xlsx" } },
+    );
+    fireEvent.click(controls.getByText("开始处理"));
+
+    await waitFor(() => {
+      expect(call).toHaveBeenCalledWith(
+        "process_tire",
+        expect.objectContaining({
+          path: "/tmp/tire.xlsx",
+          use_equipment_ledger: false,
+          skip_hidden_rows: false,
+          skip_hidden_cols: false,
+          anomaly_enabled: false,
+        }),
+      );
+    });
+  });
+});

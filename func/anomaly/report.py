@@ -24,6 +24,7 @@ _DATA_TYPE_LABELS: dict[str, str] = {
     "production": "生产数据",
     "electrical": "电力消耗",
     "worktime": "工时数据",
+    "tire": "轮胎寿命",
 }
 
 
@@ -92,7 +93,24 @@ def _build_detail(hits: list[AnomalyHit], df: pd.DataFrame) -> pd.DataFrame:
     """构建异常明细表。"""
     rows = []
     # 尝试保留上下文列
-    context_cols = [c for c in ("日期", "班次", "设备名称", "设备编号") if c in df.columns]
+    context_cols = [
+        c
+        for c in (
+            "胎号",
+            "品牌",
+            "型号",
+            "安装车辆",
+            "安装位置",
+            "安装日期",
+            "源表",
+            "源行号",
+            "日期",
+            "班次",
+            "设备名称",
+            "设备编号",
+        )
+        if c in df.columns
+    ]
 
     for hit in hits:
         row = {

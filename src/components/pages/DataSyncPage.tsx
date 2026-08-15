@@ -131,12 +131,19 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   };
 
   const handleSync = async () => {
+    const syncDir = inputDir.trim();
+    if (!syncDir) {
+      setError(t("pages:DataSyncPage.selectTheFolderContainingProcessedData"));
+      notify(t("pages:DataSyncPage.selectTheFolderContainingProcessedData"), "error");
+      return;
+    }
+    bridge.call("save_last_directory", { key: "sync_last_input_dir", path: syncDir }).catch(() => {});
     setLoading(true);
     setError(null);
     setResult(null);
     try {
       const res = await bridge.call<SyncResult>("sync_minebase", {
-        input_dir: inputDir,
+        input_dir: syncDir,
         mode,
         conflict_policy: conflictPolicy,
         data_types: dataTypes,

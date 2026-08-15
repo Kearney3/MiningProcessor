@@ -110,6 +110,7 @@ export function PathInput({
   onChange,
   placeholder,
   directory = false,
+  fileExtensions = ["xlsx", "xls"],
   defaultPath,
   onFileSelected,
 }: {
@@ -117,6 +118,7 @@ export function PathInput({
   onChange: (v: string) => void;
   placeholder?: string;
   directory?: boolean;
+  fileExtensions?: string[];
   defaultPath?: string;
   onFileSelected?: (path: string) => void;
 }) {
@@ -128,7 +130,7 @@ export function PathInput({
       defaultPath,
       filters: directory
         ? undefined
-        : [{ name: "Excel", extensions: ["xlsx", "xls"] }],
+        : [{ name: "Excel", extensions: fileExtensions }],
     });
     if (selected) {
       const p = selected as string;

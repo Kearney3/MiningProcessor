@@ -9,6 +9,7 @@ import flet as ft
 from func.daily_report import export_daily_report
 from gui.components.common import (
     _get_initial_directory,
+    _update_last_directory,
     create_anomaly_results_table,
     safe_update,
     to_local_dt,
@@ -44,7 +45,7 @@ def _warning_records(warnings: list[dict] | None) -> list[dict]:
 def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_ledger_refs: dict) -> tuple[ft.Container, dict]:
     source_path = ft.TextField(
         hint_text=t("components:daily_report.selectDataDirectory"),
-        value=_get_initial_directory(),
+        value=_get_initial_directory("daily_report_input_dir"),
         expand=True,
     )
     selected_dates = {
@@ -90,6 +91,11 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
         selected = await picker.get_directory_path(dialog_title=t("components:daily_report.selectDailyReportDataDirectory"))
         if selected:
             source_path.value = selected
+            _update_last_directory(
+                selected,
+                is_dir=True,
+                config_key="daily_report_input_dir",
+            )
             source_path.update()
 
     source_path.suffix = ft.IconButton(
@@ -163,6 +169,12 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
             result_text.value, result_text.color, result_text.visible = t("components:daily_report.endDateIsEarlierThanStartDate"), theme.ERROR, True
             safe_update(result_text)
             return
+        if Path(path).is_dir():
+            _update_last_directory(
+                path,
+                is_dir=True,
+                config_key="daily_report_input_dir",
+            )
 
         output = str(Path(path) / t("components:daily_report.dailyReportXlsx", start=selected_dates['start'].strftime('%Y-%m-%d'), end=selected_dates['end'].strftime('%Y-%m-%d')))
         exporting = True
