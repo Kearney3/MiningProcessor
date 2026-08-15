@@ -26,6 +26,7 @@ __pypackages__/
 .trellis/
 .agents/
 .serena/
+.codex_work/
 
 # Test / cache
 .pytest_cache/

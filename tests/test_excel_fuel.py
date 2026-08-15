@@ -236,6 +236,24 @@ class TestNormalProcessing:
         df_fuel = result["油耗信息"]
         assert all(t == "柴油" for t in df_fuel["油品种类"])
 
+    def test_empty_device_name_falls_back_to_device_id(self, tmp_path):
+        # Arrange: keep the existing row's fuel values but remove its name.
+        excel_path = _create_fuel_excel(tmp_path / "fuel_input.xlsx")
+        wb = openpyxl.load_workbook(excel_path)
+        ws = wb["设备柴油消耗表"]
+        ws["B8"] = None
+        ws["C8"] = "LO#165"
+        wb.save(excel_path)
+
+        # Act
+        result = process_diesel_data(str(excel_path), return_sheets=True)
+
+        # Assert: the row is retained and the ID is used as its display name.
+        df_fuel = result["油耗信息"]
+        lo_rows = df_fuel[df_fuel["设备编号"] == "LO#165"]
+        assert len(lo_rows) == 3
+        assert set(lo_rows["设备名称"]) == {"LO#165"}
+
 
 class TestMultipleSheets:
     """Test processing a file with multiple matching sheets."""
