@@ -19,11 +19,12 @@ def create_oil_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]:
     from func import config_loader
 
     cfg = LedgerConfig(
-        section_title=t("components:oil_ledger.oilLedger"),
+        section_title="油品台账",
+        display_title=t("components:oil_ledger.oilLedger"),
         label_prefix=t("components:oil_ledger.oilLedger"),
         empty_icon=ft.Icons.OIL_BARREL_OUTLINED,
         empty_text=t("components:oil_ledger.ledgeroilLedgerdata"),
-        template_filename=t("components:oil_ledger.oilLedgertemplateXlsx"),
+        template_filename="油品台账模板.xlsx",
         dialog_title=t("components:oil_ledger.importOilLedger"),
         dialog_height=300,
         backend_module=oil_ledger,

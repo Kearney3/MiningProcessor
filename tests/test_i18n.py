@@ -115,6 +115,27 @@ def test_source_i18n_calls_are_namespaced_and_resolvable(app: str):
     assert missing == []
 
 
+def test_business_identifiers_remain_chinese_and_do_not_depend_on_i18n():
+    """Locale changes must not rename business columns, sheets, or ledger exports."""
+    llm_business = (ROOT / "src/lib/llm-labeling.ts").read_text(encoding="utf-8")
+    assert "from \"../i18n\"" not in llm_business
+    assert '"维修内容列"' in llm_business
+    assert "列映射冲突：" in llm_business
+
+    ledger_specs = {
+        "ledger.py": ("设备台账", "设备台账模板.xlsx"),
+        "oil_ledger.py": ("油品台账", "油品台账模板.xlsx"),
+        "model_ledger.py": ("型号台账", "型号台账模板.xlsx"),
+    }
+    for filename, (title, template) in ledger_specs.items():
+        source = (ROOT / "gui/components" / filename).read_text(encoding="utf-8")
+        assert f'section_title="{title}"' in source
+        assert f'template_filename="{template}"' in source
+
+    ledger_base = (ROOT / "gui/components/ledger_base.py").read_text(encoding="utf-8")
+    assert 'write_formatted_excel(save_path, {"模板": df})' in ledger_base
+
+
 def test_gui_i18n_normalizes_language_and_supports_namespaces():
     original = i18n.get_language()
     try:

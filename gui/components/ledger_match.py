@@ -271,9 +271,9 @@ async def _do_export(page, log, state: MatchState, controls: _MatchControls, mod
     save_path = await picker.save_file(
         dialog_title=t("components:ledger_match.exportitemVariant"),
         file_name=(
-            t("components:ledger_match.matchingResultsFilename", sheet=sheet_label)
+            f"{sheet_label}_匹配结果.xlsx"
             if mode != "all-sheets"
-            else t("components:ledger_match.matchingResultsXlsxVariant")
+            else "匹配结果.xlsx"
         ),
         allowed_extensions=["xlsx"],
         initial_directory=_import_dir[0] or None,

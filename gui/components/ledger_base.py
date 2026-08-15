@@ -34,6 +34,7 @@ class LedgerConfig:
     empty_text: str              # "暂无设备台账数据" / "暂无油品台账数据"
     template_filename: str       # "设备台账模板.xlsx" / "油品台账模板.xlsx"
     dialog_title: str            # "导入设备台账" / "导入油品台账"
+    display_title: str | None = None  # localized UI title
     dialog_height: int = 400     # 列映射对话框高度
 
     # 后端模块
@@ -71,6 +72,7 @@ def create_ledger_section_factory(
         cfg.columns = []
     if cfg.standard_cols is None:
         cfg.standard_cols = []
+    ui_title = cfg.display_title or cfg.section_title
 
     # --- 状态 ---
     records: list[dict] = []
@@ -312,7 +314,7 @@ def create_ledger_section_factory(
                 # 回退：创建空模板
                 from func.excel_formatter import write_formatted_excel
                 df = pd.DataFrame(columns=cfg.columns)
-                write_formatted_excel(save_path, {t("components:ledger_base.template"): df})
+                write_formatted_excel(save_path, {"模板": df})
             _update_last_directory(save_path)
             _log_message(log, t("components:ledger_base.itemexporttemplate", save_path=save_path))
         except Exception as ex:
@@ -325,7 +327,7 @@ def create_ledger_section_factory(
         try:
             picker = ft.FilePicker()
             save_path = await picker.save_file(
-                dialog_title=t("components:ledger_base.export", section_title=cfg.section_title),
+                dialog_title=t("components:ledger_base.export", section_title=ui_title),
                 file_name=f"{cfg.section_title}.xlsx",
                 initial_directory=_last_directory[0] if _last_directory[0] else None,
                 allowed_extensions=["xlsx"],
@@ -337,9 +339,9 @@ def create_ledger_section_factory(
             df = pd.DataFrame(records)
             write_formatted_excel(save_path, {cfg.section_title: df})
             _update_last_directory(save_path)
-            _log_message(log, t("components:ledger_base.itemexportTotalItems", section_title=cfg.section_title, save_path=save_path, count=len(records)))
+            _log_message(log, t("components:ledger_base.itemexportTotalItems", section_title=ui_title, save_path=save_path, count=len(records)))
         except Exception as ex:
-            _log_message(log, t("components:ledger_base.exportFailed", section_title=cfg.section_title, ex=ex), level=logging.ERROR)
+            _log_message(log, t("components:ledger_base.exportFailed", section_title=ui_title, ex=ex), level=logging.ERROR)
 
     def _do_clear(e):
         """执行清空"""
@@ -451,7 +453,7 @@ def create_ledger_section_factory(
     container = ft.Container(
         content=ft.Column(
             [
-                theme.section_title(cfg.section_title),
+        theme.section_title(ui_title),
                 ft.Column(
                     [
                         ft.Row(

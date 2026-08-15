@@ -11,6 +11,8 @@ const IconDroplet = () => (
 type LedgerBackendConfig = Omit<LedgerPageConfig, "title" | "standardColumns" | "emptyMessage">;
 
 const config: LedgerBackendConfig = {
+  businessTitle: "油品台账",
+  businessTemplateFilename: "油品台账模板.xlsx",
   icon: <IconDroplet />,
   loadDataMethod: "get_oil_ledger_data",
   importMethod: "import_oil_ledger",
@@ -30,10 +32,7 @@ export function OilLedgerPage({ bridge }: { bridge: BridgeProp }) {
   const translatedConfig: LedgerPageConfig = {
     ...config,
     title: t("pages:OilLedgerPage.oilLedger"),
-    standardColumns: [
-      t("pages:OilLedgerPage.oilName"),
-      t("pages:OilLedgerPage.standardOilName"),
-    ],
+    standardColumns: ["油品名称", "标准油品名称"],
     emptyMessage: t("pages:OilLedgerPage.noOilLedgerDataImportAnOilLedgerExcelFileFirst"),
   };
 

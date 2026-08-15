@@ -22,6 +22,10 @@ export interface LedgerPageConfig {
   icon?: React.ReactNode;
   /** Standard column names for the ledger, e.g. ["设备名称", ...] */
   standardColumns: string[];
+  /** Stable Chinese business title used for exported filenames. */
+  businessTitle?: string;
+  /** Stable Chinese business filename used for template exports. */
+  businessTemplateFilename?: string;
   /** Bridge method to load rows */
   loadDataMethod: string;
   /** Bridge method to import from Excel with column mapping */
@@ -474,7 +478,8 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
     try {
       const filePath = await save({
         filters: [{ name: "Excel", extensions: ["xlsx"] }],
-        defaultPath: t("pages:LedgerPage.templateFilename", { title: config.title }),
+        defaultPath: config.businessTemplateFilename
+          ?? t("pages:LedgerPage.templateFilename", { title: config.title }),
       });
       if (!filePath) return;
       await bridge.call(config.exportTemplateMethod, { output_path: filePath });
@@ -490,7 +495,7 @@ export function LedgerPage({ bridge, config }: { bridge: BridgeProp; config: Led
     try {
       const filePath = await save({
         filters: [{ name: "Excel", extensions: ["xlsx"] }],
-        defaultPath: `${config.title}.xlsx`,
+        defaultPath: `${config.businessTitle ?? config.title}.xlsx`,
       });
       if (!filePath) return;
       await bridge.call(config.exportDataMethod, {
