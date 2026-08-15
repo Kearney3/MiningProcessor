@@ -1,9 +1,6 @@
-import shutil
-from pathlib import Path
-
 import pandas as pd
-import pytest
 
+from func import daily_report as daily_report_module
 from func.daily_report import (
     build_daily_report,
     export_daily_report,
@@ -178,15 +175,56 @@ def test_material_statistics_keywords_match_once_in_config_order():
     assert _match_material_statistics("石料", mappings) is None
 
 
-def test_daily_report_preprocesses_raw_worktime_fixture(tmp_path):
+def test_daily_report_preprocesses_raw_worktime_fixture(tmp_path, monkeypatch):
     """日报入口应能先处理按日期 Sheet 存放的原始工效表。"""
-    source = Path(__file__).parents[1] / "test_excel" / "2026.08 Tsag Ashiglalt. August工作效率表.xlsx"
-    if not source.exists():
-        pytest.skip("本地原始 Excel 样例未提供")
-    shutil.copy2(source, tmp_path / source.name)
+    source = tmp_path / "2026.08 Tsag Ashiglalt. August工作效率表.xlsx"
+    source_files = {
+        "worktime": [],
+        "operation": [],
+        "production": [],
+        "fuel": [],
+        "electrical": [],
+        "raw_worktime": [source],
+        "raw_production": [],
+        "raw_fuel": [],
+        "raw_electrical": [],
+    }
+    worktime = pd.DataFrame([
+        {
+            "日期": "2026-08-10",
+            "班次": "Day",
+            "设备名称": "模拟设备",
+            "设备编号": "1",
+            "公司": "模拟公司",
+            "应运行分钟": 600,
+            "计划维修/润滑": 0,
+            "未计划/故障": 0,
+            "总产量生产运行分钟": 400,
+            "转移": 0,
+            "待命": 0,
+        },
+    ])
+    calls = []
+
+    def fake_process_excel_data(file_path, year, month, **kwargs):
+        calls.append((file_path, year, month, kwargs))
+        return {"工时数据": worktime}
+
+    monkeypatch.setattr(daily_report_module, "_source_files", lambda _: source_files)
+    monkeypatch.setattr("func.excel_worktime.process_excel_data", fake_process_excel_data)
+    monkeypatch.setattr(pd, "ExcelFile", lambda *args, **kwargs: (_ for _ in ()).throw(
+        AssertionError("该测试不应读取真实 Excel 文件")
+    ))
 
     result = build_daily_report(tmp_path, "2026-08-10", "2026-08-10")
 
     assert len(result.report) > 0
     assert set(result.report["日期"].astype(str)) == {"2026-08-10"}
     assert {"原始设备名称", "应运行分钟", "转移"}.issubset(result.report.columns)
+    assert len(calls) == 1
+    file_path, year, month, kwargs = calls[0]
+    assert file_path == str(source)
+    assert (year, month) == (2026, 8)
+    assert kwargs["return_sheets"] is True
+    assert kwargs["skip_hidden_rows"] is False
+    assert kwargs["skip_hidden_cols"] is False
