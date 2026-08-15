@@ -49,8 +49,44 @@ packages = ["func", "gui"]
 "models/maintenance_classifier.metrics.json" = "models/maintenance_classifier.metrics.json"
 
 [tool.flet.app]
-# 只打包当前生效模型；训练轮次与候选模型不进入桌面安装包。
-exclude = ["models/maintenance_classifier_*"]
+# Flet 会递归复制应用根目录，并且不会读取 .gitignore。
+# exclude 传给 serious_python 后按“相对路径”匹配，不支持 glob 通配符。
+# 保留运行时所需的 main.py、func/、gui/、assets/、config.json 和 models/。
+exclude = [
+    ".DS_Store",
+    ".git",
+    ".github",
+    ".claude",
+    ".codex",
+    ".codex_work",
+    ".cursor",
+    ".idea",
+    ".serena",
+    ".agents",
+    ".codegraph",
+    ".vscode",
+    ".trellis",
+    ".venv",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".worktrees",
+    "Notebook",
+    "build",
+    "build-sidecar",
+    "data",
+    "dist",
+    "docs",
+    "node_modules",
+    "outputs",
+    "public",
+    "src",
+    "src-tauri",
+    "tests",
+    "wheels",
+    "config.user.json",
+    ".maintenance_llm.env",
+    "llm_labels_merged.jsonl",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -47,6 +47,10 @@ jobs:
       - name: Setup uv
         uses: astral-sh/setup-uv@v8.1.0
 
+      - name: Clean ignored files before packaging
+        shell: bash
+        run: git clean -ffdx
+
       - name: Install Linux dependencies
         if: matrix.needs_linux_deps
         shell: bash
@@ -63,7 +67,7 @@ jobs:
           uv run python -c "from func.maintenance_ml_classifier import MaintenanceMLClassifier; model = MaintenanceMLClassifier.load(); assert model.is_fitted"
           uv run ${{ matrix.build_cmd }} --yes --verbose
 
-      - name: Verify model in Flet package
+      - name: Verify Flet package scope and model
         shell: bash
         run: |
           uv run python - <<'PY'
@@ -74,13 +78,48 @@ jobs:
           archives = list(artifact.rglob("app.zip"))
           if not archives:
               raise SystemExit(f"app.zip not found under {artifact}")
+
+          forbidden_roots = {
+              ".DS_Store", ".agents", ".claude", ".codex", ".codex_work", ".codegraph",
+              ".cursor", ".git", ".github", ".idea", ".maintenance_llm.env",
+              ".pytest_cache", ".ruff_cache", ".serena", ".trellis", ".venv",
+              ".vscode", ".worktrees", "Notebook", "build", "build-sidecar",
+              "config.user.json", "data", "dist", "docs", "node_modules", "outputs",
+              "public", "src", "src-tauri", "tests", "wheels",
+          }
           model_suffix = "models/maintenance_classifier.joblib"
-          if not any(
-              any(name.endswith(model_suffix) for name in ZipFile(archive).namelist())
-              for archive in archives
-          ):
-              raise SystemExit("maintenance classifier is missing from Flet app.zip")
-          print(f"Verified maintenance classifier in {archives[0]}")
+          for archive in archives:
+              with ZipFile(archive) as package:
+                  names = package.namelist()
+                  roots = {name.split("/", 1)[0] for name in names if name}
+                  unexpected = sorted(forbidden_roots & roots)
+                  if unexpected:
+                      raise SystemExit(
+                          f"unexpected files in Flet app.zip: {', '.join(unexpected)}"
+                      )
+                  root_data_files = sorted(
+                      name
+                      for name in names
+                      if "/" not in name
+                      and name.lower().endswith(
+                          (".csv", ".db", ".jsonl", ".log", ".xls", ".xlsx")
+                      )
+                  )
+                  if root_data_files:
+                      raise SystemExit(
+                          "unexpected root-level data files in Flet app.zip: "
+                          + ", ".join(root_data_files)
+                      )
+                  if not any(name.endswith(model_suffix) for name in names):
+                      raise SystemExit(
+                          f"maintenance classifier is missing from {archive}"
+                      )
+              size_mb = archive.stat().st_size / (1024 * 1024)
+              print(f"Verified {archive}: {size_mb:.1f} MiB")
+              if size_mb > 300:
+                  raise SystemExit(
+                      f"Flet app.zip is unexpectedly large ({size_mb:.1f} MiB)"
+                  )
           PY
 
       - name: Upload Artifact
