@@ -22,6 +22,9 @@ class TestAnomalyConfig:
         assert cfg.flag_anomalies is True
         assert cfg.filter_anomalies is False
         assert cfg.handle_anomalies is False
+        assert cfg.use_threshold is True
+        assert cfg.use_sigma is False
+        assert cfg.use_percentile is False
         assert cfg.sigma_n == 3.0
         assert cfg.percentile_low == 1.0
         assert cfg.percentile_high == 99.0
@@ -51,6 +54,9 @@ class TestAnomalyConfig:
     def test_from_config_empty(self):
         cfg = AnomalyConfig.from_config({})
         assert cfg.enabled is False
+        assert cfg.use_threshold is True
+        assert cfg.use_sigma is False
+        assert cfg.use_percentile is False
         assert cfg.sigma_n == 3.0
 
 
@@ -59,8 +65,20 @@ class TestAnomalyConfig:
 # ---------------------------------------------------------------------------
 
 class TestBuildRules:
+    def test_default_methods_only_include_absolute_threshold(self):
+        cfg = AnomalyConfig(enabled=True)
+        rules = build_rules_for_type("fuel", {}, cfg)
+        assert {rule.method for rule in rules} == {"threshold"}
+
     def test_fuel_rules(self):
-        cfg = AnomalyConfig(enabled=True, sigma_n=3.0, percentile_low=1, percentile_high=99)
+        cfg = AnomalyConfig(
+            enabled=True,
+            use_sigma=True,
+            use_percentile=True,
+            sigma_n=3.0,
+            percentile_low=1,
+            percentile_high=99,
+        )
         rules = build_rules_for_type("fuel", {}, cfg)
         # 阈值规则: 油品消耗
         threshold_rules = [r for r in rules if r.method == "threshold"]
@@ -464,6 +482,8 @@ class TestBuildRulesColumnEnabled:
         """统计列中 enabled=true 的列应正常包含。"""
         cfg = AnomalyConfig(
             enabled=True,
+            use_sigma=True,
+            use_percentile=True,
             statistical_columns={"fuel": {"油品消耗": {"enabled": True}}},
         )
         rules = build_rules_for_type("fuel", {}, cfg)
@@ -472,7 +492,12 @@ class TestBuildRulesColumnEnabled:
 
     def test_statistical_columns_fallback_to_default(self):
         """config 无 statistical_columns 时应回退到默认统计列。"""
-        cfg = AnomalyConfig(enabled=True, statistical_columns={})
+        cfg = AnomalyConfig(
+            enabled=True,
+            use_sigma=True,
+            use_percentile=True,
+            statistical_columns={},
+        )
         rules = build_rules_for_type("fuel", {}, cfg)
         stat_rules = [r for r in rules if r.method in ("sigma", "percentile")]
         assert len(stat_rules) == 2  # 油品消耗 sigma + percentile
@@ -481,6 +506,8 @@ class TestBuildRulesColumnEnabled:
         """统计列未指定 enabled 时默认启用。"""
         cfg = AnomalyConfig(
             enabled=True,
+            use_sigma=True,
+            use_percentile=True,
             statistical_columns={"fuel": {"油品消耗": {}}},  # 无 enabled 键
         )
         rules = build_rules_for_type("fuel", {}, cfg)

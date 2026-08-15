@@ -302,8 +302,8 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
     def _load_sheets_and_preview(path: str):
         def _fetch():
             try:
-                import openpyxl
-                wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+                from func.excel_utils import load_workbook_safely
+                wb = load_workbook_safely(path, read_only=True, data_only=True)
                 names = list(wb.sheetnames)
                 wb.close()
             except Exception:

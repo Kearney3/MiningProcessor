@@ -949,8 +949,8 @@
         "filter_anomalies": false,
         "handle_anomalies": false,
         "use_threshold": true,
-        "use_sigma": true,
-        "use_percentile": true,
+        "use_sigma": false,
+        "use_percentile": false,
         "sigma_n": 3.0,
         "percentile_low": 1.0,
         "percentile_high": 99.0,
@@ -1008,6 +1008,14 @@
                     "min": 0,
                     "max": 720
                 }
+            },
+            "tire": {
+                "寿命（时间）": {
+                    "min": 0
+                },
+                "寿命（里程）": {
+                    "min": 0
+                }
             }
         },
         "handling_rules": {
@@ -1037,6 +1045,14 @@
                 "__all_numeric__": {
                     "strategy": "default_value",
                     "default": 0
+                }
+            },
+            "tire": {
+                "寿命（时间）": {
+                    "strategy": "nan"
+                },
+                "寿命（里程）": {
+                    "strategy": "nan"
                 }
             }
         }

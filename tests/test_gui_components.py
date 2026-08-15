@@ -301,6 +301,17 @@ def test_work_month_dropdown_offers_all_calendar_months(monkeypatch):
     assert month_options == [str(month) for month in range(1, 13)]
 
 
+def test_tire_module_exposes_file_input_and_shared_hidden_controls(monkeypatch):
+    monkeypatch.setattr(components, "datetime", FrozenDateTime, raising=False)
+
+    _, module_refs = components.create_modules_section(DummyPage())
+
+    assert "tire" in module_refs
+    assert module_refs["tire"]["path"].label == "轮胎寿命处理"
+    assert "_skip_hidden_rows_toggle" in module_refs
+    assert "_skip_hidden_cols_toggle" in module_refs
+
+
 def test_maintenance_module_enables_ml_fallback_by_default(monkeypatch):
     monkeypatch.setattr(components, "datetime", FrozenDateTime, raising=False)
 
@@ -1110,6 +1121,57 @@ def test_config_save_picker_remembers_initial_directory(monkeypatch, tmp_path):
     asyncio.run(save_button.on_click(DummyControlEvent()))
     assert len(SavePickerSpy.calls) == 2
     assert SavePickerSpy.calls[1].get("initial_directory") == str(output_path.parent)
+
+
+def test_sync_and_daily_report_use_independent_saved_directories(monkeypatch, tmp_path):
+    """同步和日报的目录记忆不应互相覆盖。"""
+    import func.config_loader as config_loader
+    from gui.components.common import _get_initial_directory, _update_last_directory
+
+    sync_dir = tmp_path / "sync"
+    daily_dir = tmp_path / "daily"
+    sync_dir.mkdir()
+    daily_dir.mkdir()
+    user_file = tmp_path / "config.user.json"
+    monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", user_file)
+    config_loader._invalidate_config_cache()
+
+    _update_last_directory(str(sync_dir), is_dir=True, config_key="sync_last_input_dir")
+    _update_last_directory(str(daily_dir), is_dir=True, config_key="daily_report_input_dir")
+
+    assert _get_initial_directory("sync_last_input_dir") == str(sync_dir)
+    assert _get_initial_directory("daily_report_input_dir") == str(daily_dir)
+    saved = json.loads(user_file.read_text(encoding="utf-8"))
+    assert saved["user_config"]["sync_last_input_dir"] == str(sync_dir)
+    assert saved["user_config"]["daily_report_input_dir"] == str(daily_dir)
+
+
+def test_daily_report_save_persists_formulas_after_validation(monkeypatch):
+    """保存日报设置时，校验通过的公式应继续可用于构造配置。"""
+    from copy import deepcopy
+
+    from gui.components.user_config import _daily_report as daily_report_module
+
+    defaults = deepcopy(config_loader.DEFAULT_DAILY_REPORT_CONFIG)
+    saved = []
+    monkeypatch.setattr(
+        daily_report_module.config_loader,
+        "get_daily_report_config",
+        lambda: deepcopy(defaults),
+    )
+    monkeypatch.setattr(
+        daily_report_module.config_loader,
+        "save_daily_report_config",
+        lambda config: saved.append(config),
+    )
+
+    _, refs = daily_report_module._create_daily_report_config_section(
+        DummyPage(), lambda *args, **kwargs: None,
+    )
+    refs["save"]()
+
+    assert saved
+    assert saved[0]["formulas"] == defaults["formulas"]
 
 
 def test_oil_ledger_build_table_restores_columns_after_clear():

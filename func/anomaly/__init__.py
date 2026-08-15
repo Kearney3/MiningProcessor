@@ -52,6 +52,7 @@ _DATA_TYPE_LABELS: dict[str, str] = {
     "production": "生产数据",
     "electrical": "电力消耗",
     "worktime": "工时数据",
+    "tire": "轮胎寿命",
 }
 
 
@@ -170,7 +171,20 @@ def _build_anomalies_df(df, hits):
         row = {"行号": hit.row_index, "异常列": hit.column, "异常值": hit.value,
                "检测方法": hit.method, "说明": hit.message}
         # 保留原始行的关键信息
-        for col in ("日期", "班次", "设备名称", "设备编号"):
+        for col in (
+            "胎号",
+            "品牌",
+            "型号",
+            "安装车辆",
+            "安装位置",
+            "安装日期",
+            "源表",
+            "源行号",
+            "日期",
+            "班次",
+            "设备名称",
+            "设备编号",
+        ):
             if col in df.columns and hit.row_index in df.index:
                 row[col] = df.at[hit.row_index, col]
         rows.append(row)

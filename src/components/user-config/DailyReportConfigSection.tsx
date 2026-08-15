@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
-import { SettingsIcon } from "../../lib/icons";
+import { CheckIcon, SettingsIcon } from "../../lib/icons";
 import { SectionCard, ActionButtons, KeywordChipInput, StatusMessage } from "./_shared";
 
 const FORMULA_KEYS = ["延迟时间", "待机时间", "设备可动率", "设备可动利用率", "设备利用率"] as const;
@@ -39,8 +39,10 @@ export function DailyReportConfigSection({ bridge }: { bridge: BridgeProp }) {
   const { notify } = useToast();
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [validating, setValidating] = useState(false);
   const [status, setStatus] = useState<{ msg: string; kind: "success" | "error" | "info" }>({ msg: "", kind: "info" });
   const [config, setConfig] = useState<DailyReportConfig>(cloneDefault());
+  const [formulaErrors, setFormulaErrors] = useState<Record<string, string>>({});
 
   const reload = useCallback(async () => {
     try {
@@ -68,18 +70,48 @@ export function DailyReportConfigSection({ bridge }: { bridge: BridgeProp }) {
 
   const updateFormula = (key: FormulaKey, value: string) => {
     setConfig((prev) => ({ ...prev, formulas: { ...prev.formulas, [key]: value } }));
+    setFormulaErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const validateFormulas = async (showToast = true): Promise<boolean> => {
+    setValidating(true);
+    try {
+      const validation = await bridge.call<{ valid: boolean; errors: Record<string, string> }>("validate_daily_report_config", { config });
+      const errors = validation.errors ?? {};
+      setFormulaErrors(errors);
+      if (!validation.valid) {
+        const message = Object.entries(errors)
+          .map(([key, value]) => t("userConfig:DailyReportConfigSection.validationError", { key, value }))
+          .join("\n");
+        setStatus({ msg: message, kind: "error" });
+        if (showToast) notify(t("userConfig:DailyReportConfigSection.dailyReportFormulaValidationFailed"), "error");
+        return false;
+      }
+      setStatus({ msg: t("userConfig:DailyReportConfigSection.formulaValidationPassed"), kind: "success" });
+      if (showToast) notify(t("userConfig:DailyReportConfigSection.formulaValidationPassed"), "success");
+      return true;
+    } catch (error) {
+      setStatus({
+        msg: t("userConfig:DailyReportConfigSection.saveError", { error: String(error) }),
+        kind: "error",
+      });
+      if (showToast) notify(t("userConfig:DailyReportConfigSection.saveError", { error: String(error) }), "error");
+      return false;
+    } finally {
+      setValidating(false);
+    }
   };
 
   const save = async () => {
     setSaving(true);
     setStatus({ msg: "", kind: "info" });
     try {
-      const validation = await bridge.call<{ valid: boolean; errors: Record<string, string> }>("validate_daily_report_config", { config });
-      if (!validation.valid) {
-        const message = Object.entries(validation.errors)
-          .map(([key, value]) => t("userConfig:DailyReportConfigSection.validationError", { key, value }))
-          .join("\n");
-        setStatus({ msg: message, kind: "error" });
+      if (!(await validateFormulas(false))) {
         notify(t("userConfig:DailyReportConfigSection.dailyReportFormulaValidationFailed"), "error");
         return;
       }
@@ -99,6 +131,7 @@ export function DailyReportConfigSection({ bridge }: { bridge: BridgeProp }) {
 
   const reset = () => {
     setConfig(cloneDefault());
+    setFormulaErrors({});
     setStatus({ msg: t("userConfig:DailyReportConfigSection.defaultValuesRestoredClickSaveToApply"), kind: "info" });
   };
 
@@ -137,17 +170,35 @@ export function DailyReportConfigSection({ bridge }: { bridge: BridgeProp }) {
               <label key={key} className="text-xs text-slate-500">
                 {key}
                 <input
-                  className="input mt-1 w-full"
+                  className={`input mt-1 w-full ${formulaErrors[key] ? "border-red-300" : ""}`}
                   value={config.formulas[key] ?? ""}
                   onChange={(e) => updateFormula(key, e.target.value)}
                   aria-label={t("userConfig:DailyReportConfigSection.formula", { key })}
+                  aria-invalid={Boolean(formulaErrors[key])}
                 />
+                {formulaErrors[key] && (
+                  <span role="alert" className="mt-1 block text-xs text-red-600">
+                    {formulaErrors[key]}
+                  </span>
+                )}
               </label>
             ))}
           </div>
         </div>
       </div>
-      <ActionButtons saving={saving} onSave={save} onReload={reload} onReset={reset} />
+      <ActionButtons
+        saving={saving}
+        disableSave={validating}
+        onSave={save}
+        onReload={reload}
+        onReset={reset}
+        onExtra={() => { void validateFormulas(); }}
+        extraIcon={<CheckIcon />}
+        extraDisabled={saving || validating}
+        extraLabel={validating
+          ? t("userConfig:DailyReportConfigSection.validatingFormula")
+          : t("userConfig:DailyReportConfigSection.validateFormula")}
+      />
       <StatusMessage message={status.msg} kind={status.kind} />
     </SectionCard>
   );

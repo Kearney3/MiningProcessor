@@ -64,6 +64,9 @@ export function ActionButtons({
   onReset,
   onExtra,
   extraLabel,
+  extraIcon,
+  extraDisabled = false,
+  disableSave = false,
 }: {
   saving: boolean;
   onSave: () => void;
@@ -71,16 +74,18 @@ export function ActionButtons({
   onReset: () => void;
   onExtra?: () => void;
   extraLabel?: string;
+  extraIcon?: React.ReactNode;
+  extraDisabled?: boolean;
+  disableSave?: boolean;
 }) {
   const { t } = useTranslation();
+  const saveDisabled = saving || disableSave;
   return (
     <div className="flex gap-2 flex-wrap mt-4 pt-3 border-t border-slate-100">
       <button
         onClick={onSave}
-        disabled={saving}
-        className={`inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 px-2.5 py-1.5 rounded-md hover:bg-blue-50 transition-colors ${
-          saving ? "opacity-50 cursor-not-allowed" : ""
-        }`}
+        disabled={saveDisabled}
+        className={`inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 px-2.5 py-1.5 rounded-md hover:bg-blue-50 transition-colors ${saveDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
       >
         <SaveIcon />
         {saving ? t("userConfig:_shared.text") : t("userConfig:_shared.save")}
@@ -102,9 +107,10 @@ export function ActionButtons({
       {onExtra && extraLabel && (
         <button
           onClick={onExtra}
-          className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 px-2.5 py-1.5 rounded-md hover:bg-slate-50 transition-colors"
+          disabled={extraDisabled}
+          className={`inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 px-2.5 py-1.5 rounded-md hover:bg-slate-50 transition-colors ${extraDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
         >
-          <PlusIcon />
+          {extraIcon ?? <PlusIcon />}
           {extraLabel}
         </button>
       )}

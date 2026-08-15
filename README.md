@@ -3,7 +3,7 @@
 > 矿山运营 Excel 报表批量处理工具
 
 <p>
-  <img src="https://img.shields.io/badge/version-v2.6.0-blue?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-v2.7.0-blue?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/Python-≥3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="python" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square" alt="license" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="platform" />
@@ -432,6 +432,20 @@ uv run scripts/bump_version.py --bump minor --dry-run
 ---
 
 ## 📋 更新日志
+
+### v2.7.0 · 2026-08-15
+
+- 🛞 **轮胎寿命处理模块**
+  - 支持全 Sheet 识别、按安装日期动态拆分安装周期，并以“寿命合计”标记统计结束
+  - 输出周期状态、异常原因、安装次数、标准寿命、磨损程度、源表和源行号等字段
+  - 支持 11 个业务字段组合去重，并在去重后重新计算受影响的安装次数和寿命字段
+  - 自动识别低质量日期，运行中轮胎的缺失拆卸读数不再产生负寿命值
+- 🧩 **双端与台账集成**
+  - Flet / Tauri 均接入轮胎处理，支持安装车辆与设备台账匹配、跳过隐藏行和隐藏列
+  - 轮胎寿命（时间）和寿命（里程）支持异常值检测、标注、过滤及处理配置
+- 🛠️ **Excel 稳定性改进**
+  - 统一 Excel 输出格式，修复数字尾部多余小数点显示
+  - 增加安全工作簿加载，避免 openpyxl 对不支持扩展和条件格式扩展的警告
 
 ### v2.6.0 · 2026-08-15
 

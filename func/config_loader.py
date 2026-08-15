@@ -140,8 +140,8 @@ DEFAULT_ANOMALY_DETECTION: dict[str, Any] = {
     "filter_anomalies": False,
     "handle_anomalies": False,
     "use_threshold": True,
-    "use_sigma": True,
-    "use_percentile": True,
+    "use_sigma": False,
+    "use_percentile": False,
     "sigma_n": 3.0,
     "percentile_low": 1.0,
     "percentile_high": 99.0,
@@ -169,6 +169,10 @@ DEFAULT_ANOMALY_DETECTION: dict[str, Any] = {
         "worktime": {
             "__all_numeric__": {"min": 0, "max": 720, "enabled": True},
         },
+        "tire": {
+            "寿命（时间）": {"min": 0, "enabled": True},
+            "寿命（里程）": {"min": 0, "enabled": True},
+        },
     },
     "statistical_columns": {
         "fuel": {"油品消耗": {"enabled": True}},
@@ -177,6 +181,10 @@ DEFAULT_ANOMALY_DETECTION: dict[str, Any] = {
         "production": {"趟次": {"enabled": True}, "产量": {"enabled": True}},
         "electrical": {"电力消耗": {"enabled": True}},
         "worktime": {},
+        "tire": {
+            "寿命（时间）": {"enabled": True},
+            "寿命（里程）": {"enabled": True},
+        },
     },
     "handling_rules": {
         "production_running": {
@@ -191,6 +199,10 @@ DEFAULT_ANOMALY_DETECTION: dict[str, Any] = {
         },
         "worktime": {
             "__all_numeric__": {"strategy": "default_value", "default": 0},
+        },
+        "tire": {
+            "寿命（时间）": {"strategy": "nan"},
+            "寿命（里程）": {"strategy": "nan"},
         },
     },
 }

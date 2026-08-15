@@ -24,6 +24,7 @@ def _create_anomaly_config_section(page: ft.Page, log):
         ("production", t("components:user_config._anomaly.productionData")),
         ("electrical", t("components:user_config._anomaly.electricalConsumption")),
         ("worktime", t("components:user_config._anomaly.worktimeData")),
+        ("tire", t("components:user_config._anomaly.tireData")),
     ]
 
     # 当前选中的数据类型
@@ -55,11 +56,11 @@ def _create_anomaly_config_section(page: ft.Page, log):
         tooltip=t("components:user_config._anomaly.configurationconfigurationconfigurationMinMaxConfiguration"),
     )
     use_sigma_toggle = ft.Checkbox(
-        label=t("components:user_config._anomaly.detection"), value=True,
+        label=t("components:user_config._anomaly.detection"), value=False,
         tooltip=t("components:user_config._anomaly.sigmaOutlierDetection"),
     )
     use_percentile_toggle = ft.Checkbox(
-        label=t("components:user_config._anomaly.percentileDetection"), value=True,
+        label=t("components:user_config._anomaly.percentileDetection"), value=False,
         tooltip=t("components:user_config._anomaly.percentileOutlierDetection"),
     )
 
@@ -68,6 +69,7 @@ def _create_anomaly_config_section(page: ft.Page, log):
         "fuel": t("components:user_config._anomaly.fuelConsumptionVariant"), "fuel_engine": t("components:user_config._anomaly.engine"),
         "production_running": t("components:user_config._anomaly.operation"), "production": t("components:user_config._anomaly.productionVariant"),
         "electrical": t("components:user_config._anomaly.electrical"), "worktime": t("components:user_config._anomaly.worktime"),
+        "tire": t("components:user_config._anomaly.tire"),
     }
     _COLUMN_DEFS: dict[str, dict[str, list[str]]] = {
         "fuel": {"threshold": ["油品消耗"], "statistical": ["油品消耗"]},
@@ -76,6 +78,7 @@ def _create_anomaly_config_section(page: ft.Page, log):
         "production": {"threshold": ["趟次", "产量"], "statistical": ["趟次", "产量"]},
         "electrical": {"threshold": ["电力消耗"], "statistical": ["电力消耗"]},
         "worktime": {"threshold": ["__all_numeric__"], "statistical": []},
+        "tire": {"threshold": ["寿命（时间）", "寿命（里程）"], "statistical": ["寿命（时间）", "寿命（里程）"]},
     }
     column_toggles: dict[str, ft.Checkbox] = {}  # key: "dtype:col"
     column_toggle_rows: dict[str, ft.Row] = {}
@@ -266,8 +269,8 @@ def _create_anomaly_config_section(page: ft.Page, log):
 
         # 加载检测方法开关
         use_threshold_toggle.value = ad.get("use_threshold", True)
-        use_sigma_toggle.value = ad.get("use_sigma", True)
-        use_percentile_toggle.value = ad.get("use_percentile", True)
+        use_sigma_toggle.value = ad.get("use_sigma", False)
+        use_percentile_toggle.value = ad.get("use_percentile", False)
 
         # 加载逐列检测开关
         thresholds_data = ad.get("thresholds", {})

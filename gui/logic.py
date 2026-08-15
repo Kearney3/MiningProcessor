@@ -66,6 +66,7 @@ _MODULE_LABELS = {
     **MODULE_LABELS,
     "merge": t("logic:fileMerge"),
     "maint": t("logic:maintenanceRecord"),
+    "tire": t("logic:tireData"),
     "batch": t("logic:batchProcessing"),
 }
 
@@ -304,6 +305,43 @@ async def on_fuel_process(page: ft.Page, fuel_refs: dict, log, equipment_ledger=
                          anomaly_config=anomaly_config, filter_zero_engine_hours=filter_zero_engine_hours,
                          filter_zero_work_hours=filter_zero_work_hours)
     _update_anomaly_results(fuel_refs, _anomalies_from_extra(extra))
+
+
+async def on_tire_process(
+    page: ft.Page,
+    tire_refs: dict,
+    log,
+    equipment_ledger=None,
+    oil_ledger=None,
+    model_ledger=None,
+    skip_hidden_rows=False,
+    skip_hidden_cols=False,
+    anomaly_config=None,
+    **_unused,
+) -> None:
+    """轮胎寿命处理按钮回调。"""
+    _update_anomaly_results(tire_refs, [])
+    btn = tire_refs["btn"]
+    path = tire_refs["path"].value
+    if not path:
+        _log_message(log, t("logic:pleaseSelectAFileFirst"), level=logging.WARNING)
+        return
+
+    extra = await _safe_run_task(
+        page,
+        btn,
+        t("logic:process"),
+        path,
+        log,
+        "tire",
+        equipment_ledger=equipment_ledger,
+        oil_ledger=oil_ledger,
+        model_ledger=model_ledger,
+        skip_hidden_rows=skip_hidden_rows,
+        skip_hidden_cols=skip_hidden_cols,
+        anomaly_config=anomaly_config,
+    )
+    _update_anomaly_results(tire_refs, _anomalies_from_extra(extra))
 
 
 def _update_prod_summary(container: ft.Column, summary: dict | None) -> None:
@@ -909,6 +947,7 @@ def wire_processing_buttons(
         ("work", on_work_process),
         ("merge", on_merge_process),
         ("maint", on_maint_process),
+        ("tire", on_tire_process),
     ]
 
     for key, callback in _MODULE_CALLBACKS:
@@ -936,11 +975,16 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
                           filter_zero_hours_meter=True, filter_zero_km_meter=True,
                           filter_zero_run_hours=False, filter_zero_run_km=False) -> None:
     """MineBase 同步按钮回调"""
-    path = sync_refs["path"].value
+    path = (sync_refs["path"].value or "").strip()
     if not path:
         _log_message(log, t("logic:pleaseFirstselectoutputDirectory"), level=logging.WARNING)
         _show_snackbar(page, t("logic:selectAnOutputDirectory"), is_error=True)
         return
+    if os.path.isdir(path):
+        try:
+            config_loader.update_user_config({"sync_last_input_dir": path})
+        except Exception:
+            logger.debug("持久化 sync_last_input_dir 失败", exc_info=True)
 
     mode_toggle = sync_refs["mode"]
     mode = mode_toggle.value if mode_toggle else "api"

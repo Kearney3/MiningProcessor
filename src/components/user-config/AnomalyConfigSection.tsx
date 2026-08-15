@@ -40,6 +40,7 @@ const getDataTypeOptions = (t: (k: string) => string): { key: string; label: str
   { key: "production", label: t("userConfig:AnomalyConfigSection.productionData") },
   { key: "electrical", label: t("userConfig:AnomalyConfigSection.electricalConsumption") },
   { key: "worktime", label: t("userConfig:AnomalyConfigSection.worktimeData") },
+  { key: "tire", label: t("userConfig:AnomalyConfigSection.tireData") },
 ];
 
 const ALL_NUMERIC = "__all_numeric__";
@@ -58,8 +59,8 @@ export function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
 
   // 检测方法开关
   const [useThreshold, setUseThreshold] = useState(true);
-  const [useSigma, setUseSigma] = useState(true);
-  const [usePercentile, setUsePercentile] = useState(true);
+  const [useSigma, setUseSigma] = useState(false);
+  const [usePercentile, setUsePercentile] = useState(false);
 
   // 统计参数
   const [sigmaN, setSigmaN] = useState("3.0");
@@ -79,6 +80,7 @@ export function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
     production: ["趟次", "产量"],
     electrical: ["电力消耗"],
     worktime: ["__all_numeric__"],
+    tire: ["寿命（时间）", "寿命（里程）"],
   };
   const [columnToggles, setColumnToggles] = useState<ColumnToggles>(() => {
     const t: ColumnToggles = {};
@@ -93,8 +95,8 @@ export function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
       const raw = await bridge.call<AnomalyConfig>("get_anomaly_config", {});
       if (raw && typeof raw === "object") {
         setUseThreshold(raw.use_threshold ?? true);
-        setUseSigma(raw.use_sigma ?? true);
-        setUsePercentile(raw.use_percentile ?? true);
+        setUseSigma(raw.use_sigma ?? false);
+        setUsePercentile(raw.use_percentile ?? false);
         setSigmaN(String(raw.sigma_n ?? 3.0));
         setPctLow(String(raw.percentile_low ?? 1.0));
         setPctHigh(String(raw.percentile_high ?? 99.0));

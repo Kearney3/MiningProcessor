@@ -18,9 +18,9 @@ logger = logging.getLogger(__name__)
 _last_directory: list[str] = [get_user_config("last_directory", "")]
 
 
-def _get_initial_directory() -> str | None:
-    """返回上次使用的目录路径（仅当目录仍然存在时），否则返回 None。"""
-    d = _last_directory[0]
+def _get_initial_directory(config_key: str = "last_directory") -> str | None:
+    """返回指定配置键保存的上次目录（仅当目录仍然存在时）。"""
+    d = _last_directory[0] if config_key == "last_directory" else get_user_config(config_key, "")
     if d and Path(d).is_dir():
         return d
     return None
@@ -192,19 +192,26 @@ class HeaderModeConfig:
             self._on_toggle_extra(enabled)
 
 
-def _update_last_directory(path: str, *, is_dir: bool = False) -> None:
-    """统一更新共享的文件选择器目录，并持久化到 config.user.json。
+def _update_last_directory(
+    path: str,
+    *,
+    is_dir: bool = False,
+    config_key: str = "last_directory",
+) -> None:
+    """更新文件选择器目录，并持久化到指定配置键。
 
     Args:
         path: 文件或目录路径。
         is_dir: 若为 True 则 path 本身即目录，否则取其父目录。
+        config_key: config.user.json 中保存目录的键。
     """
     directory = path if is_dir else str(Path(path).parent)
-    _last_directory[0] = directory
+    if config_key == "last_directory":
+        _last_directory[0] = directory
     try:
-        update_user_config({"last_directory": directory})
+        update_user_config({config_key: directory})
     except Exception:
-        logging.getLogger(__name__).debug("持久化 last_directory 失败", exc_info=True)
+        logging.getLogger(__name__).debug("持久化 %s 失败", config_key, exc_info=True)
 
 
 class SortState:
