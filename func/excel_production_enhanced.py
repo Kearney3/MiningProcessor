@@ -16,6 +16,7 @@ from func.logger import get_logger
 from func.excel_utils import dedup_dataframe, get_hidden_indices, filter_hidden_from_df, adjust_index_for_hidden, letters_to_col_indices
 from func.anomaly import detect_and_filter
 from func.anomaly.rules import AnomalyConfig
+from func.number_utils import decimal_add, decimal_mod, decimal_multiply, decimal_subtract
 
 logger = get_logger(__name__)
 
@@ -145,6 +146,11 @@ class MiningDataProcessor:
         if pd.isna(num):
             return default
         return float(num)
+
+    @staticmethod
+    def _meter_difference(end, start) -> float:
+        """按仪表读数的十进制语义计算差值，避免二进制浮点尾差。"""
+        return decimal_subtract(end, start)
 
     def find_first_matching_column(self, columns: object, keywords: object) -> Any | None:
         """
@@ -336,8 +342,8 @@ class MiningDataProcessor:
             for col_idx, excavator_name, ore_type in production_col_info:
                 trips = self.safe_number(data.iat[_row_pos, col_idx], default=0)
 
-                if trips > 0 and ore_type != "" and "共" not in ore_type and trips % 1 == 0:
-                    production = trips * capacity
+                if trips > 0 and ore_type != "" and "共" not in ore_type and decimal_mod(trips, 1) == 0:
+                    production = decimal_multiply(trips, capacity)
                     production_rows.append({
                         "日期": date_val,
                         "班次": shift_val,
@@ -347,7 +353,7 @@ class MiningDataProcessor:
                         "运次": trips,
                         "产量": production
                     })
-                    total_trips += trips
+                    total_trips = decimal_add(total_trips, trips)
                     if capacity == 0:
                         affected_rows += 1
 
@@ -364,10 +370,10 @@ class MiningDataProcessor:
                 "公司": company,
                 "小时数仪表开始": h_start,
                 "小时数仪表结束": h_end,
-                "运行小时数": h_end - h_start,
+                "运行小时数": self._meter_difference(h_end, h_start),
                 "公里数仪表开始": k_start,
                 "公里数仪表结束": k_end,
-                "运行里程": k_end - k_start,
+                "运行里程": self._meter_difference(k_end, k_start),
                 "趟次": total_trips
             })
 
@@ -424,7 +430,10 @@ class MiningDataProcessor:
             "备注": subset.iloc[:, col_notes].apply(self.safe_str).values if subset.shape[1] > col_notes else "",
         })
 
-        result_df["运行小时数"] = result_df["小时数仪表结束"] - result_df["小时数仪表开始"]
+        result_df["运行小时数"] = result_df.apply(
+            lambda row: self._meter_difference(row["小时数仪表结束"], row["小时数仪表开始"]),
+            axis=1,
+        )
 
         return result_df
 

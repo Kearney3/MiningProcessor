@@ -130,6 +130,22 @@ class TestAggregateProductionData:
         assert result is not None
         assert len(result) == 2  # 1 truck + 1 excavator
 
+    def test_decimal_values_are_summed_without_float_tail(self):
+        rows = [
+            {"日期": "2025-01-01", "班次": "Day", "矿卡名称": "T1", "挖机名称": "E1",
+             "矿石类型": "A", "运次": 0.1, "产量": 0.1, "标准设备名称（矿卡）": "T1",
+             "标准设备名称（挖机）": "E1"},
+            {"日期": "2025-01-01", "班次": "Day", "矿卡名称": "T1", "挖机名称": "E1",
+             "矿石类型": "A", "运次": 0.2, "产量": 0.2, "标准设备名称（矿卡）": "T1",
+             "标准设备名称（挖机）": "E1"},
+        ]
+
+        result = _aggregate_production_data(self._make_prod_sheets(rows))
+        truck = result[result["标准设备名称"] == "T1"].iloc[0]
+
+        assert truck["A"] == 0.3
+        assert truck["运次"] == 0.3
+
 
 # ---------------------------------------------------------------------------
 # _left_merge
@@ -249,6 +265,18 @@ class TestAggregateFuelData:
         ]
         result = _aggregate_fuel_data(self._make_fuel_sheets(rows))
         assert "shift_rank" not in result.columns
+
+    def test_decimal_values_are_summed_without_float_tail(self):
+        rows = [
+            {"日期": "2025-01-01", "班次": "Day", "标准设备名称": "T1",
+             "设备名称": "T1", "设备编号": "001", "油品消耗": 0.1},
+            {"日期": "2025-01-01", "班次": "Day", "标准设备名称": "T1",
+             "设备名称": "T1", "设备编号": "001", "油品消耗": 0.2},
+        ]
+
+        result = _aggregate_fuel_data(self._make_fuel_sheets(rows))
+
+        assert result["油品消耗"].iloc[0] == 0.3
 
 
 # ---------------------------------------------------------------------------

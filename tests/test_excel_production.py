@@ -283,6 +283,25 @@ class TestProcessSheet1:
         assert len(tr60_prod) == 2
         assert tr60_prod["产量"].sum() == pytest.approx(11 * 22)
 
+    def test_decimal_meter_difference_has_no_float_tail(self):
+        proc = _make_processor({"TR600": 85}, raw_start=6)
+        df_raw = _build_sheet1_df([
+            {
+                "truck_name": "TR600-01",
+                "hour_start": 20959.5,
+                "hour_end": 20968.3,
+                "km_start": 5000.5,
+                "km_end": 5050.3,
+                "company": "CompanyA",
+            },
+        ], raw_start=6)
+
+        running_df, _ = proc.process_sheet1(df_raw, date(2025, 1, 15), "Day")
+
+        row = running_df.iloc[0]
+        assert row["运行小时数"] == 8.8
+        assert row["运行里程"] == 49.8
+
     def test_empty_dataframe_returns_empty(self):
         proc = _make_processor({})
         df_raw = pd.DataFrame(dtype=object)
@@ -510,6 +529,44 @@ class TestProcessSingleFile:
 
         # Output file was written
         assert output_path.exists()
+
+    def test_decimal_meter_difference_is_preserved_in_export(self, tmp_path):
+        xlsx_path = tmp_path / "2026.08.15 白班.xlsx"
+        _write_two_sheet_xlsx(
+            xlsx_path,
+            truck_data=[
+                {
+                    "truck_name": "TR600-01",
+                    "hour_start": 100.0,
+                    "hour_end": 108.5,
+                    "km_start": 5000.0,
+                    "km_end": 5050.0,
+                    "company": "CompanyA",
+                },
+            ],
+            sheet2_devices=[("CAT773-02", "CompanyB", 20959.5, 20968.3)],
+            raw_start=6,
+        )
+        output_path = tmp_path / "output.xlsx"
+
+        proc = _make_processor({"TR600": 85, "CAT773": 20}, raw_start=6)
+        running_df, _ = proc.process_single_file(str(xlsx_path), str(output_path))
+
+        row = running_df[running_df["设备名称"] == "CAT773-02"].iloc[0]
+        assert row["运行小时数"] == 8.8
+
+        import openpyxl
+
+        workbook = openpyxl.load_workbook(output_path, data_only=True)
+        worksheet = workbook["运行数据"]
+        headers = [cell.value for cell in worksheet[1]]
+        device_column = headers.index("设备名称") + 1
+        hours_column = headers.index("运行小时数") + 1
+        exported_row = next(
+            row for row in worksheet.iter_rows(min_row=2)
+            if row[device_column - 1].value == "CAT773-02"
+        )
+        assert exported_row[hours_column - 1].value == 8.8
 
     def test_single_sheet_file(self, tmp_path):
         """File with only 1 sheet should still work (sheet2 returns empty)."""

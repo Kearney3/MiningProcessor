@@ -19,6 +19,7 @@ from openpyxl.utils.datetime import from_excel
 
 from func.anomaly import detect_and_filter
 from func.excel_utils import get_hidden_indices, load_workbook_safely
+from func.number_utils import decimal_divide, decimal_multiply, decimal_subtract
 
 logger = logging.getLogger(__name__)
 
@@ -185,8 +186,8 @@ def parse_date(
         # 2025.03 这类数值是年-月，而不是 Excel 日期序列号。
         if 1900 <= number < 10000:
             year = int(number)
-            fraction = number - year
-            month = int(round(fraction * 100)) if fraction else 1
+            fraction = decimal_subtract(number, year)
+            month = int(round(decimal_multiply(fraction, 100))) if fraction else 1
             if 1 <= month <= 12:
                 return (
                     f"{year:04d}-{month:02d}-01",
@@ -495,14 +496,14 @@ def recalculate_derived_fields(rows: list[dict]) -> None:
         end_km = parse_number(row.get("拆卸时公里数"))
 
         row["寿命（时间）"] = (
-            end_time - start_time
+            decimal_subtract(end_time, start_time)
             if start_time is not None
             and end_time is not None
             and end_time >= start_time
             else None
         )
         row["寿命（里程）"] = (
-            end_km - start_km
+            decimal_subtract(end_km, start_km)
             if start_km is not None
             and end_km is not None
             and end_km >= start_km
@@ -512,7 +513,7 @@ def recalculate_derived_fields(rows: list[dict]) -> None:
         standard_life = parse_number(row.get("标准寿命"))
         life_time = row.get("寿命（时间）")
         row["磨损程度"] = (
-            life_time / standard_life
+            decimal_divide(life_time, standard_life)
             if life_time is not None
             and standard_life is not None
             and standard_life > 0
@@ -734,13 +735,13 @@ def parse_sheet(
                 life_time = None
                 life_km = None
                 if start_time is not None and end_time is not None:
-                    candidate = end_time - start_time
+                    candidate = decimal_subtract(end_time, start_time)
                     if candidate >= 0:
                         life_time = candidate
                     else:
                         exceptions.append("寿命时间为负，已置空")
                 if start_km is not None and end_km is not None:
-                    candidate = end_km - start_km
+                    candidate = decimal_subtract(end_km, start_km)
                     if candidate >= 0:
                         life_km = candidate
                     else:
@@ -751,7 +752,7 @@ def parse_sheet(
                 if standard_life is None or standard_life <= 0:
                     exceptions.append("标准寿命缺失或为0，磨损程度未计算")
                 else:
-                    wear = life_time / standard_life
+                    wear = decimal_divide(life_time, standard_life)
             if standard_life_error:
                 exceptions.append(f"标准寿命字段错误({standard_life_error})")
 

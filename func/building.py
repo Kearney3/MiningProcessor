@@ -7,6 +7,8 @@ from datetime import date
 
 import pandas as pd
 
+from func.number_utils import decimal_divide
+
 
 # ── 辅助函数 ──────────────────────────────────────────────────
 
@@ -39,7 +41,7 @@ def _fault_rate(minutes: int, min_d: date | None, max_d: date | None) -> float:
     """计算故障率（故障分钟 / 总统计分钟）。"""
     total_days = _total_span_days(min_d, max_d)
     total_minutes = total_days * 24 * 60 if total_days else 0
-    return minutes / total_minutes if total_minutes else 0
+    return decimal_divide(minutes, total_minutes) if total_minutes else 0
 
 
 def _month_key(dt: date) -> str:
@@ -127,14 +129,14 @@ def build_sheets(
         y, m = mk.split("-")
         import calendar
         month_total_days = calendar.monthrange(int(y), int(m))[1]
-        rate = s["minutes"] / (month_total_days * 24 * 60) if month_total_days else 0
+        rate = decimal_divide(s["minutes"], month_total_days * 24 * 60) if month_total_days else 0
         row = {
             "月份": mk,
             "标准设备名称": v,
             "设备型号": s["model"],
             "有故障日数": len(s["fault_days"]),
             "总故障分钟": s["minutes"],
-            "总故障小时": round(s["minutes"] / 60, 1),
+            "总故障小时": round(decimal_divide(s["minutes"], 60), 1),
             "故障率": rate,
         }
         for maj in majors:
@@ -142,7 +144,7 @@ def build_sheets(
             mm = s["major_minutes"][maj]
             row[f"{maj}(故障日数)"] = len(md)
             row[f"{maj}(总故障分钟)"] = mm
-            row[f"{maj}(故障占比)"] = mm / s["minutes"] if s["minutes"] else 0
+            row[f"{maj}(故障占比)"] = decimal_divide(mm, s["minutes"]) if s["minutes"] else 0
         sheet2_rows.append(row)
     sheets["每月设备故障统计"] = pd.DataFrame(sheet2_rows)
 
@@ -174,7 +176,7 @@ def build_sheets(
         dd = device_dates.get(v, {})
         min_d, max_d = dd.get("min_date"), dd.get("max_date")
         total_days = _total_span_days(min_d, max_d)
-        rate = ls["minutes"] / (total_days * 24 * 60) if total_days else 0
+        rate = decimal_divide(ls["minutes"], total_days * 24 * 60) if total_days else 0
         row = {
             "月份": f"{min_d.year}-{min_d.month:02d}~{max_d.year}-{max_d.month:02d}" if min_d and max_d else "",
             "标准设备名称": v,
@@ -184,7 +186,7 @@ def build_sheets(
             "总日数": total_days,
             "有故障日数": len(ls["fault_days"]),
             "总故障分钟": ls["minutes"],
-            "总故障小时": round(ls["minutes"] / 60, 1),
+            "总故障小时": round(decimal_divide(ls["minutes"], 60), 1),
             "故障率": rate,
         }
         for maj in majors:
@@ -192,7 +194,7 @@ def build_sheets(
             mm = ls["major_minutes"][maj]
             row[f"{maj}(故障日数)"] = len(md)
             row[f"{maj}(总故障分钟)"] = mm
-            row[f"{maj}(故障占比)"] = mm / ls["minutes"] if ls["minutes"] else 0
+            row[f"{maj}(故障占比)"] = decimal_divide(mm, ls["minutes"]) if ls["minutes"] else 0
         sheet3_rows.append(row)
     sheets["全周期设备故障统计"] = pd.DataFrame(sheet3_rows)
 
@@ -231,10 +233,10 @@ def build_sheets(
             "大类": major,
             "小类": minor,
             "总故障分钟": ds["minutes"],
-            "总故障小时": round(ds["minutes"] / 60, 1),
+            "总故障小时": round(decimal_divide(ds["minutes"], 60), 1),
             "故障率": _fault_rate(ds["minutes"], min_d, max_d),
-            "小类故障占比": ds["minutes"] / major_mins if major_mins else 0,
-            "大类故障占比": ds["minutes"] / dev_mins if dev_mins else 0,
+            "小类故障占比": decimal_divide(ds["minutes"], major_mins) if major_mins else 0,
+            "大类故障占比": decimal_divide(ds["minutes"], dev_mins) if dev_mins else 0,
         }
         sheet4_rows.append(row)
     sheets["全周期设备故障汇总"] = pd.DataFrame(sheet4_rows)
@@ -263,14 +265,14 @@ def build_sheets(
         y, m = mk.split("-")
         import calendar
         month_total_days = calendar.monthrange(int(y), int(m))[1]
-        rate = ms["minutes"] / (month_total_days * 24 * 60) if month_total_days else 0
+        rate = decimal_divide(ms["minutes"], month_total_days * 24 * 60) if month_total_days else 0
         row = {
             "月份": mk,
             "设备型号": model,
             "有效台数": len(ms["devices"]),
             "有故障日数": len(ms["fault_days"]),
             "总故障分钟": ms["minutes"],
-            "总故障小时": round(ms["minutes"] / 60, 1),
+            "总故障小时": round(decimal_divide(ms["minutes"], 60), 1),
             "故障率": rate,
         }
         for maj in majors:
@@ -278,7 +280,7 @@ def build_sheets(
             mm = ms["major_minutes"][maj]
             row[f"{maj}(故障日数)"] = len(md)
             row[f"{maj}(总故障分钟)"] = mm
-            row[f"{maj}(故障占比)"] = mm / ms["minutes"] if ms["minutes"] else 0
+            row[f"{maj}(故障占比)"] = decimal_divide(mm, ms["minutes"]) if ms["minutes"] else 0
         sheet5_rows.append(row)
     sheets["每月设备型号故障统计"] = pd.DataFrame(sheet5_rows)
 
@@ -308,14 +310,14 @@ def build_sheets(
             for v in ls["devices"]
         )
         model_total_minutes = model_total_days * 24 * 60 if model_total_days else 0
-        rate = ls["minutes"] / model_total_minutes if model_total_minutes else 0
+        rate = decimal_divide(ls["minutes"], model_total_minutes) if model_total_minutes else 0
         row = {
             "设备型号": model,
             "有效台数": len(ls["devices"]),
             "总统计日数": model_total_days,
             "总故障天数": len(ls["fault_days"]),
             "总故障分钟": ls["minutes"],
-            "总故障小时": round(ls["minutes"] / 60, 1),
+            "总故障小时": round(decimal_divide(ls["minutes"], 60), 1),
             "故障率": rate,
         }
         for maj in majors:
@@ -323,7 +325,7 @@ def build_sheets(
             mm = ls["major_minutes"][maj]
             row[f"{maj}(故障日数)"] = len(md)
             row[f"{maj}(总故障分钟)"] = mm
-            row[f"{maj}(故障占比)"] = mm / ls["minutes"] if ls["minutes"] else 0
+            row[f"{maj}(故障占比)"] = decimal_divide(mm, ls["minutes"]) if ls["minutes"] else 0
         sheet6_rows.append(row)
     sheets["全周期设备型号故障统计"] = pd.DataFrame(sheet6_rows)
 
@@ -351,7 +353,7 @@ def build_sheets(
         )
         major_mins = model_major_minutes.get(f"{model}|{major}", 1)
         mod_mins = model_total_minutes.get(model, 1)
-        rate = ms["minutes"] / (model_total_days * 24 * 60) if model_total_days else 0
+        rate = decimal_divide(ms["minutes"], model_total_days * 24 * 60) if model_total_days else 0
         sheet7_rows.append({
             "设备型号": model,
             "有效台数": len(ms["devices"]),
@@ -360,10 +362,10 @@ def build_sheets(
             "大类": major,
             "小类": minor,
             "总故障分钟": ms["minutes"],
-            "总故障小时": round(ms["minutes"] / 60, 1),
+            "总故障小时": round(decimal_divide(ms["minutes"], 60), 1),
             "故障率": rate,
-            "小类故障占比": ms["minutes"] / major_mins if major_mins else 0,
-            "大类故障占比": ms["minutes"] / mod_mins if mod_mins else 0,
+            "小类故障占比": decimal_divide(ms["minutes"], major_mins) if major_mins else 0,
+            "大类故障占比": decimal_divide(ms["minutes"], mod_mins) if mod_mins else 0,
         })
     sheets["全周期设备型号故障汇总"] = pd.DataFrame(sheet7_rows)
 
@@ -395,10 +397,10 @@ def build_sheets(
             "小类": minor,
             "记录数": ts["count"],
             "维修工时（分钟）": ts["minutes"],
-            "维修工时（小时）": round(ts["minutes"] / 60, 1),
-            "占大类故障时间比例": ts["minutes"] / major_mins if major_mins else 0,
-            "占总故障时间比例": ts["minutes"] / month_mins if month_mins else 0,
-            "大类故障占比": major_mins / month_mins if month_mins else 0,
+            "维修工时（小时）": round(decimal_divide(ts["minutes"], 60), 1),
+            "占大类故障时间比例": decimal_divide(ts["minutes"], major_mins) if major_mins else 0,
+            "占总故障时间比例": decimal_divide(ts["minutes"], month_mins) if month_mins else 0,
+            "大类故障占比": decimal_divide(major_mins, month_mins) if month_mins else 0,
         }
         sheet8_rows.append(row)
     sheets["故障类型统计"] = pd.DataFrame(sheet8_rows)

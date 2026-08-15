@@ -9,6 +9,7 @@ from func.excel_tire import (
     TIRE_OUTPUT_SHEET,
     parse_tire_workbook,
     process_tire_data,
+    recalculate_derived_fields,
 )
 from func.ledger_postprocess import match_sheets
 
@@ -129,6 +130,23 @@ def test_parse_all_sheets_deduplicates_and_recalculates(tmp_path):
     assert running["拆卸时公里数"] is None
     assert running["寿命（时间）"] is None
     assert [row["安装次数"] for row in rows] == [1, 2]
+
+
+def test_recalculate_derived_fields_uses_decimal_meter_values():
+    rows = [{
+        "胎号": "T-DECIMAL",
+        "周期状态": "已结束",
+        "安装时使用时间": 20959.5,
+        "拆卸时使用时间": 20968.3,
+        "安装时公里数": 5000.5,
+        "拆卸时公里数": 5050.3,
+        "标准寿命": 100,
+    }]
+
+    recalculate_derived_fields(rows)
+
+    assert rows[0]["寿命（时间）"] == 8.8
+    assert rows[0]["寿命（里程）"] == 49.8
 
 
 def test_tire_anomaly_rules_cover_time_and_mileage():
