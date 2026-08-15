@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT))
 from func.sync_to_minebase import (
     MineBaseAPIClient,
     _apply_defaults,
+    _apply_ledger_matching,
     _build_field_mappings,
     _df_to_mapped_rows,
     _filter_by_date_range,
@@ -1335,6 +1336,112 @@ class TestLedgerToggleSplit:
         sig = inspect.signature(sync)
         assert sig.parameters["use_equipment_ledger"].default is False
         assert sig.parameters["use_oil_ledger"].default is True
+
+
+class TestEquipmentLedgerSyncMatching:
+    """设备台账匹配应同时替换设备名称和设备编号。"""
+
+    @staticmethod
+    def _make_ledger():
+        from func.equipment_ledger import EquipmentLedger
+
+        ledger = EquipmentLedger()
+        ledger._df = pd.DataFrame([
+            {
+                "设备名称": "原始设备",
+                "设备编号": "RAW#1",
+                "公司": "原公司",
+                "标准设备名称": "标准设备",
+                "标准设备编号": "STD#1",
+                "标准公司名称": "标准公司",
+            },
+        ])
+        ledger._build_search_cache()
+        return ledger
+
+    def test_replaces_source_name_and_code_without_mutating_input(self):
+        rows = [{
+            "sourceEquipmentName": "原始设备",
+            "sourceEquipmentCode": "RAW#1",
+            "_row_num": 2,
+        }]
+
+        result = _apply_ledger_matching(rows, "fuel", self._make_ledger())
+
+        assert result[0]["sourceEquipmentName"] == "标准设备"
+        assert result[0]["sourceEquipmentCode"] == "STD#1"
+        assert rows[0]["sourceEquipmentName"] == "原始设备"
+        assert rows[0]["sourceEquipmentCode"] == "RAW#1"
+
+
+class TestDryRunEquipmentLedgerOutput:
+    """试运行导出的 Excel 应包含台账替换后的名称和编号。"""
+
+    @patch("func.sync_to_minebase._process_fuel_file")
+    @patch("func.sync_to_minebase.discover_files")
+    @patch("func.config_loader.load_equipment_ledger_cache")
+    def test_dry_run_exports_replaced_device_name_and_code(
+        self, mock_eq_cache, mock_discover, mock_fuel, tmp_path,
+    ):
+        mapping = {
+            "fuel_consumption": {
+                "日期": "date",
+                "班次": "shiftType",
+                "设备名称": "sourceEquipmentName",
+                "设备编号": "sourceEquipmentCode",
+                "油品种类": "fuelName",
+                "油品消耗": "consumption",
+            },
+        }
+        mapping_path = tmp_path / "mapping.json"
+        mapping_path.write_text(json.dumps(mapping, ensure_ascii=False), encoding="utf-8")
+
+        mock_discover.return_value = {"fuel": [tmp_path / "Fuel.xlsx"]}
+        mock_fuel.return_value = [{
+            "date": "2025-06-01",
+            "shiftType": "Day",
+            "sourceEquipmentName": "原始设备",
+            "sourceEquipmentCode": "RAW#1",
+            "fuelName": "0#柴油",
+            "consumption": 100,
+        }]
+        mock_eq_cache.return_value = [{
+            "设备名称": "原始设备",
+            "设备编号": "RAW#1",
+            "公司": "原公司",
+            "标准设备名称": "标准设备",
+            "标准设备编号": "STD#1",
+            "标准公司名称": "标准公司",
+        }]
+
+        with patch("func.sync_to_minebase.MineBaseAPIClient") as mock_api_cls, \
+             patch(
+                 "func.config_loader.get_minebase_api_config",
+                 return_value={"url": "http://test", "username": "u", "password": "p"},
+             ):
+            mock_api_cls.return_value = MagicMock()
+            results = sync(
+                tmp_path,
+                mode="api",
+                data_types=["fuel"],
+                dry_run=True,
+                mapping_file=mapping_path,
+                use_equipment_ledger=True,
+                use_oil_ledger=False,
+            )
+
+        from openpyxl import load_workbook
+
+        output_file = Path(results["_dry_run_file"])
+        wb = load_workbook(output_file, data_only=True)
+        ws = wb["油耗数据"]
+        headers = {
+            ws.cell(row=2, column=col).value: col
+            for col in range(1, ws.max_column + 1)
+        }
+        assert ws.cell(row=3, column=headers["sourceEquipmentName"]).value == "标准设备"
+        assert ws.cell(row=3, column=headers["sourceEquipmentCode"]).value == "STD#1"
+        wb.close()
 
 
 # ---------------------------------------------------------------------------
