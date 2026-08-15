@@ -18,6 +18,7 @@ from func import config_loader
 from func.logger import get_logger
 from func.excel_utils import dedup_dataframe, get_output_filename
 from func.ledger_postprocess import match_sheets
+from func.number_utils import decimal_sum
 from func.time_utils import local_now
 
 
@@ -481,11 +482,11 @@ def _aggregate_production_data(
             index=truck_group_keys,
             columns="矿石类型",
             values="产量",
-            aggfunc="sum",
+            aggfunc=decimal_sum,
             fill_value=0,
         ).reset_index()
         # 聚合运次
-        trips_df = df.groupby(truck_group_keys, sort=False)["运次"].sum().reset_index()
+        trips_df = df.groupby(truck_group_keys, sort=False)["运次"].agg(decimal_sum).reset_index()
         # 合并
         df1 = pivot_df.merge(trips_df, on=truck_group_keys, how="left")
         # 统一列名
@@ -504,10 +505,10 @@ def _aggregate_production_data(
             index=excavator_group_keys,
             columns="矿石类型",
             values="产量",
-            aggfunc="sum",
+            aggfunc=decimal_sum,
             fill_value=0,
         ).reset_index()
-        trips_df2 = df.groupby(excavator_group_keys, sort=False)["运次"].sum().reset_index()
+        trips_df2 = df.groupby(excavator_group_keys, sort=False)["运次"].agg(decimal_sum).reset_index()
         df2 = pivot_df2.merge(trips_df2, on=excavator_group_keys, how="left")
         df2 = df2.rename(columns={excavator_name_col: "标准设备名称"})
         logger.info(f"挖机聚合完成: {len(df2)} 行")
@@ -560,7 +561,7 @@ def _aggregate_fuel_data(
     agg_dict = {}
     # 油品消耗求和
     if "油品消耗" in df.columns:
-        agg_dict["油品消耗"] = "sum"
+        agg_dict["油品消耗"] = decimal_sum
     # 设备名称/编号取第一个
     if "设备名称" in df.columns:
         agg_dict["设备名称"] = "first"

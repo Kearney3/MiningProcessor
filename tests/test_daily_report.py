@@ -6,6 +6,8 @@ from func.daily_report import (
     export_daily_report,
     validate_daily_report_formulas,
     _match_material_statistics,
+    _energy_aggregates,
+    _operation_aggregates,
 )
 from func.equipment_ledger import EquipmentLedger
 from func.model_ledger import ModelLedger
@@ -100,6 +102,53 @@ def test_daily_report_uses_worktime_devices_and_expands_production(tmp_path):
         item["数据类型"] == "生产数据" and "未归入其他" in item["消息"]
         for item in result.warnings
     )
+
+
+def test_daily_report_aggregates_decimal_values_without_float_tail():
+    operation = pd.DataFrame([
+        {"日期": "2026-08-15", "班次": "Day", "设备名称": "TR-1",
+         "运行小时数": 0.1, "运行里程": 0.2},
+        {"日期": "2026-08-15", "班次": "Day", "设备名称": "TR-1",
+         "运行小时数": 0.2, "运行里程": 0.1},
+    ])
+    operation_values = next(iter(_operation_aggregates(operation, None, None, None, None).values()))
+
+    energy = pd.DataFrame([
+        {"日期": "2026-08-15", "班次": "Day", "设备名称": "TR-1", "油品消耗": 0.1},
+        {"日期": "2026-08-15", "班次": "Day", "设备名称": "TR-1", "油品消耗": 0.2},
+    ])
+    energy_value = next(iter(_energy_aggregates(energy, None, None, None, None).values()))
+
+    assert operation_values["运行小时数"] == 0.3
+    assert operation_values["运行里程"] == 0.3
+    assert energy_value == 0.3
+
+
+def test_daily_report_formula_arithmetic_uses_decimal_values():
+    formula = daily_report_module._SafeFormula("left+right")
+
+    assert formula.evaluate({"left": 0.1, "right": 0.2}) == 0.3
+
+
+def test_daily_report_distance_uses_decimal_arithmetic(tmp_path):
+    _write_sources(tmp_path)
+    operation = pd.DataFrame([
+        {"日期": "2026-08-10", "班次": "Day", "设备名称": "原挖机", "设备编号": "1",
+         "运行小时数": 0.1, "运行里程": 0.3},
+    ])
+    production = pd.DataFrame([
+        {"日期": "2026-08-10", "班次": "Day", "矿卡名称": "原挖机", "矿卡编号": "1",
+         "挖机名称": "原挖机", "挖机编号": "1",
+         "矿石类型": "Нүүрс", "运次": 3, "产量": 0.3},
+    ])
+    with pd.ExcelWriter(tmp_path / "合并产量.xlsx") as writer:
+        operation.to_excel(writer, sheet_name="运行数据", index=False)
+        production.to_excel(writer, sheet_name="生产数据", index=False)
+
+    result = build_daily_report(tmp_path, "2026-08-10", "2026-08-10")
+    row = result.report[result.report["标准设备名称"] == "原挖机"].iloc[0]
+
+    assert row["运距（里程/趟次/2）"] == 0.025
 
 
 def test_daily_report_export_has_warning_sheet(tmp_path):

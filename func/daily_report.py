@@ -20,6 +20,14 @@ from func.config_loader import get_daily_report_config
 from func.excel_formatter import write_formatted_excel
 from func.ledger_enrichment import resolve_equipment_attributes
 from func.logger import get_logger
+from func.number_utils import (
+    decimal_add,
+    decimal_divide,
+    decimal_mod,
+    decimal_multiply,
+    decimal_power,
+    decimal_subtract,
+)
 from func.string_utils import clean_string
 from func.time_utils import local_today
 
@@ -488,9 +496,14 @@ class _SafeFormula:
             left, right = self._eval(node.left, values), self._eval(node.right, values)
             if isinstance(node.op, ast.Div) and right == 0:
                 return 0.0
-            return {ast.Add: lambda: left + right, ast.Sub: lambda: left - right,
-                    ast.Mult: lambda: left * right, ast.Div: lambda: left / right,
-                    ast.Mod: lambda: left % right, ast.Pow: lambda: left ** right}[type(node.op)]()
+            return {
+                ast.Add: lambda: decimal_add(left, right),
+                ast.Sub: lambda: decimal_subtract(left, right),
+                ast.Mult: lambda: decimal_multiply(left, right),
+                ast.Div: lambda: decimal_divide(left, right),
+                ast.Mod: lambda: decimal_mod(left, right),
+                ast.Pow: lambda: decimal_power(left, right),
+            }[type(node.op)]()
         if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
             value = self._eval(node.operand, values)
             return value if isinstance(node.op, ast.UAdd) else -value
@@ -640,8 +653,12 @@ def _operation_aggregates(operation: pd.DataFrame, equipment_ledger, model_ledge
             "公里数仪表结束": ["公里数仪表结束", "milemeterEnd"],
         }.items():
             bucket[out] = _number(_value(row, aliases))
-        bucket["运行小时数"] += _number(_value(row, ["运行小时数", "runningHours"]))
-        bucket["运行里程"] += _number(_value(row, ["运行里程", "mileage"]))
+        bucket["运行小时数"] = decimal_add(
+            bucket["运行小时数"], _number(_value(row, ["运行小时数", "runningHours"]))
+        )
+        bucket["运行里程"] = decimal_add(
+            bucket["运行里程"], _number(_value(row, ["运行里程", "mileage"]))
+        )
     return result
 
 
@@ -660,8 +677,9 @@ def _energy_aggregates(df: pd.DataFrame, equipment_ledger, model_ledger, start, 
             company_fields=["公司", "sourceCompany", "原始公司名称"],
         )
         key = _device_key(attrs, target_date, shift)
-        result[key] = result.get(key, 0.0) + _number(
-            _value(row, ["电力消耗", "consumption"] if electrical else ["油品消耗", "consumption"])
+        result[key] = decimal_add(
+            result.get(key, 0.0),
+            _number(_value(row, ["电力消耗", "consumption"] if electrical else ["油品消耗", "consumption"])),
         )
     return result
 
@@ -835,16 +853,18 @@ def build_daily_report(
             bucket = production_buckets.setdefault(key, {
                 "产量": 0.0, "趟次": 0.0, "统计": {}, "物料": {},
             })
-            bucket["产量"] += production_value
-            bucket["趟次"] += trip_value
+            bucket["产量"] = decimal_add(bucket["产量"], production_value)
+            bucket["趟次"] = decimal_add(bucket["趟次"], trip_value)
             if statistic_target:
-                bucket["统计"][statistic_target] = bucket["统计"].get(statistic_target, 0.0) + production_value
+                bucket["统计"][statistic_target] = decimal_add(
+                    bucket["统计"].get(statistic_target, 0.0), production_value
+                )
             elif material:
                 unmatched_statistics_materials.add(material_display)
             if material:
                 material_bucket = bucket["物料"].setdefault(material_display, {"产量": 0.0, "趟次": 0.0})
-                material_bucket["产量"] += production_value
-                material_bucket["趟次"] += trip_value
+                material_bucket["产量"] = decimal_add(material_bucket["产量"], production_value)
+                material_bucket["趟次"] = decimal_add(material_bucket["趟次"], trip_value)
 
     for material in sorted(unmatched_statistics_materials, key=str.casefold):
         warnings.append({
@@ -898,7 +918,14 @@ def build_daily_report(
             row["能耗"], row["能耗单位"] = electric_value, "kWh"
         else:
             row["能耗"], row["能耗单位"] = 0.0, ""
-        row["运距（里程/趟次/2）"] = row.get("运行里程", 0.0) / row["趟次"] / 2 if row["趟次"] else 0.0
+        row["运距（里程/趟次/2）"] = (
+            decimal_divide(
+                row.get("运行里程", 0.0),
+                decimal_multiply(row["趟次"], 2),
+            )
+            if row["趟次"]
+            else 0.0
+        )
         extra = worktime_extra.get(key, {})
         row.update(extra)
         context = _formula_context(pd.Series(extra), formula_aliases)
