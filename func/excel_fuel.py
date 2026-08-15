@@ -275,7 +275,7 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
                         device_name = f"{device_name} #{device_id}"
                     device_name = clean_string(device_name)
                     if not device_name:
-                        continue
+                        device_name = device_id
 
                     current_row_initial_val = np.nan
                     shift_data_map = {}
