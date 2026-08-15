@@ -23,11 +23,12 @@ def create_model_ledger_section(page: ft.Page, log) -> tuple[ft.Container, dict]
     from func import config_loader
 
     cfg = LedgerConfig(
-        section_title=t("components:model_ledger.modelLedger"),
+        section_title="型号台账",
+        display_title=t("components:model_ledger.modelLedger"),
         label_prefix=t("components:model_ledger.modelLedger"),
         empty_icon=getattr(ft.Icons, "ENGINEERING_OUTLINED", ft.Icons.INVENTORY_2_OUTLINED),
         empty_text=t("components:model_ledger.ledgermodelLedgerdata"),
-        template_filename=t("components:model_ledger.modelLedgertemplateXlsx"),
+        template_filename="型号台账模板.xlsx",
         dialog_title=t("components:model_ledger.importModelLedger"),
         dialog_height=400,
         backend_module=model_ledger,

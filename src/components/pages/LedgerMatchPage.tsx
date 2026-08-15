@@ -376,8 +376,8 @@ export function LedgerMatchPage({ bridge }: { bridge: BridgeProp }) {
     const outputPath = await save({
       filters: [{ name: "Excel", extensions: ["xlsx"] }],
       defaultPath: mode === "all-sheets"
-        ? t("pages:LedgerMatchPage.matchingResultsXlsx")
-        : t("pages:LedgerMatchPage.matchingResultsFilename", { sheet: sheetName }),
+        ? "匹配结果.xlsx"
+        : `${sheetName}_匹配结果.xlsx`,
     });
     if (!outputPath) return;
 

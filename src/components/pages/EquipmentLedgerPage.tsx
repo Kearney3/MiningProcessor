@@ -11,6 +11,8 @@ const IconTruck = () => (
 type LedgerBackendConfig = Omit<LedgerPageConfig, "title" | "standardColumns" | "emptyMessage">;
 
 const config: LedgerBackendConfig = {
+  businessTitle: "设备台账",
+  businessTemplateFilename: "设备台账模板.xlsx",
   icon: <IconTruck />,
   loadDataMethod: "get_equipment_ledger_data",
   importMethod: "import_equipment_ledger",
@@ -30,14 +32,7 @@ export function EquipmentLedgerPage({ bridge }: { bridge: BridgeProp }) {
   const translatedConfig: LedgerPageConfig = {
     ...config,
     title: t("pages:EquipmentLedgerPage.equipmentLedger"),
-    standardColumns: [
-      t("pages:EquipmentLedgerPage.equipment"),
-      t("pages:EquipmentLedgerPage.equipmentId"),
-      t("pages:EquipmentLedgerPage.company"),
-      t("pages:EquipmentLedgerPage.standardEquipmentName"),
-      t("pages:EquipmentLedgerPage.standardEquipmentId"),
-      t("pages:EquipmentLedgerPage.standardCompanyName"),
-    ],
+    standardColumns: ["设备名称", "设备编号", "公司", "标准设备名称", "标准设备编号", "标准公司名称"],
     emptyMessage: t("pages:EquipmentLedgerPage.noEquipmentLedgerDataImportAnEquipmentLedgerExcelFileFirst"),
   };
 
