@@ -3,7 +3,7 @@
 > 矿山运营 Excel 报表批量处理工具
 
 <p>
-  <img src="https://img.shields.io/badge/version-v2.5.0-blue?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-v2.6.0-blue?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/Python-≥3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="python" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square" alt="license" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="platform" />
@@ -432,6 +432,13 @@ uv run scripts/bump_version.py --bump minor --dry-run
 ---
 
 ## 📋 更新日志
+
+### v2.6.0 · 2026-08-15
+
+- 🌐 **i18n 界面国际化**
+  - Flet 与 Tauri UI 统一使用 namespace 模式
+  - 保持设备台账、油品台账及 Excel 业务字段使用中文标识
+  - 移除旧 key 兼容与 hash 后缀
 
 ### v2.5.0 · 2026-08-11
 
