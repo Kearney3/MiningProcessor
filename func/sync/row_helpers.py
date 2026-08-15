@@ -88,7 +88,7 @@ def _apply_ledger_matching(
     ledger: Any,
     warnings: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """使用设备台账标准化行数据中的设备名称。
+    """使用设备台账标准化行数据中的设备名称和设备编号。
 
     Args:
         rows: 已映射的行数据列表。
@@ -97,7 +97,7 @@ def _apply_ledger_matching(
         warnings: 可选警告收集列表，未匹配的设备名会追加到此列表。
 
     Returns:
-        设备名称标准化后的新列表。
+        设备名称和设备编号标准化后的新列表。
     """
     from func.equipment_ledger import EquipmentLedger
 
@@ -108,7 +108,8 @@ def _apply_ledger_matching(
     if not name_fields:
         return rows
 
-    matched_count = 0
+    matched_name_count = 0
+    matched_id_count = 0
     result = []
     for row in rows:
         new_row = dict(row)
@@ -116,14 +117,23 @@ def _apply_ledger_matching(
             raw_name = row.get(field)
             if not raw_name:
                 continue
-            device_id = row.get(
-                _LEDGER_ID_FIELDS.get((data_type, field), "sourceEquipmentCode")
-            )
+            id_field = _LEDGER_ID_FIELDS.get((data_type, field), "sourceEquipmentCode")
+            device_id = row.get(id_field)
             match = ledger.match_device(name=str(raw_name), device_id=device_id)
-            if match and match["标准设备名称"] != raw_name:
-                new_row[field] = match["标准设备名称"]
-                matched_count += 1
-            elif not match and warnings is not None:
+            if match:
+                standard_name = match.get("标准设备名称")
+                if standard_name and new_row.get(field) != standard_name:
+                    new_row[field] = standard_name
+                    matched_name_count += 1
+
+                # 设备台账匹配成功后，上传/预览数据中的原始设备编号也要
+                # 统一为标准设备编号。仅替换原数据中实际存在的编号字段，
+                # 避免因某些报表没有设备编号而凭空增加上传字段。
+                standard_id = match.get("标准设备编号")
+                if standard_id and id_field in row and new_row.get(id_field) != standard_id:
+                    new_row[id_field] = standard_id
+                    matched_id_count += 1
+            elif warnings is not None:
                 warnings.append({
                     "row": row.get("_row_num", "?"),
                     "field": field,
@@ -132,8 +142,13 @@ def _apply_ledger_matching(
                 })
         result.append(new_row)
 
-    if matched_count:
-        logger.info("[%s] 台账匹配: 标准化 %d 个设备名称", data_type, matched_count)
+    if matched_name_count or matched_id_count:
+        logger.info(
+            "[%s] 台账匹配: 标准化 %d 个设备名称，替换 %d 个设备编号",
+            data_type,
+            matched_name_count,
+            matched_id_count,
+        )
     return result
 
 

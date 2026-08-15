@@ -344,7 +344,10 @@ def process_single(
         logger.warning("型号台账匹配需要同时启用设备台账匹配，已跳过型号台账")
         use_model_ledger = False
         model_ledger = None
-    elif use_model_ledger and model_ledger is None:
+    elif use_model_ledger and model_ledger is None and equipment_ledger is not None:
+        # Flet GUI 已传入设备台账实例时，型号台账可以在内存中补充加载。
+        # 缓存入口则保留 model_ledger=None，统一交给
+        # postprocess_from_cache() 同时加载设备台账和型号台账。
         model_ledger = load_model_ledger_from_cache()
 
     # ── 分发到各处理器 ──
@@ -471,7 +474,7 @@ def process_single(
 
     # ── 台账匹配后处理 ──
     if use_equipment_ledger or use_oil_ledger or use_model_ledger:
-        if equipment_ledger is None and oil_ledger is None and model_ledger is None:
+        if equipment_ledger is None and oil_ledger is None:
             cache_kwargs = {
                 "use_equipment_ledger": use_equipment_ledger,
                 "use_oil_ledger": use_oil_ledger,

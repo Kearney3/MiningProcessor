@@ -3,6 +3,7 @@ import pathlib
 import sys
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
 import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -15,6 +16,7 @@ from func.orchestration import (
     load_oil_ledger_from_cache,
     postprocess_from_cache,
     postprocess_with_ledgers,
+    process_single,
 )
 
 
@@ -141,6 +143,62 @@ class TestPostprocessFromCache:
         sheets = {"sheet1": "dataframe"}
         result = postprocess_from_cache("out.xlsx", use_oil_ledger=True, preloaded_sheets=sheets)
         mock_post.assert_called_once_with("out.xlsx", None, "oil", sheets)
+
+
+class TestProcessSingleLedgerCache:
+    def test_loads_equipment_before_model_when_both_are_enabled(self, tmp_path):
+        """缓存入口必须先加载设备台账，再用标准编号匹配型号台账。"""
+        input_file = tmp_path / "input.xlsx"
+        output_file = tmp_path / "Fuel.xlsx"
+
+        def write_processed_output(path, **kwargs):
+            pd.DataFrame({
+                "设备名称": ["原始设备"],
+                "设备编号": ["RAW#1"],
+                "油品种类": ["柴油"],
+                "油品消耗": [100],
+            }).to_excel(output_file, index=False)
+
+        class StubEquipmentLedger:
+            def match_device(self, name=None, device_id=None):
+                return {
+                    "标准设备名称": "标准设备 STD#1",
+                    "标准设备编号": "STD#1",
+                    "标准公司名称": "测试公司",
+                }
+
+        class StubModelLedger:
+            def match_by_standard_id(self, standard_device_id):
+                assert standard_device_id == "STD#1"
+                return {
+                    "标准设备编号": "STD#1",
+                    "标准公司名称": "测试公司",
+                    "所有权": "自有",
+                    "设备型号": "MODEL-1",
+                    "设备类型": "矿卡",
+                    "内部分类": "运输设备",
+                }
+
+        with patch("func.excel_fuel.process_diesel_data", side_effect=write_processed_output), \
+             patch(
+                 "func.orchestration.load_equipment_ledger_from_cache",
+                 return_value=StubEquipmentLedger(),
+             ), \
+             patch(
+                 "func.orchestration.load_model_ledger_from_cache",
+                 return_value=StubModelLedger(),
+             ):
+            result = process_single(
+                "fuel",
+                str(input_file),
+                year=2026,
+                use_equipment_ledger=True,
+                use_model_ledger=True,
+            )
+
+        output = pd.read_excel(result["output_file"])
+        assert output["标准设备编号"].iloc[0] == "STD#1"
+        assert output["设备型号"].iloc[0] == "MODEL-1"
 
 
 # ---------------------------------------------------------------------------
