@@ -11,7 +11,7 @@ import re
 import threading
 
 from func import config_loader
-from func.string_utils import clean_string
+from func.string_utils import clean_string, clean_equipment_name, normalize_cyrillic_homoglyphs
 from func.logger import get_logger
 from func.excel_utils import dedup_dataframe, get_hidden_indices, filter_hidden_from_df, adjust_index_for_hidden, letters_to_col_indices
 from func.anomaly import detect_and_filter
@@ -109,8 +109,13 @@ class MiningDataProcessor:
 
     @staticmethod
     def _normalize(text: str) -> str:
-        """大写并删除空格，统一匹配基准。连字符保留（型号语义分隔符）。"""
-        return text.upper().replace(" ", "")
+        """大写、删除空格、替换西里尔同形字母，统一匹配基准。
+
+        蒙古矿区 Excel 中设备名称常混用西里尔/拉丁字母（如 СAT vs CAT），
+        肉眼无法区分但 Unicode 不同，会导致匹配失败。
+        连字符保留（型号语义分隔符）。
+        """
+        return normalize_cyrillic_homoglyphs(text.upper().replace(" ", ""))
 
     def get_load_capacity(self, truck_name):
         """根据矿卡名称模糊匹配装载量，优先匹配更长（更具体）的型号。
@@ -128,8 +133,8 @@ class MiningDataProcessor:
         return 0
 
     def safe_str(self, val):
-        """安全转字符串"""
-        return clean_string(val)
+        """安全转字符串，用于设备名称标准化（含 Cyrillic 同形字母替换）"""
+        return clean_equipment_name(val)
 
     def safe_number(self, val, default=0):
         """

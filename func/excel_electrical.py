@@ -10,7 +10,7 @@ import argparse
 
 from func.logger import get_logger
 from func.excel_utils import dedup_dataframe, detect_shift, get_hidden_indices, filter_hidden_from_df, open_workbook
-from func.string_utils import clean_string
+from func.string_utils import clean_string, clean_equipment_name
 from func.anomaly import detect_and_filter
 from func.anomaly.rules import AnomalyConfig
 from func import config_loader
@@ -120,7 +120,7 @@ def parse_excel_data(file_path, target_year=None, return_sheets=False, add_shift
                         # 使用正则提取 EX-xxxx 格式的设备名称
                         device_match = re.search(r'(EX-[\w#.-]+)', a_val)
                         if device_match:
-                            device_name = clean_string(device_match.group(1))
+                            device_name = clean_equipment_name(device_match.group(1))
 
                             # 5. 提取对应日期的消耗数值
                             for col_idx, current_date in date_mapping.items():

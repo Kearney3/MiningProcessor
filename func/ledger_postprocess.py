@@ -12,7 +12,7 @@ from func.equipment_ledger import EquipmentLedger
 from func.oil_ledger import OilLedger
 from func.ledger_enrichment import MODEL_FIELDS, resolve_equipment_attributes
 from func.excel_utils import dedup_dataframe
-from func.string_utils import clean_string
+from func.string_utils import clean_string, clean_equipment_name
 
 logger = logging.getLogger(__name__)
 
@@ -64,8 +64,8 @@ def _match_equipment_rows(
         unique_pairs = df[[name_col, id_col]].drop_duplicates()
         pair_to_result: dict[tuple, dict] = {}
         for _, row in unique_pairs.iterrows():
-            name_str = clean_string(row[name_col]) or None
-            id_str = clean_string(row[id_col]) or None
+            name_str = clean_equipment_name(row[name_col]) or None
+            id_str = clean_equipment_name(row[id_col]) or None
             result = resolve_equipment_attributes(
                 name=name_str,
                 device_id=id_str,
@@ -100,7 +100,7 @@ def _match_equipment_rows(
         unique_names = df[name_col].dropna().unique()
         name_to_result: dict = {}
         for name in unique_names:
-            name_str = clean_string(name) or None
+            name_str = clean_equipment_name(name) or None
             result = resolve_equipment_attributes(
                 name=name_str,
                 equipment_ledger=equipment_ledger,

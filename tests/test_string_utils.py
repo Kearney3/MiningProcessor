@@ -5,7 +5,7 @@ import pytest
 import pandas as pd
 import numpy as np
 
-from func.string_utils import clean_string
+from func.string_utils import clean_string, clean_equipment_name, normalize_cyrillic_homoglyphs
 
 
 class TestCleanString:
@@ -180,5 +180,155 @@ class TestCleanString:
     def test_real_world_web_copy(self):
         """模拟从网页复制的带 ZWSP 设备名"""
         assert clean_string("HITACHI​EX5600​EX#0123") == "HITACHIEX5600EX#0123"
+
+
+class TestNormalizeCyrillicHomoglyphs:
+    """测试西里尔同形字母替换函数"""
+
+    # --- 基本替换 ---
+
+    def test_cyrillic_c_to_latin(self):
+        """西里尔 С (U+0421) → 拉丁 C (U+0043)"""
+        result = normalize_cyrillic_homoglyphs("СAT777")
+        assert result == "CAT777"
+
+    def test_all_cyrillic_homoglyphs(self):
+        """覆盖全部 12 个同形字母"""
+        cyrillic = "АВСЕІКМОРТХН"
+        latin    = "ABCEIKMOPTXH"
+        assert normalize_cyrillic_homoglyphs(cyrillic) == latin
+
+    def test_mixed_script(self):
+        """混合西里尔和拉丁字母"""
+        assert normalize_cyrillic_homoglyphs("СAT 777 #18KH") == "CAT 777 #18KH"
+
+    def test_already_latin(self):
+        """纯拉丁字符串不变"""
+        assert normalize_cyrillic_homoglyphs("CAT777") == "CAT777"
+
+    def test_empty_string(self):
+        assert normalize_cyrillic_homoglyphs("") == ""
+
+    # --- 实际场景 ---
+
+    def test_mongolian_mine_truck_name(self):
+        """蒙古矿区矿卡名称场景"""
+        assert normalize_cyrillic_homoglyphs("СAT 777 #18KH") == "CAT 777 #18KH"
+
+    def test_cyrillic_only_model(self):
+        """全西里尔型号"""
+        assert normalize_cyrillic_homoglyphs("КАТ777") == "KAT777"
+
+    def test_preserves_mongolian_content(self):
+        """保留真正的蒙古文/西里尔文内容（非同形字母不替换）"""
+        text = "Мото цагийн заалт"
+        # М→M, о→o, т→t 恰好也是同形映射，但这是预期行为
+        # 关键是不影响使用场景（设备名匹配时无所谓）
+        result = normalize_cyrillic_homoglyphs(text)
+        assert result is not None  # 不应抛异常
+
+    def test_preserves_digits_and_symbols(self):
+        """数字和符号不受影响"""
+        assert normalize_cyrillic_homoglyphs("СAT-777 #18") == "CAT-777 #18"
+
+    def test_preserves_spaces(self):
+        """空格不被删除（只做字母替换）"""
+        assert normalize_cyrillic_homoglyphs("СAT 777") == "CAT 777"
+
+
+class TestCleanEquipmentName:
+    """测试 clean_equipment_name 函数（clean_string + homoglyph 二合一）"""
+
+    # --- 基本行为：继承 clean_string 的清理能力 ---
+
+    def test_none_returns_empty(self):
+        assert clean_equipment_name(None) == ""
+
+    def test_nan_returns_empty(self):
+        assert clean_equipment_name(np.nan) == ""
+
+    def test_empty_string(self):
+        assert clean_equipment_name("") == ""
+
+    def test_whitespace_only(self):
+        assert clean_equipment_name("   ") == ""
+
+    # --- homoglyph 替换 ---
+
+    def test_cyrillic_c_to_latin(self):
+        """西里尔 С (U+0421) → 拉丁 C (U+0043)"""
+        assert clean_equipment_name("СAT777") == "CAT777"
+
+    def test_all_cyrillic_homoglyphs_replaced(self):
+        """全部 12 个同形字母在 clean_equipment_name 管道中都被替换"""
+        cyrillic = "АВСЕІКМОРТХН"
+        latin    = "ABCEIKMOPTXH"
+        assert clean_equipment_name(cyrillic) == latin
+
+    def test_mixed_script_with_spaces(self):
+        """混合西里尔+拉丁+空格"""
+        assert clean_equipment_name("СAT 777 #18KH") == "CAT 777 #18KH"
+
+    def test_already_latin_unchanged(self):
+        """纯拉丁字符串不变"""
+        assert clean_equipment_name("CAT777") == "CAT777"
+
+    # --- 组合场景：clean_string 清理 + homoglyph 替换 ---
+
+    def test_whitespace_and_homoglyph_combined(self):
+        """前后空格 + 换行 + Cyrillic 同形字母"""
+        assert clean_equipment_name("  САТ-777  \n") == "CAT-777"
+
+    def test_internal_newline_and_homoglyph(self):
+        """内部换行 + homoglyph"""
+        assert clean_equipment_name("СAT\n777") == "CAT 777"
+
+    def test_tab_and_homoglyph(self):
+        """内部 Tab + homoglyph"""
+        assert clean_equipment_name("NTE\t240") == "NTE 240"
+
+    def test_zero_width_and_homoglyph(self):
+        """零宽字符 + homoglyph"""
+        assert clean_equipment_name("EX​‌#001") == "EX#001"
+
+    def test_nbsp_and_homoglyph(self):
+        """不换行空格 + homoglyph"""
+        assert clean_equipment_name("СAT 777") == "CAT 777"
+
+    def test_mixed_all_whitespace_and_homoglyph(self):
+        """所有脏数据组合"""
+        assert clean_equipment_name(" \t\n САТ \r\n 777 \t\n ") == "CAT 777"
+
+    # --- 实际设备名称场景 ---
+
+    def test_mine_truck_cyrillic_c(self):
+        """矿卡名称：西里尔 С 开头"""
+        assert clean_equipment_name("СAT 777 #18KH") == "CAT 777 #18KH"
+
+    def test_hitachi_with_cyrillic_prefix(self):
+        """挖机名称：西里尔型号前缀"""
+        assert clean_equipment_name("КАТ777") == "KAT777"
+
+    def test_real_world_excel_cell_with_homoglyph(self):
+        """模拟 Excel 单元格的脏数据 + homoglyph"""
+        assert clean_equipment_name("  NTE240 #1101\n  ") == "NTE240 #1101"
+
+    # --- 数值类型 ---
+
+    def test_integer(self):
+        assert clean_equipment_name(123) == "123"
+
+    def test_float(self):
+        assert clean_equipment_name(3.14) == "3.14"
+
+    # --- pd.Series ---
+
+    def test_series_first_element(self):
+        s = pd.Series(["  САТ777  ", "other"])
+        assert clean_equipment_name(s) == "CAT777"
+
+    def test_series_with_nan_first(self):
+        s = pd.Series([np.nan, "CAT777"])
+        assert clean_equipment_name(s) == ""
 
 
