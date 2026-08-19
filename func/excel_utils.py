@@ -194,32 +194,30 @@ def filter_hidden_from_df(
     if not hidden_rows and not hidden_cols:
         return df
 
-    result = df.copy()
-
-    # Drop hidden rows.
+    # Build row mask (keep non-hidden rows).
     # When has_header=False (header=None): Excel row 1 → df index 0.
     # When has_header=True: pandas consumed the header row, so Excel row 2 → df index 0.
     header_offset = 1 if has_header else 0
+    row_mask = pd.Series(True, index=df.index)
     if hidden_rows:
-        drop_indices = [
-            r - 1 - header_offset
-            for r in hidden_rows
-            if 0 <= r - 1 - header_offset < len(result)
-        ]
-        if drop_indices:
-            result = result.drop(index=drop_indices)
+        for r in hidden_rows:
+            idx = r - 1 - header_offset
+            if 0 <= idx < len(df):
+                row_mask.iat[idx] = False
 
-    # Drop hidden columns
+    # Build column mask (keep non-hidden columns).
     if hidden_cols:
-        drop_cols = []
-        for i in range(result.shape[1]):
-            letter = get_column_letter(i + 1)
-            if letter in hidden_cols:
-                drop_cols.append(result.columns[i])
-        if drop_cols:
-            result = result.drop(columns=drop_cols)
-            # Re-index columns to maintain sequential integer positions
-            result.columns = range(len(result.columns))
+        keep_cols = [
+            df.columns[i]
+            for i in range(df.shape[1])
+            if get_column_letter(i + 1) not in hidden_cols
+        ]
+    else:
+        keep_cols = list(df.columns)
+
+    result = df.loc[row_mask, keep_cols]
+    # Re-index columns to maintain sequential integer positions
+    result.columns = range(len(result.columns))
 
     # IMPORTANT: Do NOT reset the row index when has_header=False.
     # Preserving the original integer index lets all processors that use

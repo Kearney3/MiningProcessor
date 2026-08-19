@@ -36,7 +36,6 @@ export function MaintConfigPage({ bridge }: { bridge: BridgeProp }) {
       const data = await bridge.call<MaintClassConfig>("get_maintenance_classifications");
       setConfig(data);
     } catch (e) {
-      console.error("Failed to load maintenance classifications:", e);
     }
   }, [bridge]);
 

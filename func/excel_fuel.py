@@ -129,7 +129,7 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
                 anchor = _find_header_anchor(df_raw)
                 if anchor is not None:
                     _anchor_pos, data_start_pos = anchor
-                    header_rows = df_raw.iloc[:data_start_pos].copy().astype(object)
+                    header_rows = df_raw.iloc[:data_start_pos].astype(object)
                     if header_rows.shape[0] < 4:
                         logger.warning(f"Sheet {sheet} 表头行数不足（{header_rows.shape[0]}），跳过")
                         continue
@@ -145,7 +145,7 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
                     if start_row < 6:
                         logger.warning(f"Sheet {sheet} 行数不足（start_row={start_row}），跳过")
                         continue
-                    header_rows = df_raw.iloc[start_row - 5:start_row - 1, :].copy().astype(object)
+                    header_rows = df_raw.iloc[start_row - 5:start_row - 1, :].astype(object)
 
                 # 动态查找日期行和油品品牌行
                 _date_row_idx, _date_positions = _find_date_row(header_rows)
