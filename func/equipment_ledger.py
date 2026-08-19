@@ -7,7 +7,7 @@ from typing import Optional
 
 from func.logger import get_logger
 from func.ledger_base import LedgerBase
-from func.string_utils import clean_string
+from func.string_utils import clean_string, clean_equipment_name
 
 logger = get_logger(__name__)
 
@@ -70,16 +70,16 @@ class EquipmentLedger(LedgerBase):
             return
 
         for _, row in self._df.iterrows():
-            raw_name = clean_string(row.get("设备名称"))
+            raw_name = clean_equipment_name(row.get("设备名称"))
             std_raw = row.get("标准设备名称")
-            std_raw_clean = clean_string(std_raw)
+            std_raw_clean = clean_equipment_name(std_raw)
             standard_name = std_raw_clean if std_raw_clean else raw_name
 
             std_id_raw = row.get("标准设备编号")
             company_raw = row.get("标准公司名称")
             info = {
                 "标准设备名称": standard_name,
-                "标准设备编号": clean_string(std_id_raw),
+                "标准设备编号": clean_equipment_name(std_id_raw),
                 "标准公司名称": clean_string(company_raw),
             }
 
@@ -98,7 +98,7 @@ class EquipmentLedger(LedgerBase):
             # 仍能完成联合匹配。
             id_keys = {
                 id_key
-                for value in (clean_string(row.get("设备编号")), info["标准设备编号"])
+                for value in (clean_equipment_name(row.get("设备编号")), info["标准设备编号"])
                 for id_key in self._id_keys(value)
             }
             for name_key in name_keys:
@@ -108,7 +108,7 @@ class EquipmentLedger(LedgerBase):
 
             # 构建设备编号缓存（key 小写化）
             id_raw = row.get("设备编号")
-            device_id = clean_string(id_raw).lower()
+            device_id = clean_equipment_name(id_raw).lower()
             std_info = dict(info)
             if device_id and device_id not in self._id_cache:
                 self._id_cache[device_id] = std_info
@@ -122,7 +122,7 @@ class EquipmentLedger(LedgerBase):
     @staticmethod
     def _id_keys(value: str) -> set[str]:
         """返回设备编号的文本键及 Excel 数字化后的等价键。"""
-        cleaned = clean_string(value)
+        cleaned = clean_equipment_name(value)
         if not cleaned:
             return set()
 
@@ -140,7 +140,7 @@ class EquipmentLedger(LedgerBase):
             return None
 
         standard_ids = {
-            clean_string(item.get("标准设备编号")) for item in candidates
+            clean_equipment_name(item.get("标准设备编号")) for item in candidates
         }
         if len(standard_ids) != 1:
             logger.debug(
@@ -158,7 +158,7 @@ class EquipmentLedger(LedgerBase):
         """按设备编号精确匹配（大小写不敏感），返回标准信息 dict 或 None"""
         if not device_id:
             return None
-        device_id = clean_string(device_id).lower()
+        device_id = clean_equipment_name(device_id).lower()
         if not device_id:
             return None
         # 直接匹配
@@ -184,8 +184,8 @@ class EquipmentLedger(LedgerBase):
         未匹配的记录会输出 warning 日志。
         返回 {"标准设备名称", "标准设备编号", "标准公司名称"} 或 None
         """
-        cleaned_name = clean_string(name) if name else None
-        cleaned_id = clean_string(device_id) if device_id else None
+        cleaned_name = clean_equipment_name(name) if name else None
+        cleaned_id = clean_equipment_name(device_id) if device_id else None
 
         # 都没有
         if not cleaned_id and not cleaned_name:
@@ -229,7 +229,7 @@ class EquipmentLedger(LedgerBase):
         if self._df is None or not raw_name:
             return None
 
-        cleaned_name = clean_string(raw_name)
+        cleaned_name = clean_equipment_name(raw_name)
         if not cleaned_name:
             return None
 

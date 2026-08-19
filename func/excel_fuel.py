@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 
 from func.logger import get_logger
-from func.string_utils import clean_string
+from func.string_utils import clean_string, clean_equipment_name
 from func.excel_utils import dedup_dataframe, resolve_shift, detect_shift, get_hidden_indices, filter_hidden_from_df, open_workbook
 from func.anomaly import detect_and_filter
 from func.anomaly.rules import AnomalyConfig
@@ -268,12 +268,12 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
                 for _, row in data_body.iterrows():
                     device_name = row[1]
                     device_id = row[2]
-                    device_id = clean_string(device_id)
+                    device_id = clean_equipment_name(device_id)
                     if not device_id: continue
 
                     if device_name in ["HITACHI EX2600"]:
                         device_name = f"{device_name} #{device_id}"
-                    device_name = clean_string(device_name)
+                    device_name = clean_equipment_name(device_name)
                     if not device_name:
                         device_name = device_id
 
