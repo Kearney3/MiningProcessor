@@ -105,167 +105,170 @@ def merge_excel_files(
     file_sheet_names: dict[str, list[str]] = {}  # file -> [sheet_names]
     xl_cache: dict[str, pd.ExcelFile] = {}  # 缓存 ExcelFile 避免重复打开
 
-    for fpath in matched_files:
-        xl = pd.ExcelFile(fpath, engine=_READ_ENGINE)
-        xl_cache[fpath] = xl
-        header_dict[os.path.basename(fpath)] = {}
-        file_sheet_names[fpath] = []
-        for sname in xl.sheet_names:
-            all_sheet_names.add(sname)
-            file_sheet_names[fpath].append(sname)
-            try:
-                df_head = pd.read_excel(xl, sheet_name=sname, nrows=0)
-                header_dict[os.path.basename(fpath)][sname] = tuple(clean_string(h) for h in df_head.columns)
-            except (ValueError, KeyError) as e:
-                logger.error(f"读取文件 '{fpath}' 的 Sheet '{sname}' 表头失败: {e}")
-                header_dict[os.path.basename(fpath)][sname] = ()
+    try:
+        for fpath in matched_files:
+            xl = pd.ExcelFile(fpath, engine=_READ_ENGINE)
+            xl_cache[fpath] = xl
+            header_dict[os.path.basename(fpath)] = {}
+            file_sheet_names[fpath] = []
+            for sname in xl.sheet_names:
+                all_sheet_names.add(sname)
+                file_sheet_names[fpath].append(sname)
+                try:
+                    df_head = pd.read_excel(xl, sheet_name=sname, nrows=0)
+                    header_dict[os.path.basename(fpath)][sname] = tuple(clean_string(h) for h in df_head.columns)
+                except (ValueError, KeyError) as e:
+                    logger.error(f"读取文件 '{fpath}' 的 Sheet '{sname}' 表头失败: {e}")
+                    header_dict[os.path.basename(fpath)][sname] = ()
 
-    # 3. 如果 tolerant_header，预扫描各 sheet 列并集；否则在合并时严格校验
-    sheet_all_headers: dict[str, list[str]] = {}
-    if tolerant_header:
+        # 3. 如果 tolerant_header，预扫描各 sheet 列并集；否则在合并时严格校验
+        sheet_all_headers: dict[str, list[str]] = {}
+        if tolerant_header:
+            for sname in sorted(all_sheet_names):
+                union_headers: list[str] = []
+                seen: set[str] = set()
+                for fpath in matched_files:
+                    if sname not in file_sheet_names.get(fpath, []):
+                        continue
+                    headers = header_dict[os.path.basename(fpath)].get(sname, ())
+                    for h in headers:
+                        if h not in seen:
+                            seen.add(h)
+                            union_headers.append(h)
+                sheet_all_headers[sname] = union_headers
+
+        # 4. 按 sheet_name 逐组合并（逐文件读取，避免同时缓存所有文件数据）
+        merged_sheets: dict[str, pd.DataFrame] = {}
         for sname in sorted(all_sheet_names):
-            union_headers: list[str] = []
-            seen: set[str] = set()
+            sheet_dataframes: List[pd.DataFrame] = []
+            union_headers = sheet_all_headers.get(sname, [])
+            expected_headers: tuple | None = None
+
             for fpath in matched_files:
                 if sname not in file_sheet_names.get(fpath, []):
+                    logger.warning(f"  警告: {os.path.basename(fpath)} 缺少 Sheet '{sname}'，已跳过")
                     continue
-                headers = header_dict[os.path.basename(fpath)].get(sname, ())
-                for h in headers:
-                    if h not in seen:
-                        seen.add(h)
-                        union_headers.append(h)
-            sheet_all_headers[sname] = union_headers
 
-    # 4. 按 sheet_name 逐组合并（逐文件读取，避免同时缓存所有文件数据）
-    merged_sheets: dict[str, pd.DataFrame] = {}
-    for sname in sorted(all_sheet_names):
-        sheet_dataframes: List[pd.DataFrame] = []
-        union_headers = sheet_all_headers.get(sname, [])
-        expected_headers: tuple | None = None
+                # 使用缓存的 ExcelFile 对象，避免重复打开文件
+                try:
+                    xl = xl_cache[fpath]
+                    df = xl.parse(sheet_name=sname)
+                except (ValueError, KeyError, FileNotFoundError) as e:
+                    logger.error(f"读取文件 '{fpath}' 的 Sheet '{sname}' 失败: {e}")
+                    continue
 
-        for fpath in matched_files:
-            if sname not in file_sheet_names.get(fpath, []):
-                logger.warning(f"  警告: {os.path.basename(fpath)} 缺少 Sheet '{sname}'，已跳过")
-                continue
-
-            # 使用缓存的 ExcelFile 对象，避免重复打开文件
-            try:
-                xl = xl_cache[fpath]
-                df = xl.parse(sheet_name=sname)
-            except (ValueError, KeyError, FileNotFoundError) as e:
-                logger.error(f"读取文件 '{fpath}' 的 Sheet '{sname}' 失败: {e}")
-                continue
-
-            if need_hidden:
-                h_rows, h_cols = get_hidden_indices(fpath, sname)
-                df = filter_hidden_from_df(
-                    df,
-                    h_rows if skip_hidden_rows else set(),
-                    h_cols if skip_hidden_cols else set(),
-                    has_header=True,
-                )
-
-            if df.empty:
-                logger.warning(f"  警告: {os.path.basename(fpath)} 的 Sheet '{sname}' 为空，已跳过")
-                continue
-
-            # 清洗列名
-            df.columns = [clean_string(h) for h in df.columns]
-
-            if tolerant_header:
-                # 宽容模式：对齐到并集列，缺失列填 NaN
-                current_headers = list(df.columns)
-                if current_headers != union_headers:
-                    missing = set(union_headers) - set(current_headers)
-                    extra = set(current_headers) - set(union_headers)
-                    if missing or extra:
-                        logger.warning(
-                            f"  Sheet '{sname}' 表头不一致 ({os.path.basename(fpath)})，已自动对齐。"
-                            f" 缺失列: {sorted(missing) if missing else '无'}"
-                            f"，多余列: {sorted(extra) if extra else '无'}"
-                        )
-                    df = df.reindex(columns=union_headers)
-            else:
-                # 严格模式：表头必须完全一致，否则报错
-                current_headers = tuple(df.columns)
-                if expected_headers is None:
-                    expected_headers = current_headers
-                elif current_headers != expected_headers:
-                    error_string = ""
-                    for outer_key, inner_dict in header_dict.items():
-                        error_string += f"【{outer_key}】\n"
-                        for inner_key, value_tuple in inner_dict.items():
-                            error_string += f"  {inner_key}: {value_tuple}\t"
-                        error_string += f"\n-{'-' * 30}\n"
-
-                    raise ValueError(
-                        f"Sheet '{sname}' 的表头不一致！\n"
-                        f"  期望: {expected_headers}\n"
-                        f"  实际 ({os.path.basename(fpath)}): {current_headers}\n"
-                        f"请检查并修正后再合并。"
-                        f"  所有已导入的表头: \n{error_string}"
+                if need_hidden:
+                    h_rows, h_cols = get_hidden_indices(fpath, sname)
+                    df = filter_hidden_from_df(
+                        df,
+                        h_rows if skip_hidden_rows else set(),
+                        h_cols if skip_hidden_cols else set(),
+                        has_header=True,
                     )
 
-            sheet_dataframes.append(df)
-
-        if not sheet_dataframes:
-            logger.warning(f"Sheet '{sname}' 无有效数据，跳过")
-            continue
-
-        # 合并：第一个保留表头，其余直接拼接
-        merged_df = pd.concat(sheet_dataframes, ignore_index=True)
-
-        # 4. 排序处理
-        if sort_configs:
-            # 使用用户配置的排序规则
-            sort_columns = []
-            sort_ascending = []
-            for cfg in sort_configs:
-                col = clean_string(cfg.get("column"))
-                asc = bool(cfg.get("ascending", True))
-                if not col:
+                if df.empty:
+                    logger.warning(f"  警告: {os.path.basename(fpath)} 的 Sheet '{sname}' 为空，已跳过")
                     continue
-                if col not in merged_df.columns:
-                    logger.warning(f"  警告: Sheet '{sname}' 中不存在列 '{col}'，跳过该排序条件")
-                    continue
-                sort_columns.append(col)
-                sort_ascending.append(asc)
 
-            if sort_columns:
-                logger.info(
-                    f"Sheet '{sname}' 正在按以下规则排序: {list(zip(sort_columns, ['升序' if a else '降序' for a in sort_ascending]))}")
-                try:
-                    merged_df = merged_df.sort_values(by=sort_columns, ascending=sort_ascending,
-                                                      na_position="last").reset_index(drop=True)
-                except (TypeError, ValueError) as e:
-                    logger.error(f"Sheet '{sname}' 排序时出错: {e}")
+                # 清洗列名
+                df.columns = [clean_string(h) for h in df.columns]
+
+                if tolerant_header:
+                    # 宽容模式：对齐到并集列，缺失列填 NaN
+                    current_headers = list(df.columns)
+                    if current_headers != union_headers:
+                        missing = set(union_headers) - set(current_headers)
+                        extra = set(current_headers) - set(union_headers)
+                        if missing or extra:
+                            logger.warning(
+                                f"  Sheet '{sname}' 表头不一致 ({os.path.basename(fpath)})，已自动对齐。"
+                                f" 缺失列: {sorted(missing) if missing else '无'}"
+                                f"，多余列: {sorted(extra) if extra else '无'}"
+                            )
+                        df = df.reindex(columns=union_headers)
+                else:
+                    # 严格模式：表头必须完全一致，否则报错
+                    current_headers = tuple(df.columns)
+                    if expected_headers is None:
+                        expected_headers = current_headers
+                    elif current_headers != expected_headers:
+                        error_string = ""
+                        for outer_key, inner_dict in header_dict.items():
+                            error_string += f"【{outer_key}】\n"
+                            for inner_key, value_tuple in inner_dict.items():
+                                error_string += f"  {inner_key}: {value_tuple}\t"
+                            error_string += f"\n-{'-' * 30}\n"
+
+                        raise ValueError(
+                            f"Sheet '{sname}' 的表头不一致！\n"
+                            f"  期望: {expected_headers}\n"
+                            f"  实际 ({os.path.basename(fpath)}): {current_headers}\n"
+                            f"请检查并修正后再合并。"
+                            f"  所有已导入的表头: \n{error_string}"
+                        )
+
+                sheet_dataframes.append(df)
+
+            if not sheet_dataframes:
+                logger.warning(f"Sheet '{sname}' 无有效数据，跳过")
+                continue
+
+            # 合并：第一个保留表头，其余直接拼接
+            merged_df = pd.concat(sheet_dataframes, ignore_index=True)
+
+            # 4. 排序处理
+            time_col = None
+            if sort_configs:
+                # 使用用户配置的排序规则
+                sort_columns = []
+                sort_ascending = []
+                for cfg in sort_configs:
+                    col = clean_string(cfg.get("column"))
+                    asc = bool(cfg.get("ascending", True))
+                    if not col:
+                        continue
+                    if col not in merged_df.columns:
+                        logger.warning(f"  警告: Sheet '{sname}' 中不存在列 '{col}'，跳过该排序条件")
+                        continue
+                    sort_columns.append(col)
+                    sort_ascending.append(asc)
+
+                if sort_columns:
+                    logger.info(
+                        f"Sheet '{sname}' 正在按以下规则排序: {list(zip(sort_columns, ['升序' if a else '降序' for a in sort_ascending]))}")
+                    try:
+                        merged_df = merged_df.sort_values(by=sort_columns, ascending=sort_ascending,
+                                                          na_position="last").reset_index(drop=True)
+                    except (TypeError, ValueError) as e:
+                        logger.error(f"Sheet '{sname}' 排序时出错: {e}")
+                else:
+                    logger.warning(f"Sheet '{sname}' 无可用的排序条件，跳过排序")
             else:
-                logger.warning(f"Sheet '{sname}' 无可用的排序条件，跳过排序")
-        else:
-            # 默认：自动识别第一个时间列并升序排序
-            time_col = find_first_datetime_column(merged_df)
-            if time_col:
-                logger.info(f"Sheet '{sname}' 识别到时间列: '{time_col}'，正在按时间升序排序...")
-                merged_df[time_col] = pd.to_datetime(merged_df[time_col], errors="coerce")
-                merged_df = merged_df.sort_values(by=time_col, na_position="last").reset_index(drop=True)
-            else:
-                logger.warning(f"Sheet '{sname}' 未识别到时间列，跳过排序")
+                # 默认：自动识别第一个时间列并升序排序
+                time_col = find_first_datetime_column(merged_df)
+                if time_col:
+                    logger.info(f"Sheet '{sname}' 识别到时间列: '{time_col}'，正在按时间升序排序...")
+                    merged_df[time_col] = pd.to_datetime(merged_df[time_col], errors="coerce")
+                    merged_df = merged_df.sort_values(by=time_col, na_position="last").reset_index(drop=True)
+                else:
+                    logger.warning(f"Sheet '{sname}' 未识别到时间列，跳过排序")
 
-        # 5. 仅保留日期（独立于排序逻辑）
-        if strip_time:
-            time_col = find_first_datetime_column(merged_df)
-            if time_col:
-                merged_df[time_col] = pd.to_datetime(merged_df[time_col], errors="coerce")
-                merged_df[time_col] = merged_df[time_col].dt.date
-                logger.info(f"Sheet '{sname}' 时间列 '{time_col}' 已格式化为日期（YYYY-MM-DD）")
-            else:
-                logger.warning(f"Sheet '{sname}' 未识别到时间列，跳过日期格式化")
+            # 5. 仅保留日期（独立于排序逻辑）
+            if strip_time:
+                if time_col is None:
+                    time_col = find_first_datetime_column(merged_df)
+                if time_col:
+                    merged_df[time_col] = pd.to_datetime(merged_df[time_col], errors="coerce")
+                    merged_df[time_col] = merged_df[time_col].dt.date
+                    logger.info(f"Sheet '{sname}' 时间列 '{time_col}' 已格式化为日期（YYYY-MM-DD）")
+                else:
+                    logger.warning(f"Sheet '{sname}' 未识别到时间列，跳过日期格式化")
 
-        merged_sheets[sname] = merged_df
-
-    # Close cached ExcelFile handles
-    for xl in xl_cache.values():
-        xl.close()
+            merged_sheets[sname] = merged_df
+    finally:
+        # Close cached ExcelFile handles
+        for xl in xl_cache.values():
+            xl.close()
 
     # 5. 输出文件
     if output_file is None:

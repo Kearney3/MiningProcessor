@@ -317,7 +317,7 @@ def load_config() -> dict[str, Any]:
             base = _load_json(_CONFIG_FILE)
 
         user = _load_json(_USER_CONFIG_FILE)
-        result = _deep_merge(base, user) if user else base
+        result = _deep_merge(base, user) if user else _deep_merge(base, {})
 
         _config_cache = result
         _config_cache_mtime = (mt1, mt2, mt_bundled)
@@ -944,7 +944,8 @@ def update_llm_config(updates: dict[str, Any]) -> dict[str, Any]:
             _save_json(_USER_CONFIG_FILE, user_file)
             _invalidate_config_cache()
         except Exception:
-            current["api_key"] = api_key
+            logger.warning("无法加密 LLM API key（MP_MASTER_KEY 未设置），密钥未保存")
+            current["api_key"] = ""
             update_user_config({"llm_labeling": current})
     return get_llm_config()
 

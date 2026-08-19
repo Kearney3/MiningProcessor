@@ -20,6 +20,7 @@ import { LoadConfigPage } from "./components/pages/LoadConfigPage";
 import { MaintConfigPage } from "./components/pages/MaintConfigPage";
 import { UserConfigPage } from "./components/pages/UserConfigPage";
 import { LLMLabelingPage } from "./components/pages/LLMLabelingPage";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 function App() {
   const { t } = useTranslation();
@@ -86,6 +87,7 @@ function App() {
       {/* Main content area */}
       <div className="flex flex-1 overflow-hidden">
         <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
+        <ErrorBoundary>
         <main className="workspace-content flex-1 overflow-auto">
           <div style={{ display: currentPage === "data-processing" ? "block" : "none" }}>
             <DataProcessingPage bridge={bridge} />
@@ -124,6 +126,7 @@ function App() {
             <UserConfigPage bridge={bridge} />
           </div>
         </main>
+        </ErrorBoundary>
       </div>
 
       {/* Log panel */}

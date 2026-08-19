@@ -68,6 +68,7 @@ class MiningDataProcessor:
         self.filter_zero_run_km = filter_zero_run_km
         if device_load_map is not None:
             self.load_map: dict[str, int] = dict(device_load_map)
+            self._sorted_load_map = sorted(self.load_map.items(), key=lambda x: len(x[0]), reverse=True)
             return
 
         try:
@@ -77,6 +78,7 @@ class MiningDataProcessor:
         except Exception as ex:
             logger.warning("加载设备装载量配置失败，使用默认配置: %s", ex)
             self.load_map = config_loader.get_default_load_map(version)
+        self._sorted_load_map = sorted(self.load_map.items(), key=lambda x: len(x[0]), reverse=True)
 
     # ---------------------------
     # 基础工具函数
@@ -117,7 +119,7 @@ class MiningDataProcessor:
             return 0
 
         truck_name_norm = self._normalize(clean_string(truck_name))
-        for model, capacity in sorted(self.load_map.items(), key=lambda x: len(x[0]), reverse=True):
+        for model, capacity in self._sorted_load_map:
             if self._normalize(model) in truck_name_norm:
                 return capacity
         return 0
