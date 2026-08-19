@@ -96,7 +96,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const [filterZeroEngineHours, setFilterZeroEngineHours] = useState(true);
   const [filterZeroWorkHours, setFilterZeroWorkHours] = useState(false);
   const [filterZeroHoursMeter, setFilterZeroHoursMeter] = useState(true);
-  const [filterZeroKmMeter, setFilterZeroKmMeter] = useState(true);
+  const [filterZeroKmMeter, setFilterZeroKmMeter] = useState(false);
   const [filterZeroRunHours, setFilterZeroRunHours] = useState(false);
   const [filterZeroRunKm, setFilterZeroRunKm] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);

@@ -134,7 +134,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
   const [filterZeroEngineHours, setFilterZeroEngineHours] = useState(true);
   const [filterZeroWorkHours, setFilterZeroWorkHours] = useState(false);
   const [filterZeroHoursMeter, setFilterZeroHoursMeter] = useState(true);
-  const [filterZeroKmMeter, setFilterZeroKmMeter] = useState(true);
+  const [filterZeroKmMeter, setFilterZeroKmMeter] = useState(false);
   const [filterZeroRunHours, setFilterZeroRunHours] = useState(false);
   const [filterZeroRunKm, setFilterZeroRunKm] = useState(false);
   const [anomaly, setAnomaly] = useState<AnomalyConfig>(DEFAULT_ANOMALY_CONFIG);

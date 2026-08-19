@@ -153,7 +153,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     filter_zero_hours = ft.Checkbox(label=t("components:sync_minebase.filterZeroEngineHours"), value=True, active_color=theme.PRIMARY)
     filter_zero_work_hours = ft.Checkbox(label=t("components:sync_minebase.filterZeroOperatingHours"), value=False, active_color=theme.PRIMARY)
     filter_zero_hours_meter = ft.Checkbox(label=t("components:sync_minebase.filterZeroHoursMeter"), value=True, active_color=theme.PRIMARY)
-    filter_zero_km_meter = ft.Checkbox(label=t("components:sync_minebase.filterZeroKilometerMeter"), value=True, active_color=theme.PRIMARY)
+    filter_zero_km_meter = ft.Checkbox(label=t("components:sync_minebase.filterZeroKilometerMeter"), value=False, active_color=theme.PRIMARY)
     filter_zero_run_hours = ft.Checkbox(label=t("components:sync_minebase.filterZeroOperatingHours"), value=False, active_color=theme.PRIMARY)
     filter_zero_run_km = ft.Checkbox(label=t("components:sync_minebase.filterZeroOperatingDistance"), value=False, active_color=theme.PRIMARY)
 
