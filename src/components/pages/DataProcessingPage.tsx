@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { AnomalyRecord, BridgeProp } from "../../lib/types";
@@ -209,7 +209,7 @@ interface SortConfig {
 // ═══════════════════════════════════════
 // Fuel processing
 // ═══════════════════════════════════════
-function FuelCard({
+const FuelCard = memo(function FuelCard({
   bridge,
   useEquipmentLedger,
   useOilLedger,
@@ -305,12 +305,12 @@ function FuelCard({
       {error && <ErrorBadge message={error} />}
     </ModuleCard>
   );
-}
+});
 
 // ═══════════════════════════════════════
 // Tire life processing
 // ═══════════════════════════════════════
-function TireCard({
+const TireCard = memo(function TireCard({
   bridge,
   useEquipmentLedger,
   useOilLedger,
@@ -391,12 +391,12 @@ function TireCard({
       {error && <ErrorBadge message={error} />}
     </ModuleCard>
   );
-}
+});
 
 // ═══════════════════════════════════════
 // Production data
 // ═══════════════════════════════════════
-function ProductionCard({
+const ProductionCard = memo(function ProductionCard({
   bridge,
   useEquipmentLedger,
   useOilLedger,
@@ -434,7 +434,7 @@ function ProductionCard({
     warnings: string[];
   } | null>(null);
   const [filterZeroHoursMeter, setFilterZeroHoursMeter] = useState(true);
-  const [filterZeroKmMeter, setFilterZeroKmMeter] = useState(true);
+  const [filterZeroKmMeter, setFilterZeroKmMeter] = useState(false);
   const [filterZeroRunHours, setFilterZeroRunHours] = useState(false);
   const [filterZeroRunKm, setFilterZeroRunKm] = useState(false);
 
@@ -554,12 +554,12 @@ function ProductionCard({
       )}
     </ModuleCard>
   );
-}
+});
 
 // ═══════════════════════════════════════
 // Electrical consumption
 // ═══════════════════════════════════════
-function ElectricalCard({
+const ElectricalCard = memo(function ElectricalCard({
   bridge,
   useEquipmentLedger,
   useOilLedger,
@@ -669,12 +669,12 @@ function ElectricalCard({
       {error && <ErrorBadge message={error} />}
     </ModuleCard>
   );
-}
+});
 
 // ═══════════════════════════════════════
 // Worktime processing
 // ═══════════════════════════════════════
-function WorktimeCard({
+const WorktimeCard = memo(function WorktimeCard({
   bridge,
   useEquipmentLedger,
   useOilLedger,
@@ -797,12 +797,12 @@ function WorktimeCard({
       {error && <ErrorBadge message={error} />}
     </ModuleCard>
   );
-}
+});
 
 // ═══════════════════════════════════════
 // Merge processing
 // ═══════════════════════════════════════
-function MergeCard({
+const MergeCard = memo(function MergeCard({
   bridge,
   useEquipmentLedger,
   useOilLedger,
@@ -984,12 +984,12 @@ function MergeCard({
       {error && <ErrorBadge message={error} />}
     </ModuleCard>
   );
-}
+});
 
 // ═══════════════════════════════════════
 // Maintenance record processing
 // ═══════════════════════════════════════
-function MaintenanceCard({
+const MaintenanceCard = memo(function MaintenanceCard({
   bridge,
   useEquipmentLedger,
   useModelLedger,
@@ -1069,7 +1069,7 @@ function MaintenanceCard({
       {error && <ErrorBadge message={error} />}
     </ModuleCard>
   );
-}
+});
 
 // ═══════════════════════════════════════
 // Data processing page
@@ -1084,6 +1084,7 @@ export function DataProcessingPage({ bridge }: { bridge: BridgeProp }) {
   const [anomaly, setAnomaly] = useState<AnomalyConfig>(DEFAULT_ANOMALY_CONFIG);
   const [anomalies, setAnomalies] = useState<AnomalyRecord[]>([]);
   const { initialDir, saveDir } = useLastDirectory(bridge);
+  const anomalyConfig = useMemo(() => anomaly, [anomaly]);
 
   return (
     <div className="space-y-5">
@@ -1127,13 +1128,13 @@ export function DataProcessingPage({ bridge }: { bridge: BridgeProp }) {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <FuelCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} useModelLedger={useModelLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomaly} onAnomalies={setAnomalies} defaultPath={initialDir} onFileSelected={saveDir} />
-        <ProductionCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} useModelLedger={useModelLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomaly} onAnomalies={setAnomalies} defaultPath={initialDir} onFileSelected={saveDir} />
-        <ElectricalCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} useModelLedger={useModelLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomaly} onAnomalies={setAnomalies} defaultPath={initialDir} onFileSelected={saveDir} />
-        <WorktimeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} useModelLedger={useModelLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomaly} onAnomalies={setAnomalies} defaultPath={initialDir} onFileSelected={saveDir} />
+        <FuelCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} useModelLedger={useModelLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomalyConfig} onAnomalies={setAnomalies} defaultPath={initialDir} onFileSelected={saveDir} />
+        <ProductionCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} useModelLedger={useModelLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomalyConfig} onAnomalies={setAnomalies} defaultPath={initialDir} onFileSelected={saveDir} />
+        <ElectricalCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} useModelLedger={useModelLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomalyConfig} onAnomalies={setAnomalies} defaultPath={initialDir} onFileSelected={saveDir} />
+        <WorktimeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} useModelLedger={useModelLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomalyConfig} onAnomalies={setAnomalies} defaultPath={initialDir} onFileSelected={saveDir} />
         <MergeCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} useModelLedger={useModelLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
         <MaintenanceCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useModelLedger={useModelLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} defaultPath={initialDir} onFileSelected={saveDir} />
-        <TireCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} useModelLedger={useModelLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomaly} onAnomalies={setAnomalies} defaultPath={initialDir} onFileSelected={saveDir} />
+        <TireCard bridge={bridge} useEquipmentLedger={useEquipmentLedger} useOilLedger={useOilLedger} useModelLedger={useModelLedger} skipHiddenRows={skipHiddenRows} skipHiddenCols={skipHiddenCols} anomaly={anomalyConfig} onAnomalies={setAnomalies} defaultPath={initialDir} onFileSelected={saveDir} />
       </div>
 
       <AnomalyResultsTable records={anomalies} />

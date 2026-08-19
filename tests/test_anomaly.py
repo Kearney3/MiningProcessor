@@ -665,29 +665,36 @@ class TestAllNumericMode:
 class TestFindNumericColumns:
     def test_basic_numeric(self):
         df = pd.DataFrame({"a": [1, 2, 3], "b": ["x", "y", "z"]})
-        assert _find_numeric_columns(df) == ["a"]
+        cols, cache = _find_numeric_columns(df)
+        assert cols == ["a"]
+        assert "a" in cache
 
     def test_mixed_numeric_string(self):
         df = pd.DataFrame({"a": [1, "text", 3]})
-        cols = _find_numeric_columns(df)
+        cols, _cache = _find_numeric_columns(df)
         assert "a" in cols  # 1 和 3 可转为数值
 
     def test_all_nan_column_excluded(self):
         df = pd.DataFrame({"a": [np.nan, np.nan], "b": [1, 2]})
-        assert _find_numeric_columns(df) == ["b"]
+        cols, _cache = _find_numeric_columns(df)
+        assert cols == ["b"]
 
     def test_empty_df(self):
         df = pd.DataFrame()
-        assert _find_numeric_columns(df) == []
+        cols, cache = _find_numeric_columns(df)
+        assert cols == []
+        assert cache == {}
 
     def test_boolean_column(self):
         """布尔列可转为数值（True=1, False=0）。"""
         df = pd.DataFrame({"flag": [True, False]})
-        assert "flag" in _find_numeric_columns(df)
+        cols, _cache = _find_numeric_columns(df)
+        assert "flag" in cols
 
     def test_non_numeric_column_excluded(self):
         df = pd.DataFrame({"date": ["2025-01-01", "2025-01-02"], "name": ["a", "b"]})
-        assert _find_numeric_columns(df) == []
+        cols, _cache = _find_numeric_columns(df)
+        assert cols == []
 
 
 # ---------------------------------------------------------------------------
