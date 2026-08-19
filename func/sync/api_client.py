@@ -54,7 +54,10 @@ class MineBaseAPIClient:
         import urllib.error
 
         url = f"{self.base_url}{path}"
-        headers = {"Content-Type": "application/json"}
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "MiningProcessor/1.0",
+        }
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
 
