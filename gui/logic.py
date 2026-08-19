@@ -19,6 +19,7 @@ from func.time_utils import local_now
 
 from gui.utils import _log_message
 from gui.i18n import t
+from gui import theme
 
 logger = logging.getLogger(__name__)
 
@@ -56,10 +57,18 @@ def shutdown_tasks() -> None:
 def is_shutdown() -> bool:
     """检查全局关闭标记是否已设置。"""
     return _shutdown_event.is_set()
+
+
+def reset_shutdown() -> None:
+    """重置全局关闭标记和活跃取消事件列表，供页面重新进入时调用。"""
+    _shutdown_event.clear()
+    _active_cancel_events.clear()
+
+
 # 保存按钮原始样式，以便恢复
 _btn_original_styles: dict[int, ft.ButtonStyle] = {}
 
-_LOADING_STYLE = ft.ButtonStyle(bgcolor="#CBD5E1", color="#64748B")
+_LOADING_STYLE = ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_TERTIARY)
 
 # 模块类型中文标签（扩展自 func.excel_batch 的公共标签）
 _MODULE_LABELS = {
@@ -972,7 +981,7 @@ def wire_processing_buttons(
 
 async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=None,
                           filter_zero_engine_hours=True, filter_zero_work_hours=False,
-                          filter_zero_hours_meter=True, filter_zero_km_meter=True,
+                          filter_zero_hours_meter=True, filter_zero_km_meter=False,
                           filter_zero_run_hours=False, filter_zero_run_km=False) -> None:
     """MineBase 同步按钮回调"""
     path = (sync_refs["path"].value or "").strip()
@@ -1076,7 +1085,7 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
             _log_message(log, t("logic:filefileDataSync"), level=logging.WARNING)
             _show_snackbar(page, t("logic:filefile"), is_error=True)
             result_text.value = t("logic:filefile")
-            result_text.color = "#F59E0B"
+            result_text.color = theme.WARNING
             result_text.visible = True
             result_text.update()
             # 无结果时隐藏异常表格
@@ -1100,20 +1109,20 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
 
         if total["failed"] > 0:
             result_text.value = summary
-            result_text.color = "#EF4444"
+            result_text.color = theme.ERROR
             _show_snackbar(page, t("logic:syncCompletedWithFailedRowS", failed=total['failed']), is_error=True)
         elif dry_run:
             preview_msg = t("logic:message", summary=summary)
             if dry_run_file:
                 preview_msg += t("logic:previewFile", dry_run_file=dry_run_file)
             result_text.value = preview_msg
-            result_text.color = "#0891B2"
+            result_text.color = theme.PRIMARY
             _show_snackbar(page, t("logic:previewComplete"))
             if dry_run_file:
                 _log_message(log, t("logic:filefilesavedfile", dry_run_file=dry_run_file))
         else:
             result_text.value = summary
-            result_text.color = "#10B981"
+            result_text.color = theme.SUCCESS
             _show_snackbar(page, t("logic:syncComplete"))
 
         result_text.visible = True
@@ -1142,11 +1151,11 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
                     warnings_list.controls.append(
                         ft.Row(
                             [
-                                ft.Text(dt_label, size=11, color="#64748B", width=70),
-                                ft.Text(t("logic:rowNumber", row=w.get("row", "?")), size=11, color="#64748B", width=50),
+                                ft.Text(dt_label, size=11, color=theme.TEXT_TERTIARY, width=70),
+                                ft.Text(t("logic:rowNumber", row=w.get("row", "?")), size=11, color=theme.TEXT_TERTIARY, width=50),
                                 ft.Text(w.get("field", ""), size=11, width=100),
-                                ft.Text(val_str, size=11, color="#EF4444", width=80),
-                                ft.Text(w.get("message", ""), size=11, color="#64748B", expand=True),
+                                ft.Text(val_str, size=11, color=theme.ERROR, width=80),
+                                ft.Text(w.get("message", ""), size=11, color=theme.TEXT_TERTIARY, expand=True),
                             ],
                             spacing=8,
                         ),
@@ -1185,7 +1194,7 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
         _log_message(log, t("logic:syncFailedDataSync", ex=ex), level=logging.ERROR)
         _show_snackbar(page, t("logic:syncFailedFailure"), is_error=True)
         result_text.value = t("logic:failureVariant", ex=ex)
-        result_text.color = "#EF4444"
+        result_text.color = theme.ERROR
         result_text.visible = True
         result_text.update()
         wc = sync_refs.get("warnings_container")
@@ -1238,7 +1247,7 @@ async def _run_connection_test(
     try:
         success, msg = await asyncio.to_thread(test_fn, password)
         result.value = msg
-        result.color = "#10B981" if success else "#EF4444"
+        result.color = theme.SUCCESS if success else theme.ERROR
         result.visible = True
         result.update()
 
@@ -1246,7 +1255,7 @@ async def _run_connection_test(
         _show_snackbar(page, t("logic:connected") if success else t("logic:connectionFailed"), is_error=not success)
     except Exception as exc:
         result.value = str(exc)[:200]
-        result.color = "#EF4444"
+        result.color = theme.ERROR
         result.visible = True
         result.update()
         _show_snackbar(page, t("logic:testError"), is_error=True)

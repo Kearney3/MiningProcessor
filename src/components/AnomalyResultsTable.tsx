@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { AnomalyRecord } from "../lib/types";
 import { AlertTriangleIcon } from "../lib/icons";
@@ -29,10 +30,10 @@ function makeDisplayValue(t: (k: string) => string) {
   };
 }
 
-export function AnomalyResultsTable({ records }: { records: AnomalyRecord[] }) {
+export const AnomalyResultsTable = memo(function AnomalyResultsTable({ records }: { records: AnomalyRecord[] }) {
   const { t } = useTranslation();
-  const columns = getColumns(t);
-  const displayValue = makeDisplayValue(t);
+  const columns = useMemo(() => getColumns(t), [t]);
+  const displayValue = useMemo(() => makeDisplayValue(t), [t]);
   if (records.length === 0) return null;
 
   return (
@@ -85,4 +86,4 @@ export function AnomalyResultsTable({ records }: { records: AnomalyRecord[] }) {
       </div>
     </div>
   );
-}
+});

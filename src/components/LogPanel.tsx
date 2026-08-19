@@ -159,7 +159,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
     } catch {
       showFeedback(t("components:LogPanel.copyFailedCheckClipboardPermissions"));
     }
-  }, [filteredLogs, showFeedback]);
+  }, [filteredLogs, showFeedback, t]);
 
   const handleExport = useCallback(async () => {
     const today = localTodayString();
@@ -185,7 +185,7 @@ export function LogPanel({ logs, onClear }: LogPanelProps) {
         showFeedback(t("components:LogPanel.logExportFailed"));
       }
     }
-  }, [filteredLogs, showFeedback]);
+  }, [filteredLogs, showFeedback, t]);
 
   const resumeFollowing = useCallback(() => {
     setFollowTail(true);

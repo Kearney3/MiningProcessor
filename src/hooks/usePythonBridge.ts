@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   BatchProgress,
   BridgeInfo,
@@ -268,18 +268,27 @@ export function usePythonBridge() {
     }
   }, [doPing, fetchBridgeInfo, addConnectionLog]);
 
-  return {
-    call,
-    cancel,
-    logs,
-    clearLogs,
-    isConnected,
-    connectionStatus,
-    connectionError,
-    connectionLogs,
-    bridgeInfo,
-    reconnect,
-    progress,
-    setProgress,
-  };
+  const bridge = useMemo(
+    () => ({
+      call,
+      cancel,
+      logs,
+      clearLogs,
+      isConnected,
+      connectionStatus,
+      connectionError,
+      connectionLogs,
+      bridgeInfo,
+      reconnect,
+      progress,
+      setProgress,
+    }),
+    [
+      call, cancel, logs, clearLogs, isConnected,
+      connectionStatus, connectionError, connectionLogs,
+      bridgeInfo, reconnect, progress, setProgress,
+    ],
+  );
+
+  return bridge;
 }

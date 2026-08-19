@@ -35,7 +35,7 @@ export function useLastDirectory(
         if (res.path) setInitialDir(res.path);
       })
       .catch(() => {});
-  }, [bridge, configKey]);
+  }, [bridge.call, configKey]);
 
   // 保存目录：取文件路径的父目录
   const saveDir = useCallback(
@@ -50,7 +50,7 @@ export function useLastDirectory(
           .catch(() => {});
       }
     },
-    [bridge, configKey],
+    [bridge.call, configKey],
   );
 
   return { initialDir, saveDir };
