@@ -71,7 +71,23 @@ jobs:
         run: uv sync --dev
 
       - name: Run pytest
-        run: uv run pytest -x -v --tb=short --durations=20 --timeout=60
+        run: |
+          # Thread-based timeout is more reliable than signal on Linux CI.
+          # signal-based timeout uses SIGALRM which can't interrupt blocked threads.
+          uv run pytest -x -v --tb=short --durations=20 \
+            --timeout=60 --timeout-method=thread \
+            2>&1
+
+      - name: Dump thread stacks on failure
+        if: failure()
+        run: |
+          echo "=== Python process thread dump ==="
+          uv run python -c "
+          import sys, traceback
+          for tid, frame in sys._current_frames().items():
+              print(f'--- Thread {tid} ---')
+              traceback.print_stack(frame)
+          " 2>&1 || true
 
       - name: Verify bundled maintenance model
         run: |
