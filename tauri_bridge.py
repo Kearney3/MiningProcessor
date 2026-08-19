@@ -13,12 +13,14 @@ Tauri-Python 桥接层 — JSON-RPC over stdin/stdout
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import logging
 import os
 import secrets
 import sys
 import threading
+from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
 from pathlib import Path
@@ -61,6 +63,42 @@ else:
 
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
+
+def _validate_url(url: str) -> str:
+    """Validate a URL to prevent SSRF attacks.
+
+    Only allows http/https schemes and blocks loopback, link-local,
+    and cloud metadata addresses.
+
+    Raises:
+        ValueError: If the URL is invalid or targets a blocked address.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"URL scheme must be http or https, got: {parsed.scheme!r}")
+
+    hostname = parsed.hostname or ""
+    if not hostname:
+        raise ValueError("URL must include a hostname")
+
+    try:
+        addr = ipaddress.ip_address(hostname)
+    except ValueError:
+        # hostname is a domain name — acceptable
+        return url
+
+    if addr.is_loopback:
+        raise ValueError("Loopback addresses are not allowed")
+
+    if addr.is_link_local:
+        raise ValueError("Link-local addresses are not allowed")
+
+    # Explicit block for the well-known cloud metadata endpoint
+    _cloud_metadata = ipaddress.ip_network("169.254.169.254/32")
+    if addr in _cloud_metadata:
+        raise ValueError("Cloud metadata endpoint is not allowed")
+
+    return url
 
 
 def _sanitize_path(
@@ -481,6 +519,8 @@ def _update_llm_config(params: dict) -> dict:
     from func.config_loader import update_llm_config
     from func.secret_store import LLM_KEY_MASK
     updates = {k: v for k, v in params.items() if k in ("url", "api_key", "model", "format", "concurrency", "batch_size", "timeout", "max_retries")}
+    if "url" in updates:
+        _validate_url(updates["url"])
     cfg = update_llm_config(updates)
     cfg["api_key"] = LLM_KEY_MASK if cfg.get("api_key") else ""
     return cfg
@@ -490,7 +530,7 @@ def _update_llm_config(params: dict) -> dict:
 def _test_llm_connection(params: dict) -> dict:
     from func.config_loader import test_llm_connection
     cfg = {
-        "url": params.get("url", ""),
+        "url": _validate_url(params.get("url", "")),
         "api_key": params.get("api_key", ""),
         "format": params.get("format", "openai"),
     }
@@ -1439,7 +1479,7 @@ def _test_minebase_connection(params: dict) -> dict:
 
     if mode == "api":
         ok, msg = test_api_connection(
-            url=params.get("url", "http://localhost:3000"),
+            url=_validate_url(params.get("url", "http://localhost:3000")),
             username=params.get("username", ""),
             password=password,
         )

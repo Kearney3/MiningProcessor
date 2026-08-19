@@ -1,4 +1,5 @@
 """LLM 标注配置区域组件。"""
+import asyncio
 import logging
 
 import flet as ft
@@ -93,35 +94,32 @@ def _create_llm_config_section(page: ft.Page, log):
         except (RuntimeError, AttributeError):
             pass
 
-        def _do_fetch():
-            result = config_loader.test_llm_connection(cfg)
-            def _update():
-                if result["success"]:
-                    models = result["models"]
-                    llm_model.options = [ft.dropdown.Option(m) for m in models]
-                    if models and not llm_model.value:
-                        llm_model.value = models[0]
-                    info = result.get("error", "")
-                    if models:
-                        llm_test_result.value = t("components:user_config._llm.retrievedModels", count=len(models))
-                        llm_test_result.color = theme.TEXT_PRIMARY
-                        _log_message(log, t("components:user_config._llm.itemItemsitemmodel", count=len(models)))
-                    else:
-                        llm_test_result.value = info or t("components:user_config._llm.noModelsReturnedEnterAModelNameManually")
-                        llm_test_result.color = ft.Colors.ORANGE
-                        _log_message(log, info or t("components:user_config._llm.theApiReturnedNoModelListEnterAModelNameManually"))
+        async def _do_fetch_async():
+            result = await asyncio.to_thread(config_loader.test_llm_connection, cfg)
+            if result["success"]:
+                models = result["models"]
+                llm_model.options = [ft.dropdown.Option(m) for m in models]
+                if models and not llm_model.value:
+                    llm_model.value = models[0]
+                info = result.get("error", "")
+                if models:
+                    llm_test_result.value = t("components:user_config._llm.retrievedModels", count=len(models))
+                    llm_test_result.color = theme.TEXT_PRIMARY
+                    _log_message(log, t("components:user_config._llm.itemItemsitemmodel", count=len(models)))
                 else:
-                    llm_test_result.value = t("components:user_config._llm.connectionFailedVariant", error=result['error'])
-                    llm_test_result.color = ft.Colors.RED
-                    _log_message(log, t("components:user_config._llm.llmApiconnectionFailed", error=result['error']), level=logging.ERROR)
-                try:
-                    page.update()
-                except (RuntimeError, AttributeError):
-                    pass
-            _update()
+                    llm_test_result.value = info or t("components:user_config._llm.noModelsReturnedEnterAModelNameManually")
+                    llm_test_result.color = ft.Colors.ORANGE
+                    _log_message(log, info or t("components:user_config._llm.theApiReturnedNoModelListEnterAModelNameManually"))
+            else:
+                llm_test_result.value = t("components:user_config._llm.connectionFailedVariant", error=result['error'])
+                llm_test_result.color = ft.Colors.RED
+                _log_message(log, t("components:user_config._llm.llmApiconnectionFailed", error=result['error']), level=logging.ERROR)
+            try:
+                page.update()
+            except (RuntimeError, AttributeError):
+                pass
 
-        import threading
-        threading.Thread(target=_do_fetch, daemon=True).start()
+        page.run_task(_do_fetch_async)
 
     def _save_llm(_e):
         api_key_val = llm_api_key.value or ""
@@ -176,32 +174,28 @@ def _create_llm_config_section(page: ft.Page, log):
         except (RuntimeError, AttributeError):
             pass
 
-        def _do_verify():
-            result = config_loader.test_llm_connection(cfg)
+        async def _do_verify_async():
+            result = await asyncio.to_thread(config_loader.test_llm_connection, cfg)
             selected_model = (llm_model.value or "").strip()
 
-            def _update():
-                if result["success"]:
-                    models = result["models"]
-                    if selected_model and selected_model not in models:
-                        llm_verify_result.value = t("components:user_config._llm.connectionSucceededConnectionmodel", selected_model=selected_model, count=len(models))
-                        llm_verify_result.color = ft.Colors.AMBER
-                    else:
-                        model_info = t("components:user_config._llm.modelItem", selected_model=selected_model) if selected_model else ""
-                        llm_verify_result.value = t("components:user_config._llm.connectionSucceededItemsmodelconnection", count=len(models), model_info=model_info)
-                        llm_verify_result.color = ft.Colors.GREEN
+            if result["success"]:
+                models = result["models"]
+                if selected_model and selected_model not in models:
+                    llm_verify_result.value = t("components:user_config._llm.connectionSucceededConnectionmodel", selected_model=selected_model, count=len(models))
+                    llm_verify_result.color = ft.Colors.AMBER
                 else:
-                    llm_verify_result.value = t("components:user_config._llm.connectionFailedConnectionFailed", error=result['error'])
-                    llm_verify_result.color = ft.Colors.RED
-                try:
-                    page.update()
-                except (RuntimeError, AttributeError):
-                    pass
+                    model_info = t("components:user_config._llm.modelItem", selected_model=selected_model) if selected_model else ""
+                    llm_verify_result.value = t("components:user_config._llm.connectionSucceededItemsmodelconnection", count=len(models), model_info=model_info)
+                    llm_verify_result.color = ft.Colors.GREEN
+            else:
+                llm_verify_result.value = t("components:user_config._llm.connectionFailedConnectionFailed", error=result['error'])
+                llm_verify_result.color = ft.Colors.RED
+            try:
+                page.update()
+            except (RuntimeError, AttributeError):
+                pass
 
-            _update()
-
-        import threading
-        threading.Thread(target=_do_verify, daemon=True).start()
+        page.run_task(_do_verify_async)
 
     verify_btn = theme.secondary_btn(t("components:user_config._llm.verifyConnection"), icon=ft.Icons.CHECK_CIRCLE, on_click=_verify_connection)
     action_buttons = [

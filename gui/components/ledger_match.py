@@ -106,9 +106,8 @@ def _update_match_status(state: MatchState, controls: _MatchControls, sheet_name
 # 提取的大函数（UI 包装）
 # ========================================================================
 
-async def _do_import(page, log, state: MatchState, controls: _MatchControls, on_sheet_change_fn):
+async def _do_import(page, log, state: MatchState, controls: _MatchControls, on_sheet_change_fn, picker: ft.FilePicker):
     """File import action — thin UI wrapper around func/ledger_match.import_excel."""
-    picker = ft.FilePicker()
     files = await picker.pick_files(
         dialog_title=t("components:ledger_match.importExcelFile"),
         allowed_extensions=["xlsx", "xls"],
@@ -256,7 +255,7 @@ async def _do_match(
         page.update()
 
 
-async def _do_export(page, log, state: MatchState, controls: _MatchControls, mode: str = "current-view"):
+async def _do_export(page, log, state: MatchState, controls: _MatchControls, mode: str, picker: ft.FilePicker):
     """Export action — thin UI wrapper around func/ledger_match.export_to_excel.
 
     Args:
@@ -267,7 +266,6 @@ async def _do_export(page, log, state: MatchState, controls: _MatchControls, mod
         return
 
     sheet_label = state.current_sheet or "Sheet"
-    picker = ft.FilePicker()
     save_path = await picker.save_file(
         dialog_title=t("components:ledger_match.exportitemVariant"),
         file_name=(
@@ -352,6 +350,12 @@ def create_ledger_match_section(
     """创建台账匹配工具区域，返回 (container, refs)"""
 
     state = MatchState()
+
+    # --- Pre-register FilePicker instances on the page overlay ---
+    import_picker = ft.FilePicker()
+    export_picker = ft.FilePicker()
+    page.overlay.append(import_picker)
+    page.overlay.append(export_picker)
 
     # --- 控件 ---
     file_label = ft.Text(t("components:ledger_match.fileimportfile"), size=12, color=ft.Colors.GREY)
@@ -679,7 +683,7 @@ def create_ledger_match_section(
     # Wire action callbacks
     # ========================================================================
     async def on_import(e):
-        await _do_import(page, log, state, controls, _on_sheet_change)
+        await _do_import(page, log, state, controls, _on_sheet_change, import_picker)
         build_table()
 
     def _do_clear_impl():
@@ -735,7 +739,7 @@ def create_ledger_match_section(
         _build_export_menu()
 
     async def on_export(mode: str):
-        await _do_export(page, log, state, controls, mode)
+        await _do_export(page, log, state, controls, mode, export_picker)
 
     def _build_export_menu():
         """Rebuild export menu items (called when sheet state changes)."""
