@@ -72,9 +72,8 @@ class EquipmentLedger(LedgerBase):
         for _, row in self._df.iterrows():
             raw_name = clean_string(row.get("设备名称"))
             std_raw = row.get("标准设备名称")
-            standard_name = clean_string(std_raw)
-            if not standard_name:
-                standard_name = raw_name
+            std_raw_clean = clean_string(std_raw)
+            standard_name = std_raw_clean if std_raw_clean else raw_name
 
             std_id_raw = row.get("标准设备编号")
             company_raw = row.get("标准公司名称")
@@ -114,23 +113,11 @@ class EquipmentLedger(LedgerBase):
             if device_id and device_id not in self._id_cache:
                 self._id_cache[device_id] = std_info
 
-        # 构建标准设备名称 -> 完整信息的反向索引 (H7)（key 小写化）
-        # 从 _df 直接构建，确保没有 设备编号 的设备也能被索引
-        self._name_to_info = {}
-        for _, row in self._df.iterrows():
-            std_raw = row.get("标准设备名称")
-            standard_name = clean_string(std_raw)
-            if not standard_name:
-                continue
-            key = standard_name.lower()
-            if key not in self._name_to_info:
-                std_id_raw = row.get("标准设备编号")
-                company_raw = row.get("标准公司名称")
-                self._name_to_info[key] = {
-                    "标准设备名称": standard_name,
-                    "标准设备编号": clean_string(std_id_raw),
-                    "标准公司名称": clean_string(company_raw),
-                }
+            # 构建标准设备名称 -> 完整信息的反向索引 (H7)（key 小写化）
+            if std_raw_clean:
+                key = std_raw_clean.lower()
+                if key not in self._name_to_info:
+                    self._name_to_info[key] = dict(info)
 
     @staticmethod
     def _id_keys(value: str) -> set[str]:

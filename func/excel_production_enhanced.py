@@ -20,6 +20,9 @@ from func.number_utils import decimal_add, decimal_mod, decimal_multiply, decima
 
 logger = get_logger(__name__)
 
+_DATE_DOT_RE = re.compile(r'(\d{4}\.\d{2}\.\d{2})')
+_DATE_DASH_RE = re.compile(r'(\d{4}\-\d{2}\-\d{2})')
+
 
 class MiningDataProcessor:
     def __init__(self, version: str = "new", raw_start: int = -1, device_load_map: dict[str, int] | None = None,
@@ -85,9 +88,9 @@ class MiningDataProcessor:
     # ---------------------------
     def parse_filename(self, filename):
         """从文件名中提取日期、班次"""
-        date_match = re.search(r'(\d{4}\.\d{2}\.\d{2})', filename)
+        date_match = _DATE_DOT_RE.search(filename)
         if not date_match:
-            date_match = re.search(r'(\d{4}\-\d{2}\-\d{2})', filename)
+            date_match = _DATE_DASH_RE.search(filename)
             if not date_match:
                 raise ValueError(f"文件名中未找到日期: {filename}")
 
