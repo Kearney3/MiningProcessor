@@ -15,14 +15,19 @@ from func.anomaly.rules import ALL_NUMERIC_SENTINEL, AnomalyHit, AnomalyRule
 logger = logging.getLogger(__name__)
 
 
-def _find_numeric_columns(df: pd.DataFrame) -> list[str]:
-    """找到 DataFrame 中所有可转为数值的列（排除纯 NaN 列）。"""
+def _find_numeric_columns(df: pd.DataFrame) -> tuple[list[str], dict[str, pd.Series]]:
+    """找到 DataFrame 中所有可转为数值的列（排除纯 NaN 列）。
+
+    返回 (列名列表, {列名: 转换后的 Series}) 缓存，避免重复 pd.to_numeric 调用。
+    """
     cols = []
+    cache: dict[str, pd.Series] = {}
     for col in df.columns:
         series = pd.to_numeric(df[col], errors="coerce")
         if not series.isna().all():
             cols.append(col)
-    return cols
+            cache[col] = series
+    return cols, cache
 
 
 # 非度量列：这些列即使包含数值也不参与异常检测
@@ -46,12 +51,12 @@ class AnomalyDetector:
         for rule in self._rules:
             # __all_numeric__ 模式：对所有数值列应用同一规则
             if rule.column == ALL_NUMERIC_SENTINEL:
-                for col in _find_numeric_columns(df):
+                numeric_cols, numeric_cache = _find_numeric_columns(df)
+                for col in numeric_cols:
                     if col in _NON_METRIC_COLUMNS:
                         continue
                     expanded = AnomalyRule(column=col, method=rule.method, params=rule.params)
-                    series = pd.to_numeric(df[col], errors="coerce")
-                    hits.extend(self._apply_rule(df, series, expanded))
+                    hits.extend(self._apply_rule(df, numeric_cache[col], expanded))
                 continue
 
             if rule.column not in df.columns:
