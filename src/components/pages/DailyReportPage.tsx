@@ -27,11 +27,11 @@ export function DailyReportPage({ bridge }: { bridge: BridgeProp }) {
   const [includeRawEquipmentCode, setIncludeRawEquipmentCode] = useState(true);
   const [includeRawCompanyName, setIncludeRawCompanyName] = useState(true);
   const [includeDetailSheets, setIncludeDetailSheets] = useState(false);
-  const [skipHiddenRows, setSkipHiddenRows] = useState(false);
+  const [skipHiddenRows, setSkipHiddenRows] = useState(true);
   const [skipHiddenCols, setSkipHiddenCols] = useState(false);
-  const [filterZeroEngineHours, setFilterZeroEngineHours] = useState(false);
+  const [filterZeroEngineHours, setFilterZeroEngineHours] = useState(true);
   const [filterZeroWorkHours, setFilterZeroWorkHours] = useState(false);
-  const [filterZeroHoursMeter, setFilterZeroHoursMeter] = useState(false);
+  const [filterZeroHoursMeter, setFilterZeroHoursMeter] = useState(true);
   const [filterZeroKmMeter, setFilterZeroKmMeter] = useState(false);
   const [filterZeroRunHours, setFilterZeroRunHours] = useState(false);
   const [filterZeroRunKm, setFilterZeroRunKm] = useState(false);
