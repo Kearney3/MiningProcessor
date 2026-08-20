@@ -2,21 +2,28 @@
 用于白班和日班表的导入（多线程优化版）
 """
 import argparse
-from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any
-import pandas as pd
 import os
 import re
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
+from typing import Any
+
+import pandas as pd
 
 from func import config_loader
-from func.string_utils import clean_string, clean_equipment_name, normalize_cyrillic_homoglyphs
-from func.logger import get_logger
-from func.excel_utils import dedup_dataframe, get_hidden_indices, filter_hidden_from_df, adjust_index_for_hidden, letters_to_col_indices
 from func.anomaly import detect_and_filter
 from func.anomaly.rules import AnomalyConfig
+from func.excel_utils import (
+    adjust_index_for_hidden,
+    dedup_dataframe,
+    filter_hidden_from_df,
+    get_hidden_indices,
+    letters_to_col_indices,
+)
+from func.logger import get_logger
 from func.number_utils import decimal_add, decimal_mod, decimal_multiply, decimal_subtract
+from func.string_utils import clean_equipment_name, clean_string, normalize_cyrillic_homoglyphs
 
 logger = get_logger(__name__)
 
@@ -247,7 +254,7 @@ class MiningDataProcessor:
         row6 = df_raw.iloc[raw_start - 1, :]
         total_col_idx = None
         for idx, val in row6.items():
-            if any(k in self.safe_str(val) for k in ["总趟次", "Нийт рейс"]):
+            if any(k in self.safe_str(val) for k in ["总趟次", normalize_cyrillic_homoglyphs("Нийт рейс")]):
                 # logger.info(f"找到总趟次列：{idx},{self.safe_str(val)}")
                 total_col_idx = idx
                 break
@@ -283,18 +290,19 @@ class MiningDataProcessor:
         # data.columns.values[1] = "公司"
 
         # 5. 找运行指标列
-        hour_start_col = self.find_first_matching_column(data.columns, [["小时数", "开始"], ["Мото", "Эхэлсэн"]])
-        hour_end_col = self.find_first_matching_column(data.columns, [["小时数", "结束"], ["Мото", "Дууссан"]])
-        km_start_col = self.find_first_matching_column(data.columns, [["公里数", "开始"], ["км-ын", "Эхэлсэн"]])
-        km_end_col = self.find_first_matching_column(data.columns, [["公里数", "结束"], ["км-ын", "Дууссан"]])
-        company_col = self.find_first_matching_column(data.columns, ["公司", "Компани"])
+        _N = normalize_cyrillic_homoglyphs
+        hour_start_col = self.find_first_matching_column(data.columns, [["小时数", "开始"], [_N("Мото"), _N("Эхэлсэн")]])
+        hour_end_col = self.find_first_matching_column(data.columns, [["小时数", "结束"], [_N("Мото"), _N("Дууссан")]])
+        km_start_col = self.find_first_matching_column(data.columns, [["公里数", "开始"], [_N("км-ын"), _N("Эхэлсэн")]])
+        km_end_col = self.find_first_matching_column(data.columns, [["公里数", "结束"], [_N("км-ын"), _N("Дууссан")]])
+        company_col = self.find_first_matching_column(data.columns, ["公司", _N("Компани")])
 
         running_rows = []
         production_rows = []
 
         # 哪些列属于"生产列"
         exclude_keywords = ["小时数", "公里数", "总趟次", "备注", "开始", "结束", "公司"]
-        excavator_exclude = ["Мото", "Эхэлсэн", "Компани", "км", "Дууссан"]
+        excavator_exclude = [_N("Мото"), _N("Эхэлсэн"), _N("Компани"), _N("км"), _N("Дууссан")]
 
         # HIGH-08 fix: Pre-classify production columns outside the row loop
         # Use column positional index to avoid counting duplicates caused by
@@ -333,7 +341,7 @@ class MiningDataProcessor:
             truck_name = self.safe_str(data.at[row_idx, "矿卡名称"])
 
             # 过滤空值和合计行
-            if not truck_name or "Нийт" in truck_name:
+            if not truck_name or _N("Нийт") in truck_name:
                 continue
 
             h_start = self.safe_number(data.at[row_idx, hour_start_col]) if has_hour_start else 0
