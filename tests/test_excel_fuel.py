@@ -1,14 +1,12 @@
 """Comprehensive tests for func/excel_fuel.py (process_diesel_data)."""
 
-import os
 import datetime
-from pathlib import Path
+import os
 
-import pytest
 import openpyxl
+import pytest
 
 from func.excel_fuel import process_diesel_data
-
 
 # ---------------------------------------------------------------------------
 # Fixture helpers

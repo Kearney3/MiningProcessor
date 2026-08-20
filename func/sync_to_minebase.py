@@ -9,4 +9,4 @@ MineBase 数据同步脚本（向后兼容入口）
   - file_processors.py：文件处理器与行数据辅助函数
   - core.py：主流程、CLI、连接测试
 """
-from func.sync import *  # noqa: F401,F403
+from func.sync import *  # noqa: F403

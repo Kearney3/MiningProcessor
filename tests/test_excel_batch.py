@@ -4,21 +4,19 @@ import sys
 import threading
 
 import pandas as pd
-import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 from func.excel_batch import (
-    process_files,
+    MODULE_LABELS,
     _check_cancel,
     _emit_progress,
+    process_files,
     scan_files,
-    MODULE_LABELS,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

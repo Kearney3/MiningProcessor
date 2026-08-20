@@ -8,7 +8,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
-import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -21,7 +20,6 @@ from func.sync.file_processors import (
     _summarize,
     process_file_generic,
 )
-
 
 # ---------------------------------------------------------------------------
 # process_file_generic 测试

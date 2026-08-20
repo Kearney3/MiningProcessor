@@ -3,11 +3,10 @@
 用于导入和管理设备台账表，提供设备名称精确匹配功能
 """
 
-from typing import Optional
 
-from func.logger import get_logger
 from func.ledger_base import LedgerBase
-from func.string_utils import clean_string, clean_equipment_name
+from func.logger import get_logger
+from func.string_utils import clean_equipment_name, clean_string
 
 logger = get_logger(__name__)
 
@@ -38,7 +37,7 @@ class EquipmentLedger(LedgerBase):
         result = ledger.match_device(name="NTE240 #1101", device_id="#1101")
         # -> {"标准设备名称": "NTE240 HT#1101", "标准设备编号": "HT#1101", "标准公司名称": "A公司"}
     """
-    def __init__(self, ledger_path: Optional[str] = None):
+    def __init__(self, ledger_path: str | None = None):
         self._id_cache: dict[str, dict] = {}  # 缓存：设备编号 -> 标准信息
         self._name_to_info: dict[str, dict] = {}  # 反向索引：标准设备名称 -> 完整信息 (H7)
         self._name_records: dict[str, list[dict]] = {}
@@ -134,7 +133,7 @@ class EquipmentLedger(LedgerBase):
         return keys
 
     @staticmethod
-    def _resolve_candidates(candidates: list[dict]) -> Optional[dict]:
+    def _resolve_candidates(candidates: list[dict]) -> dict | None:
         """仅在候选记录的标准设备编号一致时返回标准信息。"""
         if not candidates:
             return None
@@ -154,7 +153,7 @@ class EquipmentLedger(LedgerBase):
         """返回名称对应的全部候选记录。"""
         return self._name_records.get(cleaned_name.lower(), [])
 
-    def match_by_id(self, device_id: str) -> Optional[dict]:
+    def match_by_id(self, device_id: str) -> dict | None:
         """按设备编号精确匹配（大小写不敏感），返回标准信息 dict 或 None"""
         if not device_id:
             return None
@@ -173,7 +172,7 @@ class EquipmentLedger(LedgerBase):
             pass
         return None
 
-    def match_device(self, name: Optional[str] = None, device_id: Optional[str] = None) -> Optional[dict]:
+    def match_device(self, name: str | None = None, device_id: str | None = None) -> dict | None:
         """
         组合匹配：按以下优先级尝试，命中即返回。
         1. 同时有编号和名称 → 先按二者联合匹配
@@ -220,11 +219,11 @@ class EquipmentLedger(LedgerBase):
 
         return result
 
-    def _match_by_name(self, cleaned_name: str) -> Optional[dict]:
+    def _match_by_name(self, cleaned_name: str) -> dict | None:
         """通过名称匹配，返回完整标准信息。多条不一致视为未命中。"""
         return self._resolve_candidates(self._name_candidates(cleaned_name))
 
-    def match(self, raw_name: str) -> Optional[dict]:
+    def match(self, raw_name: str) -> dict | None:
         """按名称匹配，并按标准设备编号判断候选是否有歧义。"""
         if self._df is None or not raw_name:
             return None

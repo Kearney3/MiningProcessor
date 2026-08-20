@@ -8,8 +8,9 @@ do not expose binary floating-point tails such as ``0.30000000000000004``.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from decimal import Decimal, InvalidOperation
-from typing import Any, Iterable
+from typing import Any
 
 
 def to_decimal(value: Any) -> Decimal | None:

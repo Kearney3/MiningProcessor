@@ -1,8 +1,10 @@
 """设备台账列映射功能测试"""
-import pytest
-import pandas as pd
 from pathlib import Path
-from func.equipment_ledger import EquipmentLedger, LEDGER_COLUMNS
+
+import pandas as pd
+import pytest
+
+from func.equipment_ledger import LEDGER_COLUMNS, EquipmentLedger
 
 
 @pytest.fixture

@@ -2,12 +2,12 @@ import pandas as pd
 
 from func import daily_report as daily_report_module
 from func.daily_report import (
+    _energy_aggregates,
+    _match_material_statistics,
+    _operation_aggregates,
     build_daily_report,
     export_daily_report,
     validate_daily_report_formulas,
-    _match_material_statistics,
-    _energy_aggregates,
-    _operation_aggregates,
 )
 from func.equipment_ledger import EquipmentLedger
 from func.model_ledger import ModelLedger

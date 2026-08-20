@@ -1,6 +1,5 @@
 """Tests for func/number_utils.py decimal-semantic helpers."""
 
-import math
 from decimal import Decimal
 
 import pytest
@@ -15,7 +14,6 @@ from func.number_utils import (
     decimal_sum,
     to_decimal,
 )
-
 
 # ---------------------------------------------------------------------------
 # to_decimal

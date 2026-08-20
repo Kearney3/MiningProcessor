@@ -4,9 +4,10 @@
 加载、名称匹配、搜索缓存、模板导出、字典转换。
 """
 
-import pandas as pd
 from pathlib import Path
-from typing import Optional
+
+import pandas as pd
+
 from func.logger import get_logger
 from func.string_utils import clean_string
 
@@ -25,14 +26,14 @@ class LedgerBase:
         template_sample: list[str],
         name_column: str = "名称",
         std_name_column: str = "标准名称",
-        ledger_path: Optional[str] = None,
+        ledger_path: str | None = None,
     ):
         self._ledger_columns = ledger_columns
         self._template_sample = template_sample
         self._name_column = name_column
         self._std_name_column = std_name_column
         self.ledger_path = ledger_path
-        self._df: Optional[pd.DataFrame] = None
+        self._df: pd.DataFrame | None = None
         self._search_cache: dict[str, list[str]] = {}
 
         if ledger_path and Path(ledger_path).exists():
@@ -120,7 +121,7 @@ class LedgerBase:
         write_formatted_excel(output_path, {"台账模板": df})
         logger.info(f"台账模板已导出: {output_path}")
 
-    def match(self, raw_name: str) -> Optional[dict]:
+    def match(self, raw_name: str) -> dict | None:
         """
         精确匹配名称（大小写不敏感）。
         当同一名称映射到多条标准记录时，只有所有记录一致才返回结果。

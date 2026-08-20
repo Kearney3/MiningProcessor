@@ -1,5 +1,6 @@
-import pandas as pd
 from unittest.mock import patch
+
+import pandas as pd
 from openpyxl import Workbook, load_workbook
 
 from func.anomaly import detect_and_filter

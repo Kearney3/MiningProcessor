@@ -50,8 +50,8 @@ class MineBaseAPIClient:
     def _request(self, method: str, path: str, data: dict | None = None) -> dict:
         """发送 HTTP 请求，对 409/410 抛出特定异常。"""
         import ssl
-        import urllib.request
         import urllib.error
+        import urllib.request
 
         url = f"{self.base_url}{path}"
         headers = {

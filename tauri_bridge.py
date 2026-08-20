@@ -20,11 +20,11 @@ import os
 import secrets
 import sys
 import threading
-from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from func.time_utils import local_datetime_from_timestamp
 
@@ -384,7 +384,6 @@ def _extract_common_params(params: dict) -> dict:
 
     消除 6 个 @_register 方法中重复的参数提取代码。
     """
-    from func.orchestration import load_equipment_ledger_from_cache, load_oil_ledger_from_cache
     return {
         "skip_hidden": params.get("skip_hidden", False),
         "skip_hidden_rows": params.get("skip_hidden_rows", False),
@@ -462,7 +461,7 @@ def _process_electrical(params: dict) -> dict:
 
 @_register("process_worktime")
 def _process_worktime(params: dict) -> dict:
-    from func.orchestration import process_single, build_worktime_header_mapping
+    from func.orchestration import build_worktime_header_mapping, process_single
     common = _extract_common_params(params)
     header_mapping = None
     if params.get("use_header_mapping"):
@@ -539,8 +538,8 @@ def _test_llm_connection(params: dict) -> dict:
 
 @_register("process_maintenance_llm")
 def _process_maintenance_llm(params: dict) -> dict:
-    from func.label_maintenance_with_llm import process_maintenance_llm
     from func.config_loader import get_llm_config
+    from func.label_maintenance_with_llm import process_maintenance_llm
 
     safe_path = str(_sanitize_path(params["path"], must_exist=True))
     llm_config = get_llm_config()
@@ -640,7 +639,7 @@ def _batch_process(params: dict) -> dict:
 
 def _batch_process_impl(params: dict, cancel_event: threading.Event) -> dict:
     from func.excel_batch import process_files
-    from func.orchestration import load_ledgers, build_worktime_header_mapping
+    from func.orchestration import build_worktime_header_mapping, load_ledgers
 
     # 台账
     use_eq = params.get("use_equipment_ledger", False)
@@ -830,8 +829,10 @@ def _export_sync_warnings(params: dict) -> dict:
 @_register("get_config")
 def _get_config(params: dict) -> dict:
     from func.config_loader import (
-        load_config, get_minebase_config,
-        get_file_keywords, get_worktime_header_mapping,
+        get_file_keywords,
+        get_minebase_config,
+        get_worktime_header_mapping,
+        load_config,
     )
 
     key = params.get("key")
@@ -876,7 +877,7 @@ def _get_anomaly_config(params: dict) -> dict:
 
 @_register("save_anomaly_config")
 def _save_anomaly_config(params: dict) -> dict:
-    from func.config_loader import update_anomaly_detection_config, save_anomaly_detection_config
+    from func.config_loader import save_anomaly_detection_config, update_anomaly_detection_config
 
     updates = params.get("updates")
     if updates is not None:
@@ -1063,8 +1064,8 @@ def _load_model_ledger_file_columns(params: dict) -> dict:
 @_register("import_equipment_ledger")
 def _import_equipment_ledger(params: dict) -> dict:
     """导入设备台账 Excel，应用列映射后保存到缓存。"""
-    from func.equipment_ledger import EquipmentLedger
     from func.config_loader import save_equipment_ledger_cache
+    from func.equipment_ledger import EquipmentLedger
 
     safe_path = str(_sanitize_path(params["file_path"], must_exist=True, allow_dir=False))
     ledger = EquipmentLedger()
@@ -1081,8 +1082,8 @@ def _import_equipment_ledger(params: dict) -> dict:
 @_register("import_oil_ledger")
 def _import_oil_ledger(params: dict) -> dict:
     """导入油品台账 Excel，应用列映射后保存到缓存。"""
-    from func.oil_ledger import OilLedger
     from func.config_loader import save_oil_ledger_cache
+    from func.oil_ledger import OilLedger
 
     safe_path = str(_sanitize_path(params["file_path"], must_exist=True, allow_dir=False))
     ledger = OilLedger()
@@ -1098,8 +1099,8 @@ def _import_oil_ledger(params: dict) -> dict:
 
 @_register("import_model_ledger")
 def _import_model_ledger(params: dict) -> dict:
-    from func.model_ledger import ModelLedger
     from func.config_loader import save_model_ledger_cache
+    from func.model_ledger import ModelLedger
 
     safe_path = str(_sanitize_path(params["file_path"], must_exist=True, allow_dir=False))
     ledger = ModelLedger()
@@ -1221,7 +1222,7 @@ def _export_ledger_data(params: dict) -> dict:
         data_type: "oil" 或 "equipment"
         output_path: 输出文件路径
     """
-    from func.config_loader import load_oil_ledger_cache, load_equipment_ledger_cache
+    from func.config_loader import load_equipment_ledger_cache, load_oil_ledger_cache
 
     data_type = params.get("data_type", "oil")
     safe_path = str(_sanitize_path(params["output_path"], allow_dir=False))
@@ -1241,6 +1242,7 @@ def _export_ledger_data(params: dict) -> dict:
         return {"error": f"无{sheet_name}数据可导出"}
 
     import pandas as pd
+
     from func.excel_formatter import write_formatted_excel
 
     df = pd.DataFrame(records)
@@ -1393,6 +1395,7 @@ def _export_matched_data(params: dict) -> dict:
         sheets: dict[sheet_name, {columns, rows}] — 多 sheet 模式（优先于 rows/columns）
     """
     import pandas as pd
+
     from func.excel_formatter import write_formatted_excel
 
     safe_output = str(_sanitize_path(params["output_path"], allow_dir=False))
@@ -1465,8 +1468,8 @@ def _test_minebase_connection(params: dict) -> dict:
     方便用户无需重新输入密码即可测试连接。
     """
     from func.config_loader import get_minebase_api_config, get_minebase_db_config
-    from func.sync_to_minebase import test_api_connection, test_db_connection
     from func.secret_store import KEYRING_SENTINEL
+    from func.sync_to_minebase import test_api_connection, test_db_connection
 
     mode = params.get("mode", "api")
     password = params.get("password", "")

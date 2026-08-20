@@ -13,8 +13,8 @@ from datetime import date
 import openpyxl
 import xlrd
 
-from func.logger import get_logger
 from func.excel_utils import load_workbook_safely
+from func.logger import get_logger
 from func.maintenance_utils import (
     detect_header_layout,
     parse_comment,
@@ -77,7 +77,7 @@ def _safe_eval_formula(value) -> int | None:
 class _XlrdCell:
     """将 xlrd 单元格适配为 openpyxl 风格的 cell 对象（最小接口）。"""
 
-    __slots__ = ("value", "comment")
+    __slots__ = ("comment", "value")
 
     def __init__(self, value):
         self.value = value

@@ -10,9 +10,9 @@ except ImportError:
 
 from func import config_loader
 from gui.components.common import _log_message
+from gui.i18n import t
 
 from ._helpers import _create_keyword_input
-from gui.i18n import t
 
 
 def _create_header_mapping_section(page: ft.Page, log):

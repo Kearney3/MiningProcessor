@@ -8,15 +8,22 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-import pandas as pd
 import flet as ft
+import pandas as pd
+
+from gui.i18n import t
 
 from .common import (
-    _log_message, _last_directory, _update_last_directory,
-    SortState, create_sortable_columns, _cell_text,
-    create_column_mapping_dialog, create_sheet_selection_dialog, PAGE_SIZE,
+    PAGE_SIZE,
+    SortState,
+    _cell_text,
+    _last_directory,
+    _log_message,
+    _update_last_directory,
+    create_column_mapping_dialog,
+    create_sheet_selection_dialog,
+    create_sortable_columns,
 )
-from gui.i18n import t
 
 try:
     from . import theme

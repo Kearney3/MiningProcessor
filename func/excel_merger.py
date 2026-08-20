@@ -2,12 +2,12 @@ import argparse
 import json
 import os
 import sys
-from typing import List
 
 import pandas as pd
+
+from func.excel_utils import dedup_dataframe, filter_hidden_from_df, get_hidden_indices, sanitize_filename
 from func.logger import get_logger
 from func.string_utils import clean_string
-from func.excel_utils import dedup_dataframe, sanitize_filename, get_hidden_indices, filter_hidden_from_df
 
 logger = get_logger(__name__)
 
@@ -48,7 +48,7 @@ def merge_excel_files(
         keyword: str,
         output_file: str | None = None,
         strip_time: bool = False,
-        sort_configs: List[dict] | None = None,
+        sort_configs: list[dict] | None = None,
         skip_hidden: bool = False,
         skip_hidden_rows: bool = False,
         skip_hidden_cols: bool = False,
@@ -82,7 +82,7 @@ def merge_excel_files(
     need_hidden = skip_hidden_rows or skip_hidden_cols
 
     # 1. 收集匹配的 Excel 文件
-    matched_files: List[str] = []
+    matched_files: list[str] = []
     for fname in sorted(os.listdir(folder_path)):
         lower = fname.lower()
         if lower.endswith("_合并.xlsx"):
@@ -140,7 +140,7 @@ def merge_excel_files(
         # 4. 按 sheet_name 逐组合并（逐文件读取，避免同时缓存所有文件数据）
         merged_sheets: dict[str, pd.DataFrame] = {}
         for sname in sorted(all_sheet_names):
-            sheet_dataframes: List[pd.DataFrame] = []
+            sheet_dataframes: list[pd.DataFrame] = []
             union_headers = sheet_all_headers.get(sname, [])
             expected_headers: tuple | None = None
 

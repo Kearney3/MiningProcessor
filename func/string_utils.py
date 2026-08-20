@@ -12,6 +12,7 @@
 """
 
 import re
+
 import pandas as pd
 
 _MULTI_SPACE = re.compile(r' {2,}')

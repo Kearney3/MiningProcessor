@@ -5,22 +5,14 @@ Excel 文件处理器适配函数。
 也包含 Excel 读取、文件发现、工时表头映射。
 """
 import sys
+from collections.abc import Callable
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import pandas as pd
 
 from func.logger import get_logger
-from func.sync.row_helpers import (
-    _apply_defaults,
-    _apply_ledger_matching,
-    _apply_oil_ledger_matching,
-    _build_field_mappings,
-    _filter_by_date_range,
-    _map_row_to_db_columns,
-    _resolve_fks_for_db,
-)
 
 logger = get_logger(__name__)
 

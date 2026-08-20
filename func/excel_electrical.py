@@ -1,19 +1,19 @@
 """
 解析电力消耗报表
 """
+import argparse
 import os
+import re
 
 import numpy as np
 import pandas as pd
-import re
-import argparse
 
-from func.logger import get_logger
-from func.excel_utils import dedup_dataframe, detect_shift, get_hidden_indices, filter_hidden_from_df, open_workbook
-from func.string_utils import clean_string, clean_equipment_name
+from func import config_loader
 from func.anomaly import detect_and_filter
 from func.anomaly.rules import AnomalyConfig
-from func import config_loader
+from func.excel_utils import dedup_dataframe, detect_shift, filter_hidden_from_df, get_hidden_indices, open_workbook
+from func.logger import get_logger
+from func.string_utils import clean_equipment_name, clean_string
 
 logger = get_logger(__name__)
 

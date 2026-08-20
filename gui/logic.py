@@ -4,22 +4,20 @@ GUI 业务逻辑层
 """
 import asyncio
 import logging
+import os
 import sys
 import threading
+
 import flet as ft
-import os
-import pandas as pd
+
 from func import config_loader
-from func.excel_batch import scan_files, process_files, MODULE_LABELS
+from func.excel_batch import MODULE_LABELS, process_files, scan_files
 from func.sync_to_minebase import sync as sync_to_minebase
-from func.sync_to_minebase import test_db_connection
-from func.sync_to_minebase import test_api_connection
+from func.sync_to_minebase import test_api_connection, test_db_connection
 from func.time_utils import local_now
-
-
-from gui.utils import _log_message
-from gui.i18n import t
 from gui import theme
+from gui.i18n import t
+from gui.utils import _log_message
 
 logger = logging.getLogger(__name__)
 
@@ -608,7 +606,7 @@ async def _poll_batch_progress_queue(progress_queue, progress_bar, progress_text
     while not done_flag.is_set():
         try:
             await asyncio.wait_for(done_flag.wait(), timeout=0.3)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # Timeout expired -> poll the queue
             _drain_batch_progress_queue_once(progress_queue, progress_bar, progress_text)
 
@@ -640,7 +638,7 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
     if batch_refs["auto_detect"].value:
         raw_start = -1
     else:
-        raw_start_text = (batch_refs.get("raw_start_input") and batch_refs["raw_start_input"].value or "-1").strip()
+        raw_start_text = ((batch_refs.get("raw_start_input") and batch_refs["raw_start_input"].value) or "-1").strip()
         try:
             raw_start = int(raw_start_text)
             if raw_start != -1 and raw_start < 1:

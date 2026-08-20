@@ -9,7 +9,6 @@ import pandas as pd
 
 from func.number_utils import decimal_divide
 
-
 # ── 辅助函数 ──────────────────────────────────────────────────
 
 def _safe_minutes(val) -> int:

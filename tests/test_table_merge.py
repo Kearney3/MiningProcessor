@@ -1,12 +1,11 @@
 """Tests for the table merge (表内合并) feature in excel_batch.py"""
 import pandas as pd
-import pytest
+
 from func.excel_batch import (
     _add_default_shift,
     _aggregate_production_data,
     _left_merge,
 )
-
 
 # ---------------------------------------------------------------------------
 # _add_default_shift

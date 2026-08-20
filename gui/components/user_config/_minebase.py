@@ -11,9 +11,9 @@ except ImportError:
 from func import config_loader
 from func.config_loader import get_minebase_config_default
 from gui.components.common import _log_message
-
-from ._helpers import _sync_port_state, _normalize_port_text
 from gui.i18n import t
+
+from ._helpers import _normalize_port_text, _sync_port_state
 
 
 def _create_minebase_section(page: ft.Page, log):
@@ -40,7 +40,7 @@ def _create_minebase_section(page: ft.Page, log):
     mb_db_user = ft.TextField(label=t("components:user_config._minebase.username"), expand=True, color=theme.TEXT_PRIMARY)
     mb_db_pass = ft.TextField(label=t("components:user_config._minebase.password"), password=True, can_reveal_password=True, expand=True)
 
-    from func.secret_store import MINEBASE_PASSWORD_MASK as _MASKED, LLM_KEY_MASK as _LLM_KEY_MASKED
+    from func.secret_store import MINEBASE_PASSWORD_MASK as _MASKED
     _api_pass_saved = False  # 是否已有保存的 API 密码
     _db_pass_saved = False   # 是否已有保存的 DB 密码
     _api_pass_raw = ""       # 原始加密密码值

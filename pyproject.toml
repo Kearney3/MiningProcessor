@@ -35,6 +35,7 @@ dev = [
     "pytest>=9.0.3",
     "pytest-cov>=7.1.0",
     "pytest-timeout>=2.3.0",
+    "ruff>=0.12.0",
 ]
 
 [build-system]
@@ -91,3 +92,41 @@ exclude = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+exclude = [
+    "build",
+    "dist",
+    "node_modules",
+    ".venv",
+    "src-tauri",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "UP",    # pyupgrade
+    "B",     # flake8-bugbear
+    "SIM",   # flake8-simplify
+    "RUF",   # ruff-specific rules
+]
+ignore = [
+    "E501",   # line too long — enforced gradually, not on day 1
+    "RUF001", # ambiguous unicode in strings (Chinese/Mongolian text)
+    "RUF002", # ambiguous unicode in docstrings
+    "RUF003", # ambiguous unicode in comments
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+    "B011",  # assert in tests is fine
+    "SIM300",# Yoda conditions in assertions
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["func", "gui"]

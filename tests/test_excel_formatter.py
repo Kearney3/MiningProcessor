@@ -6,7 +6,6 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-
 # ── _display_width ────────────────────────────────────────────────────────
 
 

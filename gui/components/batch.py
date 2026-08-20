@@ -3,14 +3,20 @@ from datetime import datetime, timedelta
 
 import flet as ft
 
-from .common import (
-    _last_directory, _update_last_directory, _log_message, _get_initial_directory,
-    _show_path_confirm, ChipToggle, year_options, month_options,
-    make_browse_handler, HeaderModeConfig, to_local_dt, create_anomaly_controls,
-    create_anomaly_results_table,
-)
 from func.time_utils import local_now, local_today
 from gui.i18n import t
+
+from .common import (
+    ChipToggle,
+    HeaderModeConfig,
+    _log_message,
+    create_anomaly_controls,
+    create_anomaly_results_table,
+    make_browse_handler,
+    month_options,
+    to_local_dt,
+    year_options,
+)
 
 try:
     from . import theme

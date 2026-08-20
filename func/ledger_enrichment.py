@@ -1,6 +1,6 @@
 """统一设备台账与型号台账匹配路径。"""
 
-from typing import Any, Optional
+from typing import Any
 
 from func.logger import get_logger
 from func.string_utils import clean_string
@@ -61,7 +61,7 @@ def resolve_equipment_attributes(
 def enrich_dataframe_device(
     df,
     name_col: str,
-    id_col: Optional[str] = None,
+    id_col: str | None = None,
     equipment_ledger=None,
     model_ledger=None,
     suffix: str = "",

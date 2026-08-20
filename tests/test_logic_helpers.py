@@ -6,7 +6,6 @@ import sys
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
-import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -539,7 +538,6 @@ class TestMatchSheets:
 # ---------------------------------------------------------------------------
 # _execute_task 返回值测试
 # ---------------------------------------------------------------------------
-from unittest.mock import patch
 
 
 class TestExecuteTaskReturnValues:
@@ -611,8 +609,8 @@ class TestWireSyncButtonImport:
     def test_wire_sync_button_sets_on_click(self):
         """wire_sync_button 应正确绑定 on_click，且点击时不抛出 ImportError。"""
         import asyncio
+
         from gui.logic import wire_sync_button
-        from gui.components.common import build_anomaly_config_from_refs
 
         mock_page = MagicMock()
         mock_log = MagicMock()

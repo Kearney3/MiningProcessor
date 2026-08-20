@@ -4,20 +4,21 @@
 支持页面关闭时自动取消后台任务。
 """
 import asyncio
-from dataclasses import dataclass, field
 import logging
 import threading
+from dataclasses import dataclass, field
 
 import flet as ft
 
+from gui.i18n import t
+
 from .common import (
-    _log_message,
-    _update_last_directory,
-    _show_path_confirm,
     _get_initial_directory,
+    _log_message,
+    _show_path_confirm,
+    _update_last_directory,
     safe_update,
 )
-from gui.i18n import t
 
 try:
     from . import theme

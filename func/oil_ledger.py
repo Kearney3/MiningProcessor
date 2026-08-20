@@ -3,7 +3,6 @@
 用于导入和管理油品台账表，提供油品名称模糊匹配功能
 """
 
-from typing import Optional
 
 from func.ledger_base import LedgerBase
 
@@ -15,7 +14,7 @@ OIL_LEDGER_COLUMNS = [
 
 
 class OilLedger(LedgerBase):
-    def __init__(self, ledger_path: Optional[str] = None):
+    def __init__(self, ledger_path: str | None = None):
         super().__init__(
             ledger_columns=OIL_LEDGER_COLUMNS,
             template_sample=[

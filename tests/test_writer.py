@@ -1,20 +1,17 @@
 """Tests for func.writer — maintenance record Excel output."""
 
 import datetime
-from pathlib import Path
 
 import pandas as pd
-import pytest
 import xlsxwriter
 
 from func.writer import (
+    _TAB_COLORS,
     _auto_col_width,
     _detect_stats,
     _make_formats,
-    _TAB_COLORS,
     write_excel,
 )
-
 
 # ── _auto_col_width ────────────────────────────────────────────────────────
 

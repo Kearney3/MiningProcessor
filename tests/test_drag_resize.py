@@ -1,5 +1,6 @@
 """Test that the drag resize handler uses the correct DragUpdateEvent attribute."""
 import dataclasses
+
 import flet as ft
 
 

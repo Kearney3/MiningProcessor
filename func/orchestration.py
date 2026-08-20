@@ -6,8 +6,6 @@
 
 import logging
 import os
-from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 
@@ -28,8 +26,8 @@ def load_equipment_ledger_from_cache():
     Returns:
         EquipmentLedger instance or None
     """
-    from func.equipment_ledger import EquipmentLedger
     from func.config_loader import has_equipment_ledger_cache, load_equipment_ledger_cache
+    from func.equipment_ledger import EquipmentLedger
 
     try:
         if has_equipment_ledger_cache():
@@ -50,8 +48,8 @@ def load_oil_ledger_from_cache():
     Returns:
         OilLedger instance or None
     """
-    from func.oil_ledger import OilLedger
     from func.config_loader import has_oil_ledger_cache, load_oil_ledger_cache
+    from func.oil_ledger import OilLedger
 
     try:
         if has_oil_ledger_cache():
@@ -68,8 +66,8 @@ def load_oil_ledger_from_cache():
 
 def load_model_ledger_from_cache():
     """从缓存加载型号台账实例，失败返回 None。"""
-    from func.model_ledger import ModelLedger
     from func.config_loader import has_model_ledger_cache, load_model_ledger_cache
+    from func.model_ledger import ModelLedger
 
     try:
         if has_model_ledger_cache():
@@ -111,7 +109,7 @@ def postprocess_with_ledgers(
     output_file: str,
     equipment_ledger=None,
     oil_ledger=None,
-    preloaded_sheets: Optional[dict[str, pd.DataFrame]] = None,
+    preloaded_sheets: dict[str, pd.DataFrame] | None = None,
     model_ledger=None,
 ) -> bool:
     """对输出 Excel 文件进行台账匹配后处理。
@@ -145,7 +143,7 @@ def postprocess_from_cache(
     use_equipment_ledger: bool = False,
     use_oil_ledger: bool = False,
     use_model_ledger: bool = False,
-    preloaded_sheets: Optional[dict[str, pd.DataFrame]] = None,
+    preloaded_sheets: dict[str, pd.DataFrame] | None = None,
 ) -> bool:
     """加载缓存台账后执行匹配后处理。
 
@@ -188,7 +186,7 @@ def postprocess_from_cache(
 
 
 def build_worktime_header_mapping(
-    mode: Optional[str] = None,
+    mode: str | None = None,
 ) -> dict:
     """构建工时表头映射配置。
 
@@ -361,8 +359,8 @@ def process_single(
                             filter_zero_work_hours=filter_zero_work_hours)
 
     elif module_type == "production":
-        from func.excel_production_enhanced import MiningDataProcessor
         from func.config_loader import get_device_load_map, get_load_map_version
+        from func.excel_production_enhanced import MiningDataProcessor
         load_map_ver = get_load_map_version()
         load_map = get_device_load_map(load_map_ver)
         processor = MiningDataProcessor(
@@ -441,8 +439,8 @@ def process_single(
         )
 
     elif module_type == "maint":
-        from func.excel_maintenance import process_maintenance_data
         from func.config_loader import get_maintenance_classifications
+        from func.excel_maintenance import process_maintenance_data
         eq_ledger = equipment_ledger
         if eq_ledger is None and use_equipment_ledger:
             eq_ledger = load_equipment_ledger_from_cache()

@@ -17,25 +17,24 @@ import re
 
 import pandas as pd
 
-from func.logger import get_logger
-from func.string_utils import clean_string
+from func import config_loader
+from func.anomaly import detect_and_filter
+from func.anomaly.rules import AnomalyConfig
 from func.excel_utils import (
-    apply_header_mapping,
     adjust_index_for_hidden,
+    apply_header_mapping,
     clean_split_dataframe,
     dedup_dataframe,
     drop_all_nan_columns,
     drop_empty_device_name,
     filter_hidden_from_df,
     get_hidden_indices,
-    open_workbook,
     sort_by_date_shift,
     split_day_night_shifts,
     strip_date_column,
 )
-from func.anomaly import detect_and_filter
-from func.anomaly.rules import AnomalyConfig
-from func import config_loader
+from func.logger import get_logger
+from func.string_utils import clean_string
 
 logger = get_logger(__name__)
 
@@ -286,7 +285,7 @@ def _finalize(
     if anomaly_config is None:
         anomaly_config = AnomalyConfig.from_config(config_loader.get_anomaly_detection_config())
     if anomaly_config.enabled:
-        output_dir = output_file and os.path.dirname(output_file) or base_dir
+        output_dir = (output_file and os.path.dirname(output_file)) or base_dir
         final_df, _ = detect_and_filter(
             final_df, "worktime", anomaly_config, output_dir=output_dir)
 

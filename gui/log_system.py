@@ -9,18 +9,18 @@ import asyncio
 import concurrent.futures
 import inspect
 import logging
-from pathlib import Path
 import sys
 import threading
+from pathlib import Path
 
 import flet as ft
+
+from func.time_utils import local_datetime_from_timestamp, local_now
+from gui.i18n import t
 
 from . import theme
 from .components.common import _last_directory, _update_last_directory
 from .log_broker import LogEntry, LogSubscription, get_log_broker
-from func.time_utils import local_datetime_from_timestamp, local_now
-from gui.i18n import t
-
 
 MAX_LOG_RECORDS = 5000
 MAX_RENDERED_RECORDS = 1000

@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 from gui.log_broker import LogEntry, LogSubscription, get_log_broker, install_gui_log_handler
-from gui.log_system import LogSystem, MAX_RENDERED_RECORDS
+from gui.log_system import MAX_RENDERED_RECORDS, LogSystem
 
 
 class StubControl:

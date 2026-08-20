@@ -6,21 +6,21 @@ import pandas as pd
 import pytest
 
 from func.label_maintenance_with_llm import (
-    LLMLabel,
-    BatchResult,
     MAX_BATCH_SIZE,
     AnthropicLabelClient,
+    BatchResult,
+    LLMLabel,
     OpenAICompatibleLabelClient,
+    _auto_correct_classification,
+    _build_records,
+    _load_local_env,
+    _normalize_url,
+    _resolve_minor,
     build_system_prompt,
     extract_response_content,
     get_allowed_taxonomy,
     label_file,
     parse_and_validate_labels,
-    _normalize_url,
-    _load_local_env,
-    _build_records,
-    _auto_correct_classification,
-    _resolve_minor,
 )
 
 
@@ -146,6 +146,7 @@ def test_client_cancel_during_retry_stops_before_next_request(
 ):
     import threading
     import urllib.error
+
     from func.label_maintenance_with_llm import _Cancelled
 
     attempts = 0
@@ -636,6 +637,7 @@ def _make_llm_excel(tmp_path, rows=100, sheet="维修明细"):
 def test_process_maintenance_llm_cancel_before_start(tmp_path):
     """取消事件在开始前已设置时应立即返回。"""
     import threading
+
     from func.label_maintenance_with_llm import process_maintenance_llm
 
     source = _make_llm_excel(tmp_path, rows=10)
@@ -654,7 +656,8 @@ def test_process_maintenance_llm_cancel_midway(tmp_path):
     """取消事件在处理中途设置时应返回部分结果。"""
     import threading
     from unittest.mock import patch
-    from func.label_maintenance_with_llm import process_maintenance_llm, BatchResult, LLMLabel
+
+    from func.label_maintenance_with_llm import BatchResult, LLMLabel, process_maintenance_llm
 
     source = _make_llm_excel(tmp_path, rows=50)
     cancel = threading.Event()
@@ -774,7 +777,8 @@ def test_process_maintenance_llm_cancel_returns_while_batches_are_in_flight(tmp_
 def test_process_maintenance_llm_no_cancel_completes_normally(tmp_path):
     """无取消事件时应正常完成。"""
     from unittest.mock import patch
-    from func.label_maintenance_with_llm import process_maintenance_llm, BatchResult, LLMLabel
+
+    from func.label_maintenance_with_llm import BatchResult, LLMLabel, process_maintenance_llm
 
     source = _make_llm_excel(tmp_path, rows=10)
 
@@ -804,6 +808,7 @@ def test_process_maintenance_llm_no_cancel_completes_normally(tmp_path):
 def test_cancel_event_parameter_exists():
     """process_maintenance_llm 应接受 cancel_event 参数。"""
     import inspect
+
     from func.label_maintenance_with_llm import process_maintenance_llm
 
     sig = inspect.signature(process_maintenance_llm)
@@ -833,6 +838,7 @@ def test_process_maintenance_llm_rejects_conflicting_column_mapping(tmp_path):
 def test_process_maintenance_llm_checkpoint_scope_changes_with_source_content(tmp_path):
     """源内容变化后不能复用按旧行号保存的 checkpoint。"""
     from unittest.mock import patch
+
     from func.label_maintenance_with_llm import BatchResult, LLMLabel, process_maintenance_llm
 
     source = _make_llm_excel(tmp_path, rows=2)
@@ -899,6 +905,7 @@ def test_process_maintenance_llm_checkpoint_scope_changes_with_source_content(tm
 def test_process_maintenance_llm_progress_has_consistent_record_breakdown(tmp_path):
     """进度百分比和当前值使用同一目标记录口径。"""
     from unittest.mock import patch
+
     from func.label_maintenance_with_llm import BatchResult, LLMLabel, process_maintenance_llm
 
     source = _make_llm_excel(tmp_path, rows=3)
@@ -955,6 +962,7 @@ def test_process_maintenance_llm_progress_has_consistent_record_breakdown(tmp_pa
 def test_process_maintenance_llm_creates_missing_output_columns(tmp_path):
     """仅有内容列时也应新建全部输出列，而不是静默遗漏分类方式。"""
     from unittest.mock import patch
+
     from func.label_maintenance_with_llm import BatchResult, LLMLabel, process_maintenance_llm
 
     source = tmp_path / "content-only.xlsx"

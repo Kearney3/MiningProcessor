@@ -1,11 +1,10 @@
 """Tests that pd.ExcelFile handles are properly closed via context managers."""
 import os
 import tempfile
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -51,10 +50,9 @@ class TestExcelFuelHandleClosed:
 
         try:
             with patch.object(pd.ExcelFile, "__enter__", tracked_enter), \
-                 patch.object(pd.ExcelFile, "__exit__", tracked_exit):
-                with pytest.raises(ValueError):
-                    # No matching sheets -> raises, but handle should still close
-                    process_diesel_data(tmp_path)
+                 patch.object(pd.ExcelFile, "__exit__", tracked_exit), pytest.raises(ValueError):
+                # No matching sheets -> raises, but handle should still close
+                process_diesel_data(tmp_path)
 
             assert enter_called, "__enter__ was never called on ExcelFile"
             assert exit_called, "__exit__ was never called on ExcelFile"

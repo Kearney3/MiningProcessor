@@ -3,15 +3,14 @@
 提供 Excel 导入、设备/油品批量匹配、结果导出等纯数据逻辑，
 由 gui/components/ledger_match.py 薄封装调用。
 """
-import datetime
 import threading
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Optional
 
 import pandas as pd
 
-from func.logger import get_logger
 from func.excel_utils import strip_date_only_times
+from func.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -34,11 +33,11 @@ class MatchState:
         self.matched_all_sheets: dict[str, pd.DataFrame] = {}
         self.matched_sheets: dict[str, pd.DataFrame] = {}
         self.unmatched_sheets: dict[str, pd.DataFrame] = {}
-        self.filtered_df: Optional[pd.DataFrame] = None
+        self.filtered_df: pd.DataFrame | None = None
         self.current_sheet: str = ""
         self.page: int = 0
         self.columns: list[str] = []
-        self.sort_column: Optional[str] = None
+        self.sort_column: str | None = None
         self.sort_ascending: bool = True
         self.view_mode: str = "all"
         self.date_only: bool = False
@@ -70,8 +69,8 @@ ProgressCallback = Callable[[float, str], None]  # (progress 0-1, message)
 
 def import_excel(
     file_path: str,
-    progress_cb: Optional[ProgressCallback] = None,
-    cancel_event: Optional[threading.Event] = None,
+    progress_cb: ProgressCallback | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> tuple[dict[str, pd.DataFrame], list[str]]:
     """Import all sheets from *file_path*.
 
@@ -116,8 +115,8 @@ def import_excel(
 
 def _batch_match(
     df: pd.DataFrame, source_col: str, match_fn: Callable,
-    result_keys: list[str], *, cancel_event: Optional[threading.Event] = None,
-    id_col: Optional[str] = None, progress_cb: Optional[ProgressCallback] = None,
+    result_keys: list[str], *, cancel_event: threading.Event | None = None,
+    id_col: str | None = None, progress_cb: ProgressCallback | None = None,
     progress_label: str = "", total_work: int = 0,
 ) -> dict[str, list]:
     """Apply *match_fn* row-by-row and return ``{key: [values...]}``."""
@@ -166,9 +165,9 @@ def _batch_match(
 
 def match_sheet(
     df: pd.DataFrame, eq_ledger, oil_ledger,
-    name_col: Optional[str], id_col: Optional[str], oil_col: Optional[str],
-    cancel_event: Optional[threading.Event] = None,
-    progress_cb: Optional[ProgressCallback] = None,
+    name_col: str | None, id_col: str | None, oil_col: str | None,
+    cancel_event: threading.Event | None = None,
+    progress_cb: ProgressCallback | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, int]:
     """Run equipment + oil matching on *df*.
 
@@ -239,8 +238,8 @@ def match_sheet(
 
 def export_to_excel(
     sheets: dict[str, pd.DataFrame], output_path: str,
-    sheet_name: str = "全部", cancel_event: Optional[threading.Event] = None,
-    progress_cb: Optional[ProgressCallback] = None,
+    sheet_name: str = "全部", cancel_event: threading.Event | None = None,
+    progress_cb: ProgressCallback | None = None,
     delete_on_cancel: bool = True,
     date_only: bool = False,
 ) -> bool:
@@ -264,9 +263,9 @@ def export_to_excel(
         DATE_NUM_FORMAT,
         HEADER_FILL,
         HEADER_FONT_COLOR,
+        _apply_date_only,
         _auto_column_widths,
         _is_date_column,
-        _apply_date_only,
     )
 
     cancelled = cancel_event or threading.Event()
@@ -370,7 +369,7 @@ def export_to_excel(
 # 视图 / 状态辅助
 # ---------------------------------------------------------------------------
 
-def get_view_df(state: MatchState) -> Optional[pd.DataFrame]:
+def get_view_df(state: MatchState) -> pd.DataFrame | None:
     """Return the DataFrame for the current view mode."""
     if state.view_mode == "matched":
         return state.matched_sheets.get(state.current_sheet)
@@ -379,7 +378,7 @@ def get_view_df(state: MatchState) -> Optional[pd.DataFrame]:
     return state.filtered_df
 
 
-def get_current_df(state: MatchState) -> Optional[pd.DataFrame]:
+def get_current_df(state: MatchState) -> pd.DataFrame | None:
     """Return the best available DataFrame for the current sheet."""
     name = state.current_sheet
     if not name:

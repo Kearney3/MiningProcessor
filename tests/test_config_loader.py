@@ -2,9 +2,9 @@
 import json
 import pathlib
 import sys
+from pathlib import Path
 
 import pytest
-from pathlib import Path
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))

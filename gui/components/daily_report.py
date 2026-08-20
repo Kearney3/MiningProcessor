@@ -1,12 +1,13 @@
 """日报导出区域。"""
 import asyncio
 import logging
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import flet as ft
 
 from func.daily_report import export_daily_report
+from func.time_utils import local_today
 from gui.components.common import (
     _get_initial_directory,
     _update_last_directory,
@@ -14,7 +15,6 @@ from gui.components.common import (
     safe_update,
     to_local_dt,
 )
-from func.time_utils import local_today
 from gui.i18n import t
 
 try:

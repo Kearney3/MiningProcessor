@@ -15,7 +15,6 @@ from func.secret_store import (
     _decrypt,
     _encrypt,
     _get_machine_id,
-    _reset_fernet_cache,
     has_encrypted_secret,
     load_minebase_secret,
     load_secret,

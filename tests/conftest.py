@@ -1,7 +1,7 @@
 """Shared test fixtures for MiningProcessor test suite."""
-import pytest
+
 import pandas as pd
-from pathlib import Path
+import pytest
 
 
 @pytest.fixture(autouse=True)

@@ -2,16 +2,15 @@
 import json
 import pathlib
 import sys
+import types
 
 import pytest
-import types
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from func import config_loader
 
-import flet as ft
+from func import config_loader
 
 
 def _find_button(refs, label):
@@ -33,7 +32,7 @@ def _find_button(refs, label):
     raise LookupError(label)
 
 # 复用 test_gui_components.py 中的最小 Spy
-from tests.test_gui_components import DummyPage, PageSpy, DummyControlEvent
+from tests.test_gui_components import DummyControlEvent, DummyPage, PageSpy
 
 # 确保 gui 包可导入
 if "gui" not in sys.modules:
@@ -43,6 +42,7 @@ if "gui" not in sys.modules:
     sys.modules["gui"] = gui_pkg
 
 import importlib.util
+
 spec = importlib.util.spec_from_file_location(
     "gui.components",
     ROOT / "gui" / "components" / "__init__.py",

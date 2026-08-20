@@ -3,10 +3,9 @@ import flet as ft
 
 import func.oil_ledger as oil_ledger
 from func.oil_ledger import OIL_LEDGER_COLUMNS
-
-from .ledger_base import LedgerConfig, create_ledger_section_factory
 from gui.i18n import t
 
+from .ledger_base import LedgerConfig, create_ledger_section_factory
 
 _OIL_LEDGER_STANDARD_COLS = [
     ("油品名称", t("components:oil_ledger.matchingnameMatchingmatching")),

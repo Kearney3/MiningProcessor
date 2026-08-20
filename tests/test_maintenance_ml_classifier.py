@@ -1,6 +1,6 @@
 """维修 ML 二级分类器测试。"""
-from datetime import date
 import json
+from datetime import date
 
 import pandas as pd
 
