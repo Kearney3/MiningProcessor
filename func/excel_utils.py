@@ -15,7 +15,7 @@ import warnings
 
 import pandas as pd
 
-from func.string_utils import clean_string
+from func.string_utils import clean_equipment_name, clean_string
 
 logger = logging.getLogger(__name__)
 
@@ -581,6 +581,23 @@ def drop_empty_device_name(
         logger.info(f"过滤了 {removed} 行设备名称为空的数据")
         return df[~mask].reset_index(drop=True)
     return df
+
+
+def normalize_equipment_name_column(
+    df: pd.DataFrame,
+    device_column: str = "设备名称",
+) -> pd.DataFrame:
+    """对指定的设备名称列进行设备文本标准化。
+
+    只处理设备名称列，其他文本字段保持原样（仅由各自的清洗流程处理）。
+    当列不存在时返回原 DataFrame，便于兼容未启用表头映射的工效表。
+    """
+    if df.empty or device_column not in df.columns:
+        return df
+
+    result = df.copy()
+    result[device_column] = result[device_column].map(clean_equipment_name)
+    return result
 
 
 def dedup_dataframe(

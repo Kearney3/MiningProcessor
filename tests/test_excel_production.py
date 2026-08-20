@@ -300,6 +300,25 @@ class TestProcessSheet1:
         assert row["运行小时数"] == 8.8
         assert row["运行里程"] == 49.8
 
+    def test_ore_type_preserves_cyrillic_homoglyphs(self):
+        """Ore types are general text and must not be homoglyph-normalized."""
+        proc = _make_processor({"TR600": 85}, raw_start=6)
+        row6 = _HEADER_ROW6.copy()
+        row7 = _HEADER_ROW7.copy()
+        row7[6] = "Сырьё"
+        rows = [[None] * len(row6) for _ in range(5)]
+        rows.extend([
+            row6,
+            row7,
+            ["TR600-01", 100.0, 108.5, 5000.0, 5050.0, "CompanyA", 10, 0, 0, 10, ""],
+        ])
+
+        _, production_df = proc.process_sheet1(
+            pd.DataFrame(rows, dtype=object), date(2025, 1, 1), "Day"
+        )
+
+        assert production_df.iloc[0]["矿石类型"] == "Сырьё"
+
     def test_empty_dataframe_returns_empty(self):
         proc = _make_processor({})
         df_raw = pd.DataFrame(dtype=object)
@@ -483,6 +502,23 @@ class TestProcessSheet2:
         result = proc.process_sheet2(df_raw, date(2025, 1, 15), "Day")
         assert not result.empty
         assert result.iloc[0]["备注"] == "SomeRemark"
+
+    def test_sheet2_remark_preserves_cyrillic_homoglyphs(self):
+        """Remarks are general text and must not be homoglyph-normalized."""
+        proc = _make_processor({})
+        n_cols = 11
+        rows = [[None] * n_cols for _ in range(3)]
+        row = [None] * n_cols
+        row[1] = "TR600-01"
+        row[2] = "CompanyA"
+        row[5] = 10.0
+        row[6] = 18.0
+        row[8] = "Событие"
+        rows.append(row)
+
+        result = proc.process_sheet2(pd.DataFrame(rows, dtype=object), date(2025, 1, 15), "Day")
+
+        assert result.iloc[0]["备注"] == "Событие"
 
 
 # ---------------------------------------------------------------------------
