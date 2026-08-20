@@ -7,7 +7,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys_path = __import__("sys").path
 sys_path.insert(0, str(ROOT))
 
-from func.excel_electrical import parse_excel_data
+from func.excel_electrical import parse_excel_data  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Fixture helpers
@@ -48,12 +48,12 @@ def _make_multi_sheet_excel(path, sheets):
 
 def _date_header(*dates):
     """Build a date header row with '日期' in col 0 and dates from col 4."""
-    return ["日期", "", "", ""] + list(dates)
+    return ["日期", "", "", "", *list(dates)]
 
 
 def _device_row(label, *values):
     """Build a data row: device label in col 0, filler, then power values from col 4."""
-    return [label, None, None, None] + list(values)
+    return [label, None, None, None, *list(values)]
 
 
 # ---------------------------------------------------------------------------
@@ -186,7 +186,7 @@ class TestShiftDetection:
         )
         df = result["电力消耗"]
         assert len(df) == 2
-        shifts = dict(zip(df["日期"], df["班次"]))
+        shifts = dict(zip(df["日期"], df["班次"], strict=False))
         day_date = pd.Timestamp("2025-03-01").date()
         night_date = pd.Timestamp("2025-03-02").date()
         assert shifts[day_date] == "Day"

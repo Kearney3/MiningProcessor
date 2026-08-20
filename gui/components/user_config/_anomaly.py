@@ -1,4 +1,6 @@
 """异常值检测配置区域组件。"""
+import contextlib
+
 import flet as ft
 
 try:
@@ -312,15 +314,11 @@ def _create_anomaly_config_section(page: ft.Page, log):
                 # 阈值
                 bounds = {}
                 if r[1].strip():
-                    try:
+                    with contextlib.suppress(ValueError):
                         bounds["min"] = float(r[1])
-                    except ValueError:
-                        pass
                 if r[2].strip():
-                    try:
+                    with contextlib.suppress(ValueError):
                         bounds["max"] = float(r[2])
-                    except ValueError:
-                        pass
                 if bounds:
                     dt_thresholds[col] = bounds
                 # 默认值（处理异常值时替换用）

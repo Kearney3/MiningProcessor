@@ -1,4 +1,6 @@
 """文件关键字配置区域组件。"""
+import contextlib
+
 import flet as ft
 
 try:
@@ -58,20 +60,16 @@ def _create_keywords_section(page: ft.Page, log):
         config_loader.update_user_config({"file_keywords": kw})
         kw_status_text.value = t("components:user_config._keywords.filenameKeywordConfigurationSaved")
         _log_message(log, t("components:user_config._keywords.savedfilenameKeywordConfiguration"))
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             page.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     def reset_keywords(_e):
         config_loader.update_user_config({"file_keywords": dict(DEFAULT_FILE_KEYWORDS)})
         _apply_kw_to_ui(DEFAULT_FILE_KEYWORDS)
         kw_status_text.value = t("components:user_config._keywords.restoreddefaultkeyword")
         _log_message(log, t("components:user_config._keywords.restoreddefaultfilenameKeywordConfiguration"))
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             page.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     kw_action_buttons = [
         theme.primary_btn(t("components:user_config._keywords.saveKeywords"), icon=ft.Icons.SAVE, on_click=save_keywords),

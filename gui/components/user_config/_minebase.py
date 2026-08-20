@@ -1,4 +1,5 @@
 """MineBase 连接配置区域组件。"""
+import contextlib
 import logging
 
 import flet as ft
@@ -153,10 +154,8 @@ def _create_minebase_section(page: ft.Page, log):
         config_loader.save_minebase_config(cfg)
         mb_status_text.value = t("components:user_config._minebase.minebaseConfigurationconfigurationsaved")
         _log_message(log, t("components:user_config._minebase.savedMinebaseConfigurationconfiguration"))
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             page.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     def _reset_mb_config(_e):
         defaults = get_minebase_config_default()
@@ -164,10 +163,8 @@ def _create_minebase_section(page: ft.Page, log):
         _apply_mb_config(defaults)
         mb_status_text.value = t("components:user_config._minebase.defaultConfigurationRestored")
         _log_message(log, t("components:user_config._minebase.defaultMinebaseDefaultdefaultconfiguration"))
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             page.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     mb_action_buttons = [
         theme.primary_btn(t("components:user_config._minebase.saveConfig"), icon=ft.Icons.SAVE, on_click=_save_mb_config),

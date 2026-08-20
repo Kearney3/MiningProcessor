@@ -8,8 +8,8 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from func.excel_merger import find_first_datetime_column, merge_excel_files
-from func.excel_utils import sanitize_filename
+from func.excel_merger import find_first_datetime_column, merge_excel_files  # noqa: E402
+from func.excel_utils import sanitize_filename  # noqa: E402
 
 
 class TestFindFirstDatetimeColumn:

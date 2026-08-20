@@ -3,6 +3,7 @@ GUI 业务逻辑层
 处理各模块的后台任务、线程管理
 """
 import asyncio
+import contextlib
 import logging
 import os
 import sys
@@ -39,10 +40,8 @@ def register_cancel_event(event: threading.Event) -> None:
 
 def unregister_cancel_event(event: threading.Event) -> None:
     """从活跃列表中移除已完成的 cancel_event。"""
-    try:
+    with contextlib.suppress(ValueError):
         _active_cancel_events.remove(event)
-    except ValueError:
-        pass
 
 
 def shutdown_tasks() -> None:
@@ -88,10 +87,8 @@ class _SnackbarManager:
         """Display a snackbar notification (thread-safe, single active instance)."""
         # Remove previous undismissed snackbar
         if self._active is not None:
-            try:
+            with contextlib.suppress(ValueError):
                 page.overlay.remove(self._active)
-            except ValueError:
-                pass
             self._active = None
 
         snackbar = ft.SnackBar(
@@ -807,10 +804,8 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
             done_flag.set()
             if not progress_poller.done():
                 progress_poller.cancel()
-                try:
+                with contextlib.suppress(asyncio.CancelledError):
                     await progress_poller
-                except asyncio.CancelledError:
-                    pass
             _log_message(log, t("logic:batchProcessingFailed", ex=ex), level=logging.ERROR)
             _show_snackbar(page, t("logic:batchProcessingFailed", ex=ex), is_error=True)
 

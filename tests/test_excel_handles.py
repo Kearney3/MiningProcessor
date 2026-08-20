@@ -1,4 +1,5 @@
 """Tests that pd.ExcelFile handles are properly closed via context managers."""
+import contextlib
 import os
 import tempfile
 from unittest.mock import patch
@@ -30,7 +31,7 @@ class TestExcelFuelHandleClosed:
 
         enter_called = False
         exit_called = False
-        original_init = pd.ExcelFile.__init__
+        _original_init = pd.ExcelFile.__init__
         original_enter = pd.ExcelFile.__enter__
         original_exit = pd.ExcelFile.__exit__
 
@@ -89,7 +90,7 @@ class TestExcelElectricalHandleClosed:
             with patch.object(pd.ExcelFile, "__enter__", tracked_enter), \
                  patch.object(pd.ExcelFile, "__exit__", tracked_exit):
                 # No "Electrical" sheets -> returns None, but handle must close
-                result = parse_excel_data(tmp_path)
+                _result = parse_excel_data(tmp_path)
 
             assert enter_called, "__enter__ was never called on ExcelFile"
             assert exit_called, "__exit__ was never called on ExcelFile"
@@ -165,11 +166,8 @@ class TestExcelProductionEnhancedHandleClosed:
         try:
             processor = MiningDataProcessor(device_load_map={})
             with patch.object(pd.ExcelFile, "__enter__", tracked_enter), \
-                 patch.object(pd.ExcelFile, "__exit__", tracked_exit):
-                try:
-                    processor.process_single_file(tmp_path)
-                except Exception:
-                    pass  # parsing may fail on our minimal file, that's fine
+                 patch.object(pd.ExcelFile, "__exit__", tracked_exit), contextlib.suppress(Exception):
+                processor.process_single_file(tmp_path)
 
             assert enter_called, "__enter__ was never called on ExcelFile"
             assert exit_called, "__exit__ was never called on ExcelFile"
@@ -209,10 +207,8 @@ class TestExcelWorktimeMultifileHandleClosed:
             with patch.object(pd.ExcelFile, "__enter__", tracked_enter), \
                  patch.object(pd.ExcelFile, "__exit__", tracked_exit):
                 output = os.path.join(base_dir, "output.xlsx")
-                try:
+                with contextlib.suppress(SystemExit):
                     process_directory(base_dir, year=2025, month=1, output_file=output)
-                except SystemExit:
-                    pass
 
             assert enter_called, "__enter__ was never called on ExcelFile"
             assert exit_called, "__exit__ was never called on ExcelFile"

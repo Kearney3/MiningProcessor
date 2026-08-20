@@ -1,4 +1,5 @@
 """MineBase 数据同步区域组件"""
+import contextlib
 from datetime import date, datetime, timedelta
 
 import flet as ft
@@ -301,10 +302,8 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     def _on_date_filter_toggle(e):
         date_range_row.visible = date_filter_check.value
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             date_range_row.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     date_filter_check.on_change = _on_date_filter_toggle
 

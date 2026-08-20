@@ -20,6 +20,7 @@ from collections.abc import Callable, Iterable
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, as_completed, wait
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
@@ -1263,10 +1264,7 @@ def process_maintenance_llm(
     )
 
     source = Path(input_path)
-    if export_mode == "details":
-        default_name = f"{source.stem}_LLM标注明细.xlsx"
-    else:
-        default_name = f"{source.stem}_LLM标注统计.xlsx"
+    default_name = f"{source.stem}_LLM标注明细.xlsx" if export_mode == "details" else f"{source.stem}_LLM标注统计.xlsx"
     if output_path is None:
         output_path = str(source.with_name(default_name))
 
@@ -1394,7 +1392,7 @@ def process_maintenance_llm(
             prog.mark_cancelling()
         with lock:
             _append_checkpoint(checkpoint, result.labels)
-            completed.update({l.record_id: l for l in result.labels})
+            completed.update({lbl.record_id: lbl for lbl in result.labels})
             all_skipped_ids.extend(result.skipped_ids)
             done_count += 1
             prog.record_success(

@@ -9,8 +9,8 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-import func.excel_batch as batch_mod
-from func.excel_batch import process_files
+import func.excel_batch as batch_mod  # noqa: E402
+from func.excel_batch import process_files  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

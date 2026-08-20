@@ -10,7 +10,7 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from func.logger import QueueHandler, _next_seq, get_logger, setup_logging
+from func.logger import QueueHandler, _next_seq, get_logger, setup_logging  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

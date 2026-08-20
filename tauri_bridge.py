@@ -13,6 +13,7 @@ Tauri-Python 桥接层 — JSON-RPC over stdin/stdout
 
 from __future__ import annotations
 
+import contextlib
 import ipaddress
 import json
 import logging
@@ -33,10 +34,8 @@ from func.time_utils import local_datetime_from_timestamp
 # 需要在代码中显式设置，避免中文 Windows 使用 GBK 编码
 for _stream in (sys.stdin, sys.stdout, sys.stderr):
     if hasattr(_stream, 'reconfigure'):
-        try:
+        with contextlib.suppress(Exception):
             _stream.reconfigure(encoding='utf-8', errors='replace')
-        except Exception:
-            pass
 
 logger = logging.getLogger(__name__)
 
@@ -681,7 +680,7 @@ def _batch_process_impl(params: dict, cancel_event: threading.Event) -> dict:
         if required not in (matched or {}):
             return {"error": f"表内合并需要 {required} 数据，但未在目录中找到"}
 
-    result, summary = process_files(
+    _result, summary = process_files(
         folder_path=safe_folder,
         matched=matched,
         year=params.get("year"),

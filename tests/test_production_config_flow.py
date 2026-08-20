@@ -1,16 +1,17 @@
 import pathlib
 import sys
+from typing import ClassVar
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from func import config_loader
-from func.excel_production_enhanced import MiningDataProcessor
-from gui import logic
+from func import config_loader  # noqa: E402
+from func.excel_production_enhanced import MiningDataProcessor  # noqa: E402
+from gui import logic  # noqa: E402
 
 
 class ProcessorSpy:
-    instances = []
+    instances: ClassVar[list] = []
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
@@ -55,7 +56,7 @@ def test_execute_task_passes_current_device_load_map_to_production_processor(mon
     input_file = tmp_path / "sample.xlsx"
     input_file.write_text("placeholder", encoding="utf-8")
 
-    error, extra = logic._execute_task("production", str(input_file), raw_start=9)
+    error, _extra = logic._execute_task("production", str(input_file), raw_start=9)
 
     assert error is None
     assert len(ProcessorSpy.instances) == 1

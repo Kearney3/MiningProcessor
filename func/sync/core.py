@@ -279,7 +279,7 @@ def sync(
     _production_cache: dict[str, dict[str, list[dict[str, Any]]]] | None = None
 
     # 试运行数据收集
-    dry_run_data: dict[str, list[dict[str, Any]]] = {} if dry_run else {}
+    dry_run_data: dict[str, list[dict[str, Any]]] = {}
 
     # 逐类型同步（每个类型可能对应多个文件）
     results = {}

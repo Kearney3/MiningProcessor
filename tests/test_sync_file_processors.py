@@ -12,7 +12,7 @@ import pandas as pd
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from func.sync.file_processors import (
+from func.sync.file_processors import (  # noqa: E402
     _process_electrical_file,
     _process_fuel_file,
     _process_production_file,

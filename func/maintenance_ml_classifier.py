@@ -95,7 +95,7 @@ class MaintenanceMLClassifier:
             if count >= self.config.min_samples_per_class
         }
         buckets: dict[str, list[str]] = defaultdict(list)
-        for text, label in zip(texts, labels):
+        for text, label in zip(texts, labels, strict=False):
             if label in allowed:
                 normalized = normalize_maintenance_content(text)
                 if normalized:
@@ -163,10 +163,7 @@ class MaintenanceMLClassifier:
         indexes = order[:, -1]
         rows = np.arange(len(probabilities))
         confidence = probabilities[rows, indexes]
-        if probabilities.shape[1] == 1:
-            margin = confidence.copy()
-        else:
-            margin = confidence - probabilities[rows, order[:, -2]]
+        margin = confidence.copy() if probabilities.shape[1] == 1 else confidence - probabilities[rows, order[:, -2]]
         return classes[indexes], confidence, margin
 
     def _predict_hierarchy(
@@ -342,6 +339,7 @@ class MaintenanceMLClassifier:
             margin_values,
             centroid_agreement,
             centroid_similarity,
+            strict=False,
         ):
             # 置信度达到阈值时放宽质心一致性要求
             centroid_ok = agrees or confidence >= self.config.min_confidence

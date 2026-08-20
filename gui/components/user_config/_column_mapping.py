@@ -1,4 +1,5 @@
 """MineBase 列映射配置区域组件。"""
+import contextlib
 import logging
 
 import flet as ft
@@ -160,10 +161,8 @@ def _create_column_mapping_section(page: ft.Page, log):
             controls.append(ft.Row([exclude_cb, src_field, dst_field, dst_menu, remove_btn], spacing=4, vertical_alignment=ft.CrossAxisAlignment.CENTER))
 
         mapping_rows_column.controls = controls
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             page.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     def _on_mapping_type_change(e):
         _current_mapping_type[0] = mapping_type_dropdown.value
@@ -203,20 +202,16 @@ def _create_column_mapping_section(page: ft.Page, log):
             mapping_status_text.value = t("components:user_config._column_mapping.saveFailed", ex=ex)
             mapping_status_text.color = theme.ERROR
             _log_message(log, t("components:user_config._column_mapping.saveconfigurationconfigurationfailed", ex=ex), level=logging.ERROR)
-            try:
+            with contextlib.suppress(RuntimeError, AttributeError):
                 page.update()
-            except (RuntimeError, AttributeError):
-                pass
             return
 
         total = sum(len(v) for v in _mapping_state.values())
         mapping_status_text.value = t("components:user_config._column_mapping.savedItemscolumnMapping", total=total)
         mapping_status_text.color = theme.TEXT_SECONDARY
         _log_message(log, t("components:user_config._column_mapping.savedconfigurationconfigurationItems", total=total))
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             page.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     def _reset_mapping(e=None):
         reset_minebase_column_mapping()
@@ -225,10 +220,8 @@ def _create_column_mapping_section(page: ft.Page, log):
         mapping_status_text.color = theme.TEXT_SECONDARY
         _log_message(log, t("components:user_config._column_mapping.configurationdefaultconfigurationconfiguration"))
         _build_mapping_rows()
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             page.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     mapping_action_buttons = [
         theme.primary_btn(t("components:user_config._column_mapping.saveMapping"), icon=ft.Icons.SAVE, on_click=_save_mapping),

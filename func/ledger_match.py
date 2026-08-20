@@ -187,7 +187,7 @@ def match_sheet(
                 cancel_event=cancel_event, id_col=id_col,
                 progress_cb=progress_cb, progress_label="正在匹配矿卡", total_work=total_work,
             )
-            for k, s in zip(DEVICE_RESULT_KEYS, ["（矿卡）"] * 3):
+            for k, s in zip(DEVICE_RESULT_KEYS, ["（矿卡）"] * 3, strict=False):
                 result_df[k + s] = truck_r[k]
             matched_count += sum(1 for v in truck_r[DEVICE_RESULT_KEYS[0]] if v)
 
@@ -197,7 +197,7 @@ def match_sheet(
                 DEVICE_RESULT_KEYS, cancel_event=cancel_event,
                 progress_cb=progress_cb, progress_label="正在匹配挖机", total_work=total_work,
             )
-            for k, s in zip(DEVICE_RESULT_KEYS, ["（挖机）"] * 3):
+            for k, s in zip(DEVICE_RESULT_KEYS, ["（挖机）"] * 3, strict=False):
                 result_df[k + s] = excav_r[k]
         else:
             equip_r = _batch_match(
@@ -274,7 +274,7 @@ def export_to_excel(
 
     # Decide export layout: multi-sheet (one tab per original sheet) vs
     # single-sheet (concatenated, legacy for "已匹配"/"未匹配" views).
-    multi_sheet = len(sheets) > 1
+    _multi_sheet = len(sheets) > 1
 
     wb = Workbook()
     try:

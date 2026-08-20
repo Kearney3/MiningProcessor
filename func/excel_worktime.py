@@ -164,7 +164,7 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
 
     # 把日期和班次的位置放在第一列和第二列
     other_cols = [col for col in final_df.columns if col not in ['日期', '班次']]
-    final_df = final_df[['日期', '班次'] + other_cols]
+    final_df = final_df[['日期', '班次', *other_cols]]
 
     # 去重
     final_df = dedup_dataframe(final_df, "工时数据")

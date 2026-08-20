@@ -1,5 +1,6 @@
 """日报导出区域。"""
 import asyncio
+import contextlib
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -106,10 +107,8 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
 
     def update_date_label(key: str):
         date_labels[key].value = selected_dates[key].strftime("%Y-%m-%d")
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             date_labels[key].update()
-        except (RuntimeError, AttributeError):
-            pass
 
     def pick_date(key: str):
         date_picker = ft.DatePicker(

@@ -5,6 +5,7 @@ import sys
 import uuid
 from datetime import date
 from pathlib import Path
+from typing import ClassVar
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -13,7 +14,7 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from func.sync_to_minebase import (
+from func.sync_to_minebase import (  # noqa: E402
     MineBaseAPIClient,
     _apply_defaults,
     _apply_ledger_matching,
@@ -28,7 +29,7 @@ from func.sync_to_minebase import (
     sync,
     sync_via_api,
 )
-from func.time_utils import local_now
+from func.time_utils import local_now  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # fixtures
@@ -366,7 +367,7 @@ class TestMapRowToDbColumns:
             "equipmentId": "uuid-123",
             "consumption": 150.5,
         }
-        columns, values = _map_row_to_db_columns(row)
+        columns, _values = _map_row_to_db_columns(row)
         assert "id" in columns
         assert "updated_at" in columns
         assert "date" in columns
@@ -395,7 +396,7 @@ class TestMapRowToDbColumns:
 
     def test_unknown_fields_ignored(self):
         row = {"date": "2025-06-01", "unknownField": "value"}
-        columns, values = _map_row_to_db_columns(row)
+        columns, _values = _map_row_to_db_columns(row)
         assert "unknownField" not in columns
         # id + updated_at + date = 3 columns
         assert len(columns) == 3
@@ -449,7 +450,7 @@ class TestApplyDefaults:
 
 
 class TestFilterByDateRange:
-    SAMPLE_ROWS = [
+    SAMPLE_ROWS: ClassVar[list] = [
         {"date": "2025-06-01", "sourceEquipmentName": "A", "consumption": 100},
         {"date": "2025-06-02", "sourceEquipmentName": "B", "consumption": 200},
         {"date": "2025-06-03", "sourceEquipmentName": "C", "consumption": 300},

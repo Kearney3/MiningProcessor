@@ -9,7 +9,7 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from func import config_loader
+from func import config_loader  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
@@ -430,8 +430,6 @@ class TestSaveMinebaseConfig:
         """完整 save → load 往返：加密保存后 load_secret 应返回真实密码。"""
         from func import secret_store
 
-        user_file = minebase_env
-
         cfg1 = {
             "mode": "database",
             "api": {"url": "", "username": "", "password": ""},
@@ -494,7 +492,7 @@ class TestAnomalyDetectionConfig:
 
     def test_update_anomaly_detection_config(self, temp_config):
         """更新应写入 config.user.json 并正确合并。"""
-        _, config_file = temp_config
+        _, _config_file = temp_config
         updates = {"enabled": True, "sigma_n": 2.5}
         config_loader._invalidate_config_cache()
         result = config_loader.update_anomaly_detection_config(updates)
@@ -509,7 +507,7 @@ class TestAnomalyDetectionConfig:
 
     def test_save_anomaly_detection_config(self, temp_config):
         """整体保存应替换 user_config 中的 anomaly_detection 段。"""
-        _, config_file = temp_config
+        _, _config_file = temp_config
         new_cfg = {"enabled": True, "generate_report": True}
         config_loader._invalidate_config_cache()
         config_loader.save_anomaly_detection_config(new_cfg)

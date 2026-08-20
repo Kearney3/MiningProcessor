@@ -1,6 +1,7 @@
 """日报导出设置：物料关键字和公式。"""
 from __future__ import annotations
 
+import contextlib
 import logging
 from copy import deepcopy
 
@@ -32,10 +33,8 @@ def _create_daily_report_config_section(page: ft.Page, log):
     def _set_status(message: str, color=theme.TEXT_SECONDARY):
         status_text.value = message
         status_text.color = color
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             status_text.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     def _rebuild_material_rows(mapping: dict):
         material_rows.clear()
@@ -64,10 +63,8 @@ def _create_daily_report_config_section(page: ft.Page, log):
                     border=ft.Border(bottom=ft.BorderSide(1, theme.BORDER)),
                 )
             )
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             material_column.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     def _collect_material_mapping() -> dict[str, list[str]]:
         result = {}
@@ -101,16 +98,12 @@ def _create_daily_report_config_section(page: ft.Page, log):
             formula_fields[key].value = str(config_state.get("formulas", {}).get(key, ""))
             formula_fields[key].error_text = None
         formula_column.controls = list(formula_fields.values())
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             formula_column.update()
-        except (RuntimeError, AttributeError):
-            pass
         _rebuild_material_rows(config_state.get("material_statistics", {}))
         _set_status("")
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             page.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     def _validate(e=None, formulas: dict[str, str] | None = None):
         formulas = formulas if formulas is not None else _collect_formulas()
@@ -127,19 +120,15 @@ def _create_daily_report_config_section(page: ft.Page, log):
                 theme.ERROR,
             )
             _log_message(log, t("components:user_config._daily_report.dailyReportFormulaValidationFailed", message=message), level=logging.WARNING)
-            try:
+            with contextlib.suppress(RuntimeError, AttributeError):
                 page.update()
-            except (RuntimeError, AttributeError):
-                pass
             return errors
         _set_status(
             t("components:user_config._daily_report.formulaValidationPassed"),
             theme.SUCCESS,
         )
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             page.update()
-        except (RuntimeError, AttributeError):
-            pass
         return {}
 
     def _save(e=None):
@@ -167,10 +156,8 @@ def _create_daily_report_config_section(page: ft.Page, log):
             field.value = defaults["formulas"].get(key, "")
             field.error_text = None
         _set_status(t("components:user_config._daily_report.defaultdefaultValueDefaultsavedefault"), theme.TEXT_SECONDARY)
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             page.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     material_header = ft.Row(
         [

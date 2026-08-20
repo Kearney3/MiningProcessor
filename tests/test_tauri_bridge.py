@@ -18,7 +18,7 @@ from func.orchestration import postprocess_from_cache
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-import tauri_bridge
+import tauri_bridge  # noqa: E402
 
 _has_psycopg2 = importlib.util.find_spec("psycopg2") is not None
 
@@ -570,7 +570,7 @@ class TestConnectionFunctions:
         mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
         with patch("psycopg2.connect", return_value=mock_conn):
             from func.sync_to_minebase import test_db_connection
-            ok, msg = test_db_connection("localhost", 5432, "minebase", "postgres", "pass")
+            ok, _msg = test_db_connection("localhost", 5432, "minebase", "postgres", "pass")
         assert ok is True
         mock_cursor.execute.assert_called_once_with("SELECT 1")
 

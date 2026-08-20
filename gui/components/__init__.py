@@ -1,5 +1,6 @@
 """GUI 组件包"""
-import flet as ft
+
+import flet as ft  # noqa: F401 — used by tests via components.ft
 
 from .batch import create_batch_section
 from .common import _log_message, create_column_mapping_dialog

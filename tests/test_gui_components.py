@@ -1,3 +1,4 @@
+import contextlib
 import importlib.util
 import json
 import logging
@@ -5,13 +6,14 @@ import pathlib
 import sys
 import time
 import types
+from typing import ClassVar
 
 import flet as ft
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from func import config_loader
+from func import config_loader  # noqa: E402
 
 # Set up gui package so relative imports work in importlib-loaded modules
 if "gui" not in sys.modules:
@@ -117,10 +119,8 @@ class PageSpy:
         if loop and loop.is_running():
             loop.create_task(coro(*args, **kwargs))
         else:
-            try:
+            with contextlib.suppress(RuntimeError):
                 asyncio.run(coro(*args, **kwargs))
-            except RuntimeError:
-                pass
         return None
 
     def run_thread(self, handler, *args):
@@ -1060,7 +1060,7 @@ def test_ledger_match_build_table_keeps_columns_when_no_data():
 class SavePickerSpy:
     """SavePicker that records kwargs for each call."""
     next_path = None
-    calls = []
+    calls: ClassVar[list] = []
 
     def __init__(self):
         pass
@@ -1078,7 +1078,7 @@ class SavePickerSpy:
 class ImportPickerSpy:
     """ImportPicker that records kwargs for each call."""
     next_files = None
-    calls = []
+    calls: ClassVar[list] = []
 
     def __init__(self):
         pass
@@ -1241,7 +1241,7 @@ def test_column_mapping_confirm_works_via_show_dialog():
     page.show_dialog(dialog)
     assert dialog.open is True
 
-    confirm_btn = [a for a in dialog.actions if str(a.content) == "确认导入"][0]
+    confirm_btn = next(a for a in dialog.actions if str(a.content) == "确认导入")
     confirm_btn.on_click(None)
 
     assert dialog.open is False
@@ -1340,7 +1340,7 @@ def test_oil_column_mapping_cancel_closes_dialog():
 
 # ---- Date format preservation tests ----
 
-import pandas as pd
+import pandas as pd  # noqa: E402
 
 
 def test_strip_date_only_times_converts_date_columns():
@@ -1382,7 +1382,7 @@ def test_strip_date_only_times_keeps_time_columns():
 def test_llm_labeling_section_creates_with_required_refs():
     from gui.components.llm_labeling import create_llm_labeling_section
 
-    section, refs = create_llm_labeling_section(DummyPage())
+    _section, refs = create_llm_labeling_section(DummyPage())
 
     assert "path" in refs
     assert "sheet" in refs

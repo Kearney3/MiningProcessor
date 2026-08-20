@@ -9,7 +9,7 @@ from openpyxl import Workbook
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from func.excel_utils import (
+from func.excel_utils import (  # noqa: E402
     filter_hidden_from_df,
     get_column_letter,
     get_hidden_indices,
@@ -83,7 +83,7 @@ class TestGetHiddenIndices:
 
     def test_by_sheet_name(self, tmp_path):
         fpath = _create_test_workbook(tmp_path, hidden_rows=[3])
-        rows, cols = get_hidden_indices(fpath, "Sheet")
+        rows, _cols = get_hidden_indices(fpath, "Sheet")
         assert rows == {3}
 
 

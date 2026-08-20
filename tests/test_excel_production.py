@@ -18,7 +18,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 if str(ROOT) not in __import__("sys").path:
     __import__("sys").path.insert(0, str(ROOT))
 
-from func.excel_production_enhanced import MiningDataProcessor
+from func.excel_production_enhanced import MiningDataProcessor  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helper: build a processor that bypasses config-file lookups
@@ -333,7 +333,7 @@ class TestProcessSheet1:
         rows.append(["TR600-01", 100.0, 108.5, 5000.0, 5050.0, "CompA", 10, 0, 0])
 
         df_raw = pd.DataFrame(rows, dtype=object)
-        running_df, production_df = proc.process_sheet1(df_raw, date(2025, 1, 1), "Day")
+        running_df, _production_df = proc.process_sheet1(df_raw, date(2025, 1, 1), "Day")
         assert not running_df.empty
         assert len(running_df) == 1
 
@@ -378,10 +378,6 @@ class TestProcessSheet1:
         load_map = {"TR600": 85}
         proc = _make_processor(load_map, raw_start=-1, target_text="Мото цагийн заалт")
 
-        truck_data = [
-            {"truck_name": "TR600-01", "hour_start": 100.0, "hour_end": 108.5,
-             "km_start": 5000.0, "km_end": 5050.0, "company": "CompA", "exc_1_trips": 10},
-        ]
         # Build DF with target_text embedded in the header row area
         n_cols = len(_HEADER_ROW6)
         rows = [[None] * n_cols for _ in range(4)]
@@ -589,7 +585,7 @@ class TestProcessSingleFile:
 
         proc = _make_processor(load_map, raw_start=6)
         output_path = tmp_path / "single_output.xlsx"
-        running_df, production_df = proc.process_single_file(str(xlsx_path), str(output_path))
+        running_df, _production_df = proc.process_single_file(str(xlsx_path), str(output_path))
 
         assert not running_df.empty
         assert len(running_df) == 1

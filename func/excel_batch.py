@@ -446,7 +446,7 @@ def _aggregate_production_data(
     """
     将生产数据的「生产数据」sheet 按矿卡/挖机分别聚合，再 concat。
     要求台账匹配已完成（标准设备名称列已存在）。
-    
+
     Returns:
         聚合后的 DataFrame，或 None（无数据时）
     """
@@ -533,7 +533,7 @@ def _aggregate_fuel_data(
     """
     将燃油数据的「油耗信息」sheet 按 (日期, 班次, 标准设备名称) 聚合。
     油品消耗求和，设备名称/设备编号取第一个值。
-    
+
     Returns:
         聚合后的 DataFrame，或 None
     """

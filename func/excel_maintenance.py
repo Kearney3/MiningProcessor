@@ -161,14 +161,12 @@ def process_maintenance_data(
         # 预处理设备名
         raw_name = preprocess_device_name(rec["原始设备名称"])
         std_name = raw_name
-        match_method = ""
 
         # 台账匹配
         if eq_ledger and raw_name:
             result = eq_ledger.match(raw_name)
             if result:
                 std_name = result["标准名称"]
-                match_method = result["匹配方式"]
                 matched_count += 1
             else:
                 unmatched_names.add(raw_name)
@@ -229,7 +227,7 @@ def process_maintenance_data(
                 rec["维修内容"] for rec in pending
             )
             accepted = 0
-            for rec, prediction in zip(pending, predictions):
+            for rec, prediction in zip(pending, predictions, strict=False):
                 if prediction is None:
                     continue
                 rec["大类"] = prediction.major

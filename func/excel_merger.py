@@ -235,7 +235,7 @@ def merge_excel_files(
 
                 if sort_columns:
                     logger.info(
-                        f"Sheet '{sname}' 正在按以下规则排序: {list(zip(sort_columns, ['升序' if a else '降序' for a in sort_ascending]))}")
+                        f"Sheet '{sname}' 正在按以下规则排序: {list(zip(sort_columns, ['升序' if a else '降序' for a in sort_ascending], strict=False))}")
                     try:
                         merged_df = merged_df.sort_values(by=sort_columns, ascending=sort_ascending,
                                                           na_position="last").reset_index(drop=True)

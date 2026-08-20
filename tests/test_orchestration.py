@@ -8,7 +8,7 @@ import pandas as pd
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from func.orchestration import (
+from func.orchestration import (  # noqa: E402
     build_worktime_header_mapping,
     load_equipment_ledger_from_cache,
     load_ledgers,
@@ -140,7 +140,7 @@ class TestPostprocessFromCache:
     @patch("func.orchestration.postprocess_with_ledgers", return_value=False)
     def test_passes_preloaded_sheets(self, mock_post, mock_load):
         sheets = {"sheet1": "dataframe"}
-        result = postprocess_from_cache("out.xlsx", use_oil_ledger=True, preloaded_sheets=sheets)
+        _result = postprocess_from_cache("out.xlsx", use_oil_ledger=True, preloaded_sheets=sheets)
         mock_post.assert_called_once_with("out.xlsx", None, "oil", sheets)
 
 

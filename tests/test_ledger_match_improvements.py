@@ -54,7 +54,7 @@ class TestViewStateManager:
         ledger_refs = MagicMock()
         oil_ledger_refs = MagicMock()
 
-        container, refs = create_ledger_match_section(
+        container, _refs = create_ledger_match_section(
             page, log, ledger_refs, oil_ledger_refs
         )
 
@@ -117,7 +117,7 @@ class TestStreamingExport:
     def test_xlsxwriter_availability(self):
         """验证 xlsxwriter 可用"""
         try:
-            import xlsxwriter
+            import xlsxwriter as _xlsxwriter  # noqa: F401
             assert True
         except ImportError:
             pytest.fail("xlsxwriter not installed")

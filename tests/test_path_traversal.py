@@ -6,7 +6,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from func.excel_utils import sanitize_filename
+from func.excel_utils import sanitize_filename  # noqa: E402
 
 
 class TestSanitizeFilename:

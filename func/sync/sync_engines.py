@@ -3,6 +3,7 @@
 
 包含 sync_via_api()、sync_via_db()、test_api_connection()、test_db_connection()。
 """
+import contextlib
 import sys
 from typing import Any
 
@@ -13,7 +14,7 @@ from func.sync.api_client import (
     SessionLimitReachedError,
 )
 from func.sync.constants import BATCH_SIZE, DATA_TYPE_REGISTRY, DEDUP_FIELDS_MAP
-from func.sync.file_processors import (
+from func.sync.row_helpers import (
     _build_field_mappings,
     _map_row_to_db_columns,
     _resolve_fks_for_db,
@@ -179,10 +180,8 @@ def sync_via_api(
                 # staging 数据未提交，批量阶段的 success 不算最终成功
                 total_success = 0
                 total_failed = len(rows) - total_skipped
-                try:
+                with contextlib.suppress(Exception):
                     api_client.cancel_import(table, session_id, expected_version=expected_version)
-                except Exception:
-                    pass
                 break
 
             confirm_data = confirm_resp.get("data", {})
@@ -335,7 +334,7 @@ def sync_via_db(
                 # 去重检查
                 dedup_cols = DEDUP_FIELDS_MAP.get(table, [])
                 dedup_values = {}
-                for col, val in zip(columns, values):
+                for col, val in zip(columns, values, strict=False):
                     if col in dedup_cols:
                         dedup_values[col] = val
 

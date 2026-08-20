@@ -398,9 +398,8 @@ def _entry_match_score(content: str, entry: dict, index: int) -> tuple | None:
     if any(value and value in content for value in excludes):
         return None
 
-    if entry.get("major") == "计划保养与非故障作业":
-        if any(marker in content for marker in _FAULT_MARKERS):
-            return None
+    if entry.get("major") == "计划保养与非故障作业" and any(marker in content for marker in _FAULT_MARKERS):
+        return None
 
     candidates: list[tuple[int, int, int]] = []
     matched_terms: set[str] = set()

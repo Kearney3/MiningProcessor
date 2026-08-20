@@ -210,7 +210,7 @@ class TestLeftMerge:
 # _aggregate_fuel_data
 # ---------------------------------------------------------------------------
 
-from func.excel_batch import _aggregate_fuel_data, _reorder_columns
+from func.excel_batch import _aggregate_fuel_data, _reorder_columns  # noqa: E402
 
 
 class TestAggregateFuelData:

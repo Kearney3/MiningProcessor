@@ -10,7 +10,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 
-from func import config_loader
+from func import config_loader  # noqa: E402
 
 
 def _find_button(refs, label):
@@ -32,7 +32,7 @@ def _find_button(refs, label):
     raise LookupError(label)
 
 # 复用 test_gui_components.py 中的最小 Spy
-from tests.test_gui_components import DummyControlEvent, DummyPage, PageSpy
+from tests.test_gui_components import DummyControlEvent, DummyPage, PageSpy  # noqa: E402
 
 # 确保 gui 包可导入
 if "gui" not in sys.modules:
@@ -41,7 +41,7 @@ if "gui" not in sys.modules:
     gui_pkg.__package__ = "gui"
     sys.modules["gui"] = gui_pkg
 
-import importlib.util
+import importlib.util  # noqa: E402
 
 spec = importlib.util.spec_from_file_location(
     "gui.components",

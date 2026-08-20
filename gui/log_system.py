@@ -7,11 +7,13 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import contextlib
 import inspect
 import logging
 import sys
 import threading
 from pathlib import Path
+from typing import ClassVar
 
 import flet as ft
 
@@ -35,16 +37,14 @@ def _diagnose(message: str, ex: BaseException | None = None) -> None:
     """日志基础设施的故障直接写 stderr，避免重新进入 GUI 日志管道。"""
 
     suffix = f": {ex}" if ex is not None else ""
-    try:
+    with contextlib.suppress(Exception):
         print(t("logSystem:message", message=message, suffix=suffix), file=sys.__stderr__)
-    except Exception:
-        pass
 
 
 class LogSystem:
     """管理一个 Flet 页面的日志状态和渲染。"""
 
-    _LEVEL_THRESHOLD = {
+    _LEVEL_THRESHOLD: ClassVar[dict[str, int]] = {
         "DEBUG": logging.DEBUG,
         "INFO": logging.INFO,
         "WARNING": logging.WARNING,
@@ -357,10 +357,8 @@ class LogSystem:
         self._log_height_user_set = True
         self._log_view_height = self._clamp_log_height(self._log_view_height - int(e.primary_delta))
         self._log_height_container.height = self._log_view_height
-        try:
+        with contextlib.suppress(RuntimeError):
             self._log_height_container.update()
-        except RuntimeError:
-            pass
 
     def _on_page_resize(self, _e) -> None:
         if (self._log_height_container.data or {}).get("collapsed"):
@@ -370,7 +368,5 @@ class LogSystem:
         else:
             self._log_view_height = self._recommended_log_height(self._log_view_height)
         self._log_height_container.height = self._log_view_height
-        try:
+        with contextlib.suppress(RuntimeError):
             self._log_height_container.update()
-        except RuntimeError:
-            pass
