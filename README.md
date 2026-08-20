@@ -3,13 +3,13 @@
 > 矿山运营 Excel 报表批量处理工具
 
 <p>
-  <img src="https://img.shields.io/badge/version-v2.7.0-blue?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-v2.7.1-blue?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/Python-≥3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="python" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square" alt="license" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="platform" />
   <img src="https://img.shields.io/badge/Tauri-v2-FFC131?style=flat-square&logo=tauri&logoColor=black" alt="tauri" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="react" />
-  <img src="https://img.shields.io/badge/tests-1144%20passed-brightgreen?style=flat-square" alt="tests" />
+  <img src="https://img.shields.io/badge/tests-1391%20passed-brightgreen?style=flat-square" alt="tests" />
 </p>
 
 <p>
@@ -209,7 +209,7 @@ MiningProcessor/
 ├── tsconfig.json / tsconfig.node.json
 ├── config.json                 # 持久化默认配置（提交 Git）
 ├── config.user.json            # 用户覆盖配置（gitignore，含凭据）
-├── tests/                      # pytest 测试（46 个文件，1144 个用例）
+├── tests/                      # pytest 测试（43 个文件，1391 个用例）
 ├── hooks/                      # Git hooks（push 前自动运行测试）
 │   └── pre-push
 ├── .github/workflows/
@@ -433,6 +433,19 @@ uv run scripts/bump_version.py --bump minor --dry-run
 
 ## 📋 更新日志
 
+### v2.7.1 · 2026-08-20
+
+- 🔍 **Ruff Lint 集成**
+  - 新增 ruff 0.16 作为项目 linter，配置在 `pyproject.toml`，启用 E/W/F/I/UP/B/SIM/RUF 规则集
+  - 自动修复 486 个 lint 问题（import 排序、`Optional[X]` → `X | None`、`contextlib.suppress` 等）
+  - 中文/蒙文 unicode 字符规则（RUF001/002/003）已按项目需要忽略
+- 🐛 **Bug 修复**（lint 过程中发现）
+  - 修复 `func/sync/__init__.py` 从错误模块导入 `_apply_defaults` 等函数（`file_processors` → `row_helpers`）
+  - 修复 `gui/components/ledger_match.py` 中未定义变量 `export_btn` → `export_menu`
+  - 实现缺失的 `strip_date_only_times()` 函数（`gui/components/common.py`）
+  - 添加缺失的 `MIN_LOG_HEIGHT` 常量（`gui/main.py`）
+  - 修复 7 个测试中使用错误变量名的问题
+
 ### v2.7.0 · 2026-08-15
 
 - 🛞 **轮胎寿命处理模块**
@@ -470,7 +483,7 @@ uv run scripts/bump_version.py --bump minor --dry-run
 - 🐛 **Excel 导出修复**
   - 修复工时分项 Sheet 将数字时间字段误识别为日期、导出为 `1970-01-01` 的问题
 - ✅ **测试覆盖**
-  - Python 测试共 1144 个，覆盖日报导出、公式校验、异常值明细和 Excel 格式化
+  - Python 测试共 1391 个，覆盖日报导出、公式校验、异常值明细和 Excel 格式化
 
 ### v2.4.0 · 2026-08-08
 

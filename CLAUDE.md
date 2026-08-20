@@ -60,7 +60,7 @@ uv run pytest tests/test_gui_components.py
 uv run pytest tests/test_gui_components.py -k config
 ```
 
-测试覆盖 1,054 个用例，涵盖 GUI 组件、配置读写、日志分发、Excel 合并、设备台账、油品台账、Keychain 凭证存储、Tauri RPC、异常值检测等多个模块（详见 README.md 测试章节）。
+测试覆盖 1,391 个用例，涵盖 GUI 组件、配置读写、日志分发、Excel 合并、设备台账、油品台账、Keychain 凭证存储、Tauri RPC、异常值检测等多个模块（详见 README.md 测试章节）。
 
 ## 高层架构
 
@@ -197,7 +197,7 @@ GUI 日志台的目标是让用户**快速理解发生了什么**，而不是看
 
 ## 测试与修改提示
 
-- 测试分布在 `tests/` 下 43 个文件中（1,054 个用例），核心文件包括：
+- 测试分布在 `tests/` 下 43 个文件中（1,391 个用例），核心文件包括：
   - `test_gui_components.py`：GUI 组件行为、布局、按钮交互
   - `test_config_loader.py`：配置读写落盘、默认值合并、运行时配置、MineBase 保存集成
   - `test_logic_helpers.py`：GUI 逻辑辅助函数
