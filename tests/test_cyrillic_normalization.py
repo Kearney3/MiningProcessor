@@ -12,13 +12,11 @@ normalized to Latin equivalents throughout the processing pipeline:
 
 import openpyxl
 import pandas as pd
-import pytest
 
 from func.equipment_ledger import EquipmentLedger
 from func.excel_production_enhanced import MiningDataProcessor
 from func.ledger_enrichment import enrich_dataframe_device
 from func.string_utils import clean_equipment_name, normalize_cyrillic_homoglyphs
-
 
 # ===========================================================================
 # Shared fixtures
@@ -421,3 +419,96 @@ class TestLedgerEnrichmentCyrillic:
         )
 
         assert result_df.loc[0, "标准设备名称"] == ""
+
+
+# ===========================================================================
+# 6. Filter keyword normalization (excel_production_enhanced)
+# ===========================================================================
+
+
+class TestFilterKeywordNormalization:
+    """Verify that Cyrillic filter keywords match safe_str()-normalized values.
+
+    After safe_str() was changed to use clean_equipment_name() (which normalizes
+    Cyrilillic homoglyphs), all hardcoded Cyrillic filter keywords must also be
+    normalized to stay in the same comparison space.
+    """
+
+    _N = staticmethod(normalize_cyrillic_homoglyphs)
+
+    # --- Summary row filter (line 336) ---
+
+    def test_summary_row_filter_cyrillic_n(self):
+        """'Нийт' (Cyrillic Н) must be filtered from safe_str() output."""
+        truck_name = clean_equipment_name("Нийт")
+        assert self._N("Нийт") in truck_name
+
+    def test_summary_row_filter_latin_h(self):
+        """'Hийт' (Latin H, already in Excel) must also be filtered."""
+        truck_name = clean_equipment_name("Hийт")
+        assert self._N("Нийт") in truck_name
+
+    def test_summary_row_filter_does_not_match_real_truck(self):
+        """'Нийт' filter must NOT match a real truck name like 'CAT 777'."""
+        truck_name = clean_equipment_name("СAT 777 #18KH")
+        assert self._N("Нийт") not in truck_name
+
+    # --- Total trips column detection (line 250) ---
+
+    def test_total_trips_column_cyrillic(self):
+        """'Нийт рейс' (Cyrillic Н) must match safe_str()-normalized header."""
+        col_val = clean_equipment_name("Нийт рейс")
+        keywords = ["总趟次", self._N("Нийт рейс")]
+        assert any(k in col_val for k in keywords)
+
+    def test_total_trips_column_latin_h(self):
+        """'Hийт рейс' (Latin H) must also match."""
+        col_val = clean_equipment_name("Hийт рейс")
+        keywords = ["总趟次", self._N("Нийт рейс")]
+        assert any(k in col_val for k in keywords)
+
+    # --- Column matching keywords (lines 286-291) ---
+
+    def test_moto_column_match(self):
+        """'Мото' (Cyrillic М) must match safe_str()-normalized header."""
+        col_val = clean_equipment_name("Мото Эхэлсэн")
+        assert self._N("Мото") in col_val
+
+    def test_end_column_match(self):
+        """'Дууссан' has no homoglyphs, must match directly."""
+        col_val = clean_equipment_name("Мото Дууссан")
+        assert self._N("Мото") in col_val
+        assert self._N("Дууссан") in col_val
+
+    def test_km_column_match(self):
+        """'км-ын' has no homoglyphs (lowercase к), must match directly."""
+        col_val = clean_equipment_name("км-ын Дууссан")
+        assert self._N("км-ын") in col_val
+
+    def test_company_column_match(self):
+        """'Компани' (Cyrillic К) must match safe_str()-normalized header."""
+        col_val = clean_equipment_name("Компани")
+        assert self._N("Компани") in col_val
+
+    # --- Excavator exclude list (line 297) ---
+
+    def test_excavator_exclude_moto(self):
+        """'Мото' in exclude list must match safe_str()-normalized excavator name."""
+        name = clean_equipment_name("Мото")
+        exclude = [self._N("Мото"), self._N("Эхэлсэн"), self._N("Компани"),
+                   self._N("км"), self._N("Дууссан")]
+        assert any(k in name for k in exclude)
+
+    def test_excavator_exclude_kompani(self):
+        """'Компани' in exclude list must match safe_str()-normalized name."""
+        name = clean_equipment_name("Компани")
+        exclude = [self._N("Мото"), self._N("Эхэлсэн"), self._N("Компани"),
+                   self._N("км"), self._N("Дууссан")]
+        assert any(k in name for k in exclude)
+
+    def test_excavator_exclude_does_not_match_real_excavator(self):
+        """Exclude list must NOT match a real excavator name."""
+        name = clean_equipment_name("СAT 777 #18KH")
+        exclude = [self._N("Мото"), self._N("Эхэлсэн"), self._N("Компани"),
+                   self._N("км"), self._N("Дууссан")]
+        assert not any(k in name for k in exclude)
