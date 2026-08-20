@@ -32,7 +32,7 @@ echo "  → $SIDECAR_BIN ($(du -sh "$SIDECAR_DIR/tauri-bridge" | cut -f1))"
 
 # ─── 2. Tauri build（bundle.resources 自动嵌入 sidecar 目录）───
 echo "[2/3] Building Tauri application (.app)..."
-source "$HOME/.cargo/env"
+if [ -f "$HOME/.cargo/env" ]; then source "$HOME/.cargo/env"; fi
 pnpm tauri build --bundles app
 
 # ─── 3. 打包 DMG ───
@@ -62,7 +62,7 @@ rm -rf "$STAGING_DIR"
 
 echo ""
 echo "═══ Bundle Contents ═══"
-ls -lh "$APP_DIR/Contents/Resources/tauri-bridge/"
+ls -lh "$APP_DIR/Contents/Resources/_up_/build-sidecar/tauri-bridge/"
 
 echo ""
 echo "═══ Build Complete ═══"
