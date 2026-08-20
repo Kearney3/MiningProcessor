@@ -25,7 +25,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 function App() {
   const { t } = useTranslation();
   const [currentPage, setCurrentPage] = useState<PageId>("data-processing");
-  const [appVersion, setAppVersion] = useState("v2.7.0");
+  const [appVersion, setAppVersion] = useState("v2.7.1");
   const bridge = usePythonBridge();
 
   useEffect(() => {
