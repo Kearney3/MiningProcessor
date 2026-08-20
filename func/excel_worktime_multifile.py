@@ -29,6 +29,7 @@ from func.excel_utils import (
     drop_empty_device_name,
     filter_hidden_from_df,
     get_hidden_indices,
+    normalize_equipment_name_column,
     sort_by_date_shift,
     split_day_night_shifts,
     strip_date_column,
@@ -225,6 +226,7 @@ def _extract_one_day(
 
     combined.insert(0, "日期", date_str)
     combined = clean_split_dataframe(combined)
+    combined = normalize_equipment_name_column(combined)
     return combined
 
 

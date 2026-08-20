@@ -16,6 +16,7 @@ from func.excel_utils import (
     filter_hidden_from_df,
     get_hidden_indices,
     open_workbook,
+    normalize_equipment_name_column,
     sort_by_date_shift,
     split_day_night_shifts,
     strip_date_column,
@@ -125,6 +126,7 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
 
                 # 3. 清洗
                 combined_day_df = clean_split_dataframe(combined_day_df)
+                combined_day_df = normalize_equipment_name_column(combined_day_df)
 
                 all_data.append(combined_day_df)
                 success_count += 1

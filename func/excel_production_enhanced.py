@@ -266,10 +266,16 @@ class MiningDataProcessor:
         header7 = df_raw.iloc[raw_start, :last_col_idx + 1]
 
         combined_headers = []
+        raw_combined_headers = []
         for h6, h7 in zip(header6, header7, strict=False):
             h6_str = self.safe_str(h6)
             h7_str = self.safe_str(h7)
             combined_headers.append(f"{h6_str}｜{h7_str}")
+            # Keep a non-homoglyph-normalized copy so general text such as
+            # ore types can be preserved in the output.
+            raw_combined_headers.append(
+                f"{clean_string(h6)}｜{clean_string(h7)}"
+            )
 
         # 4. 数据区：第raw_start+1行开始
         data = df_raw.iloc[raw_start + 1: last_row_pos + 1, :last_col_idx + 1].copy()
@@ -317,10 +323,11 @@ class MiningDataProcessor:
             if "｜" not in col_str:
                 continue
             parts = col_str.split("｜", 1)
+            raw_parts = raw_combined_headers[col_idx].split("｜", 1)
             excavator_name = self.safe_str(parts[0])
             if any(k in excavator_name for k in excavator_exclude):
                 continue
-            ore_type = self.safe_str(parts[1])
+            ore_type = clean_string(raw_parts[1])
             if not excavator_name and not ore_type:
                 continue
             seen_col_indices.add(col_idx)
@@ -443,7 +450,7 @@ class MiningDataProcessor:
             "公里数仪表结束": 0,
             "运行里程": 0,
             "趟次": 0,
-            "备注": subset.iloc[:, col_notes].apply(self.safe_str).values if subset.shape[1] > col_notes else "",
+            "备注": subset.iloc[:, col_notes].apply(clean_string).values if subset.shape[1] > col_notes else "",
         })
 
         result_df["运行小时数"] = result_df.apply(

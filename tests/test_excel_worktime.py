@@ -15,6 +15,7 @@ import pandas as pd
 import pytest
 
 from func.excel_worktime import process_excel_data
+from func.excel_worktime_multifile import process_directory
 
 # ---------------------------------------------------------------------------
 # Helper: create a worktime Excel fixture
@@ -151,6 +152,37 @@ class TestNormalProcessing:
         for name in night_equip:
             assert name in equipment, f"Expected equipment '{name}' in output"
         assert "Truck" not in equipment, "Last day row should be excluded by day_end_offset=-1"
+
+    def test_normalizes_only_mapped_device_name_column(self, tmp_path):
+        """The standardized 设备名称 column converts Cyrillic homoglyphs."""
+        excel_path = str(tmp_path / "worktime.xlsx")
+        _create_worktime_excel(
+            excel_path,
+            days=[5],
+            equipment_day=["СAT777", "Truck"],
+            equipment_night=["КАТ777", "Drill"],
+        )
+        mapping = {
+            "mode": "position",
+            "entries": [
+                {"index": 1, "new": "设备名称"},
+                {"index": 2, "new": "工时"},
+            ],
+        }
+
+        result = process_excel_data(
+            file_path=excel_path,
+            year=2025,
+            month=1,
+            return_sheets=True,
+            header_mapping=mapping,
+        )
+
+        names = set(result["工时数据"]["设备名称"])
+        assert "CAT777" in names
+        assert "KAT777" in names
+        assert "СAT777" not in names
+        assert "КАТ777" not in names
 
     def test_normal_processing_sorted_by_date(self, tmp_path):
         """Output DataFrame is sorted by date."""
@@ -592,6 +624,38 @@ class TestHeaderMapping:
         df = result["工时数据"]
         assert "日期" in df.columns
         assert "Equipment" in df.columns
+
+
+class TestMultifileDeviceNameNormalization:
+    def test_multifile_normalizes_mapped_device_name(self, tmp_path):
+        base_dir = tmp_path / "worktime"
+        day_dir = base_dir / "01"
+        day_dir.mkdir(parents=True)
+        _create_worktime_excel(
+            str(day_dir / "report_工作效率.xlsx"),
+            days=[1],
+            equipment_day=["СAT777", "Truck"],
+            equipment_night=["КАТ777", "Drill"],
+        )
+        mapping = {
+            "mode": "position",
+            "entries": [
+                {"index": 1, "new": "设备名称"},
+                {"index": 2, "new": "工时"},
+            ],
+        }
+
+        result = process_directory(
+            str(base_dir),
+            year=2025,
+            month=1,
+            return_sheets=True,
+            header_mapping=mapping,
+        )
+
+        names = set(result["工时数据"]["设备名称"])
+        assert "CAT777" in names
+        assert "KAT777" in names
 
     def test_header_mapping_none_is_noop(self, tmp_path):
         """header_mapping=None does not rename anything."""
