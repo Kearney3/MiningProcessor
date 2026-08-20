@@ -3,13 +3,12 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import re
+from pathlib import Path
 
 import pytest
 
 from gui import i18n
-
 
 ROOT = Path(__file__).resolve().parents[1]
 LANGUAGES = ("zh", "en", "mn")

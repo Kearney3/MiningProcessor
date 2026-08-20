@@ -1,8 +1,9 @@
 """Test excel_fuel handles short sheets gracefully (finding #3 fix)."""
 
 import os
-import pytest
+
 import openpyxl
+import pytest
 
 from func.excel_fuel import process_diesel_data
 

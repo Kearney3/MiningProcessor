@@ -3,10 +3,9 @@ import flet as ft
 
 import func.equipment_ledger as equipment_ledger
 from func.equipment_ledger import LEDGER_COLUMNS
-
-from .ledger_base import LedgerConfig, create_ledger_section_factory
 from gui.i18n import t
 
+from .ledger_base import LedgerConfig, create_ledger_section_factory
 
 _LEDGER_STANDARD_COLS = [
     ("设备名称", t("components:ledger.originalEquipmentNameForMatching")),

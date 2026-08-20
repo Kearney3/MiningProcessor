@@ -2,14 +2,12 @@
 import pathlib
 
 import pandas as pd
-import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys_path = __import__("sys").path
 sys_path.insert(0, str(ROOT))
 
 from func.excel_electrical import parse_excel_data
-
 
 # ---------------------------------------------------------------------------
 # Fixture helpers

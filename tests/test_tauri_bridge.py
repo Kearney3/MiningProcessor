@@ -8,13 +8,12 @@ import pathlib
 import select
 import subprocess
 import sys
-from datetime import date
 from unittest.mock import MagicMock, patch
-
-from func.orchestration import postprocess_from_cache
 
 import pandas as pd
 import pytest
+
+from func.orchestration import postprocess_from_cache
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))

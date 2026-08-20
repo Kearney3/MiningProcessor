@@ -1,10 +1,8 @@
 """Tests for the unified apply_header_mapping in func.excel_utils."""
 
 import pandas as pd
-import pytest
 
 from func.excel_utils import apply_header_mapping
-
 
 # ---------------------------------------------------------------------------
 # Exact matching (name mode, single keyword = substring)

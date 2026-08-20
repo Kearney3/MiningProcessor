@@ -10,14 +10,14 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from func.logger import QueueHandler, setup_logging, get_logger, _next_seq
+from func.logger import QueueHandler, _next_seq, get_logger, setup_logging
 
 
 @pytest.fixture(autouse=True)
 def _clean_root_logger():
     """每个测试前后清理 root logger 的非 QueueHandler handler"""
-    from func.logger import _setup_done as _orig
     import func.logger
+    from func.logger import _setup_done as _orig
     func.logger._setup_done = False  # 重置 sentinel
     root = logging.getLogger()
     original_handlers = list(root.handlers)

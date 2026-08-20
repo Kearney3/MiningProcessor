@@ -5,15 +5,14 @@ logging 是进程级基础设施，Flet Page 则是会话级对象。这个模�
 """
 from __future__ import annotations
 
-from collections import deque
-from dataclasses import dataclass
 import logging
 import threading
-from typing import Callable
 import weakref
+from collections import deque
+from collections.abc import Callable
+from dataclasses import dataclass
 
 from func.logger import DEFAULT_FORMAT
-
 
 _NOISY_LOGGERS = frozenset(
     {

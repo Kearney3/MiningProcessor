@@ -5,22 +5,22 @@
 """
 
 import os
-import pandas as pd
 from datetime import date as date_type
 
-from func.excel_fuel import process_fuel_data
-from func.excel_electrical import process_electrical_data
-from func.excel_production_enhanced import MiningDataProcessor
-from func.excel_worktime import process_worktime_data
-from func.equipment_ledger import EquipmentLedger
-from func.oil_ledger import OilLedger
-from func import config_loader
-from func.logger import get_logger
-from func.excel_utils import dedup_dataframe, get_output_filename
-from func.ledger_postprocess import match_sheets
-from func.number_utils import decimal_sum
-from func.time_utils import local_now
+import pandas as pd
 
+from func import config_loader
+from func.equipment_ledger import EquipmentLedger
+from func.excel_electrical import process_electrical_data
+from func.excel_fuel import process_fuel_data
+from func.excel_production_enhanced import MiningDataProcessor
+from func.excel_utils import dedup_dataframe, get_output_filename
+from func.excel_worktime import process_worktime_data
+from func.ledger_postprocess import match_sheets
+from func.logger import get_logger
+from func.number_utils import decimal_sum
+from func.oil_ledger import OilLedger
+from func.time_utils import local_now
 
 logger = get_logger(__name__)
 
@@ -473,7 +473,7 @@ def _aggregate_production_data(
             df1 = pd.DataFrame()
         else:
             df1 = pd.DataFrame()
-    
+
     if truck_name_col in df.columns:
         # pivot: 矿石类型 → 列，值 = 产量之和
         truck_group_keys = ["日期", "班次", truck_name_col]
@@ -497,7 +497,7 @@ def _aggregate_production_data(
     excavator_name_col = "标准设备名称（挖机）"
     if excavator_name_col not in df.columns:
         excavator_name_col = "挖机名称"
-    
+
     df2 = pd.DataFrame()
     if excavator_name_col in df.columns:
         excavator_group_keys = ["日期", "班次", excavator_name_col]

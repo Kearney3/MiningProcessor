@@ -5,9 +5,10 @@ from pathlib import Path
 
 import flet as ft
 
-from .common import _log_message, _last_directory, _update_last_directory, PAGE_SIZE, create_confirm_dialog
-from .types import ConfigRefs
 from gui.i18n import t
+
+from .common import PAGE_SIZE, _last_directory, _log_message, _update_last_directory, create_confirm_dialog
+from .types import ConfigRefs
 
 try:
     from . import theme
@@ -330,7 +331,7 @@ def create_config_section(page: ft.Page, log) -> tuple[ft.Container, "ConfigRefs
         path = files[0].path
         _update_last_directory(path)
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 data = json.load(f)
             imported = data.get("device_load_map", {})
             if not imported:

@@ -258,6 +258,7 @@ class TestMaintenanceDetails:
         self, monkeypatch, tmp_path: Path
     ):
         from datetime import date
+
         from func import excel_maintenance
 
         source = tmp_path / "input.xlsx"

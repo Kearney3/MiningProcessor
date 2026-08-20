@@ -8,8 +8,7 @@ try:
 except ImportError:
     import gui.theme as theme
 
-from func import config_loader
-from func.config_loader import get_minebase_column_mapping, save_minebase_column_mapping, reset_minebase_column_mapping
+from func.config_loader import get_minebase_column_mapping, reset_minebase_column_mapping, save_minebase_column_mapping
 from gui.components.common import _log_message
 from gui.i18n import t
 

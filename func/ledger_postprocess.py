@@ -4,20 +4,19 @@
 """
 
 import logging
-from typing import Optional
 
 import pandas as pd
 
 from func.equipment_ledger import EquipmentLedger
-from func.oil_ledger import OilLedger
-from func.ledger_enrichment import MODEL_FIELDS, resolve_equipment_attributes
 from func.excel_utils import dedup_dataframe
-from func.string_utils import clean_string, clean_equipment_name
+from func.ledger_enrichment import MODEL_FIELDS, resolve_equipment_attributes
+from func.oil_ledger import OilLedger
+from func.string_utils import clean_equipment_name, clean_string
 
 logger = logging.getLogger(__name__)
 
 
-def _find_col(columns: set[str], candidates: list[str]) -> Optional[str]:
+def _find_col(columns: set[str], candidates: list[str]) -> str | None:
     """在列名集合中查找第一个匹配的候选列名（支持 strip 匹配）"""
     # 统一列名为 str（防御 DataFrame 列名含 float/int 的情况）
     str_columns = {str(c) if not isinstance(c, str) else c for c in columns}
@@ -36,7 +35,7 @@ def _find_col(columns: set[str], candidates: list[str]) -> Optional[str]:
 def _match_equipment_rows(
     df: pd.DataFrame,
     name_col: str,
-    id_col: Optional[str],
+    id_col: str | None,
     equipment_ledger: EquipmentLedger,
     model_ledger=None,
     suffix: str = "",
@@ -170,8 +169,8 @@ def _match_oil_rows(
 
 def match_sheets(
     sheets: dict[str, pd.DataFrame],
-    equipment_ledger: Optional[EquipmentLedger] = None,
-    oil_ledger: Optional[OilLedger] = None,
+    equipment_ledger: EquipmentLedger | None = None,
+    oil_ledger: OilLedger | None = None,
     model_ledger=None,
 ) -> dict[str, pd.DataFrame]:
     """对 sheets 字典进行台账匹配后处理，返回更新后的 sheets。
@@ -224,9 +223,9 @@ def match_sheets(
 
 def apply_ledger_matching(
     output_file: str,
-    equipment_ledger: Optional[EquipmentLedger] = None,
-    oil_ledger: Optional[OilLedger] = None,
-    preloaded_sheets: Optional[dict[str, pd.DataFrame]] = None,
+    equipment_ledger: EquipmentLedger | None = None,
+    oil_ledger: OilLedger | None = None,
+    preloaded_sheets: dict[str, pd.DataFrame] | None = None,
     model_ledger=None,
 ) -> bool:
     """

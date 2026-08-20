@@ -30,7 +30,6 @@ from func.sync_to_minebase import (
 )
 from func.time_utils import local_now
 
-
 # ---------------------------------------------------------------------------
 # fixtures
 # ---------------------------------------------------------------------------
@@ -536,7 +535,6 @@ class TestDiscoverFiles:
 
     def test_discover_with_keywords(self, tmp_path):
         """关键字匹配模式与 excel_batch 一致。"""
-        import shutil
         # 创建带有关键字的文件
         (tmp_path / "Fuel report 2025.xlsx").write_bytes(b"")
         (tmp_path / "工作效率表_2025.xlsx").write_bytes(b"")
@@ -1625,8 +1623,9 @@ class TestExportDryRunToExcel:
 
     def test_export_dual_headers_with_mapping(self, tmp_path):
         """有列映射时应生成双重表头：第一行源列名，第二行字段名。"""
-        from func.sync.export import export_dry_run_to_excel
         from openpyxl import load_workbook
+
+        from func.sync.export import export_dry_run_to_excel
 
         dry_run_rows = {
             "fuel": [
@@ -1656,8 +1655,9 @@ class TestExportDryRunToExcel:
 
     def test_export_no_dual_headers_without_mapping(self, tmp_path):
         """无列映射时不应插入第二行表头（只有一行字段名）。"""
-        from func.sync.export import export_dry_run_to_excel
         from openpyxl import load_workbook
+
+        from func.sync.export import export_dry_run_to_excel
 
         dry_run_rows = {
             "fuel": [

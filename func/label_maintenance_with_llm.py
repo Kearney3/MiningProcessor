@@ -16,15 +16,14 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable, Iterable
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, as_completed, wait
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Callable, Iterable
 
 import pandas as pd
 
 from func.maintenance_classification import get_default_classifications
-
 
 logger = logging.getLogger(__name__)
 
@@ -413,7 +412,7 @@ class OpenAICompatibleLabelClient:
         *,
         taxonomy: dict[str, list[str]],
         system_prompt: str,
-        on_retry: "Callable[[int, Exception], None] | None" = None,
+        on_retry: Callable[[int, Exception], None] | None = None,
         batch_id: str = "",
         cancel_event: threading.Event | None = None,
     ) -> BatchResult:
@@ -514,7 +513,7 @@ class AnthropicLabelClient:
         *,
         taxonomy: dict[str, list[str]],
         system_prompt: str,
-        on_retry: "Callable[[int, Exception], None] | None" = None,
+        on_retry: Callable[[int, Exception], None] | None = None,
         batch_id: str = "",
         cancel_event: threading.Event | None = None,
     ) -> BatchResult:

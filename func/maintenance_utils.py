@@ -7,7 +7,6 @@ from datetime import date
 
 from func.string_utils import clean_string
 
-
 # ── 批注解析 ──────────────────────────────────────────────────
 
 def parse_comment(comment_text: str) -> list[tuple[str, str]]:

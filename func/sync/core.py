@@ -95,7 +95,7 @@ def load_column_mapping(mapping_file: str | Path | None = None) -> dict[str, dic
             logger.info("映射配置文件不存在: %s，使用默认映射", path)
             mapping = get_minebase_column_mapping()
         else:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 mapping = json.load(f)
 
     return _migrate_field_names(mapping)
@@ -252,8 +252,8 @@ def sync(
     ledger = None
     oil_ledger = None
     if use_equipment_ledger:
-        from func.equipment_ledger import EquipmentLedger
         from func.config_loader import load_equipment_ledger_cache
+        from func.equipment_ledger import EquipmentLedger
         cached = load_equipment_ledger_cache()
         if cached:
             ledger = EquipmentLedger()
@@ -264,8 +264,8 @@ def sync(
             logger.warning("设备台账缓存未找到，跳过设备名称匹配")
 
     if use_oil_ledger:
-        from func.oil_ledger import OilLedger
         from func.config_loader import load_oil_ledger_cache
+        from func.oil_ledger import OilLedger
         oil_cached = load_oil_ledger_cache()
         if oil_cached:
             oil_ledger = OilLedger()

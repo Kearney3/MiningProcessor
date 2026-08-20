@@ -1,6 +1,6 @@
 """Tests for the custom tab switching in gui/main.py"""
-import sys
 import pathlib
+import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))

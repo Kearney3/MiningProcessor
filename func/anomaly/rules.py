@@ -10,7 +10,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-
 # ---------------------------------------------------------------------------
 # 配置
 # ---------------------------------------------------------------------------
@@ -19,12 +18,22 @@ class AnomalyConfig:
     """异常检测配置，从 config_loader 加载或手动构造。"""
 
     __slots__ = (
-        "enabled", "generate_report", "flag_anomalies",
-        "filter_anomalies", "handle_anomalies",
-        "use_threshold", "use_sigma", "use_percentile",
-        "sigma_n", "percentile_low", "percentile_high",
-        "thresholds", "statistical_columns", "handling_rules",
-        "_anomaly_counts", "_anomaly_records",
+        "_anomaly_counts",
+        "_anomaly_records",
+        "enabled",
+        "filter_anomalies",
+        "flag_anomalies",
+        "generate_report",
+        "handle_anomalies",
+        "handling_rules",
+        "percentile_high",
+        "percentile_low",
+        "sigma_n",
+        "statistical_columns",
+        "thresholds",
+        "use_percentile",
+        "use_sigma",
+        "use_threshold",
     )
 
     def __init__(
@@ -64,7 +73,7 @@ class AnomalyConfig:
         self._anomaly_records: list[dict] | None = None
 
     @classmethod
-    def from_config(cls, config: dict) -> "AnomalyConfig":
+    def from_config(cls, config: dict) -> AnomalyConfig:
         """从 config_loader.load_config() 返回的配置构造。"""
         ad = config.get("anomaly_detection", {})
         return cls(
@@ -90,7 +99,7 @@ class AnomalyConfig:
         enabled: bool = False,
         generate_report: bool = False,
         mode: str = "flag",
-    ) -> "AnomalyConfig":
+    ) -> AnomalyConfig:
         """从 UI 参数构建 AnomalyConfig，逐列检测阈值从 config.user.json 读取。
 
         共享入口，供 Flet GUI 和 Tauri bridge 统一使用。

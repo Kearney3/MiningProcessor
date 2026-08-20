@@ -15,8 +15,9 @@ try:
 except ImportError:
     import gui.theme as theme
 
-from ._helpers import _create_keyword_input
 from gui.i18n import t
+
+from ._helpers import _create_keyword_input
 
 
 def _create_daily_report_config_section(page: ft.Page, log):

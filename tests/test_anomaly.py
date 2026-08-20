@@ -1,14 +1,12 @@
 """异常值检测模块测试"""
 import numpy as np
 import pandas as pd
-import pytest
 
 from func.anomaly import detect_and_filter
-from func.anomaly.detector import AnomalyDetector, _find_numeric_columns, _NON_METRIC_COLUMNS
+from func.anomaly.detector import _NON_METRIC_COLUMNS, AnomalyDetector, _find_numeric_columns
 from func.anomaly.filters import ANOMALY_FLAG_COLUMN, ANOMALY_REASON_COLUMN, AnomalyFilterer
 from func.anomaly.report import generate_anomaly_report
 from func.anomaly.rules import ALL_NUMERIC_SENTINEL, AnomalyConfig, AnomalyHit, AnomalyRule, build_rules_for_type
-
 
 # ---------------------------------------------------------------------------
 # AnomalyConfig

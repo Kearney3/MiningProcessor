@@ -9,7 +9,6 @@ Creates synthetic Excel fixtures via openpyxl / pandas and exercises:
 - day/night shift splitting via filename parsing
 """
 import pathlib
-import tempfile
 from datetime import date
 
 import pandas as pd
@@ -20,7 +19,6 @@ if str(ROOT) not in __import__("sys").path:
     __import__("sys").path.insert(0, str(ROOT))
 
 from func.excel_production_enhanced import MiningDataProcessor
-
 
 # ---------------------------------------------------------------------------
 # Helper: build a processor that bypasses config-file lookups

@@ -14,7 +14,7 @@ from gui.i18n import t
 def _create_anomaly_config_section(page: ft.Page, log):
     """创建异常值检测配置卡片，返回 (card, refs_dict)。"""
 
-    from func.anomaly.rules import ALL_NUMERIC_SENTINEL, DEFAULT_THRESHOLDS
+    from func.anomaly.rules import ALL_NUMERIC_SENTINEL
 
     # 数据类型选项
     _DATA_TYPE_OPTIONS = [

@@ -1,10 +1,9 @@
 """func/orchestration.py 共享编排逻辑测试"""
 import pathlib
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pandas as pd
-import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))

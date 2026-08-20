@@ -209,4 +209,4 @@ GUI 日志台的目标是让用户**快速理解发生了什么**，而不是看
   - `test_tauri_bridge.py`：Tauri RPC 方法、连接测试、启动迁移
 - `test_anomaly.py`：异常值检测（阈值/σ/百分位/过滤/标记/报告）
 - 改 `gui/components/`、`gui/main.py`、`func/config_loader.py` 时，优先跑相关测试文件。
-- 该仓库当前没有 lint/format 配置；不要假设存在 `ruff`、`black`、`mypy` 或 CI 命令。
+- 项目使用 `ruff` 进行 lint 检查，配置在 `pyproject.toml` 的 `[tool.ruff]` 段。运行 `uv run ruff check` 检查，`uv run ruff check --fix` 自动修复。中文/蒙文字符的 ambiguous-unicode 规则已忽略。

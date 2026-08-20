@@ -25,6 +25,7 @@ class _LedgerEncoder(json.JSONEncoder):
     """处理 pandas Timestamp 等不可直接序列化的类型。"""
     def default(self, obj):
         import datetime
+
         import numpy as np
         if isinstance(obj, pd.Timestamp):
             return obj.isoformat() if not pd.isna(obj) else None
@@ -257,7 +258,7 @@ def _load_json(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
     except (json.JSONDecodeError, OSError) as e:
         logger.warning("读取配置文件失败 (%s): %s", path.name, e)
@@ -959,10 +960,10 @@ def test_llm_connection(config: dict[str, Any] | None = None) -> dict[str, Any]:
     Returns:
         {"success": bool, "models": [...], "error": "..."}
     """
-    import ssl
-    import urllib.request
-    import urllib.error
     import json as _json
+    import ssl
+    import urllib.error
+    import urllib.request
 
     if config is None:
         config = get_llm_config()
@@ -1060,7 +1061,7 @@ def load_equipment_ledger_cache() -> list[dict] | None:
         if not _EQUIPMENT_LEDGER_CACHE.exists():
             return None
         try:
-            with open(_EQUIPMENT_LEDGER_CACHE, "r", encoding="utf-8") as f:
+            with open(_EQUIPMENT_LEDGER_CACHE, encoding="utf-8") as f:
                 return json.load(f).get("data")
         except Exception as e:
             logger.warning("加载设备台账缓存失败: %s", e)
@@ -1099,7 +1100,7 @@ def load_oil_ledger_cache() -> list[dict] | None:
         if not _OIL_LEDGER_CACHE.exists():
             return None
         try:
-            with open(_OIL_LEDGER_CACHE, "r", encoding="utf-8") as f:
+            with open(_OIL_LEDGER_CACHE, encoding="utf-8") as f:
                 return json.load(f).get("data")
         except Exception as e:
             logger.warning("加载油品台账缓存失败: %s", e)
@@ -1138,7 +1139,7 @@ def load_model_ledger_cache() -> list[dict] | None:
         if not _MODEL_LEDGER_CACHE.exists():
             return None
         try:
-            with open(_MODEL_LEDGER_CACHE, "r", encoding="utf-8") as f:
+            with open(_MODEL_LEDGER_CACHE, encoding="utf-8") as f:
                 return json.load(f).get("data")
         except Exception as e:
             logger.warning("加载型号台账缓存失败: %s", e)
@@ -1236,7 +1237,7 @@ def get_minebase_column_mapping() -> dict[str, dict[str, str]]:
     """
     if _MINEBASE_MAPPING_FILE.exists():
         try:
-            with open(_MINEBASE_MAPPING_FILE, "r", encoding="utf-8") as f:
+            with open(_MINEBASE_MAPPING_FILE, encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
             logger.warning("读取 MineBase 列映射文件失败，回退到默认值: %s", e)

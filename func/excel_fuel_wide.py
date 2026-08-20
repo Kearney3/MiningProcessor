@@ -14,9 +14,9 @@ import os
 from datetime import date
 
 import openpyxl
+import pandas as pd
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
-import pandas as pd
 
 logging.basicConfig(
     level=logging.INFO,

@@ -1,8 +1,9 @@
 """台账匹配页面改进测试"""
-import pytest
+from unittest.mock import MagicMock
+
 import flet as ft
 import pandas as pd
-from unittest.mock import MagicMock, patch
+import pytest
 
 
 class TestDataTableReplacement:

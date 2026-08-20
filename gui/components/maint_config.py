@@ -7,8 +7,9 @@ import logging
 
 import flet as ft
 
-from .common import _log_message
 from gui.i18n import t
+
+from .common import _log_message
 
 try:
     from . import theme

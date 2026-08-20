@@ -16,18 +16,18 @@ from func import config_loader
 from gui.components.common import _log_message
 from gui.i18n import t
 
-from ._keywords import _create_keywords_section
-from ._header_mapping import _create_header_mapping_section
-from ._minebase import _create_minebase_section
-from ._column_mapping import _create_column_mapping_section
 from ._anomaly import _create_anomaly_config_section
-from ._llm import _create_llm_config_section
+from ._column_mapping import _create_column_mapping_section
 from ._daily_report import _create_daily_report_config_section
+from ._header_mapping import _create_header_mapping_section
+from ._keywords import _create_keywords_section
+from ._llm import _create_llm_config_section
+from ._minebase import _create_minebase_section
 
-__all__ = ["create_user_config_section", "UserConfigRefs"]
+__all__ = ["UserConfigRefs", "create_user_config_section"]
 
 
-def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, "UserConfigRefs"]:
+def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, UserConfigRefs]:
     """创建用户配置页面，返回 (container, refs)。"""
 
     section_hint = ft.Text(

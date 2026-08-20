@@ -4,7 +4,6 @@ import pathlib
 import sys
 
 import pandas as pd
-import pytest
 from openpyxl import Workbook
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -15,7 +14,6 @@ from func.excel_utils import (
     get_column_letter,
     get_hidden_indices,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers

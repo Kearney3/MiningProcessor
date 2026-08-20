@@ -1,11 +1,10 @@
 """
 测试字符串清理工具模块
 """
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
 
-from func.string_utils import clean_string, clean_equipment_name, normalize_cyrillic_homoglyphs
+from func.string_utils import clean_equipment_name, clean_string, normalize_cyrillic_homoglyphs
 
 
 class TestCleanString:

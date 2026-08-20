@@ -1,10 +1,10 @@
 """
 测试异常行警告导出及显示增强功能。
 """
-from pathlib import Path
 import tempfile
+from pathlib import Path
+
 import pandas as pd
-import pytest
 
 from func.sync.export import export_warnings_to_excel
 from tauri_bridge import _export_sync_warnings

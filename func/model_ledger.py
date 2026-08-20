@@ -1,6 +1,5 @@
 """型号台账：按标准设备编号补充设备属性。"""
 
-from typing import Optional
 
 from func.ledger_base import LedgerBase
 from func.logger import get_logger
@@ -33,7 +32,7 @@ def _id_key(value) -> str:
 class ModelLedger(LedgerBase):
     """以标准设备编号为唯一匹配键的型号台账。"""
 
-    def __init__(self, ledger_path: Optional[str] = None):
+    def __init__(self, ledger_path: str | None = None):
         self._id_cache: dict[str, dict] = {}
         self._ambiguous_ids: set[str] = set()
         super().__init__(
@@ -69,7 +68,7 @@ class ModelLedger(LedgerBase):
             elif previous != info:
                 self._ambiguous_ids.add(key)
 
-    def match_by_standard_id(self, standard_device_id) -> Optional[dict]:
+    def match_by_standard_id(self, standard_device_id) -> dict | None:
         """按标准设备编号精确匹配；冲突编号视为未命中。"""
         key = _id_key(standard_device_id)
         if not key or key in self._ambiguous_ids:
@@ -78,7 +77,7 @@ class ModelLedger(LedgerBase):
             return None
         return self._id_cache.get(key)
 
-    def match(self, raw_name: str) -> Optional[dict]:
+    def match(self, raw_name: str) -> dict | None:
         """兼容台账通用接口，将传入值解释为标准设备编号。"""
         result = self.match_by_standard_id(raw_name)
         if not result:

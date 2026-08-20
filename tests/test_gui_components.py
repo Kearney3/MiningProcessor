@@ -1,4 +1,3 @@
-import flet as ft
 import importlib.util
 import json
 import logging
@@ -6,6 +5,8 @@ import pathlib
 import sys
 import time
 import types
+
+import flet as ft
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))

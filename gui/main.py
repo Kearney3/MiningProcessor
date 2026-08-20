@@ -1,17 +1,19 @@
 """GUI 主窗口：浅色桌面工作台与侧边栏导航布局。"""
-import flet as ft
 import logging
-from importlib.metadata import version, PackageNotFoundError
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+
+import flet as ft
 
 try:
     __version__ = version("MiningProcessor")
 except PackageNotFoundError:
     __version__ = "dev"
 
-from . import i18n as i18n
 from func.config_loader import get_user_config, update_user_config
 from func.logger import setup_logging
+
+from . import i18n as i18n
 
 # 组件模块在导入阶段会创建少量带翻译文本的常量。先读取持久化语言，
 # 再导入组件，确保首次启动就使用用户选择的语言，而不是先短暂加载中文。
@@ -19,9 +21,10 @@ i18n.init(get_user_config("language", i18n.DEFAULT_LANGUAGE))
 
 from . import components as cmp
 from . import logic as logic
-from .log_system import LogSystem
-from .log_system import MIN_LOG_HEIGHT  # re-exported for test access
 from .log_broker import install_gui_log_handler
+from .log_system import (
+    LogSystem,
+)
 
 try:
     from . import theme

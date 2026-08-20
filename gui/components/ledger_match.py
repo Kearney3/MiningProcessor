@@ -3,30 +3,32 @@ import asyncio
 import logging
 from pathlib import Path
 
-import pandas as pd
 import flet as ft
+import pandas as pd
 
 from func.ledger_match import (
+    OIL_RESULT_KEY,
     MatchState,
-    import_excel,
-    match_sheet,
+    apply_sort,
+    build_match_count_text,
     export_to_excel,
     get_current_df,
     get_view_df,
-    apply_sort,
-    build_match_count_text,
-    DEVICE_RESULT_KEYS,
-    OIL_RESULT_KEY,
-)
-from .common import (
-    _log_message,
-    _last_directory as _import_dir,
-    _update_last_directory,
-    _cell_text,
-    PAGE_SIZE,
-    create_confirm_dialog,
+    import_excel,
+    match_sheet,
 )
 from gui.i18n import t
+
+from .common import (
+    PAGE_SIZE,
+    _cell_text,
+    _log_message,
+    _update_last_directory,
+    create_confirm_dialog,
+)
+from .common import (
+    _last_directory as _import_dir,
+)
 
 try:
     from . import theme

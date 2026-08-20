@@ -3,7 +3,6 @@
 用 xlsxwriter 将所有 sheet 写入格式化的 Excel 文件。
 支持交替行底色、自适应列宽、冻结首行、自动筛选。
 """
-import calendar
 from datetime import date
 
 import pandas as pd

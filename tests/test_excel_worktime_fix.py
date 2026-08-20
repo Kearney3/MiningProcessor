@@ -1,8 +1,8 @@
 """Test return_sheets flag is checked BEFORE write_formatted_excel (finding #1 fix)."""
 
 import os
+
 import openpyxl
-import pytest
 
 from func.excel_worktime import process_excel_data
 

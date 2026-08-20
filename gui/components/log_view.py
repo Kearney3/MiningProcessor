@@ -1,9 +1,10 @@
 """日志视图组件"""
 import flet as ft
 
-from .types import LogViewRefs
-from .common import safe_update
 from gui.i18n import t
+
+from .common import safe_update
+from .types import LogViewRefs
 
 try:
     from . import theme

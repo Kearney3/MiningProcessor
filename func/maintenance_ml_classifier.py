@@ -6,9 +6,9 @@ SGD 对数损失线性分类器，适合中文短文本、拼写变体和中英�
 from __future__ import annotations
 
 from collections import Counter, defaultdict
+from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
 
 import joblib
 import numpy as np
@@ -23,7 +23,6 @@ from func.maintenance_classification import (
     MAINTENANCE_CLASSIFICATION_SCHEMA_VERSION,
     normalize_maintenance_content,
 )
-
 
 MODEL_VERSION = 3
 LABEL_SEPARATOR = "\u241f"
@@ -393,7 +392,7 @@ class MaintenanceMLClassifier:
     def load(
         cls,
         path: str | Path = DEFAULT_MODEL_PATH,
-    ) -> "MaintenanceMLClassifier":
+    ) -> MaintenanceMLClassifier:
         payload = joblib.load(Path(path))
         if payload.get("model_version") != MODEL_VERSION:
             raise ValueError("维修分类模型版本不兼容，请重新训练")

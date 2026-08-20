@@ -3,10 +3,8 @@
 from unittest.mock import MagicMock
 
 import pandas as pd
-import pytest
 
 from func.ledger_enrichment import enrich_dataframe_device, resolve_equipment_attributes
-
 
 # ---------------------------------------------------------------------------
 # helpers: mock ledger factories
