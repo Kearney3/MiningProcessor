@@ -3,6 +3,7 @@
 用于导入和管理设备台账表，提供设备名称精确匹配功能
 """
 
+import contextlib
 
 from func.ledger_base import LedgerBase
 from func.logger import get_logger
@@ -126,10 +127,8 @@ class EquipmentLedger(LedgerBase):
             return set()
 
         keys = {cleaned.lower()}
-        try:
+        with contextlib.suppress(ValueError, TypeError):
             keys.add(str(int(float(cleaned))).lower())
-        except (ValueError, TypeError):
-            pass
         return keys
 
     @staticmethod

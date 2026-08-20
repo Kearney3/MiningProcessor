@@ -421,7 +421,7 @@ def read_and_map_excel(
         df = pd.read_excel(file_path, sheet_name=sheet_name)
         # 当 sheet_name=None 时，pd.read_excel 返回 dict；取第一个 sheet
         if isinstance(df, dict):
-            df = list(df.values())[0]
+            df = next(iter(df.values()))
     except Exception as e:
         logger.error("读取 Excel 失败: %s — %s", file_path, e)
         return []

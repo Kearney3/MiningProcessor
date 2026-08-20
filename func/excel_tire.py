@@ -187,7 +187,7 @@ def parse_date(
         if 1900 <= number < 10000:
             year = int(number)
             fraction = decimal_subtract(number, year)
-            month = int(round(decimal_multiply(fraction, 100))) if fraction else 1
+            month = round(decimal_multiply(fraction, 100)) if fraction else 1
             if 1 <= month <= 12:
                 return (
                     f"{year:04d}-{month:02d}-01",
@@ -962,10 +962,7 @@ def process_tire_data(
     if return_sheets:
         return sheets
 
-    if output_file is None:
-        output_path = source.with_name("轮胎寿命统计.xlsx")
-    else:
-        output_path = Path(output_file)
+    output_path = source.with_name("轮胎寿命统计.xlsx") if output_file is None else Path(output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     from func.excel_formatter import write_formatted_excel
 

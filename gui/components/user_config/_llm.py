@@ -1,5 +1,6 @@
 """LLM 标注配置区域组件。"""
 import asyncio
+import contextlib
 import logging
 
 import flet as ft
@@ -62,10 +63,8 @@ def _create_llm_config_section(page: ft.Page, log):
         _apply_llm_to_ui(cfg)
         if cfg.get("model") and not any(o.key == cfg["model"] for o in llm_model.options):
             llm_model.options.append(ft.dropdown.Option(cfg["model"]))
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             page.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     def _resolve_api_key() -> str:
         val = (llm_api_key.value or "").strip()
@@ -82,17 +81,13 @@ def _create_llm_config_section(page: ft.Page, log):
         if not cfg["url"]:
             llm_test_result.value = t("components:user_config._llm.enterTheApiUrlFirstVariant")
             llm_test_result.color = ft.Colors.RED
-            try:
+            with contextlib.suppress(RuntimeError, AttributeError):
                 page.update()
-            except (RuntimeError, AttributeError):
-                pass
             return
         llm_test_result.value = t("components:user_config.fetchingModelList")
         llm_test_result.color = theme.TEXT_SECONDARY
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             page.update()
-        except (RuntimeError, AttributeError):
-            pass
 
         async def _do_fetch_async():
             result = await asyncio.to_thread(config_loader.test_llm_connection, cfg)
@@ -114,10 +109,8 @@ def _create_llm_config_section(page: ft.Page, log):
                 llm_test_result.value = t("components:user_config._llm.connectionFailedVariant", error=result['error'])
                 llm_test_result.color = ft.Colors.RED
                 _log_message(log, t("components:user_config._llm.llmApiconnectionFailed", error=result['error']), level=logging.ERROR)
-            try:
+            with contextlib.suppress(RuntimeError, AttributeError):
                 page.update()
-            except (RuntimeError, AttributeError):
-                pass
 
         page.run_task(_do_fetch_async)
 
@@ -136,20 +129,16 @@ def _create_llm_config_section(page: ft.Page, log):
         _reload_llm()
         llm_status.value = t("components:user_config._llm.llmConfigurationSaved")
         _log_message(log, t("components:user_config._llm.savedLlmConfigurationconfiguration"))
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             page.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     def _reset_llm(_e):
         config_loader.update_user_config({"llm_labeling": {}})
         _reload_llm()
         llm_status.value = t("components:user_config._llm.defaultConfigurationRestored")
         _log_message(log, t("components:user_config._llm.configurationLlmConfigurationconfiguration"))
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             page.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     fetch_btn = theme.secondary_btn(t("components:user_config._llm.getModels"), icon=ft.Icons.REFRESH, on_click=_fetch_models)
 
@@ -162,17 +151,13 @@ def _create_llm_config_section(page: ft.Page, log):
         if not cfg["url"]:
             llm_verify_result.value = t("components:user_config._llm.enterTheApiUrlFirstEnterApiUrlFirst")
             llm_verify_result.color = ft.Colors.AMBER
-            try:
+            with contextlib.suppress(RuntimeError, AttributeError):
                 page.update()
-            except (RuntimeError, AttributeError):
-                pass
             return
         llm_verify_result.value = t("components:user_config.verifying")
         llm_verify_result.color = theme.TEXT_SECONDARY
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             page.update()
-        except (RuntimeError, AttributeError):
-            pass
 
         async def _do_verify_async():
             result = await asyncio.to_thread(config_loader.test_llm_connection, cfg)
@@ -190,10 +175,8 @@ def _create_llm_config_section(page: ft.Page, log):
             else:
                 llm_verify_result.value = t("components:user_config._llm.connectionFailedConnectionFailed", error=result['error'])
                 llm_verify_result.color = ft.Colors.RED
-            try:
+            with contextlib.suppress(RuntimeError, AttributeError):
                 page.update()
-            except (RuntimeError, AttributeError):
-                pass
 
         page.run_task(_do_verify_async)
 

@@ -1,4 +1,5 @@
 """GUI 主窗口：浅色桌面工作台与侧边栏导航布局。"""
+import contextlib
 import logging
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -19,12 +20,14 @@ from . import i18n as i18n
 # 再导入组件，确保首次启动就使用用户选择的语言，而不是先短暂加载中文。
 i18n.init(get_user_config("language", i18n.DEFAULT_LANGUAGE))
 
-from . import components as cmp
-from . import logic as logic
-from .log_broker import install_gui_log_handler
-from .log_system import (
+from . import components as cmp  # noqa: E402
+from . import logic as logic  # noqa: E402
+from .log_broker import install_gui_log_handler  # noqa: E402
+from .log_system import (  # noqa: E402
     LogSystem,
 )
+
+MIN_LOG_HEIGHT = 140  # re-exported for tests
 
 try:
     from . import theme
@@ -66,7 +69,6 @@ def _create_lang_switcher(page: ft.Page) -> ft.Container:
 
     buttons = []
     for code, label in _LANG_OPTIONS:
-        is_selected = code == current
         buttons.append(
             ft.Segment(
                 value=code,
@@ -188,17 +190,17 @@ def main(page: ft.Page):
     ledger_section, ledger_refs = cmp.create_ledger_section(page, log)
     oil_ledger_section, oil_ledger_refs = cmp.create_oil_ledger_section(page, log)
     model_ledger_section, model_ledger_refs = cmp.create_model_ledger_section(page, log)
-    daily_report_section, daily_report_refs = cmp.create_daily_report_section(
+    daily_report_section, _daily_report_refs = cmp.create_daily_report_section(
         page, log, ledger_refs, model_ledger_refs
     )
     config_section, config_refs = cmp.create_config_section(page, log)
     user_config_section, user_config_refs = cmp.create_user_config_section(page, log)
-    maint_config_section, maint_config_refs = cmp.create_maint_config_section(page, log)
-    llm_section, llm_refs = cmp.create_llm_labeling_section(page)
+    maint_config_section, _maint_config_refs = cmp.create_maint_config_section(page, log)
+    llm_section, _llm_refs = cmp.create_llm_labeling_section(page)
     modules_section, module_refs = cmp.create_modules_section(page)
     batch_section, batch_refs = cmp.create_batch_section(page)
     module_refs["batch"] = batch_refs
-    ledger_match_section, ledger_match_refs = cmp.create_ledger_match_section(page, log, ledger_refs, oil_ledger_refs)
+    ledger_match_section, _ledger_match_refs = cmp.create_ledger_match_section(page, log, ledger_refs, oil_ledger_refs)
     sync_section, sync_refs = cmp.create_sync_section(page)
 
     # ---- 绑定处理按钮 ----
@@ -228,8 +230,6 @@ def main(page: ft.Page):
             (i18n.t("nav:userConfig"), ft.Icons.SETTINGS, "user_config"),
         ]),
     ]
-    nav_items_data = [item for _, items in nav_groups for item in items]
-
     # Content pages
     pages = {
         "modules": ft.Column([modules_section], expand=True, spacing=8),
@@ -285,10 +285,8 @@ def main(page: ft.Page):
             text_ctrl.weight = (
                 ft.FontWeight.W_600 if is_selected else ft.FontWeight.W_500
             )
-            try:
+            with contextlib.suppress(RuntimeError, AttributeError):
                 item.update()
-            except (RuntimeError, AttributeError):
-                pass
 
     sidebar = ft.Container(
         content=ft.ListView(

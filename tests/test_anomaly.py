@@ -245,9 +245,9 @@ class TestFiltererFlag:
         result = AnomalyFilterer.flag(df, hits)
         assert ANOMALY_FLAG_COLUMN in result.columns
         assert ANOMALY_REASON_COLUMN in result.columns
-        assert result.at[2, ANOMALY_FLAG_COLUMN] == True
+        assert result.at[2, ANOMALY_FLAG_COLUMN] == True  # noqa: E712
         assert "超过上限" in result.at[2, ANOMALY_REASON_COLUMN]
-        assert result.at[0, ANOMALY_FLAG_COLUMN] == False
+        assert result.at[0, ANOMALY_FLAG_COLUMN] == False  # noqa: E712
         assert result.at[0, ANOMALY_REASON_COLUMN] == ""
 
     def test_flag_preserves_all_rows(self):
@@ -379,20 +379,20 @@ class TestDetectAndFilter:
         handling = {"油品消耗": {"strategy": "default_value", "default": 0}}
         cfg = AnomalyConfig(enabled=True, flag_anomalies=False, handle_anomalies=True,
                             handling_rules=handling)
-        result_df, anomalies = detect_and_filter(df, "fuel", config=cfg, handling_rules=handling)
-        assert result_df.at[2, "油品消耗"] == 0
+        _result_df, _anomalies = detect_and_filter(df, "fuel", config=cfg, handling_rules=handling)
+        assert _result_df.at[2, "油品消耗"] == 0
 
     def test_no_anomalies(self):
         df = pd.DataFrame({"油品消耗": [100, 200, 300]})
         cfg = AnomalyConfig(enabled=True)
-        result_df, anomalies = detect_and_filter(df, "fuel", config=cfg)
-        assert anomalies is None
+        _result_df, _anomalies = detect_and_filter(df, "fuel", config=cfg)
+        assert _anomalies is None
 
     def test_custom_thresholds(self):
         df = pd.DataFrame({"油品消耗": [100, 200, 500]})
         cfg = AnomalyConfig(enabled=True, flag_anomalies=True)
         thresholds = {"油品消耗": {"max": 300}}
-        result_df, anomalies = detect_and_filter(df, "fuel", config=cfg, thresholds=thresholds)
+        _result_df, anomalies = detect_and_filter(df, "fuel", config=cfg, thresholds=thresholds)
         assert anomalies is not None
         assert len(anomalies) == 1
 
@@ -776,7 +776,7 @@ class TestDetectorSigmaEdgeCases:
 class TestDetectorPercentileEdgeCases:
     def test_hit_message_format_low(self):
         """低于 P_low 的命中消息格式。"""
-        data = [1] + list(range(10, 110))
+        data = [1, *list(range(10, 110))]
         df = pd.DataFrame({"v": data})
         rule = AnomalyRule(column="v", method="percentile", params={"low": 5, "high": 95})
         hits = AnomalyDetector([rule]).detect(df)
@@ -786,7 +786,7 @@ class TestDetectorPercentileEdgeCases:
 
     def test_hit_message_format_high(self):
         """高于 P_high 的命中消息格式。"""
-        data = list(range(10, 110)) + [200]
+        data = [*list(range(10, 110)), 200]
         df = pd.DataFrame({"v": data})
         rule = AnomalyRule(column="v", method="percentile", params={"low": 5, "high": 95})
         hits = AnomalyDetector([rule]).detect(df)
@@ -829,7 +829,7 @@ class TestFiltererFlagEdgeCases:
             AnomalyHit(column="b", method="threshold", row_index=1, value=400, message="b=400 超过上限"),
         ]
         result = AnomalyFilterer.flag(df, hits)
-        assert result.at[1, ANOMALY_FLAG_COLUMN] == True
+        assert result.at[1, ANOMALY_FLAG_COLUMN] == True  # noqa: E712
         assert "a=200" in result.at[1, ANOMALY_REASON_COLUMN]
         assert "b=400" in result.at[1, ANOMALY_REASON_COLUMN]
         assert ";" in result.at[1, ANOMALY_REASON_COLUMN]
@@ -839,7 +839,7 @@ class TestFiltererFlagEdgeCases:
         df = pd.DataFrame({"v": [100, 200]}, index=["x", "y"])
         hits = [AnomalyHit(column="v", method="threshold", row_index="y", value=200, message="v=200 超过上限")]
         result = AnomalyFilterer.flag(df, hits)
-        assert result.at["y", ANOMALY_FLAG_COLUMN] == True
+        assert result.at["y", ANOMALY_FLAG_COLUMN] == True  # noqa: E712
 
     def test_flag_missing_index_in_df(self):
         """命中索引不在 df 中时应静默跳过。"""
@@ -938,7 +938,7 @@ class TestDetectAndFilterThresholdPassthrough:
             enabled=True, flag_anomalies=True,
             thresholds={"fuel": {"油品消耗": {"max": 300}}},
         )
-        result_df, anomalies = detect_and_filter(df, "fuel", config=cfg)
+        _result_df, anomalies = detect_and_filter(df, "fuel", config=cfg)
         assert anomalies is not None
         assert len(anomalies) == 1
 
@@ -949,7 +949,7 @@ class TestDetectAndFilterThresholdPassthrough:
             enabled=True, flag_anomalies=True,
             thresholds={"electrical": {"电力消耗": {"max": 100}}},
         )
-        result_df, anomalies = detect_and_filter(df, "fuel", config=cfg)
+        _result_df, anomalies = detect_and_filter(df, "fuel", config=cfg)
         # 油品消耗 500 < 10000 (default), no anomaly
         assert anomalies is None
 
@@ -960,7 +960,7 @@ class TestDetectAndFilterThresholdPassthrough:
             enabled=True, flag_anomalies=True,
             thresholds={"fuel": {"油品消耗": {"max": 10000}}},
         )
-        result_df, anomalies = detect_and_filter(
+        _result_df, anomalies = detect_and_filter(
             df, "fuel", config=cfg,
             thresholds={"油品消耗": {"max": 300}},
         )
@@ -1112,7 +1112,7 @@ class TestCoverageGaps:
         assert result_df is not df
         assert ANOMALY_FLAG_COLUMN in result_df.columns
         assert ANOMALY_REASON_COLUMN in result_df.columns
-        assert (result_df[ANOMALY_FLAG_COLUMN] == False).all()
+        assert not result_df[ANOMALY_FLAG_COLUMN].any()
         assert (result_df[ANOMALY_REASON_COLUMN] == "").all()
         assert len(result_df) == 3
         assert anomalies is None
@@ -1129,7 +1129,7 @@ class TestCoverageGaps:
         """detect_and_filter 应在 generate_report=True 时生成报告（__init__.py:138-139）。"""
         df = pd.DataFrame({"油品消耗": [100, 200, 60000]})
         cfg = AnomalyConfig(enabled=True, flag_anomalies=True, generate_report=True)
-        result_df, anomalies = detect_and_filter(
+        _result_df, anomalies = detect_and_filter(
             df, "fuel", config=cfg, output_dir=str(tmp_path))
         assert anomalies is not None
         # 验证报告文件已生成

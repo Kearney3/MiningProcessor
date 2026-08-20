@@ -8,7 +8,7 @@ import pandas as pd
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from func.excel_utils import (
+from func.excel_utils import (  # noqa: E402
     MODULE_OUTPUT_FILES,
     clean_split_dataframe,
     dedup_dataframe,

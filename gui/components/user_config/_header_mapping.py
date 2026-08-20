@@ -1,4 +1,5 @@
 """工作效率表头映射配置区域组件。"""
+import contextlib
 import logging
 
 import flet as ft
@@ -61,9 +62,7 @@ def _create_header_mapping_section(page: ft.Page, log):
         if any(q in kw.lower() for kw in entry.get("keywords", [])):
             return True
         idx = entry.get("index")
-        if idx is not None and q in str(idx):
-            return True
-        return False
+        return idx is not None and q in str(idx)
 
     # ── 行构建 ──
     def _build_header_rows():
@@ -282,10 +281,8 @@ def _create_header_mapping_section(page: ft.Page, log):
             )
 
         header_content_column.controls = controls
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             header_content_column.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     def _toggle_expand(idx: int):
         if idx in _expanded_rows:
@@ -370,10 +367,8 @@ def _create_header_mapping_section(page: ft.Page, log):
 
         if has_error:
             _log_message(log, header_status_text.value, level=logging.WARNING)
-            try:
+            with contextlib.suppress(RuntimeError, AttributeError):
                 page.update()
-            except (RuntimeError, AttributeError):
-                pass
             return
 
         mapping_config = {"mode": "position", "entries": entries}
@@ -393,10 +388,8 @@ def _create_header_mapping_section(page: ft.Page, log):
         header_status_text.value = status_msg
         header_status_text.color = theme.TEXT_SECONDARY
         _log_message(log, t("components:user_config._header_mapping.savedworktimeHeaderMappingItems", count=len(entries)))
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             page.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     def _reset_header_mapping(e=None):
         cfg = config_loader.load_config()
@@ -410,10 +403,8 @@ def _create_header_mapping_section(page: ft.Page, log):
         header_status_text.value = t("components:user_config._header_mapping.defaultConfigurationRestored")
         header_status_text.color = theme.TEXT_SECONDARY
         _log_message(log, t("components:user_config._header_mapping.worktimeHeaderMappingReset"))
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             page.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     def _clear_header_mapping(e=None):
         config_loader.save_worktime_header_mapping({"entries": []})
@@ -423,10 +414,8 @@ def _create_header_mapping_section(page: ft.Page, log):
         header_status_text.value = t("components:user_config._header_mapping.configurationclearconfiguration")
         header_status_text.color = theme.TEXT_SECONDARY
         _log_message(log, t("components:user_config._header_mapping.configurationclearconfigurationconfiguration"))
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             page.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     # ── 工具栏（与 Tauri 对齐） ──
     toolbar = ft.Row(

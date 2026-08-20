@@ -96,7 +96,7 @@ def _hide_import_progress(controls: _MatchControls):
     controls.import_progress_bar.value = 0
 
 
-def _update_match_status(state: MatchState, controls: _MatchControls, sheet_name: str = None):
+def _update_match_status(state: MatchState, controls: _MatchControls, sheet_name: str | None = None):
     """更新匹配计数显示"""
     sheet = sheet_name or state.current_sheet
     controls.match_count_label.value = build_match_count_text(
@@ -602,7 +602,7 @@ def create_ledger_match_section(
         page_df = df.iloc[start:end]
 
         rows = []
-        for row_idx, row in page_df.iterrows():
+        for _row_idx, row in page_df.iterrows():
             cells = []
             for c in cols:
                 cell_value = _cell_text(row[c])
@@ -706,7 +706,7 @@ def create_ledger_match_section(
         oil_dropdown.options = []
         oil_dropdown.value = None
         match_btn.disabled = True
-        export_btn.disabled = True
+        export_menu.disabled = True
         status_label.value = ""
         data_table.columns = [ft.DataColumn(ft.Text(t("components:ledger_match.waitingForImportData")))]
         data_table.rows = []

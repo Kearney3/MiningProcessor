@@ -1,4 +1,5 @@
 """共享工具函数：端口字段状态同步、端口文本规范化、关键字 chip 输入组件。"""
+import contextlib
 import re
 
 import flet as ft
@@ -16,10 +17,8 @@ def _sync_port_state(port_field: ft.TextField, is_valid: bool, message: str = ""
     """统一端口字段的边框和提示状态。"""
     port_field.border_color = ft.Colors.RED if not is_valid else theme.BORDER
     port_field.error_text = message or None
-    try:
+    with contextlib.suppress(RuntimeError, AttributeError):
         port_field.update()
-    except (RuntimeError, AttributeError):
-        pass
 
 
 def _normalize_port_text(value: str | None) -> str:

@@ -224,7 +224,7 @@ class TestResolveEdgeCases:
         })
 
         # Act
-        result = resolve_equipment_attributes(
+        _result = resolve_equipment_attributes(
             name="  \n 挖掘机  \t", device_id="  ",
             equipment_ledger=eq_ledger,
         )

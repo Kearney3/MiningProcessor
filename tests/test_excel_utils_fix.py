@@ -7,7 +7,7 @@ import pandas as pd
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from func.excel_utils import split_day_night_shifts
+from func.excel_utils import split_day_night_shifts  # noqa: E402
 
 
 class TestSplitDayNightShiftsEmptyHeader:

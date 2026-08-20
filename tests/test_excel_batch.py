@@ -8,9 +8,9 @@ import pandas as pd
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch  # noqa: E402
 
-from func.excel_batch import (
+from func.excel_batch import (  # noqa: E402
     MODULE_LABELS,
     _check_cancel,
     _emit_progress,
@@ -90,7 +90,7 @@ class TestProcessFilesAllModulesCalled:
         self, mock_fuel, mock_electrical, mock_production, mock_worktime, mock_write
     ):
         matched = _make_matched()
-        result, summary = process_files(
+        result, _summary = process_files(
             folder_path="/data",
             matched=matched,
             year=2025,
@@ -135,7 +135,7 @@ class TestProcessFilesMissingModule:
     ):
         """When a module returns empty dict, its key appears in result with {}."""
         matched = _make_matched(["fuel", "electrical", "production", "worktime"])
-        result, summary = process_files(
+        result, _summary = process_files(
             folder_path="/data",
             matched=matched,
             year=2025,
@@ -158,7 +158,7 @@ class TestProcessFilesMissingModule:
         self, mock_fuel, mock_electrical, mock_production, mock_worktime, mock_write
     ):
         matched = _make_matched(["fuel", "electrical", "production", "worktime"])
-        result, summary = process_files(
+        result, _summary = process_files(
             folder_path="/data",
             matched=matched,
             year=2025,
@@ -178,7 +178,7 @@ class TestProcessFilesMissingModule:
     ):
         """When _process_fuel_module returns {}, fuel key appears with empty dict."""
         matched = _make_matched(["fuel", "electrical", "production", "worktime"])
-        result, summary = process_files(
+        result, _summary = process_files(
             folder_path="/data",
             matched=matched,
             year=2025,
@@ -207,7 +207,7 @@ class TestProcessFilesMissingModule:
         mock_production.return_value = ({}, [])
         mock_worktime.return_value = {}
         matched = _make_matched()
-        result, summary = process_files(
+        result, _summary = process_files(
             folder_path="/data",
             matched=matched,
             year=2025,
@@ -265,7 +265,7 @@ class TestCancelEvent:
         ev.set()
 
         matched = _make_matched()
-        result, summary = process_files(
+        result, _summary = process_files(
             folder_path="/data",
             matched=matched,
             year=2025,
@@ -358,7 +358,7 @@ class TestReturnSheetsPassthrough:
     ):
         """Verify that process_files returns the sheets dict keyed by module type."""
         matched = _make_matched()
-        result, summary = process_files(
+        result, _summary = process_files(
             folder_path="/data",
             matched=matched,
             year=2025,
@@ -366,7 +366,7 @@ class TestReturnSheetsPassthrough:
             merge_output=True,
         )
         assert set(result.keys()) == {"fuel", "electrical", "production", "worktime"}
-        for module_type, sheets in result.items():
+        for _module_type, sheets in result.items():
             assert isinstance(sheets, dict)
             assert len(sheets) > 0
 

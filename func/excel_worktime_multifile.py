@@ -273,7 +273,7 @@ def _finalize(
 
     # 日期、班次排在最前
     other_cols = [c for c in final_df.columns if c not in ("日期", "班次")]
-    final_df = final_df[["日期", "班次"] + other_cols]
+    final_df = final_df[["日期", "班次", *other_cols]]
 
     # 全局剔除混入的重复表头
     final_df = _remove_header_rows(final_df, other_cols)

@@ -82,7 +82,7 @@ def _button_style(
 
 # ── 按钮样式 ─────────────────────────────────────────
 
-def primary_btn(text: str, icon: str = None, **kwargs) -> ft.Button:
+def primary_btn(text: str, icon: str | None = None, **kwargs) -> ft.Button:
     """主操作按钮。"""
     kwargs.setdefault("height", CONTROL_HEIGHT)
     return ft.Button(
@@ -97,7 +97,7 @@ def primary_btn(text: str, icon: str = None, **kwargs) -> ft.Button:
     )
 
 
-def secondary_btn(text: str, icon: str = None, **kwargs) -> ft.Button:
+def secondary_btn(text: str, icon: str | None = None, **kwargs) -> ft.Button:
     """次要操作按钮。"""
     kwargs.setdefault("height", CONTROL_HEIGHT)
     return ft.Button(
@@ -113,7 +113,7 @@ def secondary_btn(text: str, icon: str = None, **kwargs) -> ft.Button:
     )
 
 
-def destructive_btn(text: str, icon: str = None, **kwargs) -> ft.Button:
+def destructive_btn(text: str, icon: str | None = None, **kwargs) -> ft.Button:
     """危险操作按钮"""
     kwargs.setdefault("height", CONTROL_HEIGHT)
     return ft.Button(
@@ -128,7 +128,7 @@ def destructive_btn(text: str, icon: str = None, **kwargs) -> ft.Button:
     )
 
 
-def accent_btn(text: str, icon: str = None, **kwargs) -> ft.Button:
+def accent_btn(text: str, icon: str | None = None, **kwargs) -> ft.Button:
     """强调操作按钮(应用配置等)"""
     kwargs.setdefault("height", CONTROL_HEIGHT)
     return ft.Button(
@@ -144,7 +144,7 @@ def accent_btn(text: str, icon: str = None, **kwargs) -> ft.Button:
     )
 
 
-def loading_btn(text: str, icon: str = None, **kwargs) -> ft.Button:
+def loading_btn(text: str, icon: str | None = None, **kwargs) -> ft.Button:
     """加载态按钮。"""
     kwargs.setdefault("height", CONTROL_HEIGHT)
     return ft.Button(

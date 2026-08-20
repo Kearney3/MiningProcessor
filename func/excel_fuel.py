@@ -158,9 +158,6 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
                 _date_row_idx, _date_positions = _find_date_row(header_rows)
                 _fuel_brand_row_idx = _find_fuel_brand_row(header_rows)
 
-                # 备份最原始的日期行（用于判断该列是否是Excel中真实存在的日期格）
-                raw_header_date_row = header_rows.iloc[_date_row_idx if _date_row_idx >= 0 else 0, :].copy()
-
                 # 日期行：按日期块 ffill（不跨越日期头边界，不延伸到汇总列）
                 if _date_positions:
                     _dr = header_rows.iloc[_date_row_idx, :].copy()
@@ -172,10 +169,7 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
                         _s, _e = _date_positions[_i], _date_positions[_i + 1]
                         _dr.iloc[_s:_e] = _dr.iloc[_s:_e].ffill()
                     # 最后一个日期头：只填充到该日期块结束，不延伸到后面的汇总列
-                    if len(_date_positions) >= 2:
-                        _block_w = _date_positions[-1] - _date_positions[-2]
-                    else:
-                        _block_w = 12  # 典型日期块宽度
+                    _block_w = _date_positions[-1] - _date_positions[-2] if len(_date_positions) >= 2 else 12
                     _last_end = _date_positions[-1] + _block_w
                     _dr.iloc[_date_positions[-1]:_last_end] = _dr.iloc[_date_positions[-1]:_last_end].ffill()
                     header_rows.iloc[_date_row_idx, :] = _dr
@@ -205,7 +199,8 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
                 col_mapping = []
                 stop_signal = False
                 for idx in range(header_rows.shape[1]):
-                    if stop_signal: break
+                    if stop_signal:
+                        break
 
                     h2 = clean_string(header_rows.iloc[_date_row_idx, idx]) if _date_row_idx >= 0 else ""
                     h3 = clean_string(header_rows.iloc[_shift_row_idx, idx]) if _shift_row_idx < header_rows.shape[0] else ""
@@ -230,7 +225,8 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
 
                     try:
                         dt = pd.to_datetime(h2)
-                        if target_year: dt = dt.replace(year=target_year)
+                        if target_year:
+                            dt = dt.replace(year=target_year)
                     except (ValueError, TypeError):
                         col_mapping.append({"type": "ignore"})
                         continue
@@ -276,7 +272,8 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
                     device_name = row[1]
                     device_id = row[2]
                     device_id = clean_equipment_name(device_id)
-                    if not device_id: continue
+                    if not device_id:
+                        continue
 
                     if device_name in ["HITACHI EX2600"]:
                         device_name = f"{device_name} #{device_id}"
@@ -288,9 +285,11 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
                     shift_data_map = {}
 
                     for idx, col_info in enumerate(col_mapping):
-                        if idx >= len(row): break
+                        if idx >= len(row):
+                            break
                         val = row[idx]
-                        if pd.isna(val): continue
+                        if pd.isna(val):
+                            continue
 
                         if col_info["type"] == "initial_start":
                             current_row_initial_val = val
@@ -306,10 +305,12 @@ def process_diesel_data(file_path, target_year=None, return_sheets=False, skip_h
                                     "设备编号": device_id, "油品种类": clean_string(col_info["fuel_type"]), "油品消耗": val
                                 })
                             elif col_info["data_type"] == "end_hours":
-                                if key not in shift_data_map: shift_data_map[key] = {}
+                                if key not in shift_data_map:
+                                    shift_data_map[key] = {}
                                 shift_data_map[key]['end'] = val
                             elif col_info["data_type"] == "work_hours":
-                                if key not in shift_data_map: shift_data_map[key] = {}
+                                if key not in shift_data_map:
+                                    shift_data_map[key] = {}
                                 shift_data_map[key]['work'] = val
 
                     # 6. 组装发动机数据（保持小时数链条连续性）

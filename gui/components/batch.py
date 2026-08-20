@@ -1,4 +1,5 @@
 """批量处理模块区域组件"""
+import contextlib
 from datetime import datetime, timedelta
 
 import flet as ft
@@ -250,10 +251,8 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     def _update_date_display():
         _date_display_text.value = _selected_date[0].strftime("%Y-%m-%d")
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             _date_display_text.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     def _on_prev_day(e):
         _selected_date[0] = _selected_date[0] - timedelta(days=1)
@@ -315,10 +314,8 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     def _on_date_filter_toggle(e):
         date_nav_row.visible = date_filter_toggle.value
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             date_nav_row.update()
-        except (RuntimeError, AttributeError):
-            pass
 
     date_filter_toggle.on_change = _on_date_filter_toggle
 

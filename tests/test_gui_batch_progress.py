@@ -9,7 +9,7 @@ import pytest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-import gui.logic as logic
+import gui.logic as logic  # noqa: E402
 
 
 class FakeBtn:

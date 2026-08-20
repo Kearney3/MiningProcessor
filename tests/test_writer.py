@@ -100,7 +100,7 @@ class TestAutoColWidth:
 class TestDetectStats:
     def test_date_column_detected_by_keyword(self):
         headers = ["日期", "设备名称", "维修内容"]
-        date_cols, pct_cols, hour_cols, wrap_cols = _detect_stats(headers, [])
+        date_cols, _pct_cols, _hour_cols, _wrap_cols = _detect_stats(headers, [])
         assert 0 in date_cols
 
     def test_percent_column_detected_by_zhanbi(self):

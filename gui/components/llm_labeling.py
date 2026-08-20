@@ -4,6 +4,7 @@
 支持页面关闭时自动取消后台任务。
 """
 import asyncio
+import contextlib
 import logging
 import threading
 from dataclasses import dataclass, field
@@ -320,10 +321,8 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                 if sheet_dropdown.value:
                     _load_columns(path, sheet_dropdown.value)
 
-            try:
+            with contextlib.suppress(RuntimeError, AttributeError):
                 page.run_task(_update_ui)
-            except (RuntimeError, AttributeError):
-                pass
 
         threading.Thread(target=_fetch, daemon=True).start()
 
@@ -360,7 +359,7 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                 _build_preview_table(columns_list, sample_data)
                 preview_info.value = t("components:llm_labeling.columnsFirst5Rows", count=len(columns_list)) if columns_list else t("components:llm_labeling.columnreadcolumn")
                 mapping_section.visible = True
-                filter_section.visible = True if columns_list else False
+                filter_section.visible = bool(columns_list)
                 if col_status.value:
                     _build_status_suggestions(col_status.value)
                 _sync_filter_availability()
@@ -372,10 +371,8 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                     filter_notice, filter_chip_row, mapping_error,
                 )
 
-            try:
+            with contextlib.suppress(RuntimeError, AttributeError):
                 page.run_task(_update_ui)
-            except (RuntimeError, AttributeError):
-                pass
 
         threading.Thread(target=_fetch, daemon=True).start()
 
@@ -551,10 +548,8 @@ def create_llm_labeling_section(page: ft.Page) -> tuple[ft.Container, dict]:
                             progress_metrics,
                         )
 
-                    try:
+                    with contextlib.suppress(RuntimeError, AttributeError):
                         page.run_task(_flush_progress)
-                    except (RuntimeError, AttributeError):
-                        pass
 
                 result = process_maintenance_llm(
                     path,

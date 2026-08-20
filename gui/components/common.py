@@ -1,4 +1,5 @@
 """GUI 组件共享工具函数与状态"""
+import contextlib
 import logging
 import math
 import threading
@@ -44,10 +45,8 @@ def _log_message(log, message: str, level: int = logging.INFO):
 def safe_update(*controls):
     """安全调用控件的 update()，忽略未挂载时的异常。"""
     for ctrl in controls:
-        try:
+        with contextlib.suppress(RuntimeError, AttributeError):
             ctrl.update()
-        except (RuntimeError, AttributeError):
-            pass
 
 
 def to_local_dt(d):
@@ -309,7 +308,7 @@ def create_anomaly_results_table() -> dict:
     except ImportError:
         import gui.theme as theme
 
-    columns = [name for name, _, _ in _ANOMALY_RESULT_COLUMNS]
+    _columns = [name for name, _, _ in _ANOMALY_RESULT_COLUMNS]
     table = ft.DataTable(
         columns=[
             ft.DataColumn(ft.Text(t(label_key), size=12, no_wrap=True))
@@ -748,3 +747,18 @@ def create_sheet_selection_dialog(
         ],
         actions_alignment=ft.MainAxisAlignment.END,
     )
+
+
+def strip_date_only_times(df: pd.DataFrame) -> pd.DataFrame:
+    """将仅含日期（时间为 00:00:00）的 datetime 列转为 date 对象。
+
+    含实际时分秒的列保持不变；非 datetime 列不受影响。
+    """
+    result = df.copy()
+    for col in result.columns:
+        if not pd.api.types.is_datetime64_any_dtype(result[col]):
+            continue
+        times = result[col].dropna().dt.floor("D")
+        if (times == result[col].dropna()).all():
+            result[col] = result[col].dt.date
+    return result

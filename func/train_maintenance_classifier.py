@@ -60,7 +60,7 @@ def load_llm_supervision(
         ids = df[record_id_column].fillna("").astype(str)
         if ids.eq("").any() or ids.duplicated().any():
             raise ValueError(f"记录 ID 列“{record_id_column}”必须非空且唯一")
-        row_lookup = dict(zip(ids, df.index))
+        row_lookup = dict(zip(ids, df.index, strict=False))
     else:
         row_lookup = None
 
@@ -72,10 +72,7 @@ def load_llm_supervision(
             item = json.loads(line)
             record_id = str(item.get("record_id", ""))
             try:
-                if row_lookup is not None:
-                    row_index = row_lookup[record_id]
-                else:
-                    row_index = int(record_id.split("-", 1)[1])
+                row_index = row_lookup[record_id] if row_lookup is not None else int(record_id.split("-", 1)[1])
                 content = df.at[row_index, content_column]
             except (KeyError, ValueError, TypeError, IndexError):
                 missing_rows += 1

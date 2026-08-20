@@ -1,7 +1,7 @@
 """用户自定义配置区域组件（优化后的表单布局与错误处理）"""
 from __future__ import annotations
 
-import logging
+import contextlib
 
 import flet as ft
 
@@ -63,10 +63,8 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, UserCo
             config_loader.reset_all_user_overrides()
             _reload_all()
             _log_message(log, t("components:user_config.__init__.configurationconfigurationconfigurationdefaultValue"))
-            try:
+            with contextlib.suppress(RuntimeError, AttributeError):
                 page.update()
-            except (RuntimeError, AttributeError):
-                pass
 
         def _on_cancel(e):
             page.pop_dialog()

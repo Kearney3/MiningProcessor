@@ -100,7 +100,8 @@ def parse_excel_data(file_path, target_year=None, return_sheets=False, add_shift
                             dt = pd.to_datetime(cell_val, unit='D', origin='1899-12-30')
                         else:
                             dt = pd.to_datetime(cell_val)
-                        if pd.isna(dt): continue
+                        if pd.isna(dt):
+                            continue
 
                         # 如果用户指定了年份，进行更正
                         if target_year:

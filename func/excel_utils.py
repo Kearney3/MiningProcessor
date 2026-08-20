@@ -122,10 +122,7 @@ def get_hidden_indices(
         file_path, read_only=False, data_only=True,
     )
     try:
-        if isinstance(sheet_name, int):
-            ws = wb.worksheets[sheet_name]
-        else:
-            ws = wb[sheet_name]
+        ws = wb.worksheets[sheet_name] if isinstance(sheet_name, int) else wb[sheet_name]
         hidden_rows = {idx for idx, dim in ws.row_dimensions.items() if dim.hidden}
         hidden_cols = {col for col, dim in ws.column_dimensions.items() if dim.hidden}
     finally:

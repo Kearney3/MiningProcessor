@@ -238,7 +238,7 @@ class MiningDataProcessor:
 
         # 使用局部变量避免多线程竞态条件（process_folder 并发调用时共享同一实例）
         raw_start = self.raw_start  # 1-based 位置
-        if self.auto_detect == True:
+        if self.auto_detect:
             # HIGH-11 fix: limit search to first 20 rows to avoid full DataFrame scan
             search_area = df_raw.iloc[:20]
             mask = search_area.apply(
@@ -259,17 +259,14 @@ class MiningDataProcessor:
                 total_col_idx = idx
                 break
 
-        if total_col_idx is not None:
-            last_col_idx = total_col_idx - 1
-        else:
-            last_col_idx = df_raw.shape[1] - 1
+        last_col_idx = total_col_idx - 1 if total_col_idx is not None else df_raw.shape[1] - 1
 
         # 3. 构造复合表头
         header6 = df_raw.iloc[raw_start - 1, :last_col_idx + 1].ffill()
         header7 = df_raw.iloc[raw_start, :last_col_idx + 1]
 
         combined_headers = []
-        for h6, h7 in zip(header6, header7):
+        for h6, h7 in zip(header6, header7, strict=False):
             h6_str = self.safe_str(h6)
             h7_str = self.safe_str(h7)
             combined_headers.append(f"{h6_str}｜{h7_str}")
@@ -412,7 +409,8 @@ class MiningDataProcessor:
         # 只在确实移除了隐藏行/列时才调整索引，否则保持原始位置
         _h_col_indices = letters_to_col_indices(self._hidden_cols) if self.skip_hidden_cols else set()
         start_row = adjust_index_for_hidden(3, self._hidden_rows, one_based=True) if self.skip_hidden_rows else 3
-        _adj_col = lambda c: adjust_index_for_hidden(c, _h_col_indices) if self.skip_hidden_cols else c
+        def _adj_col(c: int) -> int:
+            return adjust_index_for_hidden(c, _h_col_indices) if self.skip_hidden_cols else c
 
         if len(df_raw) <= start_row:
             return pd.DataFrame()
@@ -709,7 +707,7 @@ class MiningDataProcessor:
                 "errors": [],
                 "warnings": ["未找到符合条件的 Excel 文件"],
             }
-            return None if return_sheets else None
+            return None
 
         logger.info(f"共发现 {total_files} 个待处理文件，启动 {max_workers} 个线程...")
 

@@ -10,9 +10,9 @@ import pandas as pd
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from func.ledger_postprocess import _find_col, match_sheets
-from func.orchestration import get_output_path, postprocess_with_ledgers
-from gui.logic import (
+from func.ledger_postprocess import _find_col, match_sheets  # noqa: E402
+from func.orchestration import get_output_path, postprocess_with_ledgers  # noqa: E402
+from gui.logic import (  # noqa: E402
     _dispatch_module,
     _execute_task,
     _log_message,

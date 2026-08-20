@@ -241,10 +241,9 @@ def _preprocess_worktime(path: Path, year: int, month: int, options: dict[str, A
 
     header_mapping = copy.deepcopy(get_worktime_header_mapping())
     # 位置映射依赖原始列位置。跳过隐藏列后位置会变化，优先改用同一配置中的关键字匹配。
-    if options["skip_hidden_cols"] and header_mapping.get("mode") == "position":
-        if any(entry.get("keywords") for entry in header_mapping.get("entries", [])):
-            header_mapping["mode"] = "name"
-            logger.info("日报工效预处理：跳过隐藏列，表头映射切换为关键字模式")
+    if options["skip_hidden_cols"] and header_mapping.get("mode") == "position" and any(entry.get("keywords") for entry in header_mapping.get("entries", [])):
+        header_mapping["mode"] = "name"
+        logger.info("日报工效预处理：跳过隐藏列，表头映射切换为关键字模式")
     sheets = process_excel_data(
         str(path), year, month, return_sheets=True,
         header_mapping=header_mapping,
@@ -510,7 +509,7 @@ class _SafeFormula:
             return value if isinstance(node.op, ast.UAdd) else -value
         if isinstance(node, ast.Compare):
             left = self._eval(node.left, values)
-            for op, comparator in zip(node.ops, node.comparators):
+            for op, comparator in zip(node.ops, node.comparators, strict=False):
                 if not isinstance(op, self._allowed_cmps):
                     raise ValueError("不支持的比较运算")
                 right = self._eval(comparator, values)
