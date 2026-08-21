@@ -80,7 +80,10 @@ class MineBaseAPIClient:
             error_code = ""
             try:
                 err_json = json.loads(error_body)
+                nested_error = err_json.get("error")
                 error_code = err_json.get("errorCode") or err_json.get("code", "")
+                if not error_code and isinstance(nested_error, dict):
+                    error_code = nested_error.get("errorCode") or nested_error.get("code", "")
             except (json.JSONDecodeError, ValueError):
                 pass
 
@@ -151,7 +154,7 @@ class MineBaseAPIClient:
         if not session_id:
             raise RuntimeError(f"创建会话失败: {resp}")
         version = resp.get("data", {}).get("session", {}).get("version", 0)
-        logger.info("创建导入会话: %s (table=%s, version=%d)", session_id[:8], table, version)
+        logger.info("创建导入会话: %s (table=%s, version=%d)", session_id, table, version)
         return resp
 
     def send_batch(
@@ -179,6 +182,10 @@ class MineBaseAPIClient:
         }
         return self._request("POST", f"/api/import/{table}/batch", payload)
 
+    def get_session(self, table: str, session_id: str) -> dict:
+        """获取导入会话快照，用于服务端 continuation 的进度轮询。"""
+        return self._request("GET", f"/api/import/{table}/session/{session_id}")
+
     def confirm_batch(
         self,
         table: str,
@@ -187,7 +194,8 @@ class MineBaseAPIClient:
     ) -> dict:
         """确认导入批次 (contractVersion 2, 窗口化)。
 
-        服务端按窗口处理数据，客户端需循环调用直到返回 done=true。
+        服务端按窗口处理数据；若响应包含 serverContinuation=true，
+        服务端会继续处理剩余窗口，客户端应改为轮询会话快照。
         """
         return self._request("POST", f"/api/import/{table}/confirm", {
             "contractVersion": CONTRACT_VERSION,

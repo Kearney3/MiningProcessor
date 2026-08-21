@@ -642,6 +642,31 @@ class TestAPIClientV2Errors:
             assert exc_info.value.status_code == 409
             assert exc_info.value.error_code == "SESSION_STATE_CONFLICT"
 
+    def test_nested_minebase_error_code_is_extracted(self):
+        """MineBase 标准错误响应中的 error.code 应被保留。"""
+        from func.sync.api_client import MineBaseAPIError
+
+        client = MineBaseAPIClient("http://localhost:3000", "admin", "pass")
+        client.token = "fake-token"
+
+        import urllib.error
+        from io import BytesIO
+
+        error_body = json.dumps({
+            "success": False,
+            "error": {
+                "code": "IMPORT_CONFIRM_LEASE_LOST",
+                "message": "Import confirmation lease was lost",
+            },
+        }).encode()
+        resp = urllib.error.HTTPError(url="", code=409, msg="", hdrs=None, fp=BytesIO(error_body))
+        resp.read = BytesIO(error_body).read
+
+        with patch("urllib.request.urlopen", side_effect=resp):
+            with pytest.raises(MineBaseAPIError) as exc_info:
+                client.confirm_batch("fuel_consumption", "session-1")
+            assert exc_info.value.error_code == "IMPORT_CONFIRM_LEASE_LOST"
+
 
 # ---------------------------------------------------------------------------
 # sync_via_api contract v2 流程测试
@@ -725,6 +750,80 @@ class TestSyncViaApiV2:
         assert client.confirm_batch.call_count == 2
         assert result["success"] == 10  # 5 + 5
         assert result["skipped"] == 0
+
+    def test_server_continuation_polls_session_without_second_confirm(self):
+        """服务端接管剩余窗口后，客户端必须轮询会话而不是再次 confirm。"""
+        from func.sync.api_client import MineBaseAPIError
+
+        client = self._make_v2_client()
+        client.confirm_batch.side_effect = [
+            {
+                "data": {
+                    "done": False,
+                    "hasMore": True,
+                    "serverContinuation": True,
+                    "inserted": 5,
+                    "updated": 0,
+                    "skipped": 0,
+                    "rejected": 0,
+                    "session": {"id": "session-v2", "state": "CONFIRMING", "version": 2},
+                },
+            },
+            MineBaseAPIError(
+                "HTTP 409: IMPORT_CONFIRM_LEASE_LOST",
+                status_code=409,
+                error_code="IMPORT_CONFIRM_LEASE_LOST",
+            ),
+        ]
+        client.get_session.side_effect = [
+            {"data": {"session": {
+                "id": "session-v2",
+                "state": "CONFIRMING",
+                "version": 3,
+                "summary": {"inserted": 5, "updated": 0, "skipped": 0, "rejected": 0, "failed": 0},
+            }}},
+            {"data": {"session": {
+                "id": "session-v2",
+                "state": "COMPLETED",
+                "version": 4,
+                "summary": {"inserted": 10, "updated": 0, "skipped": 0, "rejected": 0, "failed": 0},
+            }}},
+        ]
+
+        with patch("time.sleep"):
+            result = sync_via_api("fuel", [{"date": "2025-06-01"}], {"日期": "date"}, client)
+
+        assert client.confirm_batch.call_count == 1
+        assert client.get_session.call_count == 2
+        client.cancel_import.assert_not_called()
+        assert result["success"] == 10
+        assert result["failed"] == 0
+
+    def test_lease_lost_reconciles_terminal_session_without_cancelling(self):
+        """租约丢失后若服务端已完成，应以终态 summary 为准且不再取消。"""
+        from func.sync.api_client import MineBaseAPIError
+
+        client = self._make_v2_client()
+        client.confirm_batch.side_effect = MineBaseAPIError(
+            "HTTP 409: IMPORT_CONFIRM_LEASE_LOST",
+            status_code=409,
+            error_code="IMPORT_CONFIRM_LEASE_LOST",
+        )
+        client.get_session.return_value = {"data": {"session": {
+            "id": "session-v2",
+            "state": "COMPLETED",
+            "version": 4,
+            "summary": {"inserted": 1, "updated": 0, "skipped": 0, "rejected": 0, "failed": 0},
+        }}}
+
+        with patch("time.sleep"):
+            result = sync_via_api("fuel", [{"date": "2025-06-01"}], {"日期": "date"}, client)
+
+        assert client.confirm_batch.call_count == 1
+        client.get_session.assert_called_once_with("fuel_consumption", "session-v2")
+        client.cancel_import.assert_not_called()
+        assert result["success"] == 1
+        assert result["failed"] == 0
 
     def test_session_limit_returns_all_failed(self):
         """SessionLimitReachedError 应返回全部行失败。"""
