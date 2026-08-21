@@ -5,6 +5,7 @@
 """
 import contextlib
 import sys
+import time
 from typing import Any
 
 from func.logger import get_logger
@@ -21,6 +22,104 @@ from func.sync.row_helpers import (
 )
 
 logger = get_logger(__name__)
+
+
+# MineBase v2 在首次 confirm 返回 serverContinuation=true 后，会由服务端
+# 自己处理剩余窗口。客户端只能读取会话快照，不能继续 POST confirm。
+_TERMINAL_SESSION_STATES = frozenset({
+    "COMPLETED",
+    "PARTIAL",
+    "FAILED",
+    "CANCELLED",
+    "EXPIRED",
+})
+_CONFIRM_RECONCILE_ERROR_CODES = frozenset({
+    "IMPORT_CONFIRM_LEASE_LOST",
+    "SESSION_BUSY",
+    "STALE_VERSION",
+})
+_CONFIRM_POLL_INTERVAL_SECONDS = 0.5
+_CONFIRM_MAX_POLL_ATTEMPTS = 10_000
+
+
+def _response_data(response: Any) -> dict[str, Any]:
+    """提取 MineBase 标准响应中的 data 对象。"""
+    if not isinstance(response, dict):
+        return {}
+    data = response.get("data", response)
+    return data if isinstance(data, dict) else {}
+
+
+def _session_from_response(response: Any) -> dict[str, Any]:
+    """提取 MineBase 响应中的 session 快照。"""
+    data = _response_data(response)
+    session = data.get("session")
+    return session if isinstance(session, dict) else {}
+
+
+def _is_terminal_session(session: dict[str, Any]) -> bool:
+    return session.get("state") in _TERMINAL_SESSION_STATES
+
+
+def _summary_count(summary: dict[str, Any], field: str, fallback: int = 0) -> int:
+    value = summary.get(field)
+    return value if isinstance(value, int) and value >= 0 else fallback
+
+
+def _counts_from_terminal_session(
+    session: dict[str, Any],
+    row_count: int,
+) -> dict[str, int] | None:
+    """从终态会话的权威 summary 生成同步结果计数。"""
+    summary = session.get("summary")
+    if not isinstance(summary, dict):
+        return None
+
+    inserted = _summary_count(summary, "inserted")
+    updated = _summary_count(summary, "updated")
+    skipped = _summary_count(summary, "skipped")
+    fallback_failed = max(0, row_count - inserted - updated - skipped)
+    return {
+        "success": inserted + updated,
+        "skipped": skipped,
+        "failed": _summary_count(summary, "failed", fallback_failed),
+    }
+
+
+def _wait_for_terminal_session(
+    api_client: Any,
+    table: str,
+    session_id: str,
+    initial_session: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """轮询服务端 continuation，直到会话进入终态。"""
+    session = initial_session if isinstance(initial_session, dict) else {}
+    for attempt in range(_CONFIRM_MAX_POLL_ATTEMPTS):
+        if _is_terminal_session(session):
+            return session
+        if attempt == _CONFIRM_MAX_POLL_ATTEMPTS - 1:
+            break
+        time.sleep(_CONFIRM_POLL_INTERVAL_SECONDS)
+        session = _session_from_response(api_client.get_session(table, session_id))
+
+    raise MineBaseAPIError(
+        f"导入会话未在限定时间内进入终态: {session_id}",
+        error_code="IMPORT_CONFIRM_TIMEOUT",
+    )
+
+
+def _cancel_import_if_active(api_client: Any, table: str, session_id: str, expected_version: int) -> None:
+    """仅取消仍可取消的会话，避免与后台确认或终态会话竞争。"""
+    try:
+        session = _session_from_response(api_client.get_session(table, session_id))
+    except Exception:
+        # 查询快照失败时保留旧行为，尽力清理可能仍处于暂存阶段的会话。
+        session = {}
+
+    state = session.get("state")
+    if state == "CONFIRMING" or state in _TERMINAL_SESSION_STATES:
+        return
+    api_client.cancel_import(table, session_id, expected_version=expected_version)
 
 
 # ---------------------------------------------------------------------------
@@ -165,12 +264,14 @@ def sync_via_api(
                     collected_warnings.append(error_item)
                     logger.error("  [%s] 行%s: %s", data_type, error_item["row"], error_item["message"])
 
-        # 窗口化 confirm：循环调用直到 done=true
+        # 窗口化 confirm：旧版服务端循环调用；MineBase 新版若返回
+        # serverContinuation=true，则由服务端处理剩余窗口，客户端改为轮询快照。
         total_inserted = 0
         total_updated = 0
         total_confirmed_skipped = 0
         total_rejected = 0
         confirm_rounds = 0
+        terminal_counts_applied = False
 
         while True:
             try:
@@ -181,10 +282,40 @@ def sync_via_api(
                 total_success = 0
                 total_failed = len(rows) - total_skipped
                 with contextlib.suppress(Exception):
-                    api_client.cancel_import(table, session_id, expected_version=expected_version)
+                    _cancel_import_if_active(api_client, table, session_id, expected_version)
+                break
+            except MineBaseAPIError as e:
+                if e.error_code not in _CONFIRM_RECONCILE_ERROR_CODES:
+                    raise
+
+                # 另一个确认 worker 可能已经接管或完成了会话。先读取权威终态，
+                # 不要把租约竞争误报为整批失败，也不要取消后台 worker 的会话。
+                terminal_session = _wait_for_terminal_session(
+                    api_client,
+                    table,
+                    session_id,
+                )
+                terminal_counts = _counts_from_terminal_session(terminal_session, len(rows))
+                if terminal_counts is None:
+                    raise MineBaseAPIError(
+                        f"导入会话终态缺少 summary: {session_id}",
+                        error_code="IMPORT_PROTOCOL_ERROR",
+                    ) from e
+                total_success = terminal_counts["success"]
+                total_skipped = terminal_counts["skipped"]
+                total_failed = terminal_counts["failed"]
+                terminal_counts_applied = True
+                confirm_rounds += 1
+                logger.info(
+                    "[%s] 确认租约由服务端接管，已从终态恢复 (插入/更新=%d, 跳过=%d, 失败=%d)",
+                    data_type,
+                    total_success,
+                    total_skipped,
+                    total_failed,
+                )
                 break
 
-            confirm_data = confirm_resp.get("data", {})
+            confirm_data = _response_data(confirm_resp)
             done = confirm_data.get("done", False)
 
             # 更新 version
@@ -199,18 +330,49 @@ def sync_via_api(
             total_rejected += confirm_data.get("rejected", 0)
             confirm_rounds += 1
 
+            if not done and confirm_data.get("serverContinuation") and confirm_data.get("hasMore"):
+                terminal_session = _wait_for_terminal_session(
+                    api_client,
+                    table,
+                    session_id,
+                    initial_session=_session_from_response(confirm_resp),
+                )
+                terminal_counts = _counts_from_terminal_session(terminal_session, len(rows))
+                if terminal_counts is None:
+                    raise MineBaseAPIError(
+                        f"导入会话终态缺少 summary: {session_id}",
+                        error_code="IMPORT_PROTOCOL_ERROR",
+                    )
+                total_success = terminal_counts["success"]
+                total_skipped = terminal_counts["skipped"]
+                total_failed = terminal_counts["failed"]
+                terminal_counts_applied = True
+                logger.info(
+                    "[%s] 服务端 continuation 完成 (插入/更新=%d, 跳过=%d, 失败=%d)",
+                    data_type,
+                    total_success,
+                    total_skipped,
+                    total_failed,
+                )
+                break
+
             if done:
                 break
 
         if confirm_rounds:
-            logger.info(
-                "[%s] API 同步完成 (v2): 插入=%d, 更新=%d, 跳过=%d, 拒绝=%d, confirm轮次=%d",
-                data_type, total_inserted, total_updated,
-                total_confirmed_skipped, total_rejected, confirm_rounds,
-            )
-            # 以 confirm 最终统计为准
-            total_success = total_inserted + total_updated
-            total_skipped = total_confirmed_skipped
+            if terminal_counts_applied:
+                logger.info(
+                    "[%s] API 同步完成 (v2): 成功=%d, 跳过=%d, 失败=%d, confirm轮次=%d",
+                    data_type, total_success, total_skipped, total_failed, confirm_rounds,
+                )
+            else:
+                logger.info(
+                    "[%s] API 同步完成 (v2): 插入=%d, 更新=%d, 跳过=%d, 拒绝=%d, confirm轮次=%d",
+                    data_type, total_inserted, total_updated,
+                    total_confirmed_skipped, total_rejected, confirm_rounds,
+                )
+                total_success = total_inserted + total_updated
+                total_skipped = total_confirmed_skipped
 
     except SessionExpiredError as e:
         logger.error("[%s] 导入会话已过期: %s", data_type, e)
@@ -218,7 +380,7 @@ def sync_via_api(
         total_success = 0
         total_failed = len(rows) - total_skipped
         try:
-            api_client.cancel_import(table, session_id, expected_version=expected_version)
+            _cancel_import_if_active(api_client, table, session_id, expected_version)
         except Exception as cancel_err:
             logger.warning("[%s] 取消导入会话失败: %s", data_type, cancel_err)
     except SessionLimitReachedError as e:
@@ -227,7 +389,7 @@ def sync_via_api(
     except Exception as e:
         logger.error("[%s] API 同步失败: %s", data_type, e)
         try:
-            api_client.cancel_import(table, session_id, expected_version=expected_version)
+            _cancel_import_if_active(api_client, table, session_id, expected_version)
         except Exception as cancel_err:
             logger.warning("[%s] 取消导入会话失败: %s", data_type, cancel_err)
         total_failed = len(rows) - total_success - total_skipped
