@@ -1,3 +1,4 @@
+import asyncio
 import contextlib
 import importlib.util
 import json
@@ -6,9 +7,11 @@ import pathlib
 import sys
 import time
 import types
+import weakref
 from typing import ClassVar
 
 import flet as ft
+import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -41,7 +44,6 @@ main_spec.loader.exec_module(gui_main)
 
 def _invoke(handler, *args, **kwargs):
     """调用 handler，自动处理 async/sync 两种情况。"""
-    import asyncio
     result = handler(*args, **kwargs)
     if asyncio.iscoroutine(result):
         asyncio.run(result)
@@ -77,6 +79,8 @@ class WindowSpy:
 
 
 class PageSpy:
+    _instances = weakref.WeakSet()
+
     def __init__(self):
         self.title = None
         self.theme_mode = None
@@ -90,6 +94,8 @@ class PageSpy:
         self.on_disconnect = None
         self.overlay = []
         self._dialogs = []
+        self._tasks: set[asyncio.Task] = set()
+        self._instances.add(self)
 
     def add(self, *controls):
         self.controls.extend(controls)
@@ -111,21 +117,41 @@ class PageSpy:
     def run_task(self, coro, *args, **kwargs):
         """同步执行 coroutine（测试专用），确保 controls 在断言前已更新。"""
         self.task_calls.append((coro, args, kwargs))
-        import asyncio
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
             loop = None
         if loop and loop.is_running():
-            loop.create_task(coro(*args, **kwargs))
+            task = loop.create_task(coro(*args, **kwargs))
+            self._tasks.add(task)
+            task.add_done_callback(self._tasks.discard)
+            return task
         else:
             with contextlib.suppress(RuntimeError):
-                asyncio.run(coro(*args, **kwargs))
+                return asyncio.run(coro(*args, **kwargs))
         return None
+
+    def close(self):
+        """Stop page callbacks and cancel tasks scheduled by this page spy."""
+        callback = self.on_disconnect or self.on_close
+        if callback is not None:
+            callback(None)
+        for task in tuple(self._tasks):
+            if not task.done():
+                task.cancel()
+        self._tasks.clear()
 
     def run_thread(self, handler, *args):
         self.thread_calls.append((handler, args))
         handler(*args)
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_page_spies():
+    yield
+    for page in list(PageSpy._instances):
+        page.close()
+    gui_main.logic.reset_shutdown()
 
 
 class DummyCheckbox:

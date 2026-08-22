@@ -158,6 +158,7 @@ class LogSystem:
     async def _flush_to_ui(self) -> None:
         """唯一允许修改日志 ListView 的方法。"""
 
+        cancelled = False
         try:
             await asyncio.sleep(FLUSH_INTERVAL)
             while not self._shutdown_event.is_set():
@@ -232,6 +233,7 @@ class LogSystem:
                     self._flush_future = None
                     break
         except asyncio.CancelledError:
+            cancelled = True
             raise
         except Exception as ex:
             _diagnose(t("logSystem:pageLogRefreshFailed"), ex)
@@ -251,7 +253,11 @@ class LogSystem:
                             or self._clear_before_sequence > self._applied_clear_sequence
                         )
                     )
-            if should_reschedule:
+            # Cancellation normally means that the owning event loop or page
+            # is shutting down.  Re-scheduling here can create a new task on a
+            # loop that is already closing, which then reports "Task was
+            # destroyed but it is pending" and can re-enter the GUI logger.
+            if not cancelled and should_reschedule:
                 self._request_flush()
 
     def _make_text(self, entry: LogEntry) -> ft.Text:
