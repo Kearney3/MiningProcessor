@@ -134,6 +134,7 @@ def sync(
     filter_zero_run_hours: bool = False,
     filter_zero_run_km: bool = False,
     conflict_policy: str = "SKIP",
+    selected_files: dict[str, list[str | Path]] | None = None,
 ) -> dict[str, dict[str, int]]:
     """执行同步的主入口。
 
@@ -156,6 +157,8 @@ def sync(
         skip_hidden: 向后兼容，True 时等价于 skip_hidden_rows=True, skip_hidden_cols=True。
         skip_hidden_rows: 是否跳过隐藏行。
         skip_hidden_cols: 是否跳过隐藏列。
+        selected_files: 用户扫描后选中的文件，按数据类型映射。为 None 时沿用
+            自动发现；传入空字典表示用户明确关闭了所有文件。
 
     Returns:
         {data_type: {"success": N, "skipped": N, "failed": N}}
@@ -202,8 +205,20 @@ def sync(
         logger.error("无法加载列映射配置，同步终止")
         return {}
 
-    # 发现文件
-    files = _discover_files(input_path, year=year, month=month)
+    # 发现文件。扫描后的人工选择必须经过目录边界校验，不能直接信任 GUI
+    # 传入的路径；未提供选择时保留原有自动发现行为。
+    if selected_files is None:
+        files = _discover_files(input_path, year=year, month=month)
+    else:
+        from func.file_scanner import selected_paths_in_folder
+
+        files = {}
+        for data_type, raw_paths in selected_files.items():
+            if data_type not in DATA_TYPE_REGISTRY:
+                continue
+            paths = selected_paths_in_folder(input_path, raw_paths) or []
+            if paths:
+                files[data_type] = paths
     if not files:
         logger.warning("在 %s 中未发现可同步的 Excel 文件", input_path)
         return {}

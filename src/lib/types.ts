@@ -61,10 +61,21 @@ export interface BatchProgress {
   total_batches?: number;
 }
 
+/** 扫描到的单个 Excel 文件 */
+export interface ScannedFile {
+  path: string;
+  name: string;
+  relative_path: string;
+  types: string[];
+  recognized: boolean;
+  selected: boolean;
+}
+
 /** 扫描结果 */
 export interface ScanResult {
   matched: Record<string, string[]>;
   missing: string[];
+  files: ScannedFile[];
 }
 
 /** 批量处理摘要 */

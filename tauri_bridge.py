@@ -620,11 +620,28 @@ def _export_maintenance_template(params: dict) -> dict:
 
 @_register("batch_scan")
 def _batch_scan(params: dict) -> dict:
-    from func.excel_batch import scan_files
+    from func.file_scanner import scan_folder
 
     safe_folder = str(_sanitize_path(params["folder_path"], must_exist=True, allow_file=False))
-    matched, missing = scan_files(safe_folder)
-    return {"matched": matched, "missing": missing}
+    return scan_folder(safe_folder, scope="batch")
+
+
+@_register("sync_scan")
+def _sync_scan(params: dict) -> dict:
+    """扫描同步目录，返回逐文件识别结果。"""
+    from func.file_scanner import scan_folder
+
+    safe_folder = str(_sanitize_path(params["input_dir"], must_exist=True, allow_file=False))
+    return scan_folder(safe_folder, scope="sync")
+
+
+@_register("daily_report_scan")
+def _daily_report_scan(params: dict) -> dict:
+    """扫描日报目录，返回逐文件识别结果。"""
+    from func.file_scanner import scan_folder
+
+    safe_folder = str(_sanitize_path(params["source_dir"], must_exist=True, allow_file=False))
+    return scan_folder(safe_folder, scope="daily")
 
 
 @_register("batch_process")
@@ -667,7 +684,7 @@ def _batch_process_impl(params: dict, cancel_event: threading.Event) -> dict:
 
     safe_folder = str(_sanitize_path(params["folder_path"], allow_file=False))
     matched = params.get("matched")
-    if not matched:
+    if matched is None:
         from func.excel_batch import scan_files
 
         matched, _ = scan_files(safe_folder)
@@ -705,6 +722,7 @@ def _batch_process_impl(params: dict, cancel_event: threading.Event) -> dict:
         filter_zero_km_meter=params.get("filter_zero_km_meter", True),
         filter_zero_run_hours=params.get("filter_zero_run_hours", False),
         filter_zero_run_km=params.get("filter_zero_run_km", False),
+        selected_files=matched if params.get("matched") is not None else None,
     )
     return {"cancelled": cancel_event.is_set(), "summary": summary}
 
@@ -746,6 +764,7 @@ def _sync_minebase(params: dict) -> dict:
         filter_zero_run_hours=params.get("filter_zero_run_hours", False),
         filter_zero_run_km=params.get("filter_zero_run_km", False),
         conflict_policy=params.get("conflict_policy", "SKIP"),
+        selected_files=params.get("selected_files"),
     )
     dry_run_file = results.pop("_dry_run_file", None)
     resp: dict = {"results": results}
@@ -781,6 +800,7 @@ def _daily_report_export(params: dict) -> dict:
         config=params.get("config"),
         preprocess_options=params.get("preprocess_options"),
         include_detail_sheets=bool(params.get("include_detail_sheets", False)),
+        selected_files=params.get("selected_files"),
     )
     return {
         "output_file": output_path,

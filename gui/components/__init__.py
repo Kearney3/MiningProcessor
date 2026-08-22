@@ -6,6 +6,7 @@ from .batch import create_batch_section
 from .common import _log_message, create_column_mapping_dialog
 from .config import create_config_section
 from .daily_report import create_daily_report_section
+from .file_scan import create_file_scan_panel
 from .ledger import create_ledger_section
 from .ledger_match import create_ledger_match_section
 from .llm_labeling import create_llm_labeling_section
@@ -23,6 +24,7 @@ __all__ = [
     "create_column_mapping_dialog",
     "create_config_section",
     "create_daily_report_section",
+    "create_file_scan_panel",
     "create_ledger_match_section",
     "create_ledger_section",
     "create_llm_labeling_section",

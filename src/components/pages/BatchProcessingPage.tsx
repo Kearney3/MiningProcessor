@@ -15,6 +15,7 @@ import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-cla
 import { useLastDirectory } from "../../hooks/useLastDirectory";
 import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG } from "../AnomalyPanel";
 import { AnomalyResultsTable } from "../AnomalyResultsTable";
+import { FileScanPanel } from "../FileScanPanel";
 import { addLocalDays, formatLocalDate, localToday } from "../../lib/dateUtils";
 
 // ═══════════════════════════════════════
@@ -104,6 +105,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
   const { initialDir, saveDir } = useLastDirectory(bridge);
   const [folderPath, setFolderPath] = useState("");
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   const [scanning, setScanning] = useState(false);
 
   // -- Processing --
@@ -149,6 +151,30 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
 
   // ── Derived ──
   const hasMissing = useMemo(() => scanResult && scanResult.missing.length > 0, [scanResult]);
+  const selectedPathSet = useMemo(() => new Set(selectedPaths), [selectedPaths]);
+  const selectedMatched = useMemo(() => {
+    if (!scanResult) return {};
+    const matched: Record<string, string[]> = {};
+    if (scanResult.files?.length) {
+      for (const file of scanResult.files) {
+        if (!selectedPathSet.has(file.path)) continue;
+        for (const type of file.types) {
+          matched[type] ??= [];
+          matched[type].push(file.path);
+        }
+      }
+      return matched;
+    }
+    // 兼容旧版桥接响应：没有逐文件明细时按原 matched 结果继续处理。
+    for (const [type, paths] of Object.entries(scanResult.matched ?? {})) {
+      matched[type] = paths.filter((path) => selectedPathSet.has(path));
+    }
+    return matched;
+  }, [scanResult, selectedPathSet]);
+  const hasSelectedFiles = useMemo(
+    () => Object.values(selectedMatched).some((paths) => paths.length > 0),
+    [selectedMatched],
+  );
 
   // ── Handlers ──
   const browse = async () => {
@@ -157,6 +183,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
       const dir = selected as string;
       setFolderPath(dir);
       setScanResult(null);
+      setSelectedPaths([]);
       saveDir(dir);
     }
   };
@@ -165,6 +192,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
     setScanning(true);
     setError(null);
     setScanResult(null);
+    setSelectedPaths([]);
     try {
       const params: Record<string, unknown> = { folder_path: folderPath };
       if (dateFilterEnabled && filterDate) {
@@ -172,6 +200,10 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
       }
       const res = await bridge.call<ScanResult>("batch_scan", params);
       setScanResult(res);
+      const paths = res.files?.length
+        ? res.files.filter((file) => file.recognized && file.selected).map((file) => file.path)
+        : Object.values(res.matched ?? {}).flat();
+      setSelectedPaths([...new Set(paths)]);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -181,6 +213,12 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
 
   const doProcess = useCallback(async () => {
     if (!scanResult) return;
+    if (!hasSelectedFiles) {
+      const message = t("pages:BatchProcessingPage.noSelectedFiles");
+      setError(message);
+      notify(message, "error");
+      return;
+    }
     setProcessing(true);
     setError(null);
     setResult(null);
@@ -190,7 +228,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
     try {
       const params: Record<string, unknown> = {
         folder_path: folderPath,
-        matched: scanResult.matched,
+        matched: selectedMatched,
         year: parseInt(year),
         month: parseInt(month),
         raw_start: parseInt(rawStart),
@@ -248,9 +286,15 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
       setProcessing(false);
       bridge.setProgress(null);
     }
-  }, [scanResult, folderPath, year, month, rawStart, useEquipmentLedger, useOilLedger, useModelLedger, skipHiddenRows, skipHiddenCols, filterZeroEngineHours, filterZeroWorkHours, filterZeroHoursMeter, filterZeroKmMeter, filterZeroRunHours, filterZeroRunKm, tableMergeMode, baseTableType, dateFilterEnabled, filterDate, useHeaderMapping, headerMode, bridge]);
+  }, [scanResult, selectedMatched, hasSelectedFiles, folderPath, year, month, rawStart, useEquipmentLedger, useOilLedger, useModelLedger, skipHiddenRows, skipHiddenCols, filterZeroEngineHours, filterZeroWorkHours, filterZeroHoursMeter, filterZeroKmMeter, filterZeroRunHours, filterZeroRunKm, tableMergeMode, baseTableType, dateFilterEnabled, filterDate, useHeaderMapping, headerMode, bridge, notify, t]);
 
   const handleProcess = () => {
+    if (!hasSelectedFiles) {
+      const message = t("pages:BatchProcessingPage.noSelectedFiles");
+      setError(message);
+      notify(message, "error");
+      return;
+    }
     if (hasMissing) {
       setShowConfirm(true);
     } else {
@@ -284,7 +328,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
           <input
             type="text"
             value={folderPath}
-            onChange={(e) => { setFolderPath(e.target.value); setScanResult(null); }}
+            onChange={(e) => { setFolderPath(e.target.value); setScanResult(null); setSelectedPaths([]); }}
             placeholder={t("pages:BatchProcessingPage.selectTheFolderContainingReports")}
             className={`${inputClass} flex-1 ${folderPath === "" ? "border-amber-300 bg-amber-50/30" : ""}`}
           />
@@ -317,30 +361,25 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
           </button>
         </div>
 
-        {/* ── Scan results as simple text list ── */}
-        {scanResult && (
-          <div className="mt-3 space-y-1.5">
-            {Object.entries(scanResult.matched).map(([type, files]) => {
-              const cfg = getTypeConfig(type);
-              return (
-                <div key={type} className="flex items-center gap-2 text-sm text-slate-700 py-1">
-                  <CheckIcon />
-                  <span className="text-slate-500">{cfg.icon}</span>
-                  <span className="text-slate-700">{typeLabel(type)}</span>
-                  <span className="text-xs text-slate-400">({t("pages:BatchProcessingPage.ui.fileCount", { count: (files as string[]).length })})</span>
-                </div>
-              );
-            })}
-            {scanResult.missing.map((type) => (
-              <div key={type} className="flex items-center gap-2 text-sm py-1">
-                <XIcon />
-                <QuestionIcon />
-                <span className="text-slate-500">{type}</span>
-                <span className="text-xs text-slate-400">{t("pages:BatchProcessingPage.notFound")}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        <FileScanPanel
+          result={scanResult}
+          selectedPaths={selectedPathSet}
+          onToggle={(path, selected) => {
+            setSelectedPaths((previous) => selected
+              ? [...new Set([...previous, path])]
+              : previous.filter((item) => item !== path));
+          }}
+          onToggleAll={(selected) => {
+            if (!scanResult) return;
+            const recognized = scanResult.files?.length
+              ? scanResult.files.filter((file) => file.recognized && file.types.length > 0).map((file) => file.path)
+              : [...new Set(Object.values(scanResult.matched ?? {}).flat())];
+            setSelectedPaths(selected ? recognized : []);
+          }}
+          typeLabel={typeLabel}
+          typeIcon={(type) => getTypeConfig(type).icon}
+          description={t("pages:BatchProcessingPage.ui.fileSelectionHint")}
+        />
       </div>
 
       {/* ════════════════════════════════════

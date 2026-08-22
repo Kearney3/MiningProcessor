@@ -3,13 +3,13 @@
 > 矿山运营 Excel 报表批量处理工具
 
 <p>
-  <img src="https://img.shields.io/badge/version-v2.7.1-blue?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-v2.8.0-blue?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/Python-≥3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="python" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square" alt="license" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="platform" />
   <img src="https://img.shields.io/badge/Tauri-v2-FFC131?style=flat-square&logo=tauri&logoColor=black" alt="tauri" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="react" />
-  <img src="https://img.shields.io/badge/tests-1391%20passed-brightgreen?style=flat-square" alt="tests" />
+  <img src="https://img.shields.io/badge/tests-1403%20passed-brightgreen?style=flat-square" alt="tests" />
 </p>
 
 <p>
@@ -75,6 +75,7 @@ pnpm dev:bridge
 - 实时日志展示
 - 设备台账管理（支持设备名称模糊匹配、编号匹配）
 - 日报导出（日期范围汇总、公式校验、原始字段开关、可选分项 Sheet）
+- 文件扫描与逐文件选择（数据同步、批量处理、日报导出均支持）
 - 异常值检测（阈值 / σ 异常 / 百分位，支持标记、过滤、替换默认值三种处理模式）
 
 ### 命令行使用
@@ -209,7 +210,7 @@ MiningProcessor/
 ├── tsconfig.json / tsconfig.node.json
 ├── config.json                 # 持久化默认配置（提交 Git）
 ├── config.user.json            # 用户覆盖配置（gitignore，含凭据）
-├── tests/                      # pytest 测试（43 个文件，1391 个用例）
+├── tests/                      # pytest 测试（53 个文件，1403 个用例）
 ├── hooks/                      # Git hooks（push 前自动运行测试）
 │   └── pre-push
 ├── .github/workflows/
@@ -327,7 +328,7 @@ Flet 日志面板保留最近 5000 条历史记录、最多渲染 1000 个控件
 ## 🧪 测试
 
 ```bash
-# 运行全部测试（935 个用例）
+# 运行全部测试（1403 个用例）
 uv run pytest
 
 # 运行指定测试文件
@@ -342,7 +343,7 @@ uv run pytest tests/test_gui_components.py -k config
 uv run pytest -v
 ```
 
-**测试覆盖范围（38 个测试文件）：**
+**测试覆盖范围（53 个测试文件）：**
 
 | 测试文件 | 覆盖内容 |
 |----------|----------|
@@ -417,7 +418,7 @@ uv run flet build windows # Windows
 # 查看当前版本，同步所有文件
 uv run scripts/bump_version.py
 
-# 升级版本号（自动同步四份文件）
+# 升级版本号（自动同步五份文件）
 uv run scripts/bump_version.py --bump patch   # 1.5.0 → 1.5.1
 uv run scripts/bump_version.py --bump minor   # 1.5.0 → 1.6.0
 uv run scripts/bump_version.py --bump major   # 1.5.0 → 2.0.0
@@ -432,6 +433,16 @@ uv run scripts/bump_version.py --bump minor --dry-run
 ---
 
 ## 📋 更新日志
+
+### v2.8.0 · 2026-08-22
+
+- 🔍 **文件扫描与逐文件选择**
+  - 数据同步、批量处理、日报导出在执行前扫描输入目录，逐文件展示识别结果。
+  - 支持识别油耗、电耗、生产、运行和工时等数据类型；未识别的 Excel 文件默认排除。
+  - 用户可以单独启用或关闭文件，处理引擎严格按启用结果执行。
+  - Tauri 与 Flet 两套 GUI 共用扫描规则和路径校验，保持行为一致。
+- 🧪 **测试覆盖**
+  - 新增扫描器、文件类型识别、选择路径边界校验测试；Python 测试共 1403 个通过。
 
 ### v2.7.1 · 2026-08-20
 

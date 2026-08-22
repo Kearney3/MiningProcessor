@@ -146,11 +146,20 @@ def _read_sheet(path: Path, preferred: str | None = None) -> pd.DataFrame | None
         return None
 
 
-def _source_files(source_dir: str | Path) -> dict[str, list[Path]]:
+def _source_files(
+    source_dir: str | Path,
+    selected_files: list[str | Path] | None = None,
+) -> dict[str, list[Path]]:
     root = Path(source_dir)
     if not root.is_dir():
         raise FileNotFoundError(f"日报输入目录不存在: {root}")
     files = [p for p in root.iterdir() if p.is_file() and p.suffix.lower() in {".xlsx", ".xls"}]
+
+    if selected_files is not None:
+        from func.file_scanner import selected_paths_in_folder
+
+        selected = set(selected_paths_in_folder(root, selected_files) or [])
+        files = [path for path in files if path.resolve() in selected]
 
     def exact(stem: str) -> list[Path]:
         return [p for p in files if p.stem.lower() == stem.lower()]
@@ -253,15 +262,24 @@ def _preprocess_worktime(path: Path, year: int, month: int, options: dict[str, A
     return (sheets or {}).get("工时数据") if sheets else None
 
 
-def _preprocess_sources(source_dir: str | Path, start: date | str | None,
-                        end: date | str | None, options: dict[str, Any],
-                        warnings: list[dict[str, Any]]) -> dict[str, list[pd.DataFrame]]:
+def _preprocess_sources(
+    source_dir: str | Path,
+    start: date | str | None,
+    end: date | str | None,
+    options: dict[str, Any],
+    warnings: list[dict[str, Any]],
+    selected_files: list[str | Path] | None = None,
+) -> dict[str, list[pd.DataFrame]]:
     """先调用各类既有处理器，再返回用于日报合并的标准化 DataFrame。"""
     from func.excel_electrical import parse_excel_data
     from func.excel_fuel import process_diesel_data
     from func.excel_production_enhanced import MiningDataProcessor
 
-    files = _source_files(source_dir)
+    if selected_files is None:
+        # 保持旧测试/扩展点中只接受 source_dir 的替身函数可用。
+        files = _source_files(source_dir)
+    else:
+        files = _source_files(source_dir, selected_files=selected_files)
     all_raw = [path for paths in files.values() for path in paths]
     year, month = _processing_year_month(start, end, all_raw)
     result: dict[str, list[pd.DataFrame]] = {
@@ -311,7 +329,11 @@ def _preprocess_sources(source_dir: str | Path, start: date | str | None,
                 filter_zero_run_hours=options["filter_zero_run_hours"],
                 filter_zero_run_km=options["filter_zero_run_km"],
             )
-            sheets = processor.process_folder(str(source_dir), return_sheets=True)
+            sheets = processor.process_folder(
+                str(source_dir),
+                return_sheets=True,
+                file_list=files["raw_production"],
+            )
             if sheets:
                 if sheets.get("运行数据") is not None:
                     result["operation"].append(sheets["运行数据"])
@@ -715,6 +737,7 @@ def build_daily_report(
     config: dict[str, Any] | None = None,
     preprocess_options: dict[str, Any] | None = None,
     include_detail_sheets: bool = False,
+    selected_files: list[str | Path] | None = None,
 ) -> DailyReportResult:
     """先预处理原始数据，再构建日报 DataFrame，不写文件。"""
     base_config = get_daily_report_config()
@@ -735,7 +758,14 @@ def build_daily_report(
         config = base_config
     warnings: list[dict[str, Any]] = []
     options = _preprocess_options(preprocess_options)
-    sources = _preprocess_sources(source_dir, start, end, options, warnings)
+    sources = _preprocess_sources(
+        source_dir,
+        start,
+        end,
+        options,
+        warnings,
+        selected_files=selected_files,
+    )
     detail_sheets = _build_detail_sheets(sources, start, end) if include_detail_sheets else {}
 
     worktime = _concat_frames(sources["worktime"])
@@ -978,6 +1008,7 @@ def export_daily_report(
     config: dict[str, Any] | None = None,
     preprocess_options: dict[str, Any] | None = None,
     include_detail_sheets: bool = False,
+    selected_files: list[str | Path] | None = None,
 ) -> DailyReportResult:
     """构建并导出日报，可选附加各模块分项 Sheet。"""
     result = build_daily_report(
@@ -987,6 +1018,7 @@ def export_daily_report(
         config=config,
         preprocess_options=preprocess_options,
         include_detail_sheets=include_detail_sheets,
+        selected_files=selected_files,
     )
     warning_df = pd.DataFrame(result.warnings, columns=["数据类型", "字段", "值", "消息"])
     sheets = {"日报": result.report, **result.detail_sheets, "匹配警告": warning_df}

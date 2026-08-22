@@ -18,6 +18,7 @@ from .common import (
     to_local_dt,
     year_options,
 )
+from .file_scan import create_file_scan_panel
 
 try:
     from . import theme
@@ -281,7 +282,10 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
         page.show_dialog(dp)
 
     # --- 处理按钮 ---
+    batch_scan_btn = theme.secondary_btn(t("components:batch.scanFiles"), icon=ft.Icons.SEARCH, height=32)
     batch_btn = theme.primary_btn(t("components:batch.batchProcessing"), icon=ft.Icons.BOLT, disabled=False)
+    batch_scan_panel, batch_scan_refs = create_file_scan_panel()
+    batch_path.on_change = lambda e: batch_scan_refs["set_result"](None)
 
     # --- 进度区 ---
     batch_progress_bar = ft.ProgressBar(value=0.0, visible=False)
@@ -364,7 +368,8 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
                 # ── 文件夹 + 日期 ──
                 theme.module_card([
-                    ft.Row([batch_path], spacing=8),
+                    ft.Row([batch_path, batch_scan_btn], spacing=8),
+                    batch_scan_panel,
                     ft.Row(
                         [batch_year, batch_month, date_filter_toggle],
                         spacing=6,
@@ -470,6 +475,8 @@ def create_batch_section(page: ft.Page) -> tuple[ft.Container, dict]:
                 "date_filter_toggle": date_filter_toggle,
         "selected_date": _selected_date,
         "btn": batch_btn,
+        "scan_btn": batch_scan_btn,
+        "scan_panel": batch_scan_refs,
         "progress_bar": batch_progress_bar,
         "progress_text": batch_progress_text,
         "cancel_btn": batch_cancel_btn,

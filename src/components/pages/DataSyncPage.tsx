@@ -8,12 +8,15 @@ import {
   FolderIcon, FuelIcon, ProductionIcon, ElectricalIcon, WorktimeIcon,
   OperationIcon, GlobeIcon, DatabaseIcon, CheckIcon, MinusIcon,
   CheckCircleIcon, XCircleIcon, AlertTriangleIcon, DownloadIcon, PlayIcon,
+  QuestionIcon,
 } from "../../lib/icons";
 import { ChipToggle } from "../../lib/ui-components";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { DatePicker } from "../DatePicker";
 import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG } from "../AnomalyPanel";
+import { FileScanPanel } from "../FileScanPanel";
 import { localToday, localTodayString, localYesterdayString } from "../../lib/dateUtils";
+import type { ScanResult } from "../../lib/types";
 
 // ═══════════════════════════════════════
 // Constants
@@ -63,11 +66,19 @@ function DataTypeCheckbox({
 export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const { notify } = useToast();
   const { t } = useTranslation();
-  const typeLabel = (id: string) => t(`pages:DataSyncPage.ui.${ALL_TYPES.find((type) => type.id === id)?.labelKey ?? id}`);
+  const typeLabel = (id: string) => {
+    const labelKey = id === "worktime" || id === "work_efficiency"
+      ? "worktimeData"
+      : ALL_TYPES.find((type) => type.id === id)?.labelKey ?? id;
+    return t(`pages:DataSyncPage.ui.${labelKey}`);
+  };
   const [inputDir, setInputDir] = useState("");
   const [mode, setMode] = useState<"api" | "database">("api");
   const [conflictPolicy, setConflictPolicy] = useState<"SKIP" | "UPDATE" | "REJECT">("SKIP");
   const [dataTypes, setDataTypes] = useState<string[]>(ALL_TYPES.map((type) => type.id));
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
+  const [scanning, setScanning] = useState(false);
   const [dryRun, setDryRun] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SyncResult | null>(null);
@@ -121,6 +132,23 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
 
   const allSelected = ALL_TYPES.length === dataTypes.length;
   const someSelected = dataTypes.length > 0 && !allSelected;
+  const selectedPathSet = new Set(selectedPaths);
+  const selectedFilesByType = scanResult?.files?.length
+    ? scanResult.files.reduce<Record<string, string[]>>((result, file) => {
+        if (!file.recognized || !selectedPathSet.has(file.path)) return result;
+        for (const type of file.types) {
+          if (!dataTypes.includes(type)) continue;
+          result[type] ??= [];
+          result[type].push(file.path);
+        }
+        return result;
+      }, {})
+    : Object.entries(scanResult?.matched ?? {}).reduce<Record<string, string[]>>((result, [type, paths]) => {
+        const selected = paths.filter((path) => selectedPathSet.has(path));
+        if (selected.length > 0) result[type] = selected;
+        return result;
+      }, {});
+  const hasSelectedFiles = Object.values(selectedFilesByType).some((paths) => paths.length > 0);
 
   const toggleSelectAll = () => {
     if (allSelected) {
@@ -130,11 +158,60 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
     }
   };
 
+  const clearScan = () => {
+    setScanResult(null);
+    setSelectedPaths([]);
+  };
+
+  const handleScan = async (): Promise<ScanResult | null> => {
+    const syncDir = inputDir.trim();
+    if (!syncDir) {
+      const message = t("pages:DataSyncPage.selectTheFolderContainingProcessedData");
+      setError(message);
+      notify(message, "error");
+      return null;
+    }
+    setScanning(true);
+    setError(null);
+    clearScan();
+    try {
+      const res = await bridge.call<ScanResult>("sync_scan", { input_dir: syncDir });
+      if (!res.files && !res.matched) {
+        // 兼容旧版桥接或测试替身；正式桥接始终返回 files。
+        return null;
+      }
+      setScanResult(res);
+      const paths = res.files?.length
+        ? res.files.filter((file) => file.recognized && file.selected).map((file) => file.path)
+        : Object.values(res.matched ?? {}).flat();
+      setSelectedPaths([...new Set(paths)]);
+      return res;
+    } catch (e) {
+      setError(String(e));
+      notify(String(e), "error");
+      return null;
+    } finally {
+      setScanning(false);
+    }
+  };
+
   const handleSync = async () => {
     const syncDir = inputDir.trim();
     if (!syncDir) {
       setError(t("pages:DataSyncPage.selectTheFolderContainingProcessedData"));
       notify(t("pages:DataSyncPage.selectTheFolderContainingProcessedData"), "error");
+      return;
+    }
+    if (!scanResult) {
+      const scanned = await handleScan();
+      // 扫描成功后停在扫描结果，让用户确认文件选择；旧版桥接没有扫描
+      // RPC 时继续走原有流程，避免升级期间阻断已存在的自动发现行为。
+      if (scanned) return;
+    }
+    if (scanResult && !hasSelectedFiles) {
+      const message = t("pages:DataSyncPage.noSelectedFiles");
+      setError(message);
+      notify(message, "error");
       return;
     }
     bridge.call("save_last_directory", { key: "sync_last_input_dir", path: syncDir }).catch(() => {});
@@ -147,6 +224,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
         mode,
         conflict_policy: conflictPolicy,
         data_types: dataTypes,
+        selected_files: scanResult ? selectedFilesByType : undefined,
         dry_run: dryRun,
         year: year ? Number(year) : undefined,
         month: month ? Number(month) : undefined,
@@ -191,6 +269,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
     if (selected) {
       const dir = selected as string;
       setInputDir(dir);
+      clearScan();
       bridge.call("save_last_directory", { key: "sync_last_input_dir", path: dir }).catch(() => {});
     }
   };
@@ -210,14 +289,42 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
             <input
               type="text"
               value={inputDir}
-              onChange={(e) => setInputDir(e.target.value)}
+              onChange={(e) => { setInputDir(e.target.value); clearScan(); }}
               placeholder={t("pages:DataSyncPage.selectTheFolderContainingProcessedData")}
               className={`${inputClass} flex-1`}
             />
             <button onClick={browse} className={btnSecondaryClass} title={t("pages:DataSyncPage.selectFolder")}>
               <FolderIcon />
             </button>
+            <button
+              type="button"
+              onClick={handleScan}
+              disabled={!inputDir || scanning || loading}
+              className={`${btnSecondaryClass} ${(!inputDir || scanning || loading) ? "opacity-50 cursor-not-allowed" : ""}`}
+              title={t("pages:DataSyncPage.scanFiles")}
+            >
+              {scanning ? t("pages:DataSyncPage.scanning") : t("pages:DataSyncPage.scanFiles")}
+            </button>
           </div>
+          <FileScanPanel
+            result={scanResult}
+            selectedPaths={selectedPathSet}
+            onToggle={(path, selected) => {
+              setSelectedPaths((previous) => selected
+                ? [...new Set([...previous, path])]
+                : previous.filter((item) => item !== path));
+            }}
+            onToggleAll={(selected) => {
+              if (!scanResult) return;
+              const recognized = scanResult.files?.length
+                ? scanResult.files.filter((file) => file.recognized && file.types.length > 0).map((file) => file.path)
+                : [...new Set(Object.values(scanResult.matched ?? {}).flat())];
+              setSelectedPaths(selected ? recognized : []);
+            }}
+            typeLabel={typeLabel}
+            typeIcon={(type) => ALL_TYPES.find((item) => item.id === (type === "worktime" ? "work_efficiency" : type))?.icon ?? <QuestionIcon />}
+            description={t("pages:DataSyncPage.fileSelectionHint")}
+          />
         </div>
 
         {/* Sync mode — restrained segmented control */}

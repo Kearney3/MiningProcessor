@@ -19,6 +19,7 @@ from .common import (
     to_local_dt,
     year_options,
 )
+from .file_scan import create_file_scan_panel
 
 try:
     from . import theme
@@ -69,6 +70,10 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
             sync_path.update()
 
     sync_path.suffix.on_click = on_browse
+
+    sync_scan_btn = theme.secondary_btn(t("components:sync_minebase.scanFiles"), icon=ft.Icons.SEARCH, height=32)
+    sync_scan_panel, sync_scan_refs = create_file_scan_panel()
+    sync_path.on_change = lambda e: sync_scan_refs["set_result"](None)
 
     # --- 同步模式 ---
     mode_toggle = ChipToggle(
@@ -362,7 +367,8 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
                 # ── 目录 + 同步模式 + 冲突策略 ──
                 theme.module_card([
-                    ft.Row([sync_path], spacing=8),
+                    ft.Row([sync_path, sync_scan_btn], spacing=8),
+                    sync_scan_panel,
                     mode_toggle.row,
                     conflict_policy.row,
                 ], label=t("components:sync_minebase.directoryAndMode")),
@@ -446,6 +452,8 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     refs = {
         "path": sync_path,
+        "scan_btn": sync_scan_btn,
+        "scan_panel": sync_scan_refs,
         "mode": mode_toggle,
         "conflict_policy": conflict_policy,
         "types": type_checks,
