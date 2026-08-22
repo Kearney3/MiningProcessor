@@ -348,3 +348,25 @@ def test_shutdown_cancels_pending_delivery():
     assert future.cancelled()
     logging.getLogger("test.shutdown").info("after")
     assert len(page.pending) == 1
+
+
+def test_cancelled_flush_does_not_reschedule_during_loop_shutdown():
+    page = DeferredPage()
+    refs = make_refs()
+    system = LogSystem(page, refs)
+    system.start()
+    logging.getLogger("test.cancel").info("pending")
+
+    async def cancel_flush():
+        task = asyncio.create_task(system._flush_to_ui())
+        await asyncio.sleep(0)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(cancel_flush())
+
+    # Cancellation during asyncio.run() teardown must not enqueue another
+    # flush task for the loop that is already closing.
+    assert len(page.pending) == 1
+    system.shutdown()
