@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { BridgeProp } from "../../lib/types";
 import { useToast } from "../Toast";
@@ -7,6 +7,9 @@ import { Collapsible, PathInput, StyledToggle as Toggle } from "../../lib/ui-com
 import { btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { useLastDirectory } from "../../hooks/useLastDirectory";
 import { localYesterdayString } from "../../lib/dateUtils";
+import { FileScanPanel } from "../FileScanPanel";
+import { ElectricalIcon, FuelIcon, ProductionIcon, QuestionIcon, WorktimeIcon } from "../../lib/icons";
+import type { ScanResult } from "../../lib/types";
 
 function joinPath(directory: string, filename: string): string {
   const trimmed = directory.replace(/[\\/]+$/, "");
@@ -36,6 +39,9 @@ export function DailyReportPage({ bridge }: { bridge: BridgeProp }) {
   const [filterZeroRunHours, setFilterZeroRunHours] = useState(false);
   const [filterZeroRunKm, setFilterZeroRunKm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
 
   useEffect(() => {
     if (initialDir && !sourceDir) setSourceDir(initialDir);
@@ -46,10 +52,68 @@ export function DailyReportPage({ bridge }: { bridge: BridgeProp }) {
     if (!enabled) setUseModel(false);
   };
 
+  const clearScan = () => {
+    setScanResult(null);
+    setSelectedPaths([]);
+  };
+
+  const handleScan = async (): Promise<ScanResult | null> => {
+    const directory = sourceDir.trim();
+    if (!directory) {
+      notify(t("pages:DailyReportPage.selectDailyReportDataDirectory"), "error");
+      return null;
+    }
+    setScanning(true);
+    clearScan();
+    try {
+      const result = await bridge.call<ScanResult>("daily_report_scan", { source_dir: directory });
+      if (!result.files && !result.matched) return null;
+      setScanResult(result);
+      const paths = result.files?.length
+        ? result.files.filter((file) => file.recognized && file.selected).map((file) => file.path)
+        : Object.values(result.matched ?? {}).flat();
+      setSelectedPaths([...new Set(paths)]);
+      return result;
+    } catch (error) {
+      notify(String(error), "error");
+      return null;
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const dailyTypeLabel = (type: string) => {
+    const key: Record<string, string> = {
+      fuel: "fuelData",
+      electrical: "electricalData",
+      production: "productionData",
+      worktime: "worktimeData",
+    };
+    return t(`pages:DataSyncPage.ui.${key[type] ?? type}`);
+  };
+
+  const dailyTypeIcon = (type: string) => {
+    const icons: Record<string, ReactNode> = {
+      fuel: <FuelIcon />,
+      electrical: <ElectricalIcon />,
+      production: <ProductionIcon />,
+      worktime: <WorktimeIcon />,
+    };
+    return icons[type] ?? <QuestionIcon />;
+  };
+
   const exportReport = async () => {
     if (!sourceDir) return notify(t("pages:DailyReportPage.selectDailyReportDataDirectory"), "error");
     if (start > end) return notify(t("pages:DailyReportPage.endDateCannotBeEarlierThanStartDate"), "error");
     if (useModel && !useEquipment) return notify(t("pages:DailyReportPage.modelLedgermatchingmatchingequipmentLedgermatching"), "error");
+    if (!scanResult) {
+      const scanned = await handleScan();
+      // 兼容旧版桥接；正式桥接返回扫描结果后停在此处，交给用户确认。
+      if (scanned) return;
+    }
+    if (scanResult && selectedPaths.length === 0) {
+      return notify(t("pages:DailyReportPage.noSelectedFiles"), "error");
+    }
     bridge.call("save_last_directory", { key: "daily_report_input_dir", path: sourceDir }).catch(() => {});
     const filename = t("pages:DailyReportPage.dailyReportXlsx", { start, end });
     const output = joinPath(sourceDir, filename);
@@ -73,6 +137,7 @@ export function DailyReportPage({ bridge }: { bridge: BridgeProp }) {
           include_raw_company_name: includeRawCompanyName,
         },
         include_detail_sheets: includeDetailSheets,
+        selected_files: scanResult ? selectedPaths : undefined,
         preprocess_options: {
           skip_hidden_rows: skipHiddenRows,
           skip_hidden_cols: skipHiddenCols,
@@ -104,15 +169,47 @@ export function DailyReportPage({ bridge }: { bridge: BridgeProp }) {
       <section className="bg-white rounded-lg border border-slate-200 p-4 space-y-5">
         <div>
           <label className="text-xs font-medium text-slate-500 mb-1.5 block">{t("pages:DailyReportPage.dataDirectory")}</label>
-          <PathInput
-            value={sourceDir}
-            onChange={setSourceDir}
-            onFileSelected={(path) => {
-              bridge.call("save_last_directory", { key: "daily_report_input_dir", path }).catch(() => {});
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <PathInput
+                value={sourceDir}
+                onChange={(value) => { setSourceDir(value); clearScan(); }}
+                onFileSelected={(path) => {
+                  clearScan();
+                  bridge.call("save_last_directory", { key: "daily_report_input_dir", path }).catch(() => {});
+                }}
+                directory
+                defaultPath={initialDir || undefined}
+                placeholder={t("pages:DailyReportPage.selectDataDirectory")}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleScan}
+              disabled={!sourceDir || scanning || loading}
+              className={`${btnSecondaryClass} ${(!sourceDir || scanning || loading) ? "opacity-50 cursor-not-allowed" : ""}`}
+            >
+              {scanning ? t("pages:DailyReportPage.scanning") : t("pages:DailyReportPage.scanFiles")}
+            </button>
+          </div>
+          <FileScanPanel
+            result={scanResult}
+            selectedPaths={new Set(selectedPaths)}
+            onToggle={(path, selected) => {
+              setSelectedPaths((previous) => selected
+                ? [...new Set([...previous, path])]
+                : previous.filter((item) => item !== path));
             }}
-            directory
-            defaultPath={initialDir || undefined}
-            placeholder={t("pages:DailyReportPage.selectDataDirectory")}
+            onToggleAll={(selected) => {
+              if (!scanResult) return;
+              const recognized = scanResult.files?.length
+                ? scanResult.files.filter((file) => file.recognized && file.types.length > 0).map((file) => file.path)
+                : [...new Set(Object.values(scanResult.matched ?? {}).flat())];
+              setSelectedPaths(selected ? recognized : []);
+            }}
+            typeLabel={dailyTypeLabel}
+            typeIcon={dailyTypeIcon}
+            description={t("pages:DailyReportPage.fileSelectionHint")}
           />
         </div>
 

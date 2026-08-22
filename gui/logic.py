@@ -13,6 +13,7 @@ import flet as ft
 
 from func import config_loader
 from func.excel_batch import MODULE_LABELS, process_files, scan_files
+from func.file_scanner import scan_folder
 from func.sync_to_minebase import sync as sync_to_minebase
 from func.sync_to_minebase import test_api_connection, test_db_connection
 from func.time_utils import local_now
@@ -611,6 +612,47 @@ async def _poll_batch_progress_queue(progress_queue, progress_bar, progress_text
     _drain_batch_progress_queue_once(progress_queue, progress_bar, progress_text)
 
 
+def _log_scan_summary(log, result: dict) -> None:
+    """将共享扫描器的类型汇总写入 Flet 日志。"""
+    matched = result.get("matched") or {}
+    missing = result.get("missing") or []
+    found_labels = [MODULE_LABELS.get(key, key) for key in matched]
+    missing_labels = [MODULE_LABELS.get(key, key) for key in missing]
+    _log_message(
+        log,
+        t(
+            "logic:scanCompleteFoundMissing",
+            found_labels=", ".join(found_labels) or t("logic:empty"),
+            missing_labels=", ".join(missing_labels) or t("logic:empty"),
+        ),
+    )
+
+
+async def on_batch_scan(page: ft.Page, batch_refs: dict, log) -> bool:
+    """扫描批量处理目录并把逐文件结果写入扫描面板。"""
+    path = (batch_refs.get("path").value or "").strip()
+    if not path:
+        _log_message(log, t("logic:selectAFolderFirst"), level=logging.WARNING)
+        return False
+
+    scan_btn = batch_refs.get("scan_btn")
+    if scan_btn is not None:
+        set_btn_state(scan_btn, False, t("logic:scanning"))
+    try:
+        result = await asyncio.to_thread(scan_folder, path, scope="batch")
+        scan_panel = batch_refs.get("scan_panel")
+        if scan_panel:
+            scan_panel["set_result"](result)
+        _log_scan_summary(log, result)
+        return True
+    except Exception as ex:
+        _log_message(log, t("logic:fileScanFailed", ex=ex), level=logging.ERROR)
+        return False
+    finally:
+        if scan_btn is not None:
+            set_btn_state(scan_btn, True, t("components:batch.scanFiles"))
+
+
 async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledger=None, oil_ledger=None, model_ledger=None, anomaly_config=None) -> None:
     """批量处理按钮回调（带文件扫描 + 缺失确认弹窗）"""
     import queue
@@ -623,6 +665,10 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
         return
 
     btn = batch_refs["btn"]
+    scan_panel = batch_refs.get("scan_panel")
+    if scan_panel and not scan_panel["has_scan"]():
+        await on_batch_scan(page, batch_refs, log)
+        return
     set_btn_state(btn, False, t("logic:scanning"))
 
     try:
@@ -674,18 +720,26 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
     progress_queue = queue.Queue()
 
     try:
-        # ── 第一阶段：扫描文件 ──
-        try:
-            matched, missing = await asyncio.to_thread(scan_files, path)
-        except Exception as ex:
-            _log_message(log, t("logic:fileScanFailed", ex=ex), level=logging.ERROR)
-            return
+        # ── 第一阶段：使用已确认的逐文件选择，兼容旧版无扫描面板的 refs ──
+        scan_panel = batch_refs.get("scan_panel")
+        selected_files_for_processing = None
+        if scan_panel and scan_panel["has_scan"]():
+            matched = scan_panel["get_selected_matched"]()
+            selected_files_for_processing = matched
+            result = scan_panel.get("get_result", lambda: None)() or {}
+            missing = result.get("missing") or []
+            if not matched:
+                _log_message(log, t("logic:noSelectedFiles"), level=logging.WARNING)
+                return
+            _log_scan_summary(log, {"matched": matched, "missing": missing})
+        else:
+            try:
+                matched, missing = await asyncio.to_thread(scan_files, path)
+            except Exception as ex:
+                _log_message(log, t("logic:fileScanFailed", ex=ex), level=logging.ERROR)
+                return
 
-        found_labels = [MODULE_LABELS.get(k, k) for k in matched]
-        missing_labels = [MODULE_LABELS.get(k, k) for k in missing]
-        _log_message(log, t("logic:scanCompleteFoundMissing",
-                            found_labels=", ".join(found_labels) or t("logic:empty"),
-                            missing_labels=", ".join(missing_labels) or t("logic:empty")))
+            _log_scan_summary(log, {"matched": matched, "missing": missing})
 
         # ── 第二阶段：表内合并基准表验证 & 缺失确认弹窗 ──
         if table_merge_config:
@@ -770,6 +824,7 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
                         model_ledger=model_ledger,
                         progress_cb=progress_queue.put_nowait,
                         cancel_event=cancel_event,
+                        selected_files=selected_files_for_processing,
                         **params,
                     )
                     thread_result["value"] = results
@@ -960,6 +1015,9 @@ def wire_processing_buttons(
 
     # Batch
     if "batch" in module_refs:
+        async def handle_batch_scan_click(e: ft.ControlEvent) -> None:
+            await on_batch_scan(page, module_refs["batch"], log)
+
         async def handle_batch_click(e: ft.ControlEvent) -> None:
             eq_toggle = module_refs["batch"].get("match_eq_toggle")
             oil_toggle = module_refs["batch"].get("match_oil_toggle")
@@ -969,7 +1027,34 @@ def wire_processing_buttons(
             model = model_ledger_refs.get("get_model_ledger", lambda: None)() if model_toggle and model_toggle.value else None
             anomaly_config = _build_anomaly_config(module_refs["batch"])
             await on_batch_process(page, module_refs["batch"], log, equipment_ledger=eq, oil_ledger=oil, model_ledger=model, anomaly_config=anomaly_config)
+        if module_refs["batch"].get("scan_btn") is not None:
+            module_refs["batch"]["scan_btn"].on_click = handle_batch_scan_click
         module_refs["batch"]["btn"].on_click = handle_batch_click
+
+
+async def on_sync_scan(page: ft.Page, sync_refs: dict, log) -> bool:
+    """扫描数据同步目录并把逐文件结果写入扫描面板。"""
+    path = (sync_refs.get("path").value or "").strip()
+    if not path:
+        _log_message(log, t("logic:pleaseFirstselectoutputDirectory"), level=logging.WARNING)
+        return False
+
+    scan_btn = sync_refs.get("scan_btn")
+    if scan_btn is not None:
+        set_btn_state(scan_btn, False, t("logic:scanning"))
+    try:
+        result = await asyncio.to_thread(scan_folder, path, scope="sync")
+        scan_panel = sync_refs.get("scan_panel")
+        if scan_panel:
+            scan_panel["set_result"](result)
+        _log_scan_summary(log, result)
+        return True
+    except Exception as ex:
+        _log_message(log, t("logic:fileScanFailed", ex=ex), level=logging.ERROR)
+        return False
+    finally:
+        if scan_btn is not None:
+            set_btn_state(scan_btn, True, t("components:sync_minebase.scanFiles"))
 
 
 async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=None,
@@ -981,6 +1066,10 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
     if not path:
         _log_message(log, t("logic:pleaseFirstselectoutputDirectory"), level=logging.WARNING)
         _show_snackbar(page, t("logic:selectAnOutputDirectory"), is_error=True)
+        return
+    scan_panel = sync_refs.get("scan_panel")
+    if scan_panel and not scan_panel["has_scan"]():
+        await on_sync_scan(page, sync_refs, log)
         return
     if os.path.isdir(path):
         try:
@@ -1036,6 +1125,20 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
     conflict_policy_val = sync_refs.get("conflict_policy")
     conflict_policy = conflict_policy_val.value if conflict_policy_val else "SKIP"
 
+    # 若用户已经扫描，则只向后端传递扫描结果中启用的文件；没有扫描面板时
+    # 保持旧版自动发现行为，兼容旧测试与未升级的调用方。
+    selected_files = None
+    if scan_panel and scan_panel["has_scan"]():
+        selected_files = {
+            data_type: paths
+            for data_type, paths in scan_panel["get_selected_matched"]().items()
+            if data_type in selected_types and paths
+        }
+        if not selected_files:
+            _log_message(log, t("logic:noSelectedFiles"), level=logging.WARNING)
+            _show_snackbar(page, t("logic:noSelectedFiles"), is_error=True)
+            return
+
     set_btn_state(btn, False, t("logic:syncing"))
     result_text.visible = False
     result_text.update()
@@ -1070,6 +1173,7 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
                 filter_zero_run_hours=filter_zero_run_hours,
                 filter_zero_run_km=filter_zero_run_km,
                 conflict_policy=conflict_policy,
+                selected_files=selected_files,
             )
 
         results = await asyncio.to_thread(_do_sync)
@@ -1201,9 +1305,14 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
 
 def wire_sync_button(sync_refs: dict, page: ft.Page, log, module_refs: dict | None = None):
     """绑定 MineBase 同步按钮"""
+    async def handle_scan_click(e: ft.ControlEvent):
+        await on_sync_scan(page, sync_refs, log)
+
     async def handle_sync_click(e: ft.ControlEvent):
         params = collect_processing_params(sync_refs)
         await on_sync_process(page, sync_refs, log, **params)
+    if sync_refs.get("scan_btn") is not None:
+        sync_refs["scan_btn"].on_click = handle_scan_click
     sync_refs["btn"].on_click = handle_sync_click
 
 

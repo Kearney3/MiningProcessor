@@ -8,6 +8,7 @@ from pathlib import Path
 import flet as ft
 
 from func.daily_report import export_daily_report
+from func.file_scanner import scan_folder
 from func.time_utils import local_today
 from gui.components.common import (
     _get_initial_directory,
@@ -17,6 +18,8 @@ from gui.components.common import (
     to_local_dt,
 )
 from gui.i18n import t
+
+from .file_scan import create_file_scan_panel
 
 try:
     from . import theme
@@ -92,6 +95,7 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
         selected = await picker.get_directory_path(dialog_title=t("components:daily_report.selectDailyReportDataDirectory"))
         if selected:
             source_path.value = selected
+            clear_scan()
             _update_last_directory(
                 selected,
                 is_dir=True,
@@ -104,6 +108,43 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
         tooltip=t("components:daily_report.selectFolder"),
         on_click=browse_source,
     )
+
+    scan_btn = theme.secondary_btn(t("components:daily_report.scanFiles"), icon=ft.Icons.SEARCH, height=32)
+    scan_panel, scan_refs = create_file_scan_panel()
+    scan_fallback = {"enabled": False}
+
+    async def scan_source(e) -> bool:
+        path = (source_path.value or "").strip()
+        if not path:
+            log(t("components:daily_report.selectdataDirectory"), logging.WARNING)
+            return False
+        scan_fallback["enabled"] = False
+        scan_btn.disabled = True
+        scan_btn.text = t("logic:scanning")
+        safe_update(scan_btn)
+        try:
+            result = await asyncio.to_thread(scan_folder, path, scope="daily")
+            if not isinstance(result, dict):
+                # 兼容尚未返回扫描结构的旧调用方；正式扫描器始终返回 dict。
+                scan_fallback["enabled"] = True
+                return False
+            scan_refs["set_result"](result)
+            log(t("components:daily_report.scanCompleted", count=len(result.get("files", []))))
+            return True
+        except Exception as ex:
+            log(t("components:daily_report.scanFailed", ex=ex), logging.ERROR)
+            return False
+        finally:
+            scan_btn.disabled = False
+            scan_btn.text = t("components:daily_report.scanFiles")
+            safe_update(scan_btn)
+
+    scan_btn.on_click = scan_source
+
+    def clear_scan(e=None):
+        scan_refs["set_result"](None)
+
+    source_path.on_change = clear_scan
 
     def update_date_label(key: str):
         date_labels[key].value = selected_dates[key].strftime("%Y-%m-%d")
@@ -160,6 +201,26 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
             result_text.value, result_text.color, result_text.visible = t("components:daily_report.selectdataDirectory"), theme.ERROR, True
             safe_update(result_text)
             return
+        if not scan_refs["has_scan"]():
+            # 首次导出先扫描；扫描器返回合法结果时停下来让用户确认。
+            # 旧版调用方若没有返回扫描结构，则继续沿用原有直接导出流程。
+            exporting = True
+            export_btn.disabled = True
+            export_btn.text = t("components:daily_report.exporting")
+            safe_update(export_btn)
+            scanned = await scan_source(None)
+            exporting = False
+            export_btn.disabled = False
+            export_btn.text = t("components:daily_report.exportDailyReport")
+            safe_update(export_btn)
+            if scanned:
+                return
+            if not scan_fallback["enabled"]:
+                return
+        if scan_refs["has_scan"]() and not scan_refs["get_selected_paths"]():
+            result_text.value, result_text.color, result_text.visible = t("logic:noSelectedFiles"), theme.ERROR, True
+            safe_update(result_text)
+            return
         if model_toggle.value and not eq_toggle.value:
             result_text.value, result_text.color, result_text.visible = t("components:daily_report.modelLedgermatchingmatchingequipmentLedger"), theme.ERROR, True
             safe_update(result_text)
@@ -198,6 +259,7 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
                     "include_raw_company_name": bool(include_raw_company.value),
                 },
                 include_detail_sheets=bool(include_detail_sheets.value),
+                selected_files=scan_refs["get_selected_paths"]() if scan_refs["has_scan"]() else None,
                 preprocess_options={
                     "skip_hidden_rows": bool(skip_hidden_rows.value),
                     "skip_hidden_cols": bool(skip_hidden_cols.value),
@@ -295,7 +357,7 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
         content=ft.Column(
             [
                 theme.section_title(t("components:daily_report.dailyReportVariant")),
-                theme.module_card([ft.Row([source_path], spacing=8)], label=t("components:daily_report.dataDirectory")),
+                theme.module_card([ft.Row([source_path, scan_btn], spacing=8), scan_panel], label=t("components:daily_report.dataDirectory")),
                 theme.module_card([date_range], label=t("components:daily_report.dateRange")),
                 theme.module_card([options], label=t("components:daily_report.processingOptions")),
                 theme.module_card([output_options], label=t("components:daily_report.outputOptions")),
@@ -314,6 +376,8 @@ def create_daily_report_section(page: ft.Page, log, ledger_refs: dict, model_led
     )
     return container, {
         "btn": export_btn,
+        "scan_btn": scan_btn,
+        "scan_panel": scan_refs,
         "source_path": source_path,
         "result_text": result_text,
         "anomaly_results": anomaly_results,

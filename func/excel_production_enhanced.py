@@ -692,13 +692,29 @@ class MiningDataProcessor:
     # ---------------------------
     # 文件夹处理（多线程）
     # ---------------------------
-    def process_folder(self, folder_path, output_file=None, max_workers=4, return_sheets=False, cancel_event=None):
+    def process_folder(
+        self,
+        folder_path,
+        output_file=None,
+        max_workers=4,
+        return_sheets=False,
+        cancel_event=None,
+        file_list=None,
+    ):
+        """处理文件夹中的生产报表，可选地只处理指定文件。
+
+        ``file_list`` 是扫描/人工选择后的 Excel 路径列表；未提供时继续使用
+        原有的目录自动发现逻辑，保持 CLI 和旧调用方行为不变。
+        """
         all_running = []
         all_production = []
         success_files = 0
         file_errors: list[dict] = []
 
-        file_list = self.collect_excel_files(folder_path)
+        if file_list is None:
+            file_list = self.collect_excel_files(folder_path)
+        else:
+            file_list = [os.fspath(path) for path in file_list]
         total_files = len(file_list)
 
         # output_file 兜底（提前到 total_files 检查之前，避免 None 传入 ExcelWriter）
