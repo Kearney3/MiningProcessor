@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pandas as pd
 
-from func.sync.export import export_warnings_to_excel
-from tauri_bridge import _export_sync_warnings
+from func.sync.export import export_anomaly_records_to_excel, export_warnings_to_excel
+from tauri_bridge import _export_sync_anomalies, _export_sync_warnings
 
 
 def test_export_warnings_to_excel_default_path():
@@ -96,3 +96,61 @@ def test_export_warning_types_mapping():
         assert df.iloc[1]["原始值"] == "（空）"
         assert df.iloc[2]["原始值"] == "（空）"
         assert df.iloc[3]["原始值"] == "（空）"
+
+
+def test_export_anomaly_records_includes_locator_columns_and_reason():
+    """异常值导出应保留定位列、检测方法、原因及合法的 0 值。"""
+    records = [
+        {
+            "数据类型": "油耗信息",
+            "相关字段": "油品消耗",
+            "异常值": 0,
+            "异常值原因": "低于下限 1",
+            "行号": 8,
+            "源表": "油耗信息",
+            "源行号": 22,
+            "检测方法": "threshold",
+            "日期": "2026-08-24",
+            "班次": "Day",
+            "设备名称": "TR100",
+            "设备编号": "TR-01",
+        },
+    ]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out_path = export_anomaly_records_to_excel(records, input_dir=tmpdir)
+        assert Path(out_path).exists()
+        assert "异常值检测结果_" in out_path
+
+        df = pd.read_excel(out_path, sheet_name="异常值明细")
+        assert list(df.columns) == [
+            "数据类型", "相关字段", "异常值", "异常值原因", "行号", "源表", "源行号",
+            "检测方法", "日期", "班次", "设备名称", "设备编号",
+        ]
+        assert df.iloc[0]["异常值"] == 0
+        assert df.iloc[0]["检测方法"] == "threshold"
+        assert df.iloc[0]["源行号"] == 22
+        assert df.iloc[0]["异常值原因"] == "低于下限 1"
+
+        summary = pd.read_excel(out_path, sheet_name="异常汇总")
+        assert summary.iloc[0]["次数"] == 1
+
+
+def test_tauri_bridge_export_sync_anomalies():
+    """Tauri 导出 RPC 应接受异常值明细并返回输出路径。"""
+    records = [{
+        "数据类型": "电力消耗",
+        "异常列": "电力消耗",
+        "异常值": 50001,
+        "说明": "超过上限 50000",
+        "行号": 4,
+        "检测方法": "threshold",
+    }]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out_path = Path(tmpdir) / "anomalies.xlsx"
+        res = _export_sync_anomalies({"records": records, "output_path": out_path})
+        assert res["output_file"] == str(out_path)
+        df = pd.read_excel(out_path, sheet_name="异常值明细")
+        assert df.iloc[0]["相关字段"] == "电力消耗"
+        assert df.iloc[0]["异常值原因"] == "超过上限 50000"

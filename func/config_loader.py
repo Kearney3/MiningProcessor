@@ -8,6 +8,7 @@
 load_config() 合并两者返回（user 覆盖 default），save 时按目标分别写入。
 """
 import copy
+import contextlib
 import json
 import logging
 import os
@@ -214,6 +215,7 @@ _runtime_config: dict[str, Any] | None = None
 
 # M1: 基于文件 mtime 的配置缓存，避免 GUI 启动期间重复读盘
 _config_lock = threading.Lock()  # protects _config_cache and _config_cache_mtime
+_config_write_lock = threading.RLock()  # serializes read-modify-write updates
 _config_cache: dict[str, Any] | None = None
 _config_cache_mtime: tuple[float, float] = (0.0, 0.0)
 
@@ -224,7 +226,10 @@ _config_cache_mtime: tuple[float, float] = (0.0, 0.0)
 
 def _deep_merge(base: dict, override: dict) -> dict:
     """深合并：override 中的键覆盖 base，dict 值递归合并。"""
-    result = dict(base)
+    # Copy the complete base tree first.  A shallow copy would leave nested
+    # dicts/lists shared with the caller and let later mutations leak back into
+    # the source configuration.
+    result = copy.deepcopy(base)
     for k, v in override.items():
         if k in result and isinstance(result[k], dict) and isinstance(v, dict):
             result[k] = _deep_merge(result[k], v)
@@ -271,6 +276,11 @@ def _save_json(path: Path, data: dict[str, Any]) -> None:
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
     tmp.replace(path)
+    if path.name == "config.user.json":
+        # This file may contain API/database credentials.  chmod is best
+        # effort for platforms whose filesystems do not expose POSIX modes.
+        with contextlib.suppress(OSError):
+            os.chmod(path, 0o600)
 
 
 # ---------------------------------------------------------------------------
@@ -307,7 +317,8 @@ def load_config() -> dict[str, Any]:
 
     with _config_lock:
         if _config_cache is not None and (mt1, mt2, mt_bundled) == _config_cache_mtime:
-            return _config_cache
+            # Never expose the mutable cache object to callers.
+            return copy.deepcopy(_config_cache)
 
         # 冻结模式：打包默认作为底层，持久化配置覆盖
         if _persistent_root != _BUNDLED_ROOT and _BUNDLED_CONFIG_FILE.exists():
@@ -322,7 +333,7 @@ def load_config() -> dict[str, Any]:
 
         _config_cache = result
         _config_cache_mtime = (mt1, mt2, mt_bundled)
-        return result
+        return copy.deepcopy(result)
 
 
 def _invalidate_config_cache() -> None:
@@ -335,8 +346,9 @@ def _invalidate_config_cache() -> None:
 
 def save_config(config: dict[str, Any]) -> None:
     """保存系统默认配置到 config.json（不含用户敏感数据）。"""
-    _save_json(_CONFIG_FILE, config)
-    _invalidate_config_cache()
+    with _config_write_lock:
+        _save_json(_CONFIG_FILE, config)
+        _invalidate_config_cache()
 
 
 # ---------------------------------------------------------------------------
@@ -356,7 +368,8 @@ def get_device_load_map(version: str = "new") -> dict[str, int]:
     with _runtime_lock:  # M3
         config = _runtime_config if _runtime_config is not None else load_config()
     key = f"device_load_map_{version}" if version != "new" else "device_load_map"
-    return config.get(key, {})
+    value = config.get(key, {})
+    return copy.deepcopy(value) if isinstance(value, dict) else {}
 
 
 # ---------------------------------------------------------------------------
@@ -398,9 +411,9 @@ def apply_device_load_map(device_load_map: dict[str, int], version: str = "new")
     config_key = "device_load_map" if version == "new" else "device_load_map_old"
     with _runtime_lock:  # M3
         config = load_config()
-        config[config_key] = dict(device_load_map)
+        config[config_key] = copy.deepcopy(device_load_map)
         _runtime_config = config
-        return _runtime_config[config_key]
+        return copy.deepcopy(_runtime_config[config_key])
 
 
 def update_device_load_map(updates: dict[str, int], version: str = "new") -> dict[str, int]:
@@ -415,15 +428,16 @@ def update_device_load_map(updates: dict[str, int], version: str = "new") -> dic
     """
     global _runtime_config
     config_key = "device_load_map" if version == "new" else "device_load_map_old"
-    config = _load_json(_CONFIG_FILE)
-    if config_key not in config:
-        config[config_key] = {}
-    config[config_key].update(updates)
-    _save_json(_CONFIG_FILE, config)
-    _invalidate_config_cache()
-    with _runtime_lock:  # M2: 清除运行时缓存，确保下次读取使用最新值
-        _runtime_config = None
-    return config[config_key]
+    with _config_write_lock:
+        config = _load_json(_CONFIG_FILE)
+        if config_key not in config:
+            config[config_key] = {}
+        config[config_key].update(updates)
+        _save_json(_CONFIG_FILE, config)
+        _invalidate_config_cache()
+        with _runtime_lock:  # M2: 清除运行时缓存，确保下次读取使用最新值
+            _runtime_config = None
+        return dict(config[config_key])
 
 
 # ---------------------------------------------------------------------------
@@ -439,10 +453,11 @@ def get_default_shift() -> str:
 
 def set_default_shift(shift: str) -> None:
     """Set default shift value when shift column is missing"""
-    config = _load_json(_CONFIG_FILE)
-    config["default_shift"] = shift
-    _save_json(_CONFIG_FILE, config)
-    _invalidate_config_cache()
+    with _config_write_lock:
+        config = _load_json(_CONFIG_FILE)
+        config["default_shift"] = shift
+        _save_json(_CONFIG_FILE, config)
+        _invalidate_config_cache()
 
 
 def get_default_year() -> int:
@@ -476,23 +491,25 @@ def get_user_config(section: str | None = None, default: Any = None) -> Any:
 
 def save_user_config(user_config: dict[str, Any]) -> None:
     """整体替换并持久化 user_config 段落（写入 config.user.json）。"""
-    user_file = _load_json(_USER_CONFIG_FILE)
-    user_file[_USER_CONFIG_SECTION] = dict(user_config)
-    _save_json(_USER_CONFIG_FILE, user_file)
-    _invalidate_config_cache()
+    with _config_write_lock:
+        user_file = _load_json(_USER_CONFIG_FILE)
+        user_file[_USER_CONFIG_SECTION] = dict(user_config)
+        _save_json(_USER_CONFIG_FILE, user_file)
+        _invalidate_config_cache()
 
 
 def update_user_config(updates: dict[str, Any]) -> dict[str, Any]:
     """合并更新 user_config（只覆盖传入的 key，其余保留，写入 config.user.json）。"""
-    user_file = _load_json(_USER_CONFIG_FILE)
-    current = user_file.get(_USER_CONFIG_SECTION, {})
-    if not isinstance(current, dict):
-        current = {}
-    current.update(updates)
-    user_file[_USER_CONFIG_SECTION] = current
-    _save_json(_USER_CONFIG_FILE, user_file)
-    _invalidate_config_cache()
-    return current
+    with _config_write_lock:
+        user_file = _load_json(_USER_CONFIG_FILE)
+        current = user_file.get(_USER_CONFIG_SECTION, {})
+        if not isinstance(current, dict):
+            current = {}
+        current.update(updates)
+        user_file[_USER_CONFIG_SECTION] = current
+        _save_json(_USER_CONFIG_FILE, user_file)
+        _invalidate_config_cache()
+        return dict(current)
 
 
 def reset_user_config(section: str | None = None) -> None:
@@ -501,17 +518,18 @@ def reset_user_config(section: str | None = None) -> None:
     - 当 `section` 为 None 时清空 config.user.json 中的 user_config。
     - 当指定了某个小节时，仅清空该小节。
     """
-    user_file = _load_json(_USER_CONFIG_FILE)
-    if section is None:
-        user_file[_USER_CONFIG_SECTION] = {}
-    else:
-        user_config = user_file.get(_USER_CONFIG_SECTION, {})
-        if not isinstance(user_config, dict):
-            user_config = {}
-        user_config.pop(section, None)
-        user_file[_USER_CONFIG_SECTION] = user_config
-    _save_json(_USER_CONFIG_FILE, user_file)
-    _invalidate_config_cache()
+    with _config_write_lock:
+        user_file = _load_json(_USER_CONFIG_FILE)
+        if section is None:
+            user_file[_USER_CONFIG_SECTION] = {}
+        else:
+            user_config = user_file.get(_USER_CONFIG_SECTION, {})
+            if not isinstance(user_config, dict):
+                user_config = {}
+            user_config.pop(section, None)
+            user_file[_USER_CONFIG_SECTION] = user_config
+        _save_json(_USER_CONFIG_FILE, user_file)
+        _invalidate_config_cache()
 
 
 def reset_all_user_overrides() -> None:
@@ -520,8 +538,9 @@ def reset_all_user_overrides() -> None:
     与 reset_user_config() 不同，此函数清除 config.user.json 中的所有内容，
     包括 minebase、anomaly_detection 等顶层段落。
     """
-    _save_json(_USER_CONFIG_FILE, {})
-    _invalidate_config_cache()
+    with _config_write_lock:
+        _save_json(_USER_CONFIG_FILE, {})
+        _invalidate_config_cache()
 
 
 
@@ -627,12 +646,12 @@ def apply_maintenance_classifications(rules: dict) -> dict:
         config["maintenance_classification_schema_version"] = (
             MAINTENANCE_CLASSIFICATION_SCHEMA_VERSION
         )
-        config["maintenance_classifications"] = rules.get("classifications", [])
-        config["maintenance_noise_exact"] = list(rules.get("noise_exact", []))
-        config["maintenance_noise_patterns"] = rules.get("noise_patterns", [])
-        config["maintenance_reason_rules"] = rules.get("reason_rules", {})
+        config["maintenance_classifications"] = copy.deepcopy(rules.get("classifications", []))
+        config["maintenance_noise_exact"] = copy.deepcopy(rules.get("noise_exact", []))
+        config["maintenance_noise_patterns"] = copy.deepcopy(rules.get("noise_patterns", []))
+        config["maintenance_reason_rules"] = copy.deepcopy(rules.get("reason_rules", {}))
         _runtime_config = config
-        return rules
+        return copy.deepcopy(rules)
 
 
 def update_maintenance_classifications(rules: dict) -> dict:
@@ -647,19 +666,20 @@ def update_maintenance_classifications(rules: dict) -> dict:
     from func.maintenance_classification import MAINTENANCE_CLASSIFICATION_SCHEMA_VERSION
 
     global _runtime_config
-    config = _load_json(_CONFIG_FILE)
-    config["maintenance_classification_schema_version"] = (
-        MAINTENANCE_CLASSIFICATION_SCHEMA_VERSION
-    )
-    config["maintenance_classifications"] = rules.get("classifications", [])
-    config["maintenance_noise_exact"] = list(rules.get("noise_exact", []))
-    config["maintenance_noise_patterns"] = rules.get("noise_patterns", [])
-    config["maintenance_reason_rules"] = rules.get("reason_rules", {})
-    _save_json(_CONFIG_FILE, config)
-    _invalidate_config_cache()
-    with _runtime_lock:
-        _runtime_config = None
-    return rules
+    with _config_write_lock:
+        config = _load_json(_CONFIG_FILE)
+        config["maintenance_classification_schema_version"] = (
+            MAINTENANCE_CLASSIFICATION_SCHEMA_VERSION
+        )
+        config["maintenance_classifications"] = rules.get("classifications", [])
+        config["maintenance_noise_exact"] = list(rules.get("noise_exact", []))
+        config["maintenance_noise_patterns"] = rules.get("noise_patterns", [])
+        config["maintenance_reason_rules"] = rules.get("reason_rules", {})
+        _save_json(_CONFIG_FILE, config)
+        _invalidate_config_cache()
+        with _runtime_lock:
+            _runtime_config = None
+        return copy.deepcopy(rules)
 
 
 def export_maintenance_classification_template(path: str, *, with_defaults: bool = False) -> str:
@@ -809,7 +829,7 @@ def get_anomaly_detection_config() -> dict[str, Any]:
     """
     config = load_config()
     ad = config.get("anomaly_detection", {})
-    return _deep_merge(DEFAULT_ANOMALY_DETECTION, ad) if ad else dict(DEFAULT_ANOMALY_DETECTION)
+    return _deep_merge(DEFAULT_ANOMALY_DETECTION, ad) if ad else copy.deepcopy(DEFAULT_ANOMALY_DETECTION)
 
 
 def get_anomaly_thresholds(data_type: str | None = None) -> dict[str, Any]:
@@ -851,23 +871,25 @@ def update_anomaly_detection_config(updates: dict[str, Any]) -> dict[str, Any]:
     dict
         更新后的完整 anomaly_detection 配置。
     """
-    user_file = _load_json(_USER_CONFIG_FILE)
-    current = user_file.get("anomaly_detection", {})
-    if not isinstance(current, dict):
-        current = {}
-    merged = _deep_merge(current, updates)
-    user_file["anomaly_detection"] = merged
-    _save_json(_USER_CONFIG_FILE, user_file)
-    _invalidate_config_cache()
-    return merged
+    with _config_write_lock:
+        user_file = _load_json(_USER_CONFIG_FILE)
+        current = user_file.get("anomaly_detection", {})
+        if not isinstance(current, dict):
+            current = {}
+        merged = _deep_merge(current, updates)
+        user_file["anomaly_detection"] = merged
+        _save_json(_USER_CONFIG_FILE, user_file)
+        _invalidate_config_cache()
+        return copy.deepcopy(merged)
 
 
 def save_anomaly_detection_config(config_data: dict[str, Any]) -> None:
     """整体替换异常值检测配置（写入 config.user.json 顶层 anomaly_detection 段）。"""
-    user_file = _load_json(_USER_CONFIG_FILE)
-    user_file["anomaly_detection"] = dict(config_data)
-    _save_json(_USER_CONFIG_FILE, user_file)
-    _invalidate_config_cache()
+    with _config_write_lock:
+        user_file = _load_json(_USER_CONFIG_FILE)
+        user_file["anomaly_detection"] = copy.deepcopy(config_data)
+        _save_json(_USER_CONFIG_FILE, user_file)
+        _invalidate_config_cache()
 
 
 # ---------------------------------------------------------------------------
@@ -921,33 +943,37 @@ def update_llm_config(updates: dict[str, Any]) -> dict[str, Any]:
     """
     from .secret_store import save_minebase_secrets
 
-    api_key = updates.pop("api_key", None)
-    current = get_user_config("llm_labeling", {})
-    if not isinstance(current, dict):
-        current = {}
-    current.update(updates)
-    update_user_config({"llm_labeling": current})
-    if api_key is not None and api_key.strip():
-        try:
-            wrapper = {"llm_api_key": {"password": api_key}}
-            encrypted = save_minebase_secrets(
-                wrapper, secret_paths=[("minebase", "llm_api_key", "password")],
-            )
-            user_file = _load_json(_USER_CONFIG_FILE)
-            minebase = user_file.get("minebase", {})
-            if not isinstance(minebase, dict):
-                minebase = {}
-            minebase["llm_api_key"] = encrypted["llm_api_key"]
-            user_file["minebase"] = minebase
-            llm_cfg = user_file.get(_USER_CONFIG_SECTION, {}).get("llm_labeling", {})
-            llm_cfg["api_key"] = "keychain"
-            user_file.setdefault(_USER_CONFIG_SECTION, {})["llm_labeling"] = llm_cfg
-            _save_json(_USER_CONFIG_FILE, user_file)
-            _invalidate_config_cache()
-        except Exception:
-            logger.warning("无法加密 LLM API key（MP_MASTER_KEY 未设置），密钥未保存")
-            current["api_key"] = ""
-            update_user_config({"llm_labeling": current})
+    # Do not pop from the caller-owned dictionary: RPC callers and GUI state
+    # may reuse the same object after this function returns.
+    pending = copy.deepcopy(updates)
+    api_key = pending.pop("api_key", None)
+    with _config_write_lock:
+        current = get_user_config("llm_labeling", {})
+        if not isinstance(current, dict):
+            current = {}
+        current.update(pending)
+        update_user_config({"llm_labeling": current})
+        if isinstance(api_key, str) and api_key.strip():
+            try:
+                wrapper = {"llm_api_key": {"password": api_key}}
+                encrypted = save_minebase_secrets(
+                    wrapper, secret_paths=[("minebase", "llm_api_key", "password")],
+                )
+                user_file = _load_json(_USER_CONFIG_FILE)
+                minebase = user_file.get("minebase", {})
+                if not isinstance(minebase, dict):
+                    minebase = {}
+                minebase["llm_api_key"] = encrypted["llm_api_key"]
+                user_file["minebase"] = minebase
+                llm_cfg = user_file.get(_USER_CONFIG_SECTION, {}).get("llm_labeling", {})
+                llm_cfg["api_key"] = "keychain"
+                user_file.setdefault(_USER_CONFIG_SECTION, {})["llm_labeling"] = llm_cfg
+                _save_json(_USER_CONFIG_FILE, user_file)
+                _invalidate_config_cache()
+            except Exception:
+                logger.warning("无法加密 LLM API key（MP_MASTER_KEY 未设置），密钥未保存")
+                current["api_key"] = ""
+                update_user_config({"llm_labeling": current})
     return get_llm_config()
 
 
@@ -1210,12 +1236,13 @@ def save_minebase_config(minebase_cfg: dict[str, Any]) -> None:
     """保存 MineBase 配置到 config.user.json（密码自动存入 Keychain）。"""
     from .secret_store import save_minebase_secrets
 
-    cfg_to_save = save_minebase_secrets(minebase_cfg)
-    # 写入 config.user.json 顶层 minebase（与 load_config 合并逻辑一致）
-    user_file = _load_json(_USER_CONFIG_FILE)
-    user_file["minebase"] = cfg_to_save
-    _save_json(_USER_CONFIG_FILE, user_file)
-    _invalidate_config_cache()
+    with _config_write_lock:
+        cfg_to_save = save_minebase_secrets(minebase_cfg)
+        # 写入 config.user.json 顶层 minebase（与 load_config 合并逻辑一致）
+        user_file = _load_json(_USER_CONFIG_FILE)
+        user_file["minebase"] = cfg_to_save
+        _save_json(_USER_CONFIG_FILE, user_file)
+        _invalidate_config_cache()
 
 
 # ---------------------------------------------------------------------------
@@ -1248,10 +1275,12 @@ def get_minebase_column_mapping() -> dict[str, dict[str, str]]:
 
 def save_minebase_column_mapping(mapping: dict[str, dict[str, str]]) -> None:
     """保存用户自定义列映射到独立 JSON 文件。"""
-    _save_json(_MINEBASE_MAPPING_FILE, mapping)
+    with _config_write_lock:
+        _save_json(_MINEBASE_MAPPING_FILE, mapping)
 
 
 def reset_minebase_column_mapping() -> None:
     """删除用户自定义映射文件，恢复为 config.json 中的默认值。"""
-    if _MINEBASE_MAPPING_FILE.exists():
-        _MINEBASE_MAPPING_FILE.unlink()
+    with _config_write_lock:
+        if _MINEBASE_MAPPING_FILE.exists():
+            _MINEBASE_MAPPING_FILE.unlink()

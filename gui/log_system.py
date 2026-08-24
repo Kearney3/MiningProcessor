@@ -85,6 +85,7 @@ class LogSystem:
 
         self._log_export_picker = ft.FilePicker()
         page.services.append(self._log_export_picker)
+        self._previous_resize_handler = getattr(page.window, "on_resize", None)
 
     def start(self) -> None:
         """绑定控件并订阅日志。重复调用不会创建重复订阅。"""
@@ -109,6 +110,12 @@ class LogSystem:
             self._flush_scheduled = False
         if future is not None and not future.done():
             future.cancel()
+        current_resize_handler = getattr(self._page.window, "on_resize", None)
+        if (
+            getattr(current_resize_handler, "__self__", None) is self
+            and getattr(current_resize_handler, "__func__", None) is LogSystem._on_page_resize
+        ):
+            self._page.window.on_resize = self._previous_resize_handler
 
     def _bind_controls(self) -> None:
         self._clear_button.on_click = self._clear_logs
@@ -367,6 +374,12 @@ class LogSystem:
             self._log_height_container.update()
 
     def _on_page_resize(self, _e) -> None:
+        previous = self._previous_resize_handler
+        if previous is not None:
+            with contextlib.suppress(Exception):
+                result = previous(_e)
+                if inspect.isawaitable(result):
+                    self._page.run_task(lambda: result)
         if (self._log_height_container.data or {}).get("collapsed"):
             return
         if self._log_height_user_set:

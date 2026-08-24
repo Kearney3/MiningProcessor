@@ -39,7 +39,8 @@ _CONFIRM_RECONCILE_ERROR_CODES = frozenset({
     "STALE_VERSION",
 })
 _CONFIRM_POLL_INTERVAL_SECONDS = 0.5
-_CONFIRM_MAX_POLL_ATTEMPTS = 10_000
+_CONFIRM_MAX_POLL_ATTEMPTS = 1_200
+_CONFIRM_MAX_WAIT_SECONDS = 10 * 60
 
 
 def _response_data(response: Any) -> dict[str, Any]:
@@ -94,10 +95,14 @@ def _wait_for_terminal_session(
 ) -> dict[str, Any]:
     """轮询服务端 continuation，直到会话进入终态。"""
     session = initial_session if isinstance(initial_session, dict) else {}
+    started_at = time.monotonic()
     for attempt in range(_CONFIRM_MAX_POLL_ATTEMPTS):
         if _is_terminal_session(session):
             return session
-        if attempt == _CONFIRM_MAX_POLL_ATTEMPTS - 1:
+        if (
+            attempt == _CONFIRM_MAX_POLL_ATTEMPTS - 1
+            or time.monotonic() - started_at >= _CONFIRM_MAX_WAIT_SECONDS
+        ):
             break
         time.sleep(_CONFIRM_POLL_INTERVAL_SECONDS)
         session = _session_from_response(api_client.get_session(table, session_id))
@@ -478,46 +483,47 @@ def sync_via_db(
     total_skipped = 0
     total_failed = 0
 
-    try:
-        for row in rows:
+    # Each row is its own transaction.  PostgreSQL marks a transaction as
+    # aborted after an INSERT error; without a rollback here, every following
+    # row and the final commit would fail and discard earlier successes.
+    for row in rows:
+        try:
+            # FK 解析
+            resolved_row = _resolve_fks_for_db(data_type, row, db_client, warnings=collected_warnings)
+            if resolved_row is None:
+                total_skipped += 1
+                continue
+
+            # 转换为 PostgreSQL 列名
+            columns, values = _map_row_to_db_columns(resolved_row)
+            if not columns:
+                total_skipped += 1
+                continue
+
+            # 去重检查
+            dedup_cols = DEDUP_FIELDS_MAP.get(table, [])
+            dedup_values = {}
+            for col, val in zip(columns, values, strict=False):
+                if col in dedup_cols:
+                    dedup_values[col] = val
+
+            if dedup_values and db_client.check_duplicate(table, dedup_values):
+                total_skipped += 1
+                continue
+
+            # 插入并立即提交，保证之前成功的行不依赖后续行的结果。
+            db_client.insert_rows(table, columns, [values])
+            db_client.commit()
+            total_success += 1
+
+        except Exception as e:
+            logger.error("[%s] 行处理失败: %s — %s", data_type, row, e)
             try:
-                # FK 解析
-                resolved_row = _resolve_fks_for_db(data_type, row, db_client, warnings=collected_warnings)
-                if resolved_row is None:
-                    total_skipped += 1
-                    continue
+                db_client.rollback()
+            except Exception as rollback_error:
+                logger.error("[%s] 行失败后的回滚也失败: %s", data_type, rollback_error)
+            total_failed += 1
 
-                # 转换为 PostgreSQL 列名
-                columns, values = _map_row_to_db_columns(resolved_row)
-                if not columns:
-                    total_skipped += 1
-                    continue
-
-                # 去重检查
-                dedup_cols = DEDUP_FIELDS_MAP.get(table, [])
-                dedup_values = {}
-                for col, val in zip(columns, values, strict=False):
-                    if col in dedup_cols:
-                        dedup_values[col] = val
-
-                if dedup_values and db_client.check_duplicate(table, dedup_values):
-                    total_skipped += 1
-                    continue
-
-                # 插入
-                db_client.insert_rows(table, columns, [values])
-                total_success += 1
-
-            except Exception as e:
-                logger.error("[%s] 行处理失败: %s — %s", data_type, row, e)
-                total_failed += 1
-
-        db_client.commit()
-        logger.info("[%s] DB 同步完成: 成功=%d, 跳过=%d, 失败=%d", data_type, total_success, total_skipped, total_failed)
-
-    except Exception as e:
-        logger.error("[%s] DB 同步失败，已回滚: %s", data_type, e)
-        db_client.rollback()
-        total_failed = len(rows) - total_success - total_skipped
+    logger.info("[%s] DB 同步完成: 成功=%d, 跳过=%d, 失败=%d", data_type, total_success, total_skipped, total_failed)
 
     return {"success": total_success, "skipped": total_skipped, "failed": total_failed, "warnings": collected_warnings}

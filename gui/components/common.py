@@ -290,18 +290,22 @@ _ANOMALY_RESULT_COLUMNS = [
     ("班次", "components:common.shift", 56),
     ("设备名称", "components:common.equipment", 160),
     ("设备编号", "components:common.equipmentId", 90),
-    ("异常列", "components:common.anomalyColumn", 100),
+    ("相关字段", "components:common.anomalyColumn", 100),
     ("异常值", "components:common.anomalyValue", 86),
     ("检测方法", "components:common.method", 82),
     ("说明", "components:common.note", 320),
+    ("源表", "components:common.sourceSheet", 120),
+    ("源行号", "components:common.sourceRow", 64),
 ]
 
 
-def create_anomaly_results_table() -> dict:
+def create_anomaly_results_table(actions=None) -> dict:
     """创建异常值结果表及其更新函数。
 
     返回的 ``update(records)`` 可由处理完成回调调用；空列表会隐藏整个结果区，
     有数据时在页面底部显示可纵向、横向滚动的 DataTable。
+
+    ``actions`` 用于在标题栏放置导出等操作按钮，保持结果表本身与业务动作解耦。
     """
     try:
         from . import theme
@@ -321,6 +325,18 @@ def create_anomaly_results_table() -> dict:
         data_row_max_height=44,
     )
     count_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
+    header_controls = [
+        ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED, color=theme.WARNING, size=17),
+        ft.Text(
+            t("components:common.anomalyDetails"),
+            size=13,
+            weight=ft.FontWeight.W_600,
+            color=theme.WARNING,
+        ),
+        count_text,
+    ]
+    if actions:
+        header_controls.extend([ft.Container(expand=True), *actions])
 
     table_view = ft.Container(
         content=ft.Column(
@@ -335,16 +351,7 @@ def create_anomaly_results_table() -> dict:
         content=ft.Column(
             [
                 ft.Row(
-                    [
-                        ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED, color=theme.WARNING, size=17),
-                        ft.Text(
-                            t("components:common.anomalyDetails"),
-                            size=13,
-                            weight=ft.FontWeight.W_600,
-                            color=theme.WARNING,
-                        ),
-                        count_text,
-                    ],
+                    header_controls,
                     spacing=6,
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
@@ -367,10 +374,15 @@ def create_anomaly_results_table() -> dict:
                 color = theme.ERROR if column == "异常值" else theme.TEXT_PRIMARY
                 if column == "说明":
                     color = theme.TEXT_SECONDARY
+                value = record.get(column)
+                if column == "相关字段":
+                    value = record.get("相关字段", record.get("异常列"))
+                if column == "说明":
+                    value = record.get("异常值原因", value)
                 cells.append(
                     ft.DataCell(
                         ft.Text(
-                            _cell_text(record.get(column)),
+                            _cell_text(value),
                             width=width,
                             size=11,
                             color=color,

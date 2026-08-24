@@ -59,13 +59,14 @@ def _create_lang_switcher(page: ft.Page) -> ft.Container:
                 title=ft.Text(i18n.t("language:changedTitle")),
                 content=ft.Text(i18n.t("language:changedMessage")),
                 actions=[
-                    ft.TextButton(i18n.t("common:ok"), on_click=lambda _: setattr(dlg, "open", False) or page.update()),
+                    ft.TextButton(
+                        i18n.t("common:ok"),
+                        on_click=lambda _: page.pop_dialog(),
+                    ),
                 ],
                 actions_alignment=ft.MainAxisAlignment.END,
             )
-            page.overlay.append(dlg)
-            dlg.open = True
-            page.update()
+            page.show_dialog(dlg)
 
     buttons = []
     for code, label in _LANG_OPTIONS:

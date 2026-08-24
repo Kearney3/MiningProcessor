@@ -27,6 +27,19 @@ function levelOrder(level: string): number {
   return { DEBUG: 10, INFO: 20, WARNING: 30, ERROR: 40, CRITICAL: 50, STDERR: 40 }[level] ?? 0;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isBatchProgress(value: unknown): value is BatchProgress {
+  if (!isRecord(value)) return false;
+  return typeof value.stage === "string"
+    && typeof value.percent === "number" && Number.isFinite(value.percent)
+    && typeof value.current === "number" && Number.isFinite(value.current)
+    && typeof value.total === "number" && Number.isFinite(value.total)
+    && typeof value.detail === "string";
+}
+
 /** 保留最近日志；溢出时优先保留 WARNING 及以上。 */
 function trimLogs(entries: LogEntry[], capacity: number): LogEntry[] {
   if (entries.length <= capacity) return entries;
@@ -196,7 +209,10 @@ export function usePythonBridge() {
       if (data.event === "log") {
         queueLogEntries([data.data]);
       } else if (data.event === "log_batch") {
-        const entries = (data.data as { entries?: PythonEvent[] }).entries ?? [];
+        const entries = isRecord(data.data) && Array.isArray(data.data.entries)
+          ? data.data.entries.filter((entry): entry is PythonEvent =>
+            isRecord(entry) && typeof entry.event === "string" && isRecord(entry.data))
+          : [];
         queueLogEntries(
           entries
             .filter((entry) => entry.event === "log")
@@ -204,12 +220,12 @@ export function usePythonBridge() {
         );
         // Extract progress events from the batch
         for (const entry of entries) {
-          if (entry.event === "progress") {
-            setProgress(entry.data as unknown as BatchProgress);
+          if (entry.event === "progress" && isBatchProgress(entry.data)) {
+            setProgress(entry.data);
           }
         }
-      } else if (data.event === "progress") {
-        setProgress(data.data as unknown as BatchProgress);
+      } else if (data.event === "progress" && isBatchProgress(data.data)) {
+        setProgress(data.data);
       }
     });
     return () => {

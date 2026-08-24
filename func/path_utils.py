@@ -28,6 +28,8 @@ def sanitize_path(
         ValueError: 路径包含 .. 或类型不匹配
         FileNotFoundError: must_exist=True 但路径不存在
     """
+    if "\x00" in raw:
+        raise ValueError("Path must not contain null bytes")
     p = Path(raw).resolve()
     if ".." in Path(raw).parts:
         raise ValueError("Path must not contain ..")

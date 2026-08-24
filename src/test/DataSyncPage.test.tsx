@@ -185,4 +185,56 @@ describe("DataSyncPage - Export Warnings", () => {
     const emptyCells = screen.getAllByText("（空）");
     expect(emptyCells.length).toBe(2);
   });
+
+  it("renders anomaly locator fields and exports anomaly results", async () => {
+    const mockSave = vi.mocked(save);
+    mockSave.mockResolvedValue("/tmp/anomalies.xlsx");
+    const mockCall = vi.fn().mockImplementation((method: string) => {
+      if (method === "get_last_directory") return Promise.resolve({ path: "" });
+      if (method === "sync_minebase") {
+        return Promise.resolve({
+          results: {
+            fuel: {
+              success: 0,
+              skipped: 0,
+              failed: 0,
+              anomalies: [{
+                数据类型: "油耗信息",
+                相关字段: "油品消耗",
+                异常值: 50001,
+                异常值原因: "超过上限 50000",
+                行号: 8,
+                源表: "油耗信息",
+                源行号: 22,
+                检测方法: "threshold",
+              }],
+            },
+          },
+        });
+      }
+      if (method === "export_sync_anomalies") {
+        return Promise.resolve({ output_file: "/tmp/anomalies.xlsx" });
+      }
+      return Promise.resolve({});
+    });
+
+    renderPage(makeBridge({ call: mockCall }));
+    const input = screen.getByPlaceholderText("选择包含已处理数据的文件夹");
+    fireEvent.change(input, { target: { value: "/tmp/test" } });
+    fireEvent.click(screen.getByText("开始同步"));
+
+    expect(await screen.findByText("threshold")).toBeInTheDocument();
+    expect(screen.getByText("源表")).toBeInTheDocument();
+    expect(screen.getByText("源行号")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("导出异常值结果"));
+
+    await vi.waitFor(() => {
+      expect(mockCall).toHaveBeenCalledWith("export_sync_anomalies", expect.objectContaining({
+        output_path: "/tmp/anomalies.xlsx",
+        records: expect.arrayContaining([
+          expect.objectContaining({ 相关字段: "油品消耗", 行号: 8, 检测方法: "threshold" }),
+        ]),
+      }));
+    });
+  });
 });

@@ -144,6 +144,45 @@ describe("usePythonBridge", () => {
     expect(result.current.logs.map((entry) => entry.seq)).toEqual([1, 2]);
   });
 
+  it("accepts only structurally valid progress events", async () => {
+    let eventHandler: (event: { payload: { event: string; data: Record<string, unknown> } }) => void;
+    mockListen.mockImplementation(async (_event, handler) => {
+      eventHandler = handler as typeof eventHandler;
+      return () => {};
+    });
+
+    const { result } = renderHook(() => usePythonBridge());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    act(() => {
+      eventHandler!({
+        payload: {
+          event: "progress",
+          data: { stage: "running", percent: "50", current: 1, total: 2, detail: "invalid" },
+        },
+      });
+    });
+    expect(result.current.progress).toBeNull();
+
+    act(() => {
+      eventHandler!({
+        payload: {
+          event: "progress",
+          data: { stage: "running", percent: 50, current: 1, total: 2, detail: "valid" },
+        },
+      });
+    });
+    expect(result.current.progress).toMatchObject({
+      stage: "running",
+      percent: 50,
+      current: 1,
+      total: 2,
+      detail: "valid",
+    });
+  });
+
   it("bounds history while preserving warnings during a log burst", async () => {
     let logHandler: (event: { payload: { event: string; data: Record<string, unknown> } }) => void;
     mockListen.mockImplementation(async (_event, handler) => {

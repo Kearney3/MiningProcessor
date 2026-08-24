@@ -82,6 +82,14 @@ export function LLMConfigSection({ bridge }: { bridge: BridgeProp }) {
   };
 
   const save = async () => {
+    if (!config.url.trim()) {
+      setStatus({ msg: t("userConfig:LLMConfigSection.apiUrlRequiredForSave"), kind: "error" });
+      return;
+    }
+    if (!config.model.trim()) {
+      setStatus({ msg: t("userConfig:LLMConfigSection.modelRequiredForSave"), kind: "error" });
+      return;
+    }
     setSaving(true);
     try {
       const apiKey = apiKeySaved && config.api_key === MASKED ? "" : config.api_key;

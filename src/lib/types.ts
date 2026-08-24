@@ -101,8 +101,10 @@ export interface AnomalyRecord {
   安装日期?: unknown;
   源表?: unknown;
   源行号?: number | string;
+  相关字段?: string;
   异常列?: string;
   异常值?: unknown;
+  异常值原因?: string;
   检测方法?: string;
   说明?: string;
 }
@@ -111,13 +113,19 @@ export interface AnomalyRecord {
 export interface SyncWarning {
   row: number | string;
   field: string;
-  value: string;
+  value: unknown;
   message: string;
 }
 
 /** 同步结果 */
 export interface SyncResult {
-  results: Record<string, { success: number; skipped: number; failed: number; warnings?: SyncWarning[] }>;
+  results: Record<string, {
+    success: number;
+    skipped: number;
+    failed: number;
+    warnings?: SyncWarning[];
+    anomalies?: AnomalyRecord[];
+  }>;
   dry_run_file?: string;
 }
 

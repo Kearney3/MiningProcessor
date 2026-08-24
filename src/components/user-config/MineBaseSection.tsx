@@ -99,17 +99,29 @@ export function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
   };
 
   const validatePort = (port: number): string | null => {
-    if (port < 0 || port > 65535) return t("userConfig:MineBaseSection.item065535Item");
+    if (!Number.isInteger(port) || port < 0 || port > 65535) return t("userConfig:MineBaseSection.item065535Item");
+    return null;
+  };
+
+  const validateConfig = (): string | null => {
+    if (config.mode === "api") {
+      if (!config.api.url.trim()) return t("userConfig:MineBaseSection.apiUrlRequired");
+      if (!config.api.username.trim()) return t("userConfig:MineBaseSection.usernameRequired");
+      return null;
+    }
+    const portError = validatePort(config.database.port);
+    if (portError) return portError;
+    if (!config.database.host.trim()) return t("userConfig:MineBaseSection.databaseHostRequired");
+    if (!config.database.database.trim()) return t("userConfig:MineBaseSection.databaseNameRequired");
+    if (!config.database.user.trim()) return t("userConfig:MineBaseSection.databaseUserRequired");
     return null;
   };
 
   const save = async () => {
-    if (config.mode === "database") {
-      const err = validatePort(config.database.port);
-      if (err) {
-        setStatus({ msg: err, kind: "error" });
-        return;
-      }
+    const validationError = validateConfig();
+    if (validationError) {
+      setStatus({ msg: validationError, kind: "error" });
+      return;
     }
     setSaving(true);
     try {
@@ -139,6 +151,11 @@ export function MineBaseSection({ bridge }: { bridge: BridgeProp }) {
   };
 
   const testConnection = async () => {
+    const validationError = validateConfig();
+    if (validationError) {
+      setTestResult({ msg: validationError, ok: false });
+      return;
+    }
     setTesting(true);
     setTestResult(null);
     try {

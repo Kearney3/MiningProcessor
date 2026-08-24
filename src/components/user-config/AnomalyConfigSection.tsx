@@ -169,6 +169,26 @@ export function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
   const save = async () => {
     setSaving(true);
     try {
+      const parseNumber = (raw: string, field: string, required = false): number | undefined => {
+        const value = raw.trim();
+        if (!value && !required) return undefined;
+        const parsed = Number(value);
+        if (!value || !Number.isFinite(parsed)) {
+          throw new Error(t("userConfig:AnomalyConfigSection.invalidNumber", { field }));
+        }
+        return parsed;
+      };
+
+      const sigmaValue = parseNumber(sigmaN, t("userConfig:AnomalyConfigSection.multiplier"), true)!;
+      const percentileLowValue = parseNumber(pctLow, t("userConfig:AnomalyConfigSection.percentileLowerBound"), true)!;
+      const percentileHighValue = parseNumber(pctHigh, t("userConfig:AnomalyConfigSection.percentileUpperBound"), true)!;
+      if (sigmaValue <= 0) {
+        throw new Error(t("userConfig:AnomalyConfigSection.sigmaMustBePositive"));
+      }
+      if (percentileLowValue < 0 || percentileHighValue > 100 || percentileLowValue >= percentileHighValue) {
+        throw new Error(t("userConfig:AnomalyConfigSection.percentileRangeInvalid"));
+      }
+
       // 收集阈值 + 处理规则
       const thresholds: Record<string, Record<string, { min?: number; max?: number; enabled?: boolean }>> = {};
       const handling_rules: Record<string, Record<string, { strategy: string; default?: number }>> = {};
@@ -183,29 +203,23 @@ export function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
           if (!col) continue;
 
           const bounds: { min?: number; max?: number } = {};
-          if (row.min.trim()) {
-            const v = parseFloat(row.min);
-            if (!isNaN(v)) bounds.min = v;
-          }
-          if (row.max.trim()) {
-            const v = parseFloat(row.max);
-            if (!isNaN(v)) bounds.max = v;
+          const min = parseNumber(row.min, `${col} / ${t("userConfig:AnomalyConfigSection.minimum")}`);
+          const max = parseNumber(row.max, `${col} / ${t("userConfig:AnomalyConfigSection.maximum")}`);
+          if (min !== undefined) bounds.min = min;
+          if (max !== undefined) bounds.max = max;
+          if (min !== undefined && max !== undefined && min > max) {
+            throw new Error(t("userConfig:AnomalyConfigSection.minimumGreaterThanMaximum", { column: col }));
           }
           if (Object.keys(bounds).length > 0) dtThresholds[col] = bounds;
 
           if (row.default.trim()) {
-            const v = parseFloat(row.default);
-            dtHandling[col] = { strategy: "default_value", default: isNaN(v) ? 0 : v };
+            const defaultValue = parseNumber(row.default, `${col} / ${t("userConfig:AnomalyConfigSection.defaultValue")}`, true)!;
+            dtHandling[col] = { strategy: "default_value", default: defaultValue };
           }
         }
         if (Object.keys(dtThresholds).length > 0) thresholds[key] = dtThresholds;
         if (Object.keys(dtHandling).length > 0) handling_rules[key] = dtHandling;
       }
-
-      const parseOr = (s: string, fallback: number) => {
-        const v = parseFloat(s);
-        return isNaN(v) ? fallback : v;
-      };
 
       // 合并逐列检测开关到 thresholds 和 statistical_columns
       const thresholdsOut = { ...thresholds };
@@ -230,9 +244,9 @@ export function AnomalyConfigSection({ bridge }: { bridge: BridgeProp }) {
         use_threshold: useThreshold,
         use_sigma: useSigma,
         use_percentile: usePercentile,
-        sigma_n: parseOr(sigmaN, 3.0),
-        percentile_low: parseOr(pctLow, 1.0),
-        percentile_high: parseOr(pctHigh, 99.0),
+        sigma_n: sigmaValue,
+        percentile_low: percentileLowValue,
+        percentile_high: percentileHighValue,
         thresholds: thresholdsOut,
         statistical_columns: statColsOut,
         handling_rules,

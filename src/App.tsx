@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { useTranslation } from "react-i18next";
 import { usePythonBridge } from "./hooks/usePythonBridge";
@@ -8,19 +8,87 @@ import { LogPanel } from "./components/LogPanel";
 import { ToastProvider } from "./components/Toast";
 import { ConnectionStatusBadge } from "./components/ConnectionStatusBadge";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
-import { DataProcessingPage } from "./components/pages/DataProcessingPage";
-import { BatchProcessingPage } from "./components/pages/BatchProcessingPage";
-import { DataSyncPage } from "./components/pages/DataSyncPage";
-import { LedgerMatchPage } from "./components/pages/LedgerMatchPage";
-import { EquipmentLedgerPage } from "./components/pages/EquipmentLedgerPage";
-import { OilLedgerPage } from "./components/pages/OilLedgerPage";
-import { ModelLedgerPage } from "./components/pages/ModelLedgerPage";
-import { DailyReportPage } from "./components/pages/DailyReportPage";
-import { LoadConfigPage } from "./components/pages/LoadConfigPage";
-import { MaintConfigPage } from "./components/pages/MaintConfigPage";
-import { UserConfigPage } from "./components/pages/UserConfigPage";
-import { LLMLabelingPage } from "./components/pages/LLMLabelingPage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+
+// Keep page code out of the initial bundle and mount only the active page. The
+// old display:none wrappers mounted every page at startup, so every page-level
+// effect ran before the user opened that page.
+const DataProcessingPage = lazy(() =>
+  import("./components/pages/DataProcessingPage").then(({ DataProcessingPage }) => ({ default: DataProcessingPage })),
+);
+const BatchProcessingPage = lazy(() =>
+  import("./components/pages/BatchProcessingPage").then(({ BatchProcessingPage }) => ({ default: BatchProcessingPage })),
+);
+const DataSyncPage = lazy(() =>
+  import("./components/pages/DataSyncPage").then(({ DataSyncPage }) => ({ default: DataSyncPage })),
+);
+const LedgerMatchPage = lazy(() =>
+  import("./components/pages/LedgerMatchPage").then(({ LedgerMatchPage }) => ({ default: LedgerMatchPage })),
+);
+const LLMLabelingPage = lazy(() =>
+  import("./components/pages/LLMLabelingPage").then(({ LLMLabelingPage }) => ({ default: LLMLabelingPage })),
+);
+const EquipmentLedgerPage = lazy(() =>
+  import("./components/pages/EquipmentLedgerPage").then(({ EquipmentLedgerPage }) => ({ default: EquipmentLedgerPage })),
+);
+const OilLedgerPage = lazy(() =>
+  import("./components/pages/OilLedgerPage").then(({ OilLedgerPage }) => ({ default: OilLedgerPage })),
+);
+const ModelLedgerPage = lazy(() =>
+  import("./components/pages/ModelLedgerPage").then(({ ModelLedgerPage }) => ({ default: ModelLedgerPage })),
+);
+const DailyReportPage = lazy(() =>
+  import("./components/pages/DailyReportPage").then(({ DailyReportPage }) => ({ default: DailyReportPage })),
+);
+const LoadConfigPage = lazy(() =>
+  import("./components/pages/LoadConfigPage").then(({ LoadConfigPage }) => ({ default: LoadConfigPage })),
+);
+const MaintConfigPage = lazy(() =>
+  import("./components/pages/MaintConfigPage").then(({ MaintConfigPage }) => ({ default: MaintConfigPage })),
+);
+const UserConfigPage = lazy(() =>
+  import("./components/pages/UserConfigPage").then(({ UserConfigPage }) => ({ default: UserConfigPage })),
+);
+
+type Bridge = ReturnType<typeof usePythonBridge>;
+
+function ActivePage({ currentPage, bridge }: { currentPage: PageId; bridge: Bridge }) {
+  switch (currentPage) {
+    case "data-processing":
+      return <DataProcessingPage bridge={bridge} />;
+    case "batch-processing":
+      return <BatchProcessingPage bridge={bridge} />;
+    case "data-sync":
+      return <DataSyncPage bridge={bridge} />;
+    case "ledger-match":
+      return <LedgerMatchPage bridge={bridge} />;
+    case "llm-labeling":
+      return <LLMLabelingPage bridge={bridge} progress={bridge.progress} setProgress={bridge.setProgress} />;
+    case "equipment-ledger":
+      return <EquipmentLedgerPage bridge={bridge} />;
+    case "oil-ledger":
+      return <OilLedgerPage bridge={bridge} />;
+    case "model-ledger":
+      return <ModelLedgerPage bridge={bridge} />;
+    case "daily-report":
+      return <DailyReportPage bridge={bridge} />;
+    case "load-config":
+      return <LoadConfigPage bridge={bridge} />;
+    case "maint-config":
+      return <MaintConfigPage bridge={bridge} />;
+    case "user-config":
+      return <UserConfigPage bridge={bridge} />;
+  }
+}
+
+function PageLoading() {
+  const { t } = useTranslation();
+  return (
+    <div className="flex min-h-48 items-center justify-center text-sm text-slate-500">
+      {t("pages:LLMLabelingPage.text")}
+    </div>
+  );
+}
 
 function App() {
   const { t } = useTranslation();
@@ -89,42 +157,9 @@ function App() {
         <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
         <ErrorBoundary>
         <main className="workspace-content flex-1 overflow-auto">
-          <div style={{ display: currentPage === "data-processing" ? "block" : "none" }}>
-            <DataProcessingPage bridge={bridge} />
-          </div>
-          <div style={{ display: currentPage === "batch-processing" ? "block" : "none" }}>
-            <BatchProcessingPage bridge={bridge} />
-          </div>
-          <div style={{ display: currentPage === "data-sync" ? "block" : "none" }}>
-            <DataSyncPage bridge={bridge} />
-          </div>
-          <div style={{ display: currentPage === "ledger-match" ? "block" : "none" }}>
-            <LedgerMatchPage bridge={bridge} />
-          </div>
-          <div style={{ display: currentPage === "llm-labeling" ? "block" : "none" }}>
-            <LLMLabelingPage bridge={bridge} progress={bridge.progress} setProgress={bridge.setProgress} />
-          </div>
-          <div style={{ display: currentPage === "equipment-ledger" ? "block" : "none" }}>
-            <EquipmentLedgerPage bridge={bridge} />
-          </div>
-          <div style={{ display: currentPage === "oil-ledger" ? "block" : "none" }}>
-            <OilLedgerPage bridge={bridge} />
-          </div>
-          <div style={{ display: currentPage === "model-ledger" ? "block" : "none" }}>
-            <ModelLedgerPage bridge={bridge} />
-          </div>
-          <div style={{ display: currentPage === "daily-report" ? "block" : "none" }}>
-            <DailyReportPage bridge={bridge} />
-          </div>
-          <div style={{ display: currentPage === "load-config" ? "block" : "none" }}>
-            <LoadConfigPage bridge={bridge} />
-          </div>
-          <div style={{ display: currentPage === "maint-config" ? "block" : "none" }}>
-            <MaintConfigPage bridge={bridge} />
-          </div>
-          <div style={{ display: currentPage === "user-config" ? "block" : "none" }}>
-            <UserConfigPage bridge={bridge} />
-          </div>
+          <Suspense fallback={<PageLoading />}>
+            <ActivePage currentPage={currentPage} bridge={bridge} />
+          </Suspense>
         </main>
         </ErrorBoundary>
       </div>
