@@ -135,6 +135,9 @@ def detect_and_filter(
     if config._anomaly_records is not None and anomalies_df is not None:
         for record in anomalies_df.to_dict("records"):
             record["数据类型"] = label
+            record["异常值原因"] = record.get("说明", "")
+            # 仅供同步编排阶段分组，返回前会移除，不暴露给 UI。
+            record["_data_type"] = data_type
             config._anomaly_records.append(record)
 
     # 处理
@@ -169,7 +172,8 @@ def _build_anomalies_df(df, hits):
     rows = []
     for hit in hits:
         row = {"行号": hit.row_index, "异常列": hit.column, "异常值": hit.value,
-               "检测方法": hit.method, "说明": hit.message}
+               "相关字段": hit.column, "检测方法": hit.method, "说明": hit.message,
+               "异常值原因": hit.message}
         # 保留原始行的关键信息
         for col in (
             "胎号",

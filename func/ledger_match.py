@@ -195,7 +195,7 @@ def match_sheet(
                 df, "挖机名称",
                 lambda name, device_id=None: eq_ledger.match_device(name=name, device_id=device_id),
                 DEVICE_RESULT_KEYS, cancel_event=cancel_event,
-                progress_cb=progress_cb, progress_label="正在匹配挖机", total_work=total_work,
+                id_col=id_col, progress_cb=progress_cb, progress_label="正在匹配挖机", total_work=total_work,
             )
             for k, s in zip(DEVICE_RESULT_KEYS, ["（挖机）"] * 3, strict=False):
                 result_df[k + s] = excav_r[k]

@@ -4,11 +4,16 @@ MineBase HTTP API 客户端 (contractVersion 2)。
 支持 session → batch → confirm 窗口化导入流程。
 """
 import json
+import time
 
 from func.logger import get_logger
 from func.sync.constants import CONTRACT_VERSION
 
 logger = get_logger(__name__)
+
+API_MAX_RETRIES = 3
+API_RETRY_BACKOFF_SECONDS = 0.5
+_RETRYABLE_HTTP_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
 
 
 # ---------------------------------------------------------------------------
@@ -41,11 +46,29 @@ class SessionExpiredError(MineBaseAPIError):
 class MineBaseAPIClient:
     """MineBase HTTP API 客户端 (contractVersion 2)。"""
 
-    def __init__(self, url: str, username: str, password: str):
+    def __init__(
+        self,
+        url: str,
+        username: str,
+        password: str,
+        *,
+        max_retries: int = API_MAX_RETRIES,
+    ):
         self.base_url = url.rstrip("/")
         self.username = username
         self.password = password
+        self.max_retries = max(0, int(max_retries))
         self.token: str | None = None
+
+    def _retry_delay(self, attempt: int, response=None) -> float:
+        """Return a bounded exponential backoff, honoring Retry-After when present."""
+        retry_after = getattr(getattr(response, "headers", None), "get", lambda *_: None)("Retry-After")
+        if retry_after is not None:
+            try:
+                return min(30.0, max(0.0, float(retry_after)))
+            except (TypeError, ValueError):
+                pass
+        return min(30.0, API_RETRY_BACKOFF_SECONDS * (2 ** attempt))
 
     def _request(self, method: str, path: str, data: dict | None = None) -> dict:
         """发送 HTTP 请求，对 409/410 抛出特定异常。"""
@@ -64,44 +87,63 @@ class MineBaseAPIClient:
         body = json.dumps(data).encode("utf-8") if data else None
         req = urllib.request.Request(url, data=body, headers=headers, method=method)
 
+        # 创建 SSL 上下文以解决 macOS 证书验证失败问题
         try:
-            # 创建 SSL 上下文以解决 macOS 证书验证失败问题
+            import certifi
+            ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        except ImportError:
+            ssl_ctx = ssl.create_default_context()
+
+        for attempt in range(self.max_retries + 1):
             try:
-                import certifi
-                ssl_ctx = ssl.create_default_context(cafile=certifi.where())
-            except ImportError:
-                ssl_ctx = ssl.create_default_context()
+                with urllib.request.urlopen(req, timeout=30, context=ssl_ctx) as resp:
+                    return json.loads(resp.read().decode("utf-8"))
+            except urllib.error.HTTPError as e:
+                if e.code in _RETRYABLE_HTTP_STATUS_CODES and attempt < self.max_retries:
+                    delay = self._retry_delay(attempt, e)
+                    logger.warning(
+                        "MineBase 请求暂时失败（HTTP %s），%s 秒后重试 (%d/%d)",
+                        e.code, delay, attempt + 1, self.max_retries,
+                    )
+                    time.sleep(delay)
+                    continue
 
-            with urllib.request.urlopen(req, timeout=30, context=ssl_ctx) as resp:
-                return json.loads(resp.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            error_body = e.read().decode("utf-8", errors="replace")[:500]
-            # 尝试解析 JSON 错误体提取 errorCode
-            error_code = ""
-            try:
-                err_json = json.loads(error_body)
-                nested_error = err_json.get("error")
-                error_code = err_json.get("errorCode") or err_json.get("code", "")
-                if not error_code and isinstance(nested_error, dict):
-                    error_code = nested_error.get("errorCode") or nested_error.get("code", "")
-            except (json.JSONDecodeError, ValueError):
-                pass
+                error_body = e.read().decode("utf-8", errors="replace")[:500]
+                # 尝试解析 JSON 错误体提取 errorCode
+                error_code = ""
+                try:
+                    err_json = json.loads(error_body)
+                    nested_error = err_json.get("error")
+                    error_code = err_json.get("errorCode") or err_json.get("code", "")
+                    if not error_code and isinstance(nested_error, dict):
+                        error_code = nested_error.get("errorCode") or nested_error.get("code", "")
+                except (json.JSONDecodeError, ValueError):
+                    pass
 
-            msg = f"HTTP {e.code}: {error_body}"
+                msg = f"HTTP {e.code}: {error_body}"
 
-            # 409: 会话限制 / 状态冲突
-            if e.code == 409:
-                if error_code in ("IMPORT_SESSION_LIMIT_REACHED", "IMPORT_SESSION_BYTES_EXCEEDED"):
-                    raise SessionLimitReachedError(msg, status_code=409, error_code=error_code) from e
-                raise MineBaseAPIError(msg, status_code=409, error_code=error_code) from e
+                # 409: 会话限制 / 状态冲突
+                if e.code == 409:
+                    if error_code in ("IMPORT_SESSION_LIMIT_REACHED", "IMPORT_SESSION_BYTES_EXCEEDED"):
+                        raise SessionLimitReachedError(msg, status_code=409, error_code=error_code) from e
+                    raise MineBaseAPIError(msg, status_code=409, error_code=error_code) from e
 
-            # 410: 会话过期
-            if e.code == 410:
-                raise SessionExpiredError(msg, status_code=410, error_code=error_code) from e
+                # 410: 会话过期
+                if e.code == 410:
+                    raise SessionExpiredError(msg, status_code=410, error_code=error_code) from e
 
-            raise RuntimeError(msg) from e
-        except urllib.error.URLError as e:
-            raise RuntimeError(f"连接失败: {url} — {e.reason}") from e
+                raise RuntimeError(msg) from e
+            except (urllib.error.URLError, TimeoutError) as e:
+                if attempt < self.max_retries:
+                    delay = self._retry_delay(attempt)
+                    logger.warning(
+                        "MineBase 请求连接失败，%s 秒后重试 (%d/%d): %s",
+                        delay, attempt + 1, self.max_retries, e,
+                    )
+                    time.sleep(delay)
+                    continue
+                reason = getattr(e, "reason", str(e))
+                raise RuntimeError(f"连接失败: {url} — {reason}") from e
 
     # ------------------------------------------------------------------
     # 认证

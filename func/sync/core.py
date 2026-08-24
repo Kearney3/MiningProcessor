@@ -18,6 +18,18 @@ from func.sync.constants import DATA_TYPE_REGISTRY
 logger = get_logger(__name__)
 
 
+_ANOMALY_RESULT_TYPE_MAP = {
+    "fuel": "fuel",
+    "fuel_engine": "fuel",
+    "electrical": "electrical",
+    "production": "production",
+    "production_running": "operation",
+    "operation": "operation",
+    "worktime": "work_efficiency",
+    "work_efficiency": "work_efficiency",
+}
+
+
 # MineBase field-definitions.ts 字段重命名映射（旧名 → 新名）。
 # 用于运行时自动迁移用户 config 中的旧列映射。
 _FIELD_RENAMES: dict[str, str] = {
@@ -135,7 +147,7 @@ def sync(
     filter_zero_run_km: bool = False,
     conflict_policy: str = "SKIP",
     selected_files: dict[str, list[str | Path]] | None = None,
-) -> dict[str, dict[str, int]]:
+) -> dict[str, dict[str, Any]]:
     """执行同步的主入口。
 
     Args:
@@ -161,7 +173,8 @@ def sync(
             自动发现；传入空字典表示用户明确关闭了所有文件。
 
     Returns:
-        {data_type: {"success": N, "skipped": N, "failed": N}}
+        {data_type: {"success": N, "skipped": N, "failed": N,
+        "anomalies": [...] (启用检测时)}}
     """
     from func.config_loader import (
         get_minebase_api_config,
@@ -295,6 +308,12 @@ def sync(
 
     # 试运行数据收集
     dry_run_data: dict[str, list[dict[str, Any]]] = {}
+    anomaly_tracking = bool(
+        anomaly_config is not None and getattr(anomaly_config, "enabled", False)
+    )
+    collected_anomalies: list[dict[str, Any]] = []
+    if anomaly_tracking:
+        anomaly_config.begin_run()
 
     # 逐类型同步（每个类型可能对应多个文件）
     results = {}
@@ -383,36 +402,75 @@ def sync(
                 dry_run_data[data_type] = results[data_type].pop("dry_run_rows")
 
     finally:
-        if db_client:
-            db_client.close()
+        try:
+            if anomaly_tracking:
+                collected_anomalies = anomaly_config.end_run()
+        finally:
+            if db_client:
+                db_client.close()
+
+    # 将处理器按内部数据类型记录的异常，归档到同步结果对应的数据类型。
+    # 处理器可能一次返回 fuel_engine / production_running 等子类型，
+    # 因此不能直接使用记录上的中文标签作为结果 key。
+    if anomaly_tracking:
+        for record in collected_anomalies:
+            if not isinstance(record, dict):
+                continue
+            internal_type = record.pop("_data_type", None)
+            result_type = _ANOMALY_RESULT_TYPE_MAP.get(internal_type)
+            if result_type and result_type in results:
+                results[result_type].setdefault("anomalies", []).append(record)
+        for result in results.values():
+            if isinstance(result, dict):
+                result.setdefault("anomalies", [])
 
     # 汇总
     logger.info("=" * 50)
     logger.info("同步汇总:")
     total = {"success": 0, "skipped": 0, "failed": 0}
     total_warnings = 0
+    total_anomalies = 0
     for dt, r in results.items():
+        if not isinstance(r, dict) or dt.startswith("_"):
+            continue
         dt_warnings = r.get("warnings", [])
+        dt_anomalies = r.get("anomalies", [])
         total_warnings += len(dt_warnings)
-        logger.info("  %s: 成功=%d, 跳过=%d, 失败=%d, 异常=%d", dt, r["success"], r["skipped"], r["failed"], len(dt_warnings))
+        total_anomalies += len(dt_anomalies)
+        logger.info(
+            "  %s: 成功=%d, 跳过=%d, 失败=%d, 同步警告=%d, 异常值=%d",
+            dt, r["success"], r["skipped"], r["failed"],
+            len(dt_warnings), len(dt_anomalies),
+        )
         for k in total:
             total[k] += r[k]
-    logger.info("  合计: 成功=%d, 跳过=%d, 失败=%d, 异常=%d", total["success"], total["skipped"], total["failed"], total_warnings)
+    logger.info(
+        "  合计: 成功=%d, 跳过=%d, 失败=%d, 同步警告=%d, 异常值=%d",
+        total["success"], total["skipped"], total["failed"],
+        total_warnings, total_anomalies,
+    )
     if total_warnings:
-        logger.warning("  ⚠️  共 %d 条异常记录，请在 GUI 或前端中查看详情", total_warnings)
+        logger.warning("  ⚠️  共 %d 条同步警告，请在 GUI 或前端中查看详情", total_warnings)
+    if total_anomalies:
+        logger.warning("  ⚠️  共 %d 条异常值检测结果，请在 GUI 或前端中查看详情", total_anomalies)
 
     # 试运行模式：导出预览 Excel
     if dry_run and dry_run_data:
         from func.sync.export import export_dry_run_to_excel
         # 收集所有警告
         all_warnings: list[tuple[str, dict]] = []
+        all_anomalies: list[dict[str, Any]] = []
         for dt, r in results.items():
+            if not isinstance(r, dict) or dt.startswith("_"):
+                continue
             for w in r.get("warnings", []):
                 all_warnings.append((dt, w))
+            all_anomalies.extend(r.get("anomalies", []))
         try:
             dry_run_file = export_dry_run_to_excel(
                 dry_run_data,
                 warnings=all_warnings,
+                anomalies=all_anomalies,
                 column_mapping=column_mapping,
                 input_dir=input_path,
             )

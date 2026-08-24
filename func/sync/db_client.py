@@ -6,6 +6,13 @@ from func.sync.constants import VALID_TABLES
 
 logger = get_logger(__name__)
 
+DB_CONNECT_TIMEOUT_SECONDS = 30
+
+
+def _escape_like_fragment(value: str) -> str:
+    """Escape user text before embedding it in a SQL ``LIKE`` pattern."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
 
 class MineBaseDBClient:
     """MineBase PostgreSQL 直连客户端。"""
@@ -14,6 +21,7 @@ class MineBaseDBClient:
         import psycopg2
         self.conn = psycopg2.connect(
             host=host, port=port, dbname=database, user=user, password=password,
+            connect_timeout=DB_CONNECT_TIMEOUT_SECONDS,
         )
         self.conn.autocommit = False
         logger.info("已连接 MineBase 数据库: %s@%s:%d/%s", user, host, port, database)
@@ -21,6 +29,15 @@ class MineBaseDBClient:
     def close(self) -> None:
         if self.conn and not self.conn.closed:
             self.conn.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, _exc_value, _traceback):
+        if exc_type is not None and self.conn and not self.conn.closed:
+            self.conn.rollback()
+        self.close()
+        return False
 
     def resolve_equipment_id(self, equip_name: str) -> str | None:
         """通过 3 级级联查找设备 ID（与 MineBase API 一致）。"""
@@ -45,8 +62,8 @@ class MineBaseDBClient:
 
             # 3. 模糊匹配 equipment_match_table.equip_name（包含关系）
             cur.execute(
-                "SELECT equipment_id FROM equipment_match_table WHERE LOWER(equip_name) LIKE LOWER(%s) AND equipment_id IS NOT NULL LIMIT 1",
-                (f"%{equip_name}%",),
+                "SELECT equipment_id FROM equipment_match_table WHERE LOWER(equip_name) LIKE LOWER(%s) ESCAPE '\\' AND equipment_id IS NOT NULL LIMIT 1",
+                (f"%{_escape_like_fragment(equip_name)}%",),
             )
             row = cur.fetchone()
             if row:

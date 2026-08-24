@@ -27,7 +27,7 @@ from func.sync.core import (
     sync,
 )
 from func.sync.db_client import MineBaseDBClient
-from func.sync.export import export_dry_run_to_excel
+from func.sync.export import export_anomaly_records_to_excel, export_dry_run_to_excel
 from func.sync.file_processors import (
     _df_to_mapped_rows,
     _process_electrical_file,
@@ -80,6 +80,7 @@ __all__ = [
     "_resolve_fks_for_db",
     "discover_files",
     "export_dry_run_to_excel",
+    "export_anomaly_records_to_excel",
     "get_minebase_api_config",
     "load_column_mapping",
     "main",

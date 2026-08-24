@@ -72,6 +72,23 @@ class AnomalyConfig:
         # 运行时收集异常明细，供 GUI 表格展示；不参与检测规则计算。
         self._anomaly_records: list[dict] | None = None
 
+    def begin_run(self) -> None:
+        """开始一次任务级异常收集。"""
+        self._anomaly_counts = []
+        self._anomaly_records = []
+
+    def end_run(self) -> list[dict]:
+        """结束异常收集并返回本次任务的异常明细。"""
+        records = list(self._anomaly_records or [])
+        self._anomaly_counts = None
+        self._anomaly_records = None
+        return records
+
+    def clear_run(self) -> None:
+        """清理任务级异常收集状态，适用于异常退出路径。"""
+        self._anomaly_counts = None
+        self._anomaly_records = None
+
     @classmethod
     def from_config(cls, config: dict) -> AnomalyConfig:
         """从 config_loader.load_config() 返回的配置构造。"""

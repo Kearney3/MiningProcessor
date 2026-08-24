@@ -15,6 +15,7 @@ from .common import (
     _show_path_confirm,
     _update_last_directory,
     create_anomaly_controls,
+    create_anomaly_results_table,
     month_options,
     to_local_dt,
     year_options,
@@ -54,8 +55,10 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
 
     _browse_picker = ft.FilePicker()
     _save_warnings_picker = ft.FilePicker()
+    _save_anomalies_picker = ft.FilePicker()
     page.services.append(_browse_picker)
     page.services.append(_save_warnings_picker)
+    page.services.append(_save_anomalies_picker)
 
     async def on_browse(e):
         result = await _browse_picker.get_directory_path(dialog_title=t("components:sync_minebase.selectoutputDirectory"))
@@ -324,6 +327,14 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     )
 
     # --- 异常行表格 ---
+    export_anomalies_btn = theme.secondary_btn(
+        t("components:sync_minebase.exportAnomalyResults"),
+        icon=ft.Icons.DOWNLOAD,
+        height=28,
+    )
+    anomaly_results = create_anomaly_results_table(actions=[export_anomalies_btn])
+
+    # --- 同步警告列表 ---
     warnings_count_text = ft.Text("", size=12, color=theme.TEXT_SECONDARY)
     export_warnings_btn = theme.secondary_btn(t("components:sync_minebase.exportExcel"), icon=ft.Icons.DOWNLOAD, height=28)
     warnings_list = ft.Column([], spacing=2, scroll=ft.ScrollMode.AUTO, height=200)
@@ -443,6 +454,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     spacing=12,
                 ),
+                anomaly_results["container"],
                 warnings_container,
             ],
             spacing=theme.SPACING_MD,
@@ -487,6 +499,9 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "warnings_count_text": warnings_count_text,
         "export_warnings_btn": export_warnings_btn,
         "save_warnings_picker": _save_warnings_picker,
+        "anomaly_results": anomaly_results,
+        "export_anomalies_btn": export_anomalies_btn,
+        "save_anomalies_picker": _save_anomalies_picker,
     }
 
     return container, refs

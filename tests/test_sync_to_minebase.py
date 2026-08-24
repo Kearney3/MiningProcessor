@@ -1208,6 +1208,52 @@ class TestSyncWithProcessors:
         mock_fuel_proc.assert_called_once()
 
     @patch("func.sync_to_minebase.sync_via_api")
+    @patch("func.sync_to_minebase._process_fuel_file")
+    @patch("func.sync_to_minebase.discover_files")
+    def test_sync_collects_anomalies_by_result_type(
+        self, mock_discover, mock_fuel_proc, mock_sync_api, tmp_path,
+    ):
+        """启用异常检测时，处理器明细应进入对应同步结果并清理运行态缓存。"""
+        from func.anomaly.rules import AnomalyConfig
+
+        mock_discover.return_value = {"fuel": [tmp_path / "Fuel.xlsx"]}
+
+        def _process(*args, **kwargs):
+            cfg = kwargs["anomaly_config"]
+            cfg._anomaly_records.append({
+                "数据类型": "油耗信息",
+                "相关字段": "油品消耗",
+                "异常值": 50001,
+                "异常值原因": "超过上限 50000",
+                "行号": 8,
+                "源表": "油耗信息",
+                "源行号": 22,
+                "检测方法": "threshold",
+                "_data_type": "fuel",
+            })
+            return [{"date": "2025-06-01", "consumption": 50001}]
+
+        mock_fuel_proc.side_effect = _process
+        mock_sync_api.return_value = {"success": 1, "skipped": 0, "failed": 0, "warnings": []}
+        anomaly_config = AnomalyConfig(enabled=True)
+
+        with patch("func.sync_to_minebase.MineBaseAPIClient") as mock_api_cls, \
+             patch("func.sync_to_minebase.get_minebase_api_config", return_value={"url": "http://test", "username": "u", "password": "p"}):
+            mock_api_cls.return_value = MagicMock()
+            results = sync(
+                tmp_path,
+                mode="api",
+                data_types=["fuel"],
+                anomaly_config=anomaly_config,
+            )
+
+        assert len(results["fuel"]["anomalies"]) == 1
+        assert results["fuel"]["anomalies"][0]["检测方法"] == "threshold"
+        assert results["fuel"]["anomalies"][0]["源行号"] == 22
+        assert "_data_type" not in results["fuel"]["anomalies"][0]
+        assert anomaly_config._anomaly_records is None
+
+    @patch("func.sync_to_minebase.sync_via_api")
     @patch("func.sync_to_minebase._process_electrical_file")
     @patch("func.sync_to_minebase._process_fuel_file")
     @patch("func.sync_to_minebase.discover_files")
@@ -1788,6 +1834,32 @@ class TestExportDryRunToExcel:
         df = pd.read_excel(out_path, sheet_name="异常行")
         assert len(df) == 1
         assert df.iloc[0]["字段"] == "sourceEquipmentName"
+
+    def test_export_with_anomalies(self, tmp_path):
+        """试运行预览应把异常值检测结果写入独立 sheet。"""
+        from func.sync.export import export_dry_run_to_excel
+
+        dry_run_rows = {"fuel": [{"date": "2025-06-01"}]}
+        anomalies = [{
+            "数据类型": "油耗信息",
+            "相关字段": "油品消耗",
+            "异常值": 50001,
+            "异常值原因": "超过上限 50000",
+            "行号": 6,
+            "检测方法": "threshold",
+        }]
+        out_path = export_dry_run_to_excel(
+            dry_run_rows,
+            anomalies=anomalies,
+            input_dir=tmp_path,
+        )
+
+        xls = pd.ExcelFile(out_path)
+        assert "异常值" in xls.sheet_names
+        df = pd.read_excel(out_path, sheet_name="异常值")
+        assert df.iloc[0]["行号"] == 6
+        assert df.iloc[0]["检测方法"] == "threshold"
+        assert df.iloc[0]["异常值原因"] == "超过上限 50000"
 
     def test_export_no_warnings_no_sheet(self, tmp_path):
         """无警告时不应生成异常行 sheet。"""

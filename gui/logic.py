@@ -32,23 +32,28 @@ _shutdown_event = threading.Event()
 
 # 活跃任务的 cancel_event 集合，页面关闭时统一触发
 _active_cancel_events: list[threading.Event] = []
+_active_cancel_events_lock = threading.RLock()
 
 
 def register_cancel_event(event: threading.Event) -> None:
     """将一个 cancel_event 注册到活跃列表中，关闭时自动触发。"""
-    _active_cancel_events.append(event)
+    with _active_cancel_events_lock:
+        _active_cancel_events.append(event)
 
 
 def unregister_cancel_event(event: threading.Event) -> None:
     """从活跃列表中移除已完成的 cancel_event。"""
-    with contextlib.suppress(ValueError):
-        _active_cancel_events.remove(event)
+    with _active_cancel_events_lock:
+        with contextlib.suppress(ValueError):
+            _active_cancel_events.remove(event)
 
 
 def shutdown_tasks() -> None:
     """设置全局关闭标记，并触发所有活跃任务的 cancel_event。"""
     _shutdown_event.set()
-    for ev in _active_cancel_events[:]:
+    with _active_cancel_events_lock:
+        active_events = list(_active_cancel_events)
+    for ev in active_events:
         ev.set()
 
 
@@ -60,7 +65,8 @@ def is_shutdown() -> bool:
 def reset_shutdown() -> None:
     """重置全局关闭标记和活跃取消事件列表，供页面重新进入时调用。"""
     _shutdown_event.clear()
-    _active_cancel_events.clear()
+    with _active_cancel_events_lock:
+        _active_cancel_events.clear()
 
 
 # 保存按钮原始样式，以便恢复
@@ -68,14 +74,15 @@ _btn_original_styles: dict[int, ft.ButtonStyle] = {}
 
 _LOADING_STYLE = ft.ButtonStyle(bgcolor=theme.SURFACE_HIGH, color=theme.TEXT_TERTIARY)
 
-# 模块类型中文标签（扩展自 func.excel_batch 的公共标签）
-_MODULE_LABELS = {
-    **MODULE_LABELS,
-    "merge": t("logic:fileMerge"),
-    "maint": t("logic:maintenanceRecord"),
-    "tire": t("logic:tireData"),
-    "batch": t("logic:batchProcessing"),
-}
+def _module_label(module_type: str) -> str:
+    """Return a module label using the language active at call time."""
+    translated = {
+        "merge": t("logic:fileMerge"),
+        "maint": t("logic:maintenanceRecord"),
+        "tire": t("logic:tireData"),
+        "batch": t("logic:batchProcessing"),
+    }
+    return translated.get(module_type, MODULE_LABELS.get(module_type, module_type))
 
 
 class _SnackbarManager:
@@ -144,8 +151,10 @@ def _hide_snackbar() -> None:
     _snackbar_mgr.hide()
 
 
-def set_btn_state(btn: ft.Button, enabled: bool, label: str = t("logic:process")):
+def set_btn_state(btn: ft.Button, enabled: bool, label: str | None = None):
     """设置按钮状态：禁用时置灰并显示加载态文字，恢复时还原原始样式"""
+    if label is None:
+        label = t("logic:process")
     btn.disabled = not enabled
     btn.text = label
     if not enabled:
@@ -234,7 +243,7 @@ async def run_task(page: ft.Page, module_type: str, path: str, log, cancel_event
     Args:
         cancel_event: 可选的取消事件，页面关闭或用户取消时自动置位。
     """
-    label = _MODULE_LABELS.get(module_type, module_type)
+    label = _module_label(module_type)
     _log_message(log, f"[{label}] " + t("logic:processingStarted", label=label))
     error_message, extra = await asyncio.to_thread(_execute_task, module_type, path, cancel_event, **kwargs)
     if error_message:
@@ -612,7 +621,18 @@ async def _poll_batch_progress_queue(progress_queue, progress_bar, progress_text
     _drain_batch_progress_queue_once(progress_queue, progress_bar, progress_text)
 
 
-def _log_scan_summary(log, result: dict) -> None:
+async def _wait_for_thread_event(event: threading.Event, timeout: float) -> bool:
+    """Wait for a worker-thread event without occupying an executor thread."""
+    deadline = asyncio.get_running_loop().time() + timeout
+    while not event.is_set():
+        remaining = deadline - asyncio.get_running_loop().time()
+        if remaining <= 0:
+            return False
+        await asyncio.sleep(min(0.1, remaining))
+    return True
+
+
+def _log_scan_summary(log, result: dict) -> list[str]:
     """将共享扫描器的类型汇总写入 Flet 日志。"""
     matched = result.get("matched") or {}
     missing = result.get("missing") or []
@@ -626,6 +646,7 @@ def _log_scan_summary(log, result: dict) -> None:
             missing_labels=", ".join(missing_labels) or t("logic:empty"),
         ),
     )
+    return missing_labels
 
 
 async def on_batch_scan(page: ft.Page, batch_refs: dict, log) -> bool:
@@ -731,7 +752,7 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
             if not matched:
                 _log_message(log, t("logic:noSelectedFiles"), level=logging.WARNING)
                 return
-            _log_scan_summary(log, {"matched": matched, "missing": missing})
+            missing_labels = _log_scan_summary(log, {"matched": matched, "missing": missing})
         else:
             try:
                 matched, missing = await asyncio.to_thread(scan_files, path)
@@ -739,7 +760,7 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
                 _log_message(log, t("logic:fileScanFailed", ex=ex), level=logging.ERROR)
                 return
 
-            _log_scan_summary(log, {"matched": matched, "missing": missing})
+            missing_labels = _log_scan_summary(log, {"matched": matched, "missing": missing})
 
         # ── 第二阶段：表内合并基准表验证 & 缺失确认弹窗 ──
         if table_merge_config:
@@ -784,7 +805,7 @@ async def on_batch_process(page: ft.Page, batch_refs: dict, log, equipment_ledge
             page.show_dialog(dialog)
 
             # 等待用户操作（带超时防死锁）
-            confirmed = await asyncio.to_thread(event.wait, 300)
+            confirmed = await _wait_for_thread_event(event, 300)
             if not confirmed or not should_continue[0]:
                 _log_message(log, t("logic:theUserCanceledBatchProcessing"), level=logging.WARNING)
                 return
@@ -1190,6 +1211,9 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
             if wc:
                 wc.visible = False
                 wc.update()
+            anomaly_refs = sync_refs.get("anomaly_results")
+            if anomaly_refs:
+                anomaly_refs["update"]([])
             return
 
         # 提取试运行预览文件路径
@@ -1197,6 +1221,8 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
 
         total = {"success": 0, "skipped": 0, "failed": 0}
         for r in results.values():
+            if not isinstance(r, dict):
+                continue
             for k in total:
                 total[k] += r.get(k, 0)
 
@@ -1229,10 +1255,50 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
         from gui.components.sync_minebase import DATA_TYPES as _DT_NAMES
 
         _dt_label_map = dict(_DT_NAMES)
+        all_anomalies: list[dict] = []
         all_warnings: list[tuple[str, dict]] = []
         for dt, r in results.items():
+            if not isinstance(r, dict):
+                continue
+            for record in r.get("anomalies", []):
+                if not isinstance(record, dict):
+                    continue
+                anomaly = dict(record)
+                anomaly.setdefault("数据类型", _dt_label_map.get(dt, dt))
+                all_anomalies.append(anomaly)
             for w in r.get("warnings", []):
                 all_warnings.append((dt, w))
+
+        anomaly_refs = sync_refs.get("anomaly_results")
+        if anomaly_refs:
+            anomaly_refs["update"](all_anomalies)
+
+            export_anomalies_btn = sync_refs.get("export_anomalies_btn")
+            save_anomalies_picker = sync_refs.get("save_anomalies_picker")
+            if export_anomalies_btn:
+                async def _on_export_anomalies(e):
+                    from func.sync.export import export_anomaly_records_to_excel
+
+                    ts = local_now().strftime("%Y%m%d_%H%M%S")
+                    target_path = None
+                    if save_anomalies_picker:
+                        res = await save_anomalies_picker.save_file(
+                            dialog_title=t("logic:chooseWhereToSaveExportedAnomalyResults"),
+                            file_name=t("logic:anomalyDetectionResultsXlsx", ts=ts),
+                            allowed_extensions=["xlsx"],
+                        )
+                        if not res:
+                            return
+                        target_path = res
+                    out_path = export_anomaly_records_to_excel(
+                        all_anomalies,
+                        output_path=target_path,
+                        input_dir=path,
+                    )
+                    _log_message(log, t("logic:anomalyResultsExportedTo", out_path=out_path))
+                    _show_snackbar(page, t("logic:anomalyResultsExportedTo", out_path=out_path))
+
+                export_anomalies_btn.on_click = _on_export_anomalies
 
         warnings_container = sync_refs.get("warnings_container")
         warnings_list = sync_refs.get("warnings_list")
@@ -1298,6 +1364,9 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
         if wc:
             wc.visible = False
             wc.update()
+        anomaly_refs = sync_refs.get("anomaly_results")
+        if anomaly_refs:
+            anomaly_refs["update"]([])
     finally:
         if not _shutdown_event.is_set():
             set_btn_state(btn, True, t("logic:itemMinebase"))

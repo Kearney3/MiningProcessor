@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
-import type { BridgeProp, SyncResult, SyncWarning } from "../../lib/types";
+import type { AnomalyRecord, BridgeProp, SyncResult, SyncWarning } from "../../lib/types";
 import { useToast } from "../Toast";
 import {
   FolderIcon, FuelIcon, ProductionIcon, ElectricalIcon, WorktimeIcon,
@@ -14,6 +14,7 @@ import { ChipToggle } from "../../lib/ui-components";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
 import { DatePicker } from "../DatePicker";
 import { AnomalyPanel, type AnomalyConfig, DEFAULT_ANOMALY_CONFIG } from "../AnomalyPanel";
+import { AnomalyResultsTable } from "../AnomalyResultsTable";
 import { FileScanPanel } from "../FileScanPanel";
 import { localToday, localTodayString, localYesterdayString } from "../../lib/dateUtils";
 import type { ScanResult } from "../../lib/types";
@@ -248,8 +249,13 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
       });
       setResult(res);
       const total = Object.values(res.results).reduce(
-        (acc, r) => ({ success: acc.success + r.success, skipped: acc.skipped + r.skipped, failed: acc.failed + r.failed }),
-        { success: 0, skipped: 0, failed: 0 },
+        (acc, r) => ({
+          success: acc.success + r.success,
+          skipped: acc.skipped + r.skipped,
+          failed: acc.failed + r.failed,
+          anomalies: acc.anomalies + (r.anomalies?.length ?? 0),
+        }),
+        { success: 0, skipped: 0, failed: 0, anomalies: 0 },
       );
       if (total.failed > 0) {
         notify(t("pages:DataSyncPage.syncCompletedSucceededSkipFailed", { success: total.success, skipped: total.skipped, failed: total.failed }), "error");
@@ -271,6 +277,35 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
       setInputDir(dir);
       clearScan();
       bridge.call("save_last_directory", { key: "sync_last_input_dir", path: dir }).catch(() => {});
+    }
+  };
+
+  const anomalyRecords: AnomalyRecord[] = result
+    ? Object.entries(result.results).flatMap(([type, stats]) =>
+        (stats.anomalies ?? []).map((record) => ({
+          ...record,
+          数据类型: record.数据类型 ?? typeLabel(type),
+        })),
+      )
+    : [];
+
+  const handleExportAnomalies = async () => {
+    if (anomalyRecords.length === 0) return;
+    try {
+      const today = localTodayString();
+      const savePath = await save({
+        defaultPath: t("pages:DataSyncPage.anomalyDetectionResultsXlsx", { today }),
+        filters: [{ name: "Excel", extensions: ["xlsx"] }],
+      });
+      if (!savePath) return;
+
+      const res = await bridge.call<{ output_file: string }>("export_sync_anomalies", {
+        records: anomalyRecords,
+        output_path: savePath,
+      });
+      notify(t("pages:DataSyncPage.anomalyResultsExportedTo", { path: res.output_file }), "success");
+    } catch (e) {
+      notify(t("pages:DataSyncPage.exportFailed", { error: e }), "error");
     }
   };
 
@@ -730,8 +765,9 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
             skipped: acc.skipped + r.skipped,
             failed: acc.failed + r.failed,
             warnings: acc.warnings + (r.warnings?.length ?? 0),
+            anomalies: acc.anomalies + (r.anomalies?.length ?? 0),
           }),
-          { success: 0, skipped: 0, failed: 0, warnings: 0 },
+          { success: 0, skipped: 0, failed: 0, warnings: 0, anomalies: 0 },
         );
         const hasError = totals.failed > 0;
         return (
@@ -743,6 +779,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
             {totals.skipped > 0 && <span>· {t("pages:DataSyncPage.skipped")} {totals.skipped}</span>}
             {totals.failed > 0 && <span>· {t("pages:DataSyncPage.failure")} {totals.failed}</span>}
             {totals.warnings > 0 && <span>· {t("pages:DataSyncPage.ui.anomalies")} {totals.warnings}</span>}
+            {totals.anomalies > 0 && <span>· {t("pages:DataSyncPage.ui.anomalyValues")} {totals.anomalies}</span>}
           </div>
         );
       })()}
@@ -825,6 +862,8 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
         </div>
       )}
 
+      <AnomalyResultsTable records={anomalyRecords} onExport={handleExportAnomalies} />
+
       {/* Warnings table */}
       {result && (() => {
         const allWarnings: { type: string; label: string; w: SyncWarning }[] = [];
@@ -896,7 +935,11 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
                       <td className="px-4 py-2 text-sm text-slate-700">{item.label}</td>
                       <td className="py-2 text-sm text-slate-500">{item.w.row}</td>
                       <td className="py-2 text-sm text-slate-700">{item.w.field}</td>
-                      <td className="py-2 text-sm text-red-600 font-mono">{item.w.value || t("pages:DataSyncPage.empty")}</td>
+                      <td className="py-2 text-sm text-red-600 font-mono">{
+                        item.w.value === null || item.w.value === undefined || item.w.value === ""
+                          ? t("pages:DataSyncPage.empty")
+                          : String(item.w.value)
+                      }</td>
                       <td className="py-2 pr-4 text-sm text-slate-500">{item.w.message}</td>
                     </tr>
                   ))}

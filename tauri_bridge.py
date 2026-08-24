@@ -19,7 +19,9 @@ import json
 import logging
 import os
 import secrets
+import socket
 import sys
+import tempfile
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
@@ -38,6 +40,8 @@ for _stream in (sys.stdin, sys.stdout, sys.stderr):
             _stream.reconfigure(encoding='utf-8', errors='replace')
 
 logger = logging.getLogger(__name__)
+
+MAX_TEXT_FILE_BYTES = 10 * 1024 * 1024
 
 # ─── 项目路径注册 ───
 # PyInstaller 打包模式：从临时解压目录加载，但持久化数据写入 Application Support
@@ -63,6 +67,26 @@ else:
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+
+def _get_project_version() -> str:
+    """Read the bridge version from package metadata, with source-tree fallback."""
+    try:
+        from importlib.metadata import version
+
+        return version("MiningProcessor")
+    except Exception:
+        try:
+            import tomllib
+
+            with (PROJECT_ROOT / "pyproject.toml").open("rb") as file:
+                return str(tomllib.load(file)["project"]["version"])
+        except (KeyError, OSError, TypeError, tomllib.TOMLDecodeError):
+            return "dev"
+
+
+_BRIDGE_VERSION = _get_project_version()
+
+
 def _validate_url(url: str) -> str:
     """Validate a URL to prevent SSRF attacks.
 
@@ -80,22 +104,39 @@ def _validate_url(url: str) -> str:
     if not hostname:
         raise ValueError("URL must include a hostname")
 
+    def _is_blocked_address(addr: ipaddress._BaseAddress) -> bool:
+        return (
+            addr.is_loopback
+            or addr.is_link_local
+            or addr.is_private
+            or addr.is_reserved
+            or addr.is_multicast
+            or addr.is_unspecified
+            or addr in ipaddress.ip_network("169.254.169.254/32")
+        )
+
     try:
         addr = ipaddress.ip_address(hostname)
     except ValueError:
-        # hostname is a domain name — acceptable
+        # Local MineBase installations intentionally use localhost.
+        if hostname.casefold() in {"localhost", "localhost.localdomain"}:
+            return url
+        # Resolve hostnames once and reject private/link-local answers.  A
+        # DNS failure is left to the HTTP client so offline configuration can
+        # still be saved; callers will receive the normal connection error.
+        try:
+            addresses = {
+                ipaddress.ip_address(result[4][0])
+                for result in socket.getaddrinfo(hostname, None, type=socket.SOCK_STREAM)
+            }
+        except (OSError, ValueError):
+            addresses = set()
+        if any(_is_blocked_address(address) for address in addresses):
+            raise ValueError("URL resolves to a private or local address")
         return url
 
-    if addr.is_loopback:
-        raise ValueError("Loopback addresses are not allowed")
-
-    if addr.is_link_local:
-        raise ValueError("Link-local addresses are not allowed")
-
-    # Explicit block for the well-known cloud metadata endpoint
-    _cloud_metadata = ipaddress.ip_network("169.254.169.254/32")
-    if addr in _cloud_metadata:
-        raise ValueError("Cloud metadata endpoint is not allowed")
+    if _is_blocked_address(addr):
+        raise ValueError("Private, loopback, or link-local addresses are not allowed")
 
     return url
 
@@ -112,6 +153,14 @@ def _sanitize_path(
     """
     from func.path_utils import sanitize_path
     return sanitize_path(raw, must_exist=must_exist, allow_file=allow_file, allow_dir=allow_dir)
+
+
+def _require_params(params: dict, *names: str) -> None:
+    """Raise a clear validation error instead of leaking ``KeyError`` to RPC clients."""
+    missing = [name for name in names if name not in params or params[name] is None]
+    if missing:
+        joined = ", ".join(missing)
+        raise ValueError(f"Missing required parameter(s): {joined}")
 
 
 # ─── JSON 编码器（处理 pandas/numpy/datetime 等类型）───
@@ -460,6 +509,7 @@ def _process_electrical(params: dict) -> dict:
 
 @_register("process_worktime")
 def _process_worktime(params: dict) -> dict:
+    _require_params(params, "path", "year", "month")
     from func.orchestration import build_worktime_header_mapping, process_single
     common = _extract_common_params(params)
     header_mapping = None
@@ -577,7 +627,8 @@ def _process_maintenance_llm(params: dict) -> dict:
 
 
 # LLM 标注取消文件（用于处理器在网络请求间隔中检测取消）。
-_CANCEL_FILE = Path.home() / ".cache" / "mining_processor_cancel"
+# Include the process ID so multiple bridge instances cannot cancel each other.
+_CANCEL_FILE = Path(tempfile.gettempdir()) / f"mining_processor_cancel_{os.getpid()}"
 
 
 @_register("cancel_llm_labeling")
@@ -845,6 +896,23 @@ def _export_sync_warnings(params: dict) -> dict:
     return {"output_file": out_file}
 
 
+@_register("export_sync_anomalies")
+def _export_sync_anomalies(params: dict) -> dict:
+    """导出同步过程中检测到的异常值明细。"""
+    from func.sync.export import export_anomaly_records_to_excel
+
+    records = params.get("records", [])
+    output_path = params.get("output_path")
+    input_dir = params.get("input_dir")
+
+    out_file = export_anomaly_records_to_excel(
+        records,
+        output_path=output_path,
+        input_dir=input_dir,
+    )
+    return {"output_file": out_file}
+
+
 @_register("get_config")
 def _get_config(params: dict) -> dict:
     from func.config_loader import (
@@ -869,6 +937,7 @@ def _get_config(params: dict) -> dict:
 
 @_register("save_config")
 def _save_config(params: dict) -> dict:
+    _require_params(params, "data")
     from func.config_loader import save_config, update_user_config
 
     target = params.get("target", "default")
@@ -881,6 +950,7 @@ def _save_config(params: dict) -> dict:
 
 @_register("save_minebase_config")
 def _save_minebase_config(params: dict) -> dict:
+    _require_params(params, "config")
     from func.config_loader import save_minebase_config
 
     save_minebase_config(params["config"])
@@ -917,6 +987,7 @@ def _get_device_load_map(params: dict) -> dict:
 
 @_register("update_device_load_map")
 def _update_device_load_map(params: dict) -> dict:
+    _require_params(params, "map_data")
     from func.config_loader import update_device_load_map
 
     update_device_load_map(params["map_data"], params.get("version", "new"))
@@ -925,6 +996,7 @@ def _update_device_load_map(params: dict) -> dict:
 
 @_register("apply_device_load_map")
 def _apply_device_load_map(params: dict) -> dict:
+    _require_params(params, "map_data")
     from func.config_loader import apply_device_load_map
 
     apply_device_load_map(params["map_data"], params.get("version", "new"))
@@ -947,6 +1019,7 @@ def _get_load_map_version(params: dict) -> dict:
 
 @_register("set_load_map_version")
 def _set_load_map_version(params: dict) -> dict:
+    _require_params(params, "version")
     from func.config_loader import set_load_map_version
 
     set_load_map_version(params["version"])
@@ -977,6 +1050,7 @@ def _import_maintenance_classifications(params: dict) -> dict:
 
 @_register("update_maintenance_classifications")
 def _update_maintenance_classifications(params: dict) -> dict:
+    _require_params(params, "rules")
     from func.config_loader import update_maintenance_classifications
 
     rules = params["rules"]
@@ -998,6 +1072,7 @@ def _get_minebase_column_mapping(params: dict) -> dict:
 @_register("save_minebase_column_mapping")
 def _save_minebase_column_mapping(params: dict) -> dict:
     """保存 MineBase 列映射配置。"""
+    _require_params(params, "mapping")
     from func.config_loader import save_minebase_column_mapping
     save_minebase_column_mapping(params["mapping"])
     return {"ok": True}
@@ -1302,6 +1377,7 @@ def _read_excel_sheet(params: dict) -> dict:
 
     max_rows=0 或不传表示不限制行数。
     """
+    _require_params(params, "path", "sheet")
     import pandas as pd
     safe_path = str(_sanitize_path(params["path"], must_exist=True, allow_dir=False))
     max_rows = params.get("max_rows", 0)
@@ -1459,7 +1535,7 @@ def _check_directory_exists(params: dict) -> dict:
 
 @_register("ping")
 def _ping(params: dict) -> dict:
-    return {"pong": True, "pid": __import__("os").getpid(), "version": "1.2.0"}
+    return {"pong": True, "pid": os.getpid(), "version": _BRIDGE_VERSION}
 
 
 @_register("get_sync_data_types")
@@ -1473,8 +1549,14 @@ def _get_sync_data_types(params: dict) -> dict:
 def _write_text_file(params: dict) -> dict:
     """将文本内容写入指定路径（用于日志导出等）。"""
     from func.path_utils import sanitize_path
+    _require_params(params, "path")
     safe_path = str(sanitize_path(params["path"], allow_dir=False))
     content = params.get("content", "")
+    if not isinstance(content, str):
+        raise ValueError("content must be a string")
+    content_size = len(content.encode("utf-8"))
+    if content_size > MAX_TEXT_FILE_BYTES:
+        raise ValueError(f"content exceeds the {MAX_TEXT_FILE_BYTES} byte limit")
     Path(safe_path).write_text(content, encoding="utf-8")
     return {"ok": True}
 
