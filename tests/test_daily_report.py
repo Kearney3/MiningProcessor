@@ -187,6 +187,15 @@ def test_daily_report_export_can_include_detail_sheets_and_runtime_identity_opti
     assert "原始公司名称" not in report.columns
 
 
+def test_daily_report_source_files_matches_raw_fuel_case_insensitively(tmp_path):
+    source = tmp_path / "Fuel Report 2026.xlsx"
+    source.touch()
+
+    files = daily_report_module._source_files(tmp_path)
+
+    assert files["raw_fuel"] == [source]
+
+
 def test_daily_report_formula_validation_rejects_unknown_names_and_bad_syntax():
     valid = {
         "延迟时间": "transfer+auxiliary_work+waiting_load",
