@@ -189,7 +189,7 @@ def _source_files(
             p for p in files if "白班" in p.name or "夜班" in p.name
         ]),
         "raw_fuel": sorted([
-            p for p in files if "Fuel report" in p.name or "设备柴油消耗" in p.name
+            p for p in files if "fuel report" in p.name.casefold() or "设备柴油消耗" in p.name
         ]),
         "raw_electrical": sorted([
             p for p in files if "Цахилгааны хэлтэс" in p.name or "Electrical" in p.name
