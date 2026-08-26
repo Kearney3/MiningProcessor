@@ -93,7 +93,7 @@ function PageLoading() {
 function App() {
   const { t } = useTranslation();
   const [currentPage, setCurrentPage] = useState<PageId>("data-processing");
-  const [appVersion, setAppVersion] = useState("v2.8.0");
+  const [appVersion, setAppVersion] = useState("v2.9.0");
   const bridge = usePythonBridge();
 
   useEffect(() => {

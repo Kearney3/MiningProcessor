@@ -3,7 +3,7 @@
 > 矿山运营 Excel 报表批量处理工具
 
 <p>
-  <img src="https://img.shields.io/badge/version-v2.8.0-blue?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-v2.9.0-blue?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/Python-≥3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="python" />
   <img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square" alt="license" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="platform" />
@@ -432,6 +432,16 @@ uv run scripts/bump_version.py --bump minor --dry-run
 ---
 
 ## 📋 更新日志
+
+### v2.9.0 · 2026-08-26
+
+- ⚙️ **系统资源设置**
+  - 用户配置新增系统资源设置，可调整参与报表计算的 CPU 核心数，范围为 1 到当前可用逻辑核心数。
+  - 生产报表批量处理会读取该设置；CLI 显式指定 `--workers` 时仍优先使用命令行参数。
+  - Flet 与 Tauri 界面同步提供该设置，配置保存至用户配置。
+- 🧪 **测试与构建**
+  - 新增 CPU 核心数配置校验、持久化和生产并行度覆盖。
+  - Python 测试、前端测试和生产构建均已验证通过。
 
 ### v2.8.0 · 2026-08-22
 
