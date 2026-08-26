@@ -6,3 +6,4 @@ export { ColumnMappingSection } from "./ColumnMappingSection";
 export { AnomalyConfigSection } from "./AnomalyConfigSection";
 export { SectionCard, ActionButtons, StatusMessage, KeywordChipInput } from "./_shared";
 export { DailyReportConfigSection } from "./DailyReportConfigSection";
+export { SystemResourceSection } from "./SystemResourceSection";

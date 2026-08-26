@@ -80,6 +80,15 @@
     "AnomalyPanel.ui.columnRulesHint": "Хэрэглэгчийн тохиргоо → Хэвийн бус утга илрүүлэх хэсэгт багана тус бүрийн дүрмийг тохируулна."
   },
   "userConfig": {
+    "SystemResourceSection.systemResourceSettings": "Системийн нөөцийн тохиргоо",
+    "SystemResourceSection.configureCpuResourcesForDataProcessing": "Тайлан боловсруулахад ашиглах CPU цөмийг тохируулах",
+    "SystemResourceSection.cpuCores": "Боловсруулалтад ашиглах CPU цөм",
+    "SystemResourceSection.cpuCoresHint": "Олон цөм ашиглавал үйлдвэрлэлийн тайланг багцаар боловсруулах хурд нэмэгдэж болох ч системийн нөөц илүү зарцуулна.",
+    "SystemResourceSection.availableCpuCores": "Боломжтой: {available} цөм",
+    "SystemResourceSection.invalidCpuCores": "1–{max} хооронд бүхэл тоо оруулна уу",
+    "SystemResourceSection.cpuCoresSaved": "CPU цөмийн тохиргоо хадгалагдлаа",
+    "SystemResourceSection.saveFailed": "Хадгалж чадсангүй: {error}",
+    "SystemResourceSection.defaultConfigurationRestoredClickSaveToApply": "Үндсэн утгыг сэргээв (хадгалахын тулд хадгалах товч дарна уу)",
     "AnomalyConfigSection.multiplier": "σ multiplier",
     "AnomalyConfigSection.production": "production",
     "AnomalyConfigSection.saveFailed": "Save failed: {error}",

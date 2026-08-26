@@ -80,6 +80,15 @@
     "AnomalyPanel.ui.columnRulesHint": "Configure per-column detection in User Config → Anomaly Detection."
   },
   "userConfig": {
+    "SystemResourceSection.systemResourceSettings": "System Resource Settings",
+    "SystemResourceSection.configureCpuResourcesForDataProcessing": "Adjust the CPU cores used for report processing",
+    "SystemResourceSection.cpuCores": "CPU cores used for processing",
+    "SystemResourceSection.cpuCoresHint": "More cores can speed up batch production report processing, but use more system resources. Changes apply to the next task.",
+    "SystemResourceSection.availableCpuCores": "Available: {available} cores",
+    "SystemResourceSection.invalidCpuCores": "Enter an integer from 1 to {max}",
+    "SystemResourceSection.cpuCoresSaved": "CPU core setting saved",
+    "SystemResourceSection.saveFailed": "Save failed: {error}",
+    "SystemResourceSection.defaultConfigurationRestoredClickSaveToApply": "Default restored (click Save to apply)",
     "AnomalyConfigSection.multiplier": "σ multiplier",
     "AnomalyConfigSection.production": "production",
     "AnomalyConfigSection.saveFailed": "Save failed: {error}",
