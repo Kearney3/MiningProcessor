@@ -31,6 +31,23 @@ const ALL_TYPES = [
   { id: "operation", labelKey: "operationData", icon: <OperationIcon /> },
 ] as const;
 
+type MineBaseSyncProfile = {
+  id: string;
+  name?: string;
+  mode?: "api" | "database";
+  api?: { url?: string };
+  database?: { host?: string; port?: number };
+};
+
+function mineBaseProfileAddress(profile: MineBaseSyncProfile): string {
+  if (profile.mode === "database") {
+    const host = profile.database?.host?.trim() || "";
+    const port = profile.database?.port;
+    return host ? `${host}${port ? `:${port}` : ""}` : "";
+  }
+  return profile.api?.url?.trim() || "";
+}
+
 // ═══════════════════════════════════════
 // Data type checkbox component
 // ═══════════════════════════════════════
@@ -75,6 +92,8 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   };
   const [inputDir, setInputDir] = useState("");
   const [mode, setMode] = useState<"api" | "database">("api");
+  const [minebaseProfileId, setMinebaseProfileId] = useState("");
+  const [minebaseProfiles, setMinebaseProfiles] = useState<MineBaseSyncProfile[]>([]);
   const [conflictPolicy, setConflictPolicy] = useState<"SKIP" | "UPDATE" | "REJECT">("SKIP");
   const [dataTypes, setDataTypes] = useState<string[]>(ALL_TYPES.map((type) => type.id));
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
@@ -115,6 +134,20 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
 
   // 启动时从配置加载上次目录，不存在则清空
   useEffect(() => {
+    bridge.call<{
+      active_profile_id?: string;
+      profiles?: MineBaseSyncProfile[];
+    }>("get_config", { key: "minebase" })
+      .then((config) => {
+        const profiles = Array.isArray(config.profiles) ? config.profiles : [];
+        setMinebaseProfiles(profiles);
+        const active = profiles.find((profile) => profile.id === config.active_profile_id) ?? profiles[0];
+        if (!active) return;
+        setMinebaseProfileId(active.id);
+        setMode(active.mode === "database" ? "database" : "api");
+      })
+      .catch(() => {});
+
     bridge.call<{ path: string }>("get_last_directory", { key: "sync_last_input_dir" })
       .then((res) => {
         const saved = res.path;
@@ -162,6 +195,16 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const clearScan = () => {
     setScanResult(null);
     setSelectedPaths([]);
+  };
+
+  const handleMineBaseProfileChange = (profileId: string) => {
+    setMinebaseProfileId(profileId);
+    const profile = minebaseProfiles.find((item) => item.id === profileId);
+    if (profile) {
+      setMode(profile.mode === "database" ? "database" : "api");
+    }
+    setError(null);
+    setResult(null);
   };
 
   const handleScan = async (): Promise<ScanResult | null> => {
@@ -223,6 +266,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
       const res = await bridge.call<SyncResult>("sync_minebase", {
         input_dir: syncDir,
         mode,
+        profile_id: minebaseProfileId || undefined,
         conflict_policy: conflictPolicy,
         data_types: dataTypes,
         selected_files: scanResult ? selectedFilesByType : undefined,
@@ -360,6 +404,43 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
             typeIcon={(type) => ALL_TYPES.find((item) => item.id === (type === "worktime" ? "work_efficiency" : type))?.icon ?? <QuestionIcon />}
             description={t("pages:DataSyncPage.fileSelectionHint")}
           />
+        </div>
+
+        {/* MineBase connection profile */}
+        <div>
+          <label htmlFor="minebase-sync-profile" className="text-xs font-medium text-slate-500 mb-1.5 block">
+            {t("pages:DataSyncPage.connectionProfile")}
+          </label>
+          {minebaseProfiles.length > 0 ? (
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <select
+                id="minebase-sync-profile"
+                value={minebaseProfileId}
+                onChange={(e) => handleMineBaseProfileChange(e.target.value)}
+                disabled={loading || scanning}
+                className={`${inputClass} flex-1`}
+              >
+                {minebaseProfiles.map((profile) => {
+                  const address = mineBaseProfileAddress(profile);
+                  return (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.name || profile.id}{address ? ` · ${address}` : ""}
+                    </option>
+                  );
+                })}
+              </select>
+              <span className="text-xs text-slate-400 shrink-0">
+                {mode === "api" ? t("pages:DataSyncPage.apiMode") : t("pages:DataSyncPage.databaseMode")}
+              </span>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400">
+              {t("pages:DataSyncPage.noConnectionProfiles")}
+            </p>
+          )}
+          <p className="text-xs text-slate-400 mt-1">
+            {t("pages:DataSyncPage.profileSelectionHint")}
+          </p>
         </div>
 
         {/* Sync mode — restrained segmented control */}

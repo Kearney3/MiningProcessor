@@ -159,7 +159,7 @@ MiningProcessor/
 │   └── Cargo.toml
 ├── func/                       # 核心处理引擎（Python）
 │   ├── config_loader.py        # 配置读写与运行时管理
-│   ├── secret_store.py         # Keychain 凭证存储（密码加密）
+│   ├── secret_store.py         # 凭证加密存储
 │   ├── equipment_ledger.py     # 设备台账与模糊匹配
 │   ├── oil_ledger.py           # 油品台账管理
 │   ├── ledger_base.py / ledger_match.py / ledger_postprocess.py
@@ -250,11 +250,10 @@ MiningProcessor/
 | `user_config.worktime_header_mapping` | 工作效率表自定义表头映射（支持位置模式和模糊匹配） |
 | `user_config.file_keywords` | 各报表文件识别关键字 |
 | `anomaly_detection` | 异常值检测配置（阈值、σ/百分位参数、处理规则） |
-| `minebase.mode` | MineBase 同步模式：`api` 或 `database` |
-| `minebase.api` | API 模式连接参数（`url/username/password`） |
-| `minebase.database` | 数据库直连参数（`host/port/database/user/password`） |
+| `minebase.active_profile_id` | 当前使用的 MineBase 连接档案 ID |
+| `minebase.profiles` | 多个连接档案；每个档案包含名称、模式，以及 API/数据库连接参数 |
 
-> **⚠️ 安全说明**：`minebase` 下的 `password` 字段通过系统 Keychain 加密存储（macOS Keychain / Windows Credential Manager），配置文件中仅保存哨兵值 `__keyring__`。首次启动 Tauri GUI 时自动将残留明文密码迁移到 Keychain；若 Keychain 不可用，密码以明文保留在 `config.user.json` 中作为回退。
+> **⚠️ 安全说明**：MineBase 每个连接档案的 API/数据库密码使用 Fernet 加密后写入 `config.user.json`，Tauri 前端只收到 `__keyring__` 哨兵，不会收到密文。保存多个档案即可记住不同地址、账号和密码；保存时选择的档案会成为当前同步档案。
 
 > **⚠️ 行为说明**：GUI 中"应用当前配置"仅更新运行时内存（`apply_device_load_map()`），"保存配置"才会写回文件（`update_device_load_map()`）。
 
@@ -365,7 +364,7 @@ uv run pytest -v
 | `test_user_config_section.py` | 用户配置面板 |
 | `test_production_config_flow.py` / `test_production_model_match.py` | 生产配置与模型匹配 |
 | `test_tab_switching.py` / `test_drag_resize.py` | Tab 切换与拖拽 |
-| `test_secret_store.py` | Keychain 凭证存储、密码迁移、故障回退 |
+| `test_secret_store.py` | 凭证加密存储、密码迁移、故障回退 |
 | `test_tauri_bridge.py` | Tauri RPC 方法、连接测试、启动迁移 |
 | `test_orchestration.py` | 多报表编排处理 |
 | `test_sync_to_minebase.py` / `test_sync_file_processors.py` | MineBase 同步 |
@@ -676,7 +675,7 @@ uv run scripts/bump_version.py --bump minor --dry-run
 - React 前端 + Python sidecar（JSON-RPC over stdio）
 - 7 个 Excel 报表处理模块
 - 设备台账 / 油品台账 / 模糊匹配
-- Keychain 密码加密存储
+- Fernet 密码加密存储
 - GitHub Actions 自动构建（CI 通过后触发）+ artifacts 清理
 
 ---

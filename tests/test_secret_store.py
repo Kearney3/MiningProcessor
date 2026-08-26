@@ -17,7 +17,6 @@ from func.secret_store import (  # noqa: E402
     _get_machine_id,
     has_encrypted_secret,
     load_minebase_secret,
-    load_secret,
     save_minebase_secrets,
 )
 
@@ -73,51 +72,62 @@ class TestSaveMinebaseSecrets:
     def test_encrypts_password_fields(self):
         """密码字段应被加密。"""
         cfg = {
-            "api": {"url": "http://example.com", "username": "admin", "password": "secret123"},
-            "database": {"host": "localhost", "port": 5432, "user": "postgres", "password": "db_pass"},
+            "profiles": [{
+                "id": "one",
+                "api": {"url": "http://example.com", "username": "admin", "password": "secret123"},
+                "database": {"host": "localhost", "port": 5432, "user": "postgres", "password": "db_pass"},
+            }],
         }
         result = save_minebase_secrets(cfg)
 
-        assert result["api"]["password"].startswith(_ENCRYPTED_PREFIX)
-        assert result["database"]["password"].startswith(_ENCRYPTED_PREFIX)
-        assert _decrypt(result["api"]["password"]) == "secret123"
-        assert _decrypt(result["database"]["password"]) == "db_pass"
+        profile = result["profiles"][0]
+        assert profile["api"]["password"].startswith(_ENCRYPTED_PREFIX)
+        assert profile["database"]["password"].startswith(_ENCRYPTED_PREFIX)
+        assert _decrypt(profile["api"]["password"]) == "secret123"
+        assert _decrypt(profile["database"]["password"]) == "db_pass"
 
     def test_preserves_non_password_fields(self):
         """非密码字段应保持不变。"""
         cfg = {
-            "api": {"url": "http://example.com", "username": "admin", "password": "secret"},
-            "database": {"host": "localhost", "port": 5432, "user": "postgres", "password": "db"},
+            "profiles": [{
+                "id": "one",
+                "api": {"url": "http://example.com", "username": "admin", "password": "secret"},
+                "database": {"host": "localhost", "port": 5432, "user": "postgres", "password": "db"},
+            }],
         }
         result = save_minebase_secrets(cfg)
 
-        assert result["api"]["url"] == "http://example.com"
-        assert result["api"]["username"] == "admin"
-        assert result["database"]["host"] == "localhost"
-        assert result["database"]["port"] == 5432
+        profile = result["profiles"][0]
+        assert profile["api"]["url"] == "http://example.com"
+        assert profile["api"]["username"] == "admin"
+        assert profile["database"]["host"] == "localhost"
+        assert profile["database"]["port"] == 5432
 
     def test_does_not_mutate_input(self):
         """不应修改传入的原始配置。"""
-        cfg = {"api": {"password": "original"}}
+        cfg = {"profiles": [{"id": "one", "api": {"password": "original"}}]}
         save_minebase_secrets(cfg)
-        assert cfg["api"]["password"] == "original"
+        assert cfg["profiles"][0]["api"]["password"] == "original"
 
     def test_skips_empty_and_none(self):
         """空密码和 None 不应加密。"""
         cfg = {
-            "api": {"password": ""},
-            "database": {"password": None},
+            "profiles": [{
+                "id": "one",
+                "api": {"password": ""},
+                "database": {"password": None},
+            }],
         }
         result = save_minebase_secrets(cfg)
-        assert result["api"]["password"] == ""
-        assert result["database"]["password"] is None
+        assert result["profiles"][0]["api"]["password"] == ""
+        assert result["profiles"][0]["database"]["password"] is None
 
     def test_skips_already_encrypted(self):
         """已经是 __enc__ 格式的值不应重复加密。"""
         already = _encrypt("already_encrypted")
-        cfg = {"api": {"password": already}}
+        cfg = {"profiles": [{"id": "one", "api": {"password": already}}]}
         result = save_minebase_secrets(cfg)
-        assert result["api"]["password"] == already
+        assert result["profiles"][0]["api"]["password"] == already
 
 
 # ---------------------------------------------------------------------------
@@ -129,7 +139,10 @@ class TestLoadSecret:
         encrypted = _encrypt("real_pass")
         config_file = tmp_path / "config.json"
         config_file.write_text(
-            json.dumps({"minebase": {"api": {"password": encrypted}}}),
+            json.dumps({"minebase": {
+                "active_profile_id": "one",
+                "profiles": [{"id": "one", "api": {"password": encrypted}}],
+            }}),
             encoding="utf-8",
         )
         empty_user = tmp_path / "config.user.json"
@@ -138,14 +151,17 @@ class TestLoadSecret:
             patch.object(config_loader, "_CONFIG_FILE", config_file),
             patch.object(config_loader, "_USER_CONFIG_FILE", empty_user),
         ):
-            result = load_secret(("minebase", "api", "password"))
+            result = load_minebase_secret("api", "one")
         assert result == "real_pass"
 
     def test_returns_plaintext_as_is(self, tmp_path):
         """非加密值应原样返回。"""
         config_file = tmp_path / "config.json"
         config_file.write_text(
-            json.dumps({"minebase": {"api": {"password": "plain123"}}}),
+            json.dumps({"minebase": {
+                "active_profile_id": "one",
+                "profiles": [{"id": "one", "api": {"password": "plain123"}}],
+            }}),
             encoding="utf-8",
         )
         empty_user = tmp_path / "config.user.json"
@@ -154,7 +170,7 @@ class TestLoadSecret:
             patch.object(config_loader, "_CONFIG_FILE", config_file),
             patch.object(config_loader, "_USER_CONFIG_FILE", empty_user),
         ):
-            result = load_secret(("minebase", "api", "password"))
+            result = load_minebase_secret("api", "one")
         assert result == "plain123"
 
     def test_returns_empty_when_missing(self, tmp_path):
@@ -167,7 +183,7 @@ class TestLoadSecret:
             patch.object(config_loader, "_CONFIG_FILE", config_file),
             patch.object(config_loader, "_USER_CONFIG_FILE", empty_user),
         ):
-            result = load_secret(("minebase", "api", "password"))
+            result = load_minebase_secret("api")
         assert result == ""
 
 
@@ -177,7 +193,10 @@ class TestLoadSecret:
 class TestLoadMinebaseSecret:
     def test_end_to_end_encrypt_then_decrypt(self, tmp_path):
         """端到端：加密存储 → 读取解密。"""
-        cfg = {"api": {"password": "api_secret"}}
+        cfg = {
+            "active_profile_id": "one",
+            "profiles": [{"id": "one", "api": {"password": "api_secret"}}],
+        }
         encrypted_cfg = save_minebase_secrets(cfg)
 
         config_file = tmp_path / "config.json"
@@ -188,7 +207,7 @@ class TestLoadMinebaseSecret:
             patch.object(config_loader, "_CONFIG_FILE", config_file),
             patch.object(config_loader, "_USER_CONFIG_FILE", empty_user),
         ):
-            result = load_minebase_secret("api")
+            result = load_minebase_secret("api", "one")
         assert result == "api_secret"
 
 
@@ -200,7 +219,10 @@ class TestHasEncryptedSecret:
         encrypted = _encrypt("pass")
         config_file = tmp_path / "config.json"
         config_file.write_text(
-            json.dumps({"minebase": {"api": {"password": encrypted}}}),
+            json.dumps({"minebase": {
+                "active_profile_id": "one",
+                "profiles": [{"id": "one", "api": {"password": encrypted}}],
+            }}),
             encoding="utf-8",
         )
         empty_user = tmp_path / "config.user.json"
@@ -209,12 +231,15 @@ class TestHasEncryptedSecret:
             patch.object(config_loader, "_CONFIG_FILE", config_file),
             patch.object(config_loader, "_USER_CONFIG_FILE", empty_user),
         ):
-            assert has_encrypted_secret(("minebase", "api", "password")) is True
+            assert has_encrypted_secret(("minebase", "profiles", "0", "api", "password")) is True
 
     def test_returns_false_for_plaintext(self, tmp_path):
         config_file = tmp_path / "config.json"
         config_file.write_text(
-            json.dumps({"minebase": {"api": {"password": "plain"}}}),
+            json.dumps({"minebase": {
+                "active_profile_id": "one",
+                "profiles": [{"id": "one", "api": {"password": "plain"}}],
+            }}),
             encoding="utf-8",
         )
         empty_user = tmp_path / "config.user.json"
@@ -223,7 +248,7 @@ class TestHasEncryptedSecret:
             patch.object(config_loader, "_CONFIG_FILE", config_file),
             patch.object(config_loader, "_USER_CONFIG_FILE", empty_user),
         ):
-            assert has_encrypted_secret(("minebase", "api", "password")) is False
+            assert has_encrypted_secret(("minebase", "profiles", "0", "api", "password")) is False
 
 
 # ---------------------------------------------------------------------------

@@ -121,6 +121,7 @@ class LogViewRefs(TypedDict):
 
 class SyncRefs(TypedDict):
     path: ft.TextField
+    profile: ft.Dropdown
     mode: Any  # ChipToggle
     types: dict[str, ft.Checkbox]
     dry_run: ft.Checkbox
@@ -137,6 +138,8 @@ class SyncRefs(TypedDict):
 
 
 class UserConfigRefs(TypedDict):
+    mb_profile: ft.Dropdown
+    mb_profile_name: ft.TextField
     mb_mode: ft.Dropdown
     mb_api_url: ft.TextField
     mb_api_user: ft.TextField
@@ -148,6 +151,8 @@ class UserConfigRefs(TypedDict):
     mb_db_pass: ft.TextField
     mb_status_text: ft.Text
     mb_action_buttons: list[ft.Button]
+    mb_add_profile_btn: ft.Button
+    mb_remove_profile_btn: ft.Button
     mb_api_test_btn: ft.Button
     mb_api_test_result: ft.Text
     mb_test_btn: ft.Button

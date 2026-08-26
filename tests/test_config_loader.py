@@ -1,4 +1,5 @@
 """config_loader 模块测试"""
+import copy
 import json
 import pathlib
 import sys
@@ -354,9 +355,14 @@ class TestSaveMinebaseConfig:
         """创建带 minebase 配置的临时环境。"""
         config_data = {
             "minebase": {
-                "mode": "database",
-                "api": {"url": "http://localhost:3000", "username": "", "password": ""},
-                "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "postgres", "password": ""},
+                "active_profile_id": "local-db",
+                "profiles": [{
+                    "id": "local-db",
+                    "name": "本地数据库",
+                    "mode": "database",
+                    "api": {"url": "http://localhost:3000", "username": "", "password": ""},
+                    "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "postgres", "password": ""},
+                }],
             },
         }
         config_file = tmp_path / "config.json"
@@ -373,15 +379,21 @@ class TestSaveMinebaseConfig:
         user_file = minebase_env
 
         cfg = {
-            "mode": "database",
-            "api": {"url": "", "username": "", "password": ""},
-            "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "admin", "password": "hunter2"},
+            "active_profile_id": "local-db",
+            "profiles": [{
+                "id": "local-db",
+                "name": "本地数据库",
+                "mode": "database",
+                "api": {"url": "", "username": "", "password": ""},
+                "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "admin", "password": "hunter2"},
+            }],
         }
         config_loader.save_minebase_config(cfg)
 
         saved = json.loads(user_file.read_text(encoding="utf-8"))
-        assert saved["minebase"]["database"]["password"].startswith("__enc__")
-        assert saved["minebase"]["database"]["user"] == "admin"
+        profile = saved["minebase"]["profiles"][0]
+        assert profile["database"]["password"].startswith("__enc__")
+        assert profile["database"]["user"] == "admin"
 
     def test_save_encrypted_does_not_re_encrypt(self, minebase_env):
         """第二次保存（密码已是加密格式）不应重复加密。"""
@@ -390,56 +402,146 @@ class TestSaveMinebaseConfig:
         user_file = minebase_env
 
         cfg1 = {
-            "mode": "database",
-            "api": {"url": "", "username": "", "password": ""},
-            "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "admin", "password": "hunter2"},
+            "active_profile_id": "local-db",
+            "profiles": [{
+                "id": "local-db",
+                "name": "本地数据库",
+                "mode": "database",
+                "api": {"url": "", "username": "", "password": ""},
+                "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "admin", "password": "hunter2"},
+            }],
         }
         config_loader.save_minebase_config(cfg1)
 
         saved1 = json.loads(user_file.read_text(encoding="utf-8"))
-        encrypted_pw = saved1["minebase"]["database"]["password"]
+        encrypted_pw = saved1["minebase"]["profiles"][0]["database"]["password"]
 
         cfg2 = {
-            "mode": "database",
-            "api": {"url": "", "username": "", "password": ""},
-            "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "new_admin", "password": encrypted_pw},
+            "active_profile_id": "local-db",
+            "profiles": [{
+                "id": "local-db",
+                "name": "本地数据库",
+                "mode": "database",
+                "api": {"url": "", "username": "", "password": ""},
+                "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "new_admin", "password": encrypted_pw},
+            }],
         }
         config_loader.save_minebase_config(cfg2)
 
         saved2 = json.loads(user_file.read_text(encoding="utf-8"))
-        assert saved2["minebase"]["database"]["password"] == encrypted_pw
-        assert _decrypt(saved2["minebase"]["database"]["password"]) == "hunter2"
-        assert saved2["minebase"]["database"]["user"] == "new_admin"
+        profile = saved2["minebase"]["profiles"][0]
+        assert profile["database"]["password"] == encrypted_pw
+        assert _decrypt(profile["database"]["password"]) == "hunter2"
+        assert profile["database"]["user"] == "new_admin"
 
     def test_save_empty_password_does_not_encrypt(self, minebase_env):
         """空密码不应加密。"""
         user_file = minebase_env
 
         cfg = {
-            "mode": "api",
-            "api": {"url": "http://localhost:3000", "username": "user", "password": ""},
-            "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "postgres", "password": ""},
+            "active_profile_id": "local-api",
+            "profiles": [{
+                "id": "local-api",
+                "name": "本地 API",
+                "mode": "api",
+                "api": {"url": "http://localhost:3000", "username": "user", "password": ""},
+                "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "postgres", "password": ""},
+            }],
         }
         config_loader.save_minebase_config(cfg)
 
         saved = json.loads(user_file.read_text(encoding="utf-8"))
-        assert saved["minebase"]["database"]["password"] == ""
-        assert saved["minebase"]["api"]["password"] == ""
+        profile = saved["minebase"]["profiles"][0]
+        assert profile["database"]["password"] == ""
+        assert profile["api"]["password"] == ""
 
     def test_load_secret_returns_real_password_after_encrypted_save(self, minebase_env):
         """完整 save → load 往返：加密保存后 load_secret 应返回真实密码。"""
         from func import secret_store
 
         cfg1 = {
-            "mode": "database",
-            "api": {"url": "", "username": "", "password": ""},
-            "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "admin", "password": "s3cret"},
+            "active_profile_id": "local-db",
+            "profiles": [{
+                "id": "local-db",
+                "name": "本地数据库",
+                "mode": "database",
+                "api": {"url": "", "username": "", "password": ""},
+                "database": {"host": "localhost", "port": 5432, "database": "minebase", "user": "admin", "password": "s3cret"},
+            }],
         }
         config_loader.save_minebase_config(cfg1)
 
         config_loader._invalidate_config_cache()
-        result = secret_store.load_secret(("minebase", "database", "password"))
+        result = secret_store.load_minebase_secret("database", "local-db")
         assert result == "s3cret"
+
+    def test_multiple_profiles_keep_independent_passwords(self, minebase_env):
+        """每个地址/账号档案都应独立加密并可按 id 读取。"""
+        cfg = {
+            "active_profile_id": "prod-admin",
+            "profiles": [
+                {
+                    "id": "prod-admin",
+                    "name": "生产管理员",
+                    "mode": "api",
+                    "api": {"url": "https://minebase.example.com", "username": "admin", "password": "admin-pass"},
+                    "database": {"host": "db.example.com", "port": 5432, "database": "minebase", "user": "postgres", "password": ""},
+                },
+                {
+                    "id": "prod-reader",
+                    "name": "生产只读",
+                    "mode": "api",
+                    "api": {"url": "https://minebase.example.com", "username": "reader", "password": "reader-pass"},
+                    "database": {"host": "db.example.com", "port": 5432, "database": "minebase", "user": "readonly", "password": ""},
+                },
+            ],
+        }
+        config_loader.save_minebase_config(cfg)
+
+        saved = json.loads(minebase_env.read_text(encoding="utf-8"))["minebase"]
+        assert all(profile["api"]["password"].startswith("__enc__") for profile in saved["profiles"])
+        assert config_loader.get_minebase_api_config("prod-admin")["password"] == "admin-pass"
+        assert config_loader.get_minebase_api_config("prod-reader")["password"] == "reader-pass"
+
+    def test_keyring_sentinel_preserves_each_profile_password(self, minebase_env):
+        """UI 只回传哨兵时，不能把其他档案的密码覆盖掉。"""
+        first = {
+            "active_profile_id": "one",
+            "profiles": [
+                {
+                    "id": "one", "name": "一", "mode": "api",
+                    "api": {"url": "https://one", "username": "u1", "password": "p1"},
+                    "database": {"host": "h1", "port": 5432, "database": "d", "user": "db1", "password": "dbp1"},
+                },
+                {
+                    "id": "two", "name": "二", "mode": "api",
+                    "api": {"url": "https://two", "username": "u2", "password": "p2"},
+                    "database": {"host": "h2", "port": 5432, "database": "d", "user": "db2", "password": "dbp2"},
+                },
+            ],
+        }
+        config_loader.save_minebase_config(first)
+        before = json.loads(minebase_env.read_text(encoding="utf-8"))["minebase"]["profiles"]
+        before_tokens = {
+            profile["id"]: (profile["api"]["password"], profile["database"]["password"])
+            for profile in before
+        }
+
+        second = copy.deepcopy(first)
+        second["profiles"][0]["api"]["username"] = "u1-updated"
+        for profile in second["profiles"]:
+            profile["api"]["password"] = "__keyring__"
+            profile["database"]["password"] = "__keyring__"
+        config_loader.save_minebase_config(second)
+
+        after = json.loads(minebase_env.read_text(encoding="utf-8"))["minebase"]["profiles"]
+        after_tokens = {
+            profile["id"]: (profile["api"]["password"], profile["database"]["password"])
+            for profile in after
+        }
+        assert after_tokens == before_tokens
+        assert config_loader.get_minebase_api_config("one")["password"] == "p1"
+        assert config_loader.get_minebase_db_config("two")["password"] == "dbp2"
 
 
 # ---------------------------------------------------------------------------

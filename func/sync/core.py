@@ -147,6 +147,7 @@ def sync(
     filter_zero_run_km: bool = False,
     conflict_policy: str = "SKIP",
     selected_files: dict[str, list[str | Path]] | None = None,
+    profile_id: str | None = None,
 ) -> dict[str, dict[str, Any]]:
     """执行同步的主入口。
 
@@ -156,6 +157,7 @@ def sync(
         data_types: 要同步的数据类型列表，None 同步所有。
         dry_run: 仅预览，不实际推送。
         mapping_file: 映射配置文件路径。
+        profile_id: 使用的 MineBase 连接档案 id；None 使用当前活动档案。
         api_url: 覆盖 API URL。
         db_host: 覆盖数据库主机。
         year: 年份（用于文件发现和 work_efficiency 文件名匹配）。
@@ -185,6 +187,7 @@ def sync(
         _apply_defaults,
         _apply_ledger_matching,
         _apply_oil_ledger_matching,
+        _filter_anomaly_records_by_date,
         _filter_by_date_range,
     )
 
@@ -244,7 +247,7 @@ def sync(
             return {}
 
     # 确定同步模式
-    sync_mode = mode or get_minebase_mode()
+    sync_mode = mode or get_minebase_mode(profile_id)
     logger.info("同步模式: %s", sync_mode)
 
     # 初始化客户端
@@ -252,13 +255,13 @@ def sync(
     db_client = None
 
     if sync_mode == "api":
-        cfg = get_minebase_api_config()
+        cfg = get_minebase_api_config(profile_id)
         url = api_url or cfg.get("url", "http://localhost:3000")
         api_client = MineBaseAPIClient(url, cfg.get("username", ""), cfg.get("password", ""))
         if not dry_run:
             api_client.login()
     elif sync_mode == "database":
-        cfg = get_minebase_db_config()
+        cfg = get_minebase_db_config(profile_id)
         host = db_host or cfg.get("host", "localhost")
         db_client = MineBaseDBClient(
             host=host,
@@ -413,6 +416,11 @@ def sync(
     # 处理器可能一次返回 fuel_engine / production_running 等子类型，
     # 因此不能直接使用记录上的中文标签作为结果 key。
     if anomaly_tracking:
+        collected_anomalies = _filter_anomaly_records_by_date(
+            collected_anomalies,
+            date_start,
+            date_end,
+        )
         for record in collected_anomalies:
             if not isinstance(record, dict):
                 continue
@@ -501,6 +509,7 @@ def main():
     parser.add_argument("--mapping", help="列映射配置文件路径")
     parser.add_argument("--url", help="MineBase API 地址（覆盖配置）")
     parser.add_argument("--db-host", help="MineBase 数据库主机（覆盖配置）")
+    parser.add_argument("--profile-id", help="MineBase 连接档案 id（默认使用当前活动档案）")
     parser.add_argument("--year", type=int, help="年份（用于文件发现）")
     parser.add_argument("--month", type=int, help="月份（用于文件发现）")
     parser.add_argument("--date-start", dest="date_start", help="起始日期过滤（含），格式 YYYY-MM-DD")
@@ -517,6 +526,7 @@ def main():
         mapping_file=args.mapping,
         api_url=args.url,
         db_host=args.db_host,
+        profile_id=args.profile_id,
         year=args.year,
         month=args.month,
         date_start=args.date_start,

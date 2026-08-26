@@ -333,13 +333,32 @@ def save_minebase_secrets(
     The caller is responsible for writing the returned config to
     ``config.user.json``.
     """
-    paths = secret_paths if secret_paths is not None else _SECRET_PATHS
     cfg_clean = copy.deepcopy(cfg)
 
+    if secret_paths is None and isinstance(cfg_clean.get("profiles"), list):
+        # MineBase passwords live inside a list of connection profiles.  Walk
+        # the list directly because the generic dict path helpers deliberately
+        # do not interpret numeric path components as list indexes.
+        for profile in cfg_clean["profiles"]:
+            if not isinstance(profile, dict):
+                continue
+            for section in ("api", "database"):
+                section_cfg = profile.get(section)
+                if not isinstance(section_cfg, dict):
+                    continue
+                val = section_cfg.get("password")
+                if val and not val.startswith(_ENCRYPTED_PREFIX):
+                    section_cfg["password"] = _encrypt(val)
+        return cfg_clean
+
+    paths = secret_paths or []
     for path in paths:
-        val = _get_nested(cfg_clean, path[1:])
+        # Explicit paths are shared with callers that pass a full config path
+        # such as ("minebase", "llm_api_key", "password").
+        relative_path = path[1:] if path and path[0] == "minebase" else path
+        val = _get_nested(cfg_clean, relative_path)
         if val and not val.startswith(_ENCRYPTED_PREFIX):
-            _set_nested(cfg_clean, path[1:], _encrypt(val))
+            _set_nested(cfg_clean, relative_path, _encrypt(val))
 
     return cfg_clean
 
@@ -351,8 +370,12 @@ def load_secret(path: tuple[str, ...]) -> str:
     return _decrypt(val)
 
 
-def load_minebase_secret(section: str) -> str:
-    """Load the password for a minebase sub-module (api or database)."""
+def load_minebase_secret(section: str, profile_id: str | None = None) -> str:
+    """Load a MineBase password for a profile or the auxiliary LLM secret."""
+    if section == "api":
+        return config_loader.get_minebase_api_config(profile_id).get("password", "")
+    if section == "database":
+        return config_loader.get_minebase_db_config(profile_id).get("password", "")
     return load_secret(("minebase", section, "password"))
 
 
