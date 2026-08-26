@@ -73,6 +73,12 @@ _USER_CONFIG_FILE = _persistent_root / "config.user.json"
 
 _USER_CONFIG_SECTION = "user_config"
 
+# 生产报表按文件并行处理时使用的默认工作线程数。Excel 解析主要受 I/O
+# 和底层库释放 GIL 的影响，因此这里将“参与计算的 CPU 核心数”映射为
+# 处理文件的并行 worker 数；用户可以在设置中按机器负载调整它。
+DEFAULT_CPU_CORES = 4
+CPU_CORES_CONFIG_KEY = "cpu_cores"
+
 
 DEFAULT_DAILY_REPORT_CONFIG: dict[str, Any] = {
     "material_statistics": {
@@ -304,6 +310,71 @@ def get_config_file_path() -> Path:
 def get_user_config_file_path() -> Path:
     """获取用户配置文件路径"""
     return _USER_CONFIG_FILE
+
+
+# ---------------------------------------------------------------------------
+# 系统资源配置
+# ---------------------------------------------------------------------------
+
+def get_available_cpu_cores() -> int:
+    """返回当前进程可使用的逻辑 CPU 核心数。"""
+    return max(1, os.cpu_count() or 1)
+
+
+def get_default_cpu_cores() -> int:
+    """返回系统资源配置的默认核心数。"""
+    return min(DEFAULT_CPU_CORES, get_available_cpu_cores())
+
+
+def validate_cpu_cores(value: Any) -> int:
+    """校验并规范化 CPU 核心数。
+
+    核心数必须是 1 到当前机器可用逻辑核心数之间的整数。
+    """
+    if isinstance(value, bool) or value is None:
+        raise ValueError(
+            f"CPU 核心数必须是 1 到 {get_available_cpu_cores()} 之间的整数"
+        )
+
+    try:
+        if isinstance(value, str):
+            text = value.strip()
+            if not text.isdigit():
+                raise ValueError
+            parsed = int(text)
+        else:
+            parsed = int(value)
+            if parsed != value:
+                raise ValueError
+    except (TypeError, ValueError, OverflowError):
+        raise ValueError(
+            f"CPU 核心数必须是 1 到 {get_available_cpu_cores()} 之间的整数"
+        ) from None
+
+    available = get_available_cpu_cores()
+    if not 1 <= parsed <= available:
+        raise ValueError(f"CPU 核心数必须是 1 到 {available} 之间的整数")
+    return parsed
+
+
+def get_cpu_cores() -> int:
+    """读取生产报表并行处理使用的 CPU 核心数。
+
+    配置文件被手工改坏或从更高核心数的机器迁移到低核心数机器时，
+    自动回退到安全默认值，而不是让线程池在任务开始时才失败。
+    """
+    configured = get_user_config(CPU_CORES_CONFIG_KEY, None)
+    try:
+        return validate_cpu_cores(configured)
+    except ValueError:
+        return get_default_cpu_cores()
+
+
+def set_cpu_cores(value: Any) -> int:
+    """校验并持久化 CPU 核心数，返回规范化后的值。"""
+    parsed = validate_cpu_cores(value)
+    update_user_config({CPU_CORES_CONFIG_KEY: parsed})
+    return parsed
 
 
 # ---------------------------------------------------------------------------

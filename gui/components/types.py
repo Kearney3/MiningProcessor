@@ -138,6 +138,12 @@ class SyncRefs(TypedDict):
 
 
 class UserConfigRefs(TypedDict):
+    cpu_cores: ft.TextField
+    cpu_status_text: ft.Text
+    cpu_action_buttons: list[ft.Button]
+    reload_cpu_config: Callable[[], None]
+    save_cpu_config: Callable[[Any], None]
+    reset_cpu_config: Callable[[Any], None]
     mb_profile: ft.Dropdown
     mb_profile_name: ft.TextField
     mb_mode: ft.Dropdown

@@ -80,6 +80,15 @@
     "AnomalyPanel.ui.columnRulesHint": "逐列检测开关请在「用户配置 → 异常值检测配置」中设置"
   },
   "userConfig": {
+    "SystemResourceSection.systemResourceSettings": "系统资源设置",
+    "SystemResourceSection.configureCpuResourcesForDataProcessing": "调整报表处理使用的 CPU 核心数",
+    "SystemResourceSection.cpuCores": "参与计算的 CPU 核心数",
+    "SystemResourceSection.cpuCoresHint": "核心数越多，批量生产报表处理通常越快，但会占用更多系统资源。修改后对下一次处理任务生效。",
+    "SystemResourceSection.availableCpuCores": "当前可用：{available} 核",
+    "SystemResourceSection.invalidCpuCores": "请输入 1 到 {max} 之间的整数",
+    "SystemResourceSection.cpuCoresSaved": "CPU 核心数设置已保存",
+    "SystemResourceSection.saveFailed": "保存失败: {error}",
+    "SystemResourceSection.defaultConfigurationRestoredClickSaveToApply": "已恢复默认值（需点击保存生效）",
     "AnomalyConfigSection.multiplier": "σ 倍数",
     "AnomalyConfigSection.production": "产量",
     "AnomalyConfigSection.saveFailed": "保存失败: {error}",

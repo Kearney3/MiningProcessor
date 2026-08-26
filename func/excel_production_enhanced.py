@@ -696,7 +696,7 @@ class MiningDataProcessor:
         self,
         folder_path,
         output_file=None,
-        max_workers=4,
+        max_workers=None,
         return_sheets=False,
         cancel_event=None,
         file_list=None,
@@ -705,7 +705,20 @@ class MiningDataProcessor:
 
         ``file_list`` 是扫描/人工选择后的 Excel 路径列表；未提供时继续使用
         原有的目录自动发现逻辑，保持 CLI 和旧调用方行为不变。
+
+        ``max_workers`` 未显式传入时读取用户设置中的 CPU 核心数；CLI 等
+        显式指定 worker 数的调用方仍然优先使用自己的参数。
         """
+        if max_workers is None:
+            max_workers = config_loader.get_cpu_cores()
+        else:
+            try:
+                max_workers = int(max_workers)
+            except (TypeError, ValueError):
+                raise ValueError("max_workers 必须是正整数") from None
+            if max_workers < 1:
+                raise ValueError("max_workers 必须是正整数")
+
         all_running = []
         all_production = []
         success_files = 0
@@ -882,8 +895,8 @@ def main():
     setup_logging()
     parser = argparse.ArgumentParser(description="处理矿卡数据")
     parser.add_argument("input_file", help="输入Excel文件路径")
-    parser.add_argument("--workers", type=int, default=min(8, (os.cpu_count() or 4) * 2),
-                        help="线程数，默认 min(8, CPU*2)")
+    parser.add_argument("--workers", type=int, default=None,
+                        help="线程数，默认读取设置中的 CPU 核心数")
     parser.add_argument("--version", choices=["new", "old"], default="new",
                         help="装载量映射版本，new（默认）或 old")
     parser.add_argument("--raw_start", type=int, default=6, help="复合表头起始行，默认 6, 使用-1自动检测")

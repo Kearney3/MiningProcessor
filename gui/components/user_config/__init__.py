@@ -23,6 +23,7 @@ from ._header_mapping import _create_header_mapping_section
 from ._keywords import _create_keywords_section
 from ._llm import _create_llm_config_section
 from ._minebase import _create_minebase_section
+from ._system import _create_system_resource_section
 
 __all__ = ["UserConfigRefs", "create_user_config_section"]
 
@@ -43,6 +44,7 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, UserCo
     anomaly_card, anomaly_refs = _create_anomaly_config_section(page, log)
     llm_card, llm_refs = _create_llm_config_section(page, log)
     daily_report_card, daily_report_refs = _create_daily_report_config_section(page, log)
+    system_resource_card, system_resource_refs = _create_system_resource_section(page, log)
 
     def _reload_all():
         """重新加载所有子区域的配置。"""
@@ -54,6 +56,7 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, UserCo
         map_refs["build"]()
         anomaly_refs["reload"]()
         daily_report_refs["reload"]()
+        system_resource_refs["reload"]()
 
     def _on_reset_all(e):
         """还原所有用户配置为默认值。"""
@@ -96,6 +99,7 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, UserCo
                     vertical_alignment=ft.CrossAxisAlignment.CENTER,
                 ),
                 section_hint,
+                system_resource_card,
                 llm_card,
                 minebase_card,
                 keywords_card,
@@ -140,6 +144,12 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, UserCo
         "reload_keywords": kw_refs["reload"],
         "reload_header_mapping": hm_refs["reload"],
         "reload_llm_config": llm_refs["reload"],
+        "cpu_cores": system_resource_refs["cpu_cores"],
+        "cpu_status_text": system_resource_refs["status_text"],
+        "cpu_action_buttons": system_resource_refs["action_buttons"],
+        "reload_cpu_config": system_resource_refs["reload"],
+        "save_cpu_config": system_resource_refs["save"],
+        "reset_cpu_config": system_resource_refs["reset"],
     }
 
     _reload_all()

@@ -562,6 +562,40 @@ def _get_llm_config(params: dict) -> dict:
     return cfg
 
 
+@_register("get_system_resource_config")
+def _get_system_resource_config(params: dict) -> dict:
+    """返回系统资源设置及当前机器可用核心数。"""
+    from func.config_loader import (
+        get_available_cpu_cores,
+        get_cpu_cores,
+        get_default_cpu_cores,
+    )
+
+    return {
+        "cpu_cores": get_cpu_cores(),
+        "available_cpu_cores": get_available_cpu_cores(),
+        "default_cpu_cores": get_default_cpu_cores(),
+    }
+
+
+@_register("save_system_resource_config")
+def _save_system_resource_config(params: dict) -> dict:
+    """校验并保存系统资源设置。"""
+    _require_params(params, "cpu_cores")
+    from func.config_loader import (
+        get_available_cpu_cores,
+        get_default_cpu_cores,
+        set_cpu_cores,
+    )
+
+    cpu_cores = set_cpu_cores(params["cpu_cores"])
+    return {
+        "cpu_cores": cpu_cores,
+        "available_cpu_cores": get_available_cpu_cores(),
+        "default_cpu_cores": get_default_cpu_cores(),
+    }
+
+
 @_register("update_llm_config")
 def _update_llm_config(params: dict) -> dict:
     from func.config_loader import update_llm_config

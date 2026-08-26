@@ -10,6 +10,7 @@ import {
   ColumnMappingSection,
   AnomalyConfigSection,
   DailyReportConfigSection,
+  SystemResourceSection,
 } from "../user-config";
 import { RestoreIcon } from "../../lib/icons";
 
@@ -98,6 +99,7 @@ export function UserConfigPage({ bridge }: { bridge: BridgeProp }) {
       </div>
 
       <div className="space-y-2">
+        <SystemResourceSection key={`system-resource-${resetKey}`} bridge={bridge} />
         <LLMConfigSection key={`llm-${resetKey}`} bridge={bridge} />
         <MineBaseSection key={`mb-${resetKey}`} bridge={bridge} />
         <FileKeywordsSection key={`kw-${resetKey}`} bridge={bridge} />
