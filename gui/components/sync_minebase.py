@@ -4,7 +4,7 @@ from datetime import date, datetime, timedelta
 
 import flet as ft
 
-from func.config_loader import get_minebase_mode
+from func.config_loader import get_minebase_config, get_minebase_mode
 from func.time_utils import local_today
 from gui.i18n import t
 
@@ -78,11 +78,52 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
     sync_scan_panel, sync_scan_refs = create_file_scan_panel()
     sync_path.on_change = lambda e: sync_scan_refs["set_result"](None)
 
+    # --- MineBase 连接档案 ---
+    minebase_config = get_minebase_config()
+    minebase_profiles = [
+        profile for profile in minebase_config.get("profiles", [])
+        if isinstance(profile, dict) and profile.get("id")
+    ]
+    active_profile_id = minebase_config.get("active_profile_id") or (
+        minebase_profiles[0].get("id", "") if minebase_profiles else ""
+    )
+
+    def _profile_summary(profile: dict) -> str:
+        name = profile.get("name") or profile.get("id", "")
+        if profile.get("mode") == "database":
+            database = profile.get("database", {})
+            address = database.get("host", "")
+            port = database.get("port")
+            if address and port:
+                address = f"{address}:{port}"
+        else:
+            address = profile.get("api", {}).get("url", "")
+        return f"{name} · {address}" if address else name
+
+    minebase_profile = ft.Dropdown(
+        label=t("components:sync_minebase.connectionProfile"),
+        options=[
+            ft.dropdown.Option(key=profile["id"], text=_profile_summary(profile))
+            for profile in minebase_profiles
+        ],
+        value=active_profile_id,
+        expand=True,
+    )
+
     # --- 同步模式 ---
     mode_toggle = ChipToggle(
         options=[("api", t("components:sync_minebase.apiMode")), ("database", t("components:sync_minebase.directDb"))],
-        initial=get_minebase_mode(),
+        initial=get_minebase_mode(active_profile_id or None),
     )
+
+    def on_profile_select(_e):
+        selected_id = minebase_profile.value or ""
+        profile = next((item for item in minebase_profiles if item.get("id") == selected_id), None)
+        if profile:
+            mode_toggle.value = profile.get("mode") if profile.get("mode") in ("api", "database") else "api"
+            mode_toggle.update()
+
+    minebase_profile.on_select = on_profile_select
 
     # --- 冲突策略 ---
     conflict_policy = ChipToggle(
@@ -380,6 +421,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
                 theme.module_card([
                     ft.Row([sync_path, sync_scan_btn], spacing=8),
                     sync_scan_panel,
+                    ft.Row([minebase_profile], spacing=8),
                     mode_toggle.row,
                     conflict_policy.row,
                 ], label=t("components:sync_minebase.directoryAndMode")),
@@ -466,6 +508,7 @@ def create_sync_section(page: ft.Page) -> tuple[ft.Container, dict]:
         "path": sync_path,
         "scan_btn": sync_scan_btn,
         "scan_panel": sync_scan_refs,
+        "profile": minebase_profile,
         "mode": mode_toggle,
         "conflict_policy": conflict_policy,
         "types": type_checks,

@@ -82,6 +82,11 @@ class MineBaseAPIClient:
             "User-Agent": "MiningProcessor/1.0",
         }
         if self.token:
+            # MineBase 的当前认证中间件从 token Cookie 读取 JWT。
+            # 客户端不是浏览器，不能依赖浏览器自动保存登录 Cookie，因此
+            # 登录响应中的 token 需要在后续请求中显式带回去。
+            headers["Cookie"] = f"token={self.token}"
+            # 保留 Bearer 头，兼容已经支持 Authorization 的 MineBase 部署。
             headers["Authorization"] = f"Bearer {self.token}"
 
         body = json.dumps(data).encode("utf-8") if data else None

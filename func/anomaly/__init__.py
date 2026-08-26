@@ -55,6 +55,17 @@ _DATA_TYPE_LABELS: dict[str, str] = {
     "tire": "轮胎寿命",
 }
 
+_SOURCE_SHEET_LABELS: dict[str, str] = {
+    "fuel_engine": "设备信息",
+    "fuel": "油耗信息",
+    "electrical": "电力消耗",
+    "production_running": "运行数据",
+    "production": "生产数据",
+    "worktime": "工时数据",
+    "work_efficiency": "工时数据",
+    "tire": "轮胎寿命",
+}
+
 
 def detect_and_filter(
     df,
@@ -129,7 +140,7 @@ def detect_and_filter(
         config._anomaly_counts.append((data_type, affected_rows))
 
     # 构建异常明细 DataFrame
-    anomalies_df = _build_anomalies_df(df, hits)
+    anomalies_df = _build_anomalies_df(df, hits, data_type=data_type)
 
     # 运行时保留明细，供 GUI 在任务完成后展示；报告生成仍沿用原有路径。
     if config._anomaly_records is not None and anomalies_df is not None:
@@ -165,8 +176,13 @@ def detect_and_filter(
     return result_df, anomalies_df
 
 
-def _build_anomalies_df(df, hits):
-    """根据检测结果构建异常明细 DataFrame。"""
+def _build_anomalies_df(df, hits, data_type=None):
+    """根据检测结果构建异常明细 DataFrame。
+
+    处理器通常在检测前已完成标准化，但不一定保留源表元数据。因此，
+    缺少元数据时使用标准化输出表名，并按当前 DataFrame 的实际位置推算
+    Excel 源行号（第 1 行为表头）。
+    """
     import pandas as pd
 
     rows = []
@@ -191,6 +207,38 @@ def _build_anomalies_df(df, hits):
         ):
             if col in df.columns and hit.row_index in df.index:
                 row[col] = df.at[hit.row_index, col]
+
+        if _is_missing_locator_value(row.get("源表")):
+            row["源表"] = _SOURCE_SHEET_LABELS.get(data_type, "")
+        if _is_missing_locator_value(row.get("源行号")):
+            row["源行号"] = _source_row_number(df, hit.row_index)
         rows.append(row)
 
     return pd.DataFrame(rows) if rows else None
+
+
+def _is_missing_locator_value(value) -> bool:
+    """判断定位字段是否缺失，不把合法的 0 当成空值。"""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return True
+    try:
+        import pandas as pd
+        return bool(pd.isna(value))
+    except (TypeError, ValueError):
+        return False
+
+
+def _source_row_number(df, row_index):
+    """将 DataFrame 行索引转换为标准输出 Excel 的 1-based 源行号。"""
+    try:
+        position = df.index.get_loc(row_index)
+        if isinstance(position, slice):
+            return ""
+        if hasattr(position, "__len__") and not isinstance(position, (str, bytes)):
+            return ""
+        return int(position) + 2
+    except (KeyError, TypeError, ValueError):
+        try:
+            return int(row_index) + 2
+        except (TypeError, ValueError):
+            return ""

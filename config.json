@@ -316,19 +316,26 @@
         }
     },
     "minebase": {
-        "mode": "api",
-        "api": {
-            "url": "http://localhost:3000",
-            "username": "",
-            "password": ""
-        },
-        "database": {
-            "host": "localhost",
-            "port": 5432,
-            "database": "minebase",
-            "user": "postgres",
-            "password": ""
-        }
+        "active_profile_id": "local-api",
+        "profiles": [
+            {
+                "id": "local-api",
+                "name": "本地 MineBase",
+                "mode": "api",
+                "api": {
+                    "url": "http://localhost:3000",
+                    "username": "",
+                    "password": ""
+                },
+                "database": {
+                    "host": "localhost",
+                    "port": 5432,
+                    "database": "minebase",
+                    "user": "postgres",
+                    "password": ""
+                }
+            }
+        ]
     },
     "user_config_default": {
         "file_keywords": {

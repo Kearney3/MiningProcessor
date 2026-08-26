@@ -478,9 +478,28 @@ class TestGetConfigRPC:
         with patch("tauri_bridge._register", lambda name: (lambda fn: fn)):
             pass
         result = tauri_bridge._get_config({"key": "minebase"})
-        assert "mode" in result
-        assert "api" in result
-        assert "database" in result
+        assert result["active_profile_id"]
+        assert result["profiles"]
+        assert all("api" in profile and "database" in profile for profile in result["profiles"])
+
+    def test_key_minebase_masks_profile_passwords(self, monkeypatch):
+        """配置 RPC 只返回密码哨兵，不泄露 Fernet 密文。"""
+        monkeypatch.setattr(
+            "func.config_loader.get_minebase_config",
+            lambda: {
+                "active_profile_id": "one",
+                "profiles": [{
+                    "id": "one",
+                    "api": {"password": "__enc__secret"},
+                    "database": {"password": "__enc__db-secret"},
+                }],
+            },
+        )
+
+        result = tauri_bridge._get_config({"key": "minebase"})
+        profile = result["profiles"][0]
+        assert profile["api"]["password"] == "__keyring__"
+        assert profile["database"]["password"] == "__keyring__"
 
     def test_key_file_keywords(self):
         """file_keywords key 应返回关键字配置。"""
@@ -524,6 +543,26 @@ class TestMinebaseConnectionRPC:
         with patch("func.sync_to_minebase.test_api_connection", return_value=(False, "连接失败")):
             result = tauri_bridge._test_minebase_connection({"mode": "api", "url": "http://x", "username": "u", "password": "p"})
         assert result["success"] is False
+
+    def test_api_sentinel_uses_selected_profile_password(self, monkeypatch):
+        monkeypatch.setattr(
+            "func.config_loader.get_minebase_api_config",
+            lambda profile_id=None: {"password": f"password-for-{profile_id}"},
+        )
+        with patch("func.sync_to_minebase.test_api_connection", return_value=(True, "连接成功")) as test:
+            tauri_bridge._test_minebase_connection({
+                "mode": "api",
+                "profile_id": "reader",
+                "url": "http://x",
+                "username": "u",
+                "password": "__keyring__",
+            })
+
+        test.assert_called_once_with(
+            url="http://x",
+            username="u",
+            password="password-for-reader",
+        )
 
     def test_db_mode_success(self):
         with patch("func.sync_to_minebase.test_db_connection", return_value=(True, "连接成功")):

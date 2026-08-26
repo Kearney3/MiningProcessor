@@ -574,6 +574,28 @@ class TestMineBaseAPIClient:
         client = MineBaseAPIClient("http://localhost:3000/", "admin", "pass")
         assert client.base_url == "http://localhost:3000"
 
+    def test_request_sends_token_cookie_for_minebase_auth(self):
+        """MineBase 当前服务端从 token Cookie 读取登录令牌。"""
+        class Response:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self):
+                return b'{"success": true}'
+
+        client = MineBaseAPIClient("http://localhost:3000", "admin", "pass")
+        client.token = "jwt-token"
+
+        with patch("urllib.request.urlopen", return_value=Response()) as urlopen:
+            assert client._request("GET", "/api/import/fuel_consumption/session/1") == {"success": True}
+
+        request = urlopen.call_args.args[0]
+        assert request.get_header("Cookie") == "token=jwt-token"
+        assert request.get_header("Authorization") == "Bearer jwt-token"
+
 
 # ---------------------------------------------------------------------------
 # MineBaseAPIClient contract v2 错误处理
@@ -911,9 +933,10 @@ class TestMineBaseConfig:
         monkeypatch.setattr(config_loader, "_CONFIG_FILE", pathlib.Path("/nonexistent"))
         monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", pathlib.Path("/nonexistent"))
         cfg = config_loader.get_minebase_config()
-        assert cfg["mode"] == "api"
-        assert cfg["api"]["url"] == "http://localhost:3000"
-        assert cfg["database"]["port"] == 5432
+        assert cfg["active_profile_id"] == "local-api"
+        assert cfg["profiles"][0]["mode"] == "api"
+        assert cfg["profiles"][0]["api"]["url"] == "http://localhost:3000"
+        assert cfg["profiles"][0]["database"]["port"] == 5432
 
     def test_get_minebase_mode_default(self, monkeypatch):
         from func import config_loader

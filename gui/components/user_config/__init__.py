@@ -115,6 +115,8 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, UserCo
     )
 
     refs: UserConfigRefs = {
+        "mb_profile": mb_refs["mb_profile"],
+        "mb_profile_name": mb_refs["mb_profile_name"],
         "mb_mode": mb_refs["mb_mode"],
         "mb_api_url": mb_refs["mb_api_url"],
         "mb_api_user": mb_refs["mb_api_user"],
@@ -126,6 +128,8 @@ def create_user_config_section(page: ft.Page, log) -> tuple[ft.Container, UserCo
         "mb_db_pass": mb_refs["mb_db_pass"],
         "mb_status_text": mb_refs["mb_status_text"],
         "mb_action_buttons": mb_refs["mb_action_buttons"],
+        "mb_add_profile_btn": mb_refs["mb_add_profile_btn"],
+        "mb_remove_profile_btn": mb_refs["mb_remove_profile_btn"],
         "mb_api_test_btn": mb_refs["mb_api_test_btn"],
         "mb_api_test_result": mb_refs["mb_api_test_result"],
         "mb_test_btn": mb_refs["mb_test_btn"],

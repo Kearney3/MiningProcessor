@@ -4,6 +4,8 @@
 import uuid
 from typing import Any
 
+import pandas as pd
+
 from func.logger import get_logger
 from func.time_utils import local_now
 
@@ -374,4 +376,50 @@ def _filter_by_date_range(
     skipped = len(rows) - len(result)
     if skipped:
         logger.info("日期过滤: 保留 %d/%d 行 (范围: %s ~ %s)", len(result), len(rows), date_start, date_end)
+    return result
+
+
+def _filter_anomaly_records_by_date(
+    records: list[dict[str, Any]],
+    date_start: str | None,
+    date_end: str | None,
+) -> list[dict[str, Any]]:
+    """按同步日期范围过滤异常明细。
+
+    异常检测发生在同步行过滤之前，因此异常记录必须在任务级收集完成后
+    再应用同一日期范围。缺少或无法解析日期的记录沿用行过滤规则保留，
+    避免因定位信息不完整而静默丢失异常结果。
+    """
+    if not date_start and not date_end:
+        return list(records)
+
+    start = pd.to_datetime(date_start, errors="coerce") if date_start else None
+    end = pd.to_datetime(date_end, errors="coerce") if date_end else None
+    start_date = start.date() if start is not None and not pd.isna(start) else None
+    end_date = end.date() if end is not None and not pd.isna(end) else None
+
+    result = []
+    for record in records:
+        value = record.get("日期", record.get("date"))
+        if value is None or (isinstance(value, str) and not value.strip()):
+            result.append(record)
+            continue
+
+        parsed = pd.to_datetime(value, errors="coerce")
+        if pd.isna(parsed):
+            result.append(record)
+            continue
+        record_date = parsed.date()
+        if start_date and record_date < start_date:
+            continue
+        if end_date and record_date > end_date:
+            continue
+        result.append(record)
+
+    skipped = len(records) - len(result)
+    if skipped:
+        logger.info(
+            "异常值日期过滤: 保留 %d/%d 条 (范围: %s ~ %s)",
+            len(result), len(records), date_start, date_end,
+        )
     return result

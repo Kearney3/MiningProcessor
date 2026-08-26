@@ -242,13 +242,22 @@ def _get_nested(d: dict[str, Any], path: tuple[str, ...]) -> Any:
     """按路径取值，缺 key 时返回 None。"""
     cur: Any = d
     for k in path:
-        if not isinstance(cur, dict):
+        if isinstance(cur, dict):
+            cur = cur.get(k)
+        elif isinstance(cur, list):
+            try:
+                index = int(k)
+            except (TypeError, ValueError):
+                return None
+            if index < 0 or index >= len(cur):
+                return None
+            cur = cur[index]
+        else:
             return None
-        cur = cur.get(k)
     return cur
 
 
-def _set_nested(d: dict[str, Any], path: tuple[str, str, str], value: Any) -> None:
+def _set_nested(d: dict[str, Any], path: tuple[str, ...], value: Any) -> None:
     """按路径设置值，自动创建中间 dict。"""
     cur = d
     for k in path[:-1]:
@@ -1188,57 +1197,170 @@ def has_model_ledger_cache() -> bool:
 # MineBase 同步配置
 # ---------------------------------------------------------------------------
 
-_MINEBASE_CONFIG_FALLBACK: dict[str, Any] = {
+# MineBase 配置以“连接档案”为单位保存。一个档案绑定一个地址和一组
+# 凭据，因此同一地址可以保存多个账号，同一账号也可以保存多个地址。
+# 密码字段只在内存中解密；落盘时由 secret_store 逐档案加密。
+_MINEBASE_PROFILE_FALLBACK: dict[str, Any] = {
+    "id": "local-api",
+    "name": "本地 MineBase",
     "mode": "api",
     "api": {"url": "http://localhost:3000", "username": "", "password": ""},
-    "database": {"host": "127.0.0.1", "port": 5432, "database": "minebase", "user": "postgres", "password": ""},
+    "database": {
+        "host": "localhost",
+        "port": 5432,
+        "database": "minebase",
+        "user": "postgres",
+        "password": "",
+    },
+}
+
+_MINEBASE_CONFIG_FALLBACK: dict[str, Any] = {
+    "active_profile_id": "local-api",
+    "profiles": [_MINEBASE_PROFILE_FALLBACK],
 }
 
 
+def _normalize_minebase_profile(raw: Any, index: int) -> dict[str, Any]:
+    """补齐一个连接档案的默认字段，并确保其 id 可用于选择。"""
+    profile = _deep_merge(_MINEBASE_PROFILE_FALLBACK, raw if isinstance(raw, dict) else {})
+    profile_id = str(profile.get("id") or f"profile-{index + 1}").strip()
+    profile["id"] = profile_id or f"profile-{index + 1}"
+    profile["name"] = str(profile.get("name") or f"连接 {index + 1}").strip()
+    if profile.get("mode") not in ("api", "database"):
+        profile["mode"] = "api"
+
+    api = profile.get("api") if isinstance(profile.get("api"), dict) else {}
+    database = profile.get("database") if isinstance(profile.get("database"), dict) else {}
+    profile["api"] = {
+        "url": str(api.get("url") or ""),
+        "username": str(api.get("username") or ""),
+        "password": str(api.get("password") or ""),
+    }
+    try:
+        port = int(database.get("port", 5432))
+    except (TypeError, ValueError):
+        port = 5432
+    profile["database"] = {
+        "host": str(database.get("host") or "localhost"),
+        "port": port,
+        "database": str(database.get("database") or "minebase"),
+        "user": str(database.get("user") or "postgres"),
+        "password": str(database.get("password") or ""),
+    }
+    return profile
+
+
+def _normalize_minebase_config(raw: Any) -> dict[str, Any]:
+    """返回独立副本的连接档案配置。"""
+    raw_dict = raw if isinstance(raw, dict) else {}
+    raw_profiles = raw_dict.get("profiles")
+    if not isinstance(raw_profiles, list) or not raw_profiles:
+        raw_profiles = [_MINEBASE_PROFILE_FALLBACK]
+
+    profiles: list[dict[str, Any]] = []
+    used_ids: set[str] = set()
+    for index, raw_profile in enumerate(raw_profiles):
+        profile = _normalize_minebase_profile(raw_profile, index)
+        profile_id = profile["id"]
+        if profile_id in used_ids:
+            suffix = 2
+            candidate = f"{profile_id}-{suffix}"
+            while candidate in used_ids:
+                suffix += 1
+                candidate = f"{profile_id}-{suffix}"
+            profile["id"] = candidate
+        used_ids.add(profile["id"])
+        profiles.append(profile)
+
+    active_id = str(raw_dict.get("active_profile_id") or "").strip()
+    if active_id not in used_ids:
+        active_id = profiles[0]["id"]
+    return {"active_profile_id": active_id, "profiles": profiles}
+
+
+def _get_minebase_profile(profile_id: str | None = None) -> dict[str, Any]:
+    """获取当前档案或指定档案的副本。"""
+    config = get_minebase_config()
+    selected_id = profile_id or config["active_profile_id"]
+    for profile in config["profiles"]:
+        if profile["id"] == selected_id:
+            return copy.deepcopy(profile)
+    if profile_id:
+        raise ValueError(f"MineBase 连接档案不存在: {profile_id}")
+    return copy.deepcopy(config["profiles"][0])
+
+
 def get_minebase_config() -> dict[str, Any]:
-    """获取 MineBase 同步配置（config.json 默认值 + config.user.json 覆盖）。"""
+    """获取 MineBase 连接档案配置（默认值 + 用户覆盖）。"""
     config = load_config()
-    return _deep_merge(_MINEBASE_CONFIG_FALLBACK, config.get("minebase", {}))
+    return _normalize_minebase_config(config.get("minebase"))
 
 
 def get_minebase_config_default() -> dict[str, Any]:
-    """获取 MineBase 同步的默认配置（仅 config.json，不含用户覆盖）。"""
+    """获取 MineBase 连接档案默认配置（仅 config.json）。"""
     config = _load_json(_CONFIG_FILE)
-    return dict(config.get("minebase", {}))
+    return _normalize_minebase_config(config.get("minebase"))
 
 
-def get_minebase_mode() -> str:
-    """获取 MineBase 同步模式：'api' 或 'database'。"""
-    return get_minebase_config().get("mode", "api")
+def get_minebase_mode(profile_id: str | None = None) -> str:
+    """获取当前或指定 MineBase 连接档案的模式。"""
+    return _get_minebase_profile(profile_id).get("mode", "api")
 
 
-def get_minebase_api_config() -> dict[str, Any]:
-    """获取 MineBase API 模式配置（密码从 Keychain 解密）。"""
-    from .secret_store import load_minebase_secret
+def get_minebase_api_config(profile_id: str | None = None) -> dict[str, Any]:
+    """获取当前或指定 API 档案配置，密码在返回前解密。"""
+    from .secret_store import _decrypt
 
-    cfg = get_minebase_config().get("api", {})
-    if "password" in cfg:
-        cfg = {**cfg, "password": load_minebase_secret("api")}
+    profile = _get_minebase_profile(profile_id)
+    cfg = copy.deepcopy(profile.get("api", {}))
+    cfg["password"] = _decrypt(cfg.get("password", ""))
     return cfg
 
 
-def get_minebase_db_config() -> dict[str, Any]:
-    """获取 MineBase 数据库直连模式配置（密码从 Keychain 解密）。"""
-    from .secret_store import load_minebase_secret
+def get_minebase_db_config(profile_id: str | None = None) -> dict[str, Any]:
+    """获取当前或指定数据库档案配置，密码在返回前解密。"""
+    from .secret_store import _decrypt
 
-    cfg = get_minebase_config().get("database", {})
-    if "password" in cfg:
-        cfg = {**cfg, "password": load_minebase_secret("database")}
+    profile = _get_minebase_profile(profile_id)
+    cfg = copy.deepcopy(profile.get("database", {}))
+    cfg["password"] = _decrypt(cfg.get("password", ""))
     return cfg
+
+
+def _preserve_minebase_secret_sentinels(
+    incoming: dict[str, Any],
+    current: dict[str, Any],
+) -> dict[str, Any]:
+    """把 UI 的密码哨兵替换为当前档案中已保存的加密值。"""
+    from .secret_store import KEYRING_SENTINEL
+
+    current_by_id = {p.get("id"): p for p in current.get("profiles", [])}
+    result = copy.deepcopy(incoming)
+    for profile in result.get("profiles", []):
+        old = current_by_id.get(profile.get("id"), {})
+        for section in ("api", "database"):
+            password = profile.get(section, {}).get("password")
+            if password != KEYRING_SENTINEL:
+                continue
+            old_password = old.get(section, {}).get("password", "")
+            profile[section]["password"] = old_password if old_password else ""
+    return result
 
 
 def save_minebase_config(minebase_cfg: dict[str, Any]) -> None:
-    """保存 MineBase 配置到 config.user.json（密码自动存入 Keychain）。"""
+    """保存连接档案配置；密码按档案加密后写入 config.user.json。"""
     from .secret_store import save_minebase_secrets
 
+    if not isinstance(minebase_cfg, dict) or not isinstance(minebase_cfg.get("profiles"), list):
+        raise ValueError("MineBase 配置必须包含 profiles 列表")
+    if not minebase_cfg["profiles"]:
+        raise ValueError("至少需要保留一个 MineBase 连接档案")
+
     with _config_write_lock:
-        cfg_to_save = save_minebase_secrets(minebase_cfg)
-        # 写入 config.user.json 顶层 minebase（与 load_config 合并逻辑一致）
+        current = get_minebase_config()
+        normalized = _normalize_minebase_config(minebase_cfg)
+        normalized = _preserve_minebase_secret_sentinels(normalized, current)
+        cfg_to_save = save_minebase_secrets(normalized)
         user_file = _load_json(_USER_CONFIG_FILE)
         user_file["minebase"] = cfg_to_save
         _save_json(_USER_CONFIG_FILE, user_file)

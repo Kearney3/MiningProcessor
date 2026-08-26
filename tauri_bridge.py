@@ -816,6 +816,7 @@ def _sync_minebase(params: dict) -> dict:
         filter_zero_run_km=params.get("filter_zero_run_km", False),
         conflict_policy=params.get("conflict_policy", "SKIP"),
         selected_files=params.get("selected_files"),
+        profile_id=params.get("profile_id"),
     )
     dry_run_file = results.pop("_dry_run_file", None)
     resp: dict = {"results": results}
@@ -922,9 +923,26 @@ def _get_config(params: dict) -> dict:
         load_config,
     )
 
+    def _mask_minebase_passwords(config: dict) -> dict:
+        from func.secret_store import KEYRING_SENTINEL
+
+        minebase = config if isinstance(config.get("profiles"), list) else config.get("minebase")
+        if not isinstance(minebase, dict):
+            return config
+        for profile in minebase.get("profiles", []):
+            if not isinstance(profile, dict):
+                continue
+            for section in ("api", "database"):
+                connection = profile.get(section, {})
+                if isinstance(connection, dict) and connection.get("password"):
+                    connection["password"] = KEYRING_SENTINEL
+        return config
+
     key = params.get("key")
     if key == "minebase":
-        return get_minebase_config()
+        # The frontend only needs to know whether a password exists. Never
+        # send the encrypted token over the JSON-RPC boundary.
+        return _mask_minebase_passwords(get_minebase_config())
     if key == "file_keywords":
         return get_file_keywords()
     if key == "worktime_header_mapping":
@@ -932,7 +950,7 @@ def _get_config(params: dict) -> dict:
     config = load_config()
     if key:
         return config.get(key, {})
-    return config
+    return _mask_minebase_passwords(config)
 
 
 @_register("save_config")
@@ -1565,21 +1583,22 @@ def _write_text_file(params: dict) -> dict:
 def _test_minebase_connection(params: dict) -> dict:
     """测试 MineBase 连接（API 或数据库模式）。
 
-    如果前端传入 __keyring__ 哨兵值，自动从已保存的配置中加载真实密码，
-    方便用户无需重新输入密码即可测试连接。
+    如果前端传入 __keyring__ 哨兵值，按 profile_id 从已保存的配置中加载
+    真实密码，方便用户无需重新输入密码即可测试连接。
     """
     from func.config_loader import get_minebase_api_config, get_minebase_db_config
     from func.secret_store import KEYRING_SENTINEL
     from func.sync_to_minebase import test_api_connection, test_db_connection
 
     mode = params.get("mode", "api")
+    profile_id = params.get("profile_id")
     password = params.get("password", "")
 
     if password == KEYRING_SENTINEL:
         if mode == "api":
-            password = get_minebase_api_config().get("password", "")
+            password = get_minebase_api_config(profile_id).get("password", "")
         else:
-            password = get_minebase_db_config().get("password", "")
+            password = get_minebase_db_config(profile_id).get("password", "")
 
     if mode == "api":
         ok, msg = test_api_connection(

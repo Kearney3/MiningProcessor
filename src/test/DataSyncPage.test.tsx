@@ -237,4 +237,50 @@ describe("DataSyncPage - Export Warnings", () => {
       }));
     });
   });
+
+  it("uses the selected MineBase connection profile for synchronization", async () => {
+    const mockCall = vi.fn().mockImplementation((method: string) => {
+      if (method === "get_config") {
+        return Promise.resolve({
+          active_profile_id: "primary-api",
+          profiles: [
+            {
+              id: "primary-api",
+              name: "生产 API",
+              mode: "api",
+              api: { url: "https://minebase.example" },
+            },
+            {
+              id: "backup-db",
+              name: "备用数据库",
+              mode: "database",
+              database: { host: "db.example", port: 5432 },
+            },
+          ],
+        });
+      }
+      if (method === "get_last_directory") return Promise.resolve({ path: "" });
+      if (method === "sync_scan") return Promise.resolve({});
+      if (method === "sync_minebase") {
+        return Promise.resolve({ results: {} });
+      }
+      return Promise.resolve({});
+    });
+
+    renderPage(makeBridge({ call: mockCall }));
+
+    const profileSelect = await screen.findByLabelText("同步账号配置");
+    fireEvent.change(profileSelect, { target: { value: "backup-db" } });
+    fireEvent.change(screen.getByPlaceholderText("选择包含已处理数据的文件夹"), {
+      target: { value: "/tmp/test" },
+    });
+    fireEvent.click(screen.getByText("开始同步"));
+
+    await vi.waitFor(() => {
+      expect(mockCall).toHaveBeenCalledWith("sync_minebase", expect.objectContaining({
+        profile_id: "backup-db",
+        mode: "database",
+      }));
+    });
+  });
 });

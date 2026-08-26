@@ -89,9 +89,11 @@ def test_user_config_save_persists_minebase_config(monkeypatch, tmp_path):
     refs["save_mb_config"](DummyControlEvent())
 
     saved = json.loads(user_file.read_text(encoding="utf-8"))
-    assert saved["minebase"]["mode"] == "database"
-    assert saved["minebase"]["database"]["host"] == "127.0.0.1"
-    assert saved["minebase"]["database"]["port"] == 5432
+    profile = saved["minebase"]["profiles"][0]
+    assert saved["minebase"]["active_profile_id"] == profile["id"]
+    assert profile["mode"] == "database"
+    assert profile["database"]["host"] == "127.0.0.1"
+    assert profile["database"]["port"] == 5432
     assert logs[-1] == "已保存 MineBase 连接配置"
 
 
@@ -104,6 +106,7 @@ def test_user_config_invalid_port_shows_error(monkeypatch, tmp_path):
     monkeypatch.setattr(config_loader, "_USER_CONFIG_FILE", user_file)
 
     _, refs = components.create_user_config_section(PageSpy(), logs.append)
+    refs["mb_mode"].value = "database"
     refs["mb_db_port"].value = "99999"
 
     refs["save_mb_config"](DummyControlEvent())

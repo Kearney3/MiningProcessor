@@ -1100,6 +1100,8 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
 
     mode_toggle = sync_refs["mode"]
     mode = mode_toggle.value if mode_toggle else "api"
+    profile_ref = sync_refs.get("profile")
+    profile_id = profile_ref.value if profile_ref and profile_ref.value else None
 
     type_checks = sync_refs["types"]
     selected_types = [k for k, cb in type_checks.items() if cb.value]
@@ -1174,6 +1176,7 @@ async def on_sync_process(page: ft.Page, sync_refs: dict, log, anomaly_config=No
             return sync_to_minebase(
                 input_dir=path,
                 mode=mode,
+                profile_id=profile_id,
                 data_types=selected_types,
                 dry_run=dry_run,
                 year=year,
@@ -1443,6 +1446,7 @@ async def on_test_db_connection(page: ft.Page, config_refs: dict, log):
     """
     from func.config_loader import get_minebase_db_config
 
+    profile_id = (config_refs.get("mb_profile").value if config_refs.get("mb_profile") else None)
     host = (config_refs["mb_db_host"].value or "").strip()
     port_str = (config_refs["mb_db_port"].value or "").strip()
     database = (config_refs["mb_db_name"].value or "").strip()
@@ -1459,7 +1463,7 @@ async def on_test_db_connection(page: ft.Page, config_refs: dict, log):
 
     await _run_connection_test(
         config_refs["mb_test_btn"], config_refs["mb_test_result"],
-        password, get_minebase_db_config, _validate, _test,
+        password, lambda: get_minebase_db_config(profile_id), _validate, _test,
         page, log, t("logic:database"),
     )
 
@@ -1479,6 +1483,7 @@ async def on_test_api_connection(page: ft.Page, config_refs: dict, log):
     """
     from func.config_loader import get_minebase_api_config
 
+    profile_id = (config_refs.get("mb_profile").value if config_refs.get("mb_profile") else None)
     url = (config_refs["mb_api_url"].value or "").strip()
     username = (config_refs["mb_api_user"].value or "").strip()
     password = config_refs["mb_api_pass"].value or ""
@@ -1493,7 +1498,7 @@ async def on_test_api_connection(page: ft.Page, config_refs: dict, log):
 
     await _run_connection_test(
         config_refs["mb_api_test_btn"], config_refs["mb_api_test_result"],
-        password, get_minebase_api_config, _validate, _test,
+        password, lambda: get_minebase_api_config(profile_id), _validate, _test,
         page, log, "API",
     )
 
