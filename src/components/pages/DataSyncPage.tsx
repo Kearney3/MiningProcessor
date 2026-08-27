@@ -162,7 +162,7 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
           });
       })
       .catch(() => {});
-  }, [bridge]);
+  }, [bridge.call]);
 
   const allSelected = ALL_TYPES.length === dataTypes.length;
   const someSelected = dataTypes.length > 0 && !allSelected;

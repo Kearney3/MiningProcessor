@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { DataSyncPage } from "../components/pages/DataSyncPage";
 import type { BridgeProp } from "../lib/types";
 import { ToastProvider } from "../components/Toast";
@@ -269,7 +269,8 @@ describe("DataSyncPage - Export Warnings", () => {
 
     renderPage(makeBridge({ call: mockCall }));
 
-    const profileSelect = await screen.findByLabelText("同步账号配置");
+    await screen.findByRole("option", { name: /备用数据库/ });
+    const profileSelect = screen.getByLabelText("同步账号配置");
     fireEvent.change(profileSelect, { target: { value: "backup-db" } });
     fireEvent.change(screen.getByPlaceholderText("选择包含已处理数据的文件夹"), {
       target: { value: "/tmp/test" },
@@ -281,6 +282,58 @@ describe("DataSyncPage - Export Warnings", () => {
         profile_id: "backup-db",
         mode: "database",
       }));
+    });
+  });
+
+  it("keeps the selected profile when the bridge instance changes during sync", async () => {
+    const profiles = [
+      {
+        id: "primary-api",
+        name: "生产 API",
+        mode: "api",
+        api: { url: "https://minebase.example" },
+      },
+      {
+        id: "backup-api",
+        name: "备用 API",
+        mode: "api",
+        api: { url: "https://backup.example" },
+      },
+    ];
+    let rerenderPage: ((ui: React.ReactNode) => void) | undefined;
+    const mockCall = vi.fn().mockImplementation((method: string) => {
+      if (method === "get_config") {
+        return Promise.resolve({ active_profile_id: "primary-api", profiles });
+      }
+      if (method === "get_last_directory") return Promise.resolve({ path: "" });
+      if (method === "sync_scan") {
+        // 模拟同步日志更新导致父组件创建了新的 bridge 对象。
+        act(() => {
+          rerenderPage?.(
+            <ToastProvider>
+              <DataSyncPage bridge={{ ...bridge }} />
+            </ToastProvider>,
+          );
+        });
+        return Promise.resolve({});
+      }
+      if (method === "sync_minebase") return Promise.resolve({ results: {} });
+      return Promise.resolve({});
+    });
+    const bridge = makeBridge({ call: mockCall });
+    const rendered = renderPage(bridge);
+    rerenderPage = rendered.rerender;
+
+    await screen.findByRole("option", { name: /备用 API/ });
+    const profileSelect = screen.getByLabelText("同步账号配置");
+    fireEvent.change(profileSelect, { target: { value: "backup-api" } });
+    fireEvent.change(screen.getByPlaceholderText("选择包含已处理数据的文件夹"), {
+      target: { value: "/tmp/test" },
+    });
+    fireEvent.click(screen.getByText("开始同步"));
+
+    await vi.waitFor(() => {
+      expect(screen.getByLabelText("同步账号配置")).toHaveValue("backup-api");
     });
   });
 });
