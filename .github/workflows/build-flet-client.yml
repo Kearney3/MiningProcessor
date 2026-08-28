@@ -65,6 +65,7 @@ jobs:
         run: |
           test -s models/maintenance_classifier.joblib
           uv run python -c "from func.maintenance_ml_classifier import MaintenanceMLClassifier; model = MaintenanceMLClassifier.load(); assert model.is_fitted"
+          uv run python scripts/validate_desktop_icons.py
           uv run ${{ matrix.build_cmd }} --yes --verbose
 
       - name: Verify Flet package scope and model

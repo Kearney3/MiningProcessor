@@ -17,6 +17,10 @@ SIDECAR_DIR="build-sidecar"
 
 echo "═══ MiningProcessor Tauri Build ═══"
 
+# ─── 0. 图标资源校验 ───
+echo "[0/3] Validating desktop icons..."
+uv run python scripts/validate_desktop_icons.py
+
 # ─── 1. PyInstaller（onedir 模式）───
 echo "[1/3] Building Python sidecar with PyInstaller..."
 uv run pyinstaller tauri_bridge.spec \

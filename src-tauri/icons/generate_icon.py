@@ -1,7 +1,10 @@
 """从 assets/logo.png 生成各平台应用图标。"""
-from pathlib import Path
-import subprocess
 import shutil
+import struct
+import subprocess
+from io import BytesIO
+from pathlib import Path
+
 from PIL import Image
 
 ICONS_DIR = Path(__file__).resolve().parent
@@ -10,6 +13,7 @@ ASSETS_DIR.mkdir(exist_ok=True)
 
 SZ = 512
 SOURCE_LOGO = ASSETS_DIR / "logo.png"
+ICO_SIZES = [(32, 32), (16, 16), (24, 24), (48, 48), (64, 64), (128, 128), (256, 256)]
 
 
 def draw_icon(size: int) -> Image.Image:
@@ -36,7 +40,11 @@ def write_files():
     print(f"  PNG  -> icon.png ({SZ}x{SZ})")
 
     img.save(ASSETS_DIR / "app_icon.png", "PNG")
-    print(f"  PNG  -> assets/app_icon.png")
+    print("  PNG  -> assets/app_icon.png")
+
+    # Flet's desktop builder discovers the default app icon as assets/icon.*.
+    img.save(ASSETS_DIR / "icon.png", "PNG")
+    print("  PNG  -> assets/icon.png")
 
     # 各尺寸
     sizes = {
@@ -67,17 +75,50 @@ def write_files():
         ["iconutil", "-c", "icns", str(iconset_dir), "-o", str(ICONS_DIR / "icon.icns")],
         capture_output=True, check=True,
     )
-    print(f"  ICNS -> icon.icns")
+    print("  ICNS -> icon.icns")
     shutil.copy2(ICONS_DIR / "icon.icns", ASSETS_DIR / "app_icon.icns")
-    print(f"  ICNS -> assets/app_icon.icns")
+    print("  ICNS -> assets/app_icon.icns")
     shutil.rmtree(iconset_dir)
 
     # ico
-    ico_sizes = [(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)]
-    ico_imgs = [img.resize(s, Image.LANCZOS) for s in ico_sizes]
-    ico_imgs[0].save(ICONS_DIR / "icon.ico", format="ICO",
-                     sizes=ico_sizes, append_images=ico_imgs[1:])
-    print(f"  ICO  -> icon.ico")
+    # Pillow's ICO writer generates all layers from the source image via
+    # ``sizes``.  Saving a pre-resized 16x16 image and passing append_images
+    # silently produces a single 16x16 entry.
+    _write_ico(img, ICONS_DIR / "icon.ico")
+    print("  ICO  -> icon.ico")
+
+
+def _write_ico(image: Image.Image, path: Path) -> None:
+    """Write an ordered PNG-backed ICO with Tauri's preferred first layer."""
+    encoded_layers = []
+    for width, height in ICO_SIZES:
+        layer = image.resize((width, height), Image.Resampling.LANCZOS)
+        buffer = BytesIO()
+        layer.save(buffer, format="PNG")
+        encoded_layers.append((width, height, buffer.getvalue()))
+
+    directory_size = 6 + 16 * len(encoded_layers)
+    directory = bytearray(struct.pack("<HHH", 0, 1, len(encoded_layers)))
+    payload = bytearray()
+    offset = directory_size
+    for width, height, data in encoded_layers:
+        directory.extend(
+            struct.pack(
+                "<BBBBHHII",
+                width if width < 256 else 0,
+                height if height < 256 else 0,
+                0,
+                0,
+                1,
+                32,
+                len(data),
+                offset,
+            )
+        )
+        payload.extend(data)
+        offset += len(data)
+
+    path.write_bytes(directory + payload)
 
 
 def _svg_str(logo_href: str) -> str:

@@ -66,6 +66,7 @@ jobs:
         shell: bash
         run: |
           uv sync --dev
+          uv run python scripts/validate_desktop_icons.py
           uv run pyinstaller tauri_bridge.spec \
             --distpath build-sidecar \
             --clean --noconfirm
@@ -181,6 +182,7 @@ jobs:
         shell: bash
         run: |
           uv sync --dev
+          uv run python scripts/validate_desktop_icons.py
           uv run pyinstaller tauri_bridge.spec \
             --distpath build-sidecar \
             --clean --noconfirm

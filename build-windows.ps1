@@ -15,6 +15,10 @@ $SIDECAR_DIR = "build-sidecar"
 
 Write-Host "═══ MiningProcessor Tauri Build (Windows) ═══" -ForegroundColor Cyan
 
+# ─── 0. 图标资源校验 ───
+Write-Host "[0/2] Validating desktop icons..." -ForegroundColor Yellow
+uv run python scripts/validate_desktop_icons.py
+
 # ─── 1. PyInstaller（onedir 模式）───
 Write-Host "[1/2] Building Python sidecar with PyInstaller..." -ForegroundColor Yellow
 uv run pyinstaller tauri_bridge.spec `
