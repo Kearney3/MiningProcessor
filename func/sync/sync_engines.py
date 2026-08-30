@@ -14,7 +14,7 @@ from func.sync.api_client import (
     SessionExpiredError,
     SessionLimitReachedError,
 )
-from func.sync.constants import BATCH_SIZE, DATA_TYPE_REGISTRY, DEDUP_FIELDS_MAP
+from func.sync.constants import BATCH_SIZE, CONFLICT_POLICIES, DATA_TYPE_REGISTRY, DEDUP_FIELDS_MAP
 from func.sync.row_helpers import (
     _build_field_mappings,
     _map_row_to_db_columns,
@@ -378,6 +378,9 @@ def sync_via_api(
                 )
                 total_success = total_inserted + total_updated
                 total_skipped = total_confirmed_skipped
+                # MineBase reports REJECT duplicates separately from skipped
+                # rows; expose them as failures in the sync result.
+                total_failed += total_rejected
 
     except SessionExpiredError as e:
         logger.error("[%s] 导入会话已过期: %s", data_type, e)
@@ -441,7 +444,7 @@ def test_db_connection(
 
 
 # ---------------------------------------------------------------------------
-# 直连数据库同步模式（不变）
+# 直连数据库同步模式
 # ---------------------------------------------------------------------------
 
 
@@ -452,18 +455,23 @@ def sync_via_db(
     db_client: Any,
     dry_run: bool = False,
     row_warnings: list[dict[str, Any]] | None = None,
+    conflict_policy: str = "SKIP",
 ) -> dict[str, Any]:
     """通过直连数据库模式同步数据。
 
     Args:
         row_warnings: 可选警告收集列表（来自台账匹配阶段），
                       合并 FK 解析阶段的警告后一并返回。
+        conflict_policy: 冲突策略 ('SKIP' | 'UPDATE' | 'REJECT')，与 API 模式一致。
 
     Returns:
         {"success": N, "skipped": N, "failed": N, "warnings": [...]}
     """
     table = DATA_TYPE_REGISTRY[data_type]["table"]
     collected_warnings: list[dict[str, Any]] = list(row_warnings) if row_warnings else []
+
+    if conflict_policy not in CONFLICT_POLICIES:
+        raise ValueError(f"无效的冲突策略: {conflict_policy}（支持: SKIP、UPDATE、REJECT）")
 
     if not rows:
         logger.info("[%s] 无数据可同步", data_type)
@@ -508,7 +516,18 @@ def sync_via_db(
                     dedup_values[col] = val
 
             if dedup_values and db_client.check_duplicate(table, dedup_values):
-                total_skipped += 1
+                if conflict_policy == "SKIP":
+                    total_skipped += 1
+                    continue
+                if conflict_policy == "REJECT":
+                    total_failed += 1
+                    continue
+
+                updated = db_client.update_row(table, columns, values, dedup_values)
+                if updated != 1:
+                    raise RuntimeError(f"重复行更新失败: {table}")
+                db_client.commit()
+                total_success += 1
                 continue
 
             # 插入并立即提交，保证之前成功的行不依赖后续行的结果。

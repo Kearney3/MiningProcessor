@@ -28,6 +28,7 @@ from func.sync_to_minebase import (  # noqa: E402
     read_and_map_excel,
     sync,
     sync_via_api,
+    sync_via_db,
 )
 from func.time_utils import local_now  # noqa: E402
 
@@ -65,7 +66,7 @@ def sample_mapping(tmp_path):
             "班次": "shiftType",
             "矿卡名称": "sourceTruckName",
             "挖机名称": "sourceExcavatorName",
-            "矿石类型": "sourceMaterialTypeName",
+            "矿石类型": "materialTypeId",
             "运次": "tripCount",
             "产量": "production",
         },
@@ -228,12 +229,20 @@ class TestMigrateFieldNames:
         assert result["production_record"]["挖机名称"] == "sourceExcavatorName"
 
     def test_old_materialtypename_migrated(self, tmp_path):
-        """materialTypeName → sourceMaterialTypeName。"""
+        """materialTypeName → materialTypeId under the current MineBase contract."""
         mapping = {"production_record": {"矿石类型": "materialTypeName"}}
         path = tmp_path / "old_mapping.json"
         path.write_text(json.dumps(mapping, ensure_ascii=False))
         result = load_column_mapping(path)
-        assert result["production_record"]["矿石类型"] == "sourceMaterialTypeName"
+        assert result["production_record"]["矿石类型"] == "materialTypeId"
+
+    def test_removed_source_material_type_name_migrated(self, tmp_path):
+        """The removed sourceMaterialTypeName field migrates to materialTypeId."""
+        mapping = {"production_record": {"矿石类型": "sourceMaterialTypeName"}}
+        path = tmp_path / "removed_mapping.json"
+        path.write_text(json.dumps(mapping, ensure_ascii=False))
+        result = load_column_mapping(path)
+        assert result["production_record"]["矿石类型"] == "materialTypeId"
 
     def test_old_equipmentcode_migrated(self, tmp_path):
         """equipmentCode → sourceEquipmentCode（不是丢弃）。"""
@@ -346,11 +355,37 @@ class TestBuildFieldMappings:
         _, mapping = sample_mapping
         result = _build_field_mappings(mapping["production_record"], "production_record")
         truck_mapping = next(m for m in result if m["systemField"] == "sourceTruckName")
-        assert truck_mapping["fkResolve"]["relation"] == "truck"
+        assert truck_mapping["fkResolve"]["relation"] == "equipment"
         excavator_mapping = next(m for m in result if m["systemField"] == "sourceExcavatorName")
-        assert excavator_mapping["fkResolve"]["relation"] == "excavator"
-        material_mapping = next(m for m in result if m["systemField"] == "sourceMaterialTypeName")
+        assert excavator_mapping["fkResolve"]["relation"] == "equipment"
+        material_mapping = next(m for m in result if m["systemField"] == "materialTypeId")
         assert material_mapping["fkResolve"]["relation"] == "materialType"
+
+    def test_production_mappings_match_minebase_current_contract(self):
+        """Production mappings must use canonical FK relations and materialTypeId."""
+        mapping = {
+            "日期": "date",
+            "班次": "shiftType",
+            "矿卡名称": "sourceTruckName",
+            "挖机名称": "sourceExcavatorName",
+            "矿石类型": "materialTypeId",
+        }
+
+        result = _build_field_mappings(mapping, "production_record")
+
+        assert next(m for m in result if m["systemField"] == "sourceTruckName")["fkResolve"] == {
+            "relation": "equipment",
+            "matchField": "equipName",
+        }
+        assert next(m for m in result if m["systemField"] == "sourceExcavatorName")["fkResolve"] == {
+            "relation": "equipment",
+            "matchField": "equipName",
+        }
+        assert next(m for m in result if m["systemField"] == "materialTypeId")["fkResolve"] == {
+            "relation": "materialType",
+            "matchField": "code",
+        }
+        assert all(m["systemField"] != "sourceMaterialTypeName" for m in result)
 
 
 # ---------------------------------------------------------------------------
@@ -862,6 +897,17 @@ class TestSyncViaApiV2:
         assert result["success"] == 0
         assert result["failed"] == 2
 
+    def test_rejected_rows_are_reported_as_failed(self):
+        """MineBase REJECT outcomes must be reflected in failed, not lost."""
+        client = self._make_v2_client(inserted=1, rejected=2)
+        rows = [{"date": f"2025-06-{i:02d}"} for i in range(1, 4)]
+
+        result = sync_via_api("fuel", rows, {"日期": "date"}, client)
+
+        assert result["success"] == 1
+        assert result["skipped"] == 0
+        assert result["failed"] == 2
+
     def test_session_expired_returns_failed(self):
         """SessionExpiredError during confirm 应返回失败。"""
         from func.sync.api_client import SessionExpiredError
@@ -920,6 +966,57 @@ class TestSyncDB:
         results = sync(tmp_path, mode="database", data_types=["fuel"], dry_run=True, mapping_file=mapping_path)
         assert "fuel" in results
         assert results["fuel"]["success"] == 0
+
+    def test_update_policy_updates_duplicate_rows(self):
+        """DB mode should honor UPDATE instead of silently skipping duplicates."""
+        from func.sync import sync_engines
+
+        db = MagicMock()
+        db.check_duplicate.return_value = True
+        db.update_row.return_value = 1
+        row = {"date": "2025-06-01"}
+        columns = ["date", "shift_type", "equipment_id", "fuel_name", "consumption"]
+        values = ["2025-06-01", "Day", "equipment-1", "0#柴油", 150.0]
+
+        with patch.object(sync_engines, "_resolve_fks_for_db", return_value=row), \
+             patch.object(sync_engines, "_map_row_to_db_columns", return_value=(columns, values)):
+            result = sync_via_db("fuel", [row], {}, db, conflict_policy="UPDATE")
+
+        assert result["success"] == 1
+        assert result["skipped"] == 0
+        assert result["failed"] == 0
+        db.update_row.assert_called_once_with(
+            "fuel_consumption",
+            columns,
+            values,
+            {
+                "date": "2025-06-01",
+                "shift_type": "Day",
+                "equipment_id": "equipment-1",
+                "fuel_name": "0#柴油",
+            },
+        )
+        db.commit.assert_called_once()
+
+    def test_reject_policy_counts_duplicate_rows_as_failed(self):
+        """DB mode should report REJECT duplicates as failures."""
+        from func.sync import sync_engines
+
+        db = MagicMock()
+        db.check_duplicate.return_value = True
+        row = {"date": "2025-06-01"}
+
+        with patch.object(sync_engines, "_resolve_fks_for_db", return_value=row), \
+             patch.object(sync_engines, "_map_row_to_db_columns", return_value=(
+                 ["date", "shift_type", "equipment_id", "fuel_name"],
+                 ["2025-06-01", "Day", "equipment-1", "0#柴油"],
+             )):
+            result = sync_via_db("fuel", [row], {}, db, conflict_policy="REJECT")
+
+        assert result["success"] == 0
+        assert result["skipped"] == 0
+        assert result["failed"] == 1
+        db.update_row.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -1324,7 +1421,7 @@ class TestResolveFksForDb:
             "shiftType": "夜班",
             "sourceTruckName": "CAT785D-01",
             "sourceExcavatorName": "EX-001",
-            "sourceMaterialTypeName": "铜矿",
+            "materialTypeId": "铜矿",
             "tripCount": 10,
             "production": 350.0,
         }

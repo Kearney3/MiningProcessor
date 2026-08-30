@@ -245,7 +245,7 @@ def _process_production_file(
         "班次": "shiftType",
         "矿卡名称": "sourceTruckName",
         "挖机名称": "sourceExcavatorName",
-        "矿石类型": "sourceMaterialTypeName",
+        "矿石类型": "materialTypeId",
         "运次": "tripCount",
         "产量": "production",
     }
