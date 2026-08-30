@@ -41,11 +41,14 @@ def _build_field_mappings(column_mapping: dict[str, str], table: str) -> list[di
     - materialType → materialType
     """
     # 定义哪些字段需要 FK 解析（新字段名：sourceEquipmentName 等）
+    # MineBase v2 uses canonical Prisma relation names.  Production's truck
+    # and excavator are role-specific fields on the same equipment relation;
+    # the role is carried by the target FK field's prismaField on the server.
     fk_fields = {
         "sourceEquipmentName": {"relation": "equipment", "matchField": "equipName"},
-        "sourceTruckName": {"relation": "truck", "matchField": "equipName"},
-        "sourceExcavatorName": {"relation": "excavator", "matchField": "equipName"},
-        "sourceMaterialTypeName": {"relation": "materialType", "matchField": "code"},
+        "sourceTruckName": {"relation": "equipment", "matchField": "equipName"},
+        "sourceExcavatorName": {"relation": "equipment", "matchField": "equipName"},
+        "materialTypeId": {"relation": "materialType", "matchField": "code"},
     }
 
     mappings = []
@@ -279,7 +282,9 @@ def _resolve_fks_for_db(
             return None
 
         # 物料类型
-        material_name = row.get("sourceMaterialTypeName")
+        # MineBase v2 removed sourceMaterialTypeName.  The Excel value is
+        # supplied through materialTypeId and resolved by code/name.
+        material_name = row.get("materialTypeId")
         if material_name:
             material_id = db_client.resolve_material_type_id(material_name)
             if material_id:

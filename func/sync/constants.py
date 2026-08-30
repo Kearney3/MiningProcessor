@@ -45,6 +45,9 @@ DATA_TYPE_REGISTRY: dict[str, dict[str, Any]] = {
 # MineBase 导入 API 合约版本
 CONTRACT_VERSION = 2
 
+# MineBase import-session conflict policy enum
+CONFLICT_POLICIES: frozenset[str] = frozenset({"SKIP", "UPDATE", "REJECT"})
+
 # 每批发送的行数
 BATCH_SIZE = 100
 
@@ -58,7 +61,10 @@ DEDUP_FIELDS_MAP: dict[str, list[str]] = {
     "electricity_consumption": ["date", "shift_type", "equipment_id"],
     "work_efficiency": ["date", "shift_type", "equipment_id"],
     "equipment_operation": ["date", "shift_type", "equipment_id"],
-    "production_record": ["date", "shift_type", "truck_id", "excavator_id", "material_type_id"],
+    "production_record": [
+        "date", "shift_type", "truck_id", "excavator_id", "material_type_id",
+        "trip_count", "production",
+    ],
 }
 
 # API 字段名 → PostgreSQL 列名映射
@@ -73,7 +79,6 @@ FIELD_TO_COLUMN_MAP: dict[str, str] = {
     "sourceTruckCode": "source_truck_code",
     "sourceExcavatorName": "source_excavator_name",
     "sourceExcavatorCode": "source_excavator_code",
-    "sourceMaterialTypeName": "source_material_type_name",
     # FK resolved 字段
     "equipmentId": "equipment_id",
     "truckId": "truck_id",
@@ -117,5 +122,4 @@ FIELD_TO_COLUMN_MAP: dict[str, str] = {
     "equipmentCode": "source_equipment_code",
     "truckName": "source_truck_name",
     "excavatorName": "source_excavator_name",
-    "materialTypeName": "source_material_type_name",
 }

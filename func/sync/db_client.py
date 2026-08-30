@@ -121,6 +121,58 @@ class MineBaseDBClient:
             psycopg2.extras.execute_values(cur, query, values_list, page_size=200)
         return len(values_list)
 
+    def update_row(
+        self,
+        table: str,
+        columns: list[str],
+        values: list[Any],
+        match_fields: dict[str, Any],
+    ) -> int:
+        """Update one row selected by its duplicate identity.
+
+        The caller supplies already-mapped PostgreSQL column names.  Primary
+        key and timestamp columns are excluded from the imported assignments;
+        ``updated_at`` is refreshed by the database, matching MineBase's API
+        UPDATE behavior.
+        """
+        if table not in VALID_TABLES:
+            raise ValueError(f"Invalid table name: {table}")
+        if not match_fields:
+            return 0
+
+        from psycopg2 import sql
+
+        assignments = [
+            (column, value)
+            for column, value in zip(columns, values, strict=False)
+            if column not in {"id", "updated_at"} and column not in match_fields
+        ]
+        if not assignments:
+            # Keep the operation meaningful even when every imported value is
+            # part of the duplicate identity.
+            assignments = [("updated_at", None)]
+
+        set_clauses = [
+            sql.SQL("{} = %s").format(sql.Identifier(column))
+            for column, _value in assignments
+            if column != "updated_at"
+        ]
+        params = [value for column, value in assignments if column != "updated_at"]
+        set_clauses.append(sql.SQL("{} = CURRENT_TIMESTAMP").format(sql.Identifier("updated_at")))
+        where_clauses = [
+            sql.SQL("{} = %s").format(sql.Identifier(column))
+            for column in match_fields
+        ]
+        params.extend(match_fields.values())
+        query = sql.SQL("UPDATE {} SET {} WHERE {}").format(
+            sql.Identifier(table),
+            sql.SQL(", ").join(set_clauses),
+            sql.SQL(" AND ").join(where_clauses),
+        )
+        with self.conn.cursor() as cur:
+            cur.execute(query, params)
+            return cur.rowcount
+
     def commit(self) -> None:
         self.conn.commit()
 

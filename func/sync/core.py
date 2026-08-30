@@ -39,7 +39,10 @@ _FIELD_RENAMES: dict[str, str] = {
     "truckCode": "sourceTruckCode",
     "excavatorName": "sourceExcavatorName",
     "excavatorCode": "sourceExcavatorCode",
-    "materialTypeName": "sourceMaterialTypeName",
+    # MineBase removed sourceMaterialTypeName; production imports now resolve
+    # the Excel material value directly into the materialTypeId FK.
+    "materialTypeName": "materialTypeId",
+    "sourceMaterialTypeName": "materialTypeId",
     "company": "sourceCompany",
 }
 
@@ -398,7 +401,15 @@ def sync(
             if sync_mode == "api":
                 results[data_type] = _sync_via_api(data_type, all_rows, mapping, api_client, dry_run, row_warnings=data_warnings, conflict_policy=conflict_policy)
             else:
-                results[data_type] = _sync_via_db(data_type, all_rows, mapping, db_client, dry_run, row_warnings=data_warnings)
+                results[data_type] = _sync_via_db(
+                    data_type,
+                    all_rows,
+                    mapping,
+                    db_client,
+                    dry_run,
+                    row_warnings=data_warnings,
+                    conflict_policy=conflict_policy,
+                )
 
             # 收集试运行数据
             if dry_run and "dry_run_rows" in results[data_type]:
