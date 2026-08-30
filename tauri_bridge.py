@@ -87,11 +87,19 @@ def _get_project_version() -> str:
 _BRIDGE_VERSION = _get_project_version()
 
 
-def _validate_url(url: str) -> str:
+def _validate_url(url: str, *, allow_local: bool = False) -> str:
     """Validate a URL to prevent SSRF attacks.
 
     Only allows http/https schemes and blocks loopback, link-local,
-    and cloud metadata addresses.
+    and cloud metadata addresses.  LLM endpoints may explicitly opt in to
+    local addresses because local model servers commonly listen on loopback
+    or a private network interface.
+
+    Args:
+        url: URL to validate.
+        allow_local: Allow loopback, private, and link-local addresses. Cloud
+            metadata, multicast, reserved, and unspecified addresses remain
+            blocked.
 
     Raises:
         ValueError: If the URL is invalid or targets a blocked address.
@@ -104,16 +112,22 @@ def _validate_url(url: str) -> str:
     if not hostname:
         raise ValueError("URL must include a hostname")
 
+    cloud_metadata = ipaddress.ip_network("169.254.169.254/32")
+
+    def _is_local_address(addr: ipaddress._BaseAddress) -> bool:
+        return addr.is_loopback or addr.is_link_local or addr.is_private
+
     def _is_blocked_address(addr: ipaddress._BaseAddress) -> bool:
         return (
-            addr.is_loopback
-            or addr.is_link_local
-            or addr.is_private
+            _is_local_address(addr)
             or addr.is_reserved
             or addr.is_multicast
             or addr.is_unspecified
-            or addr in ipaddress.ip_network("169.254.169.254/32")
+            or addr in cloud_metadata
         )
+
+    def _is_allowed_local_address(addr: ipaddress._BaseAddress) -> bool:
+        return allow_local and _is_local_address(addr) and addr not in cloud_metadata
 
     try:
         addr = ipaddress.ip_address(hostname)
@@ -132,10 +146,14 @@ def _validate_url(url: str) -> str:
         except (OSError, ValueError):
             addresses = set()
         if any(_is_blocked_address(address) for address in addresses):
+            if addresses and all(_is_allowed_local_address(address) for address in addresses):
+                return url
             raise ValueError("URL resolves to a private or local address")
         return url
 
     if _is_blocked_address(addr):
+        if _is_allowed_local_address(addr):
+            return url
         raise ValueError("Private, loopback, or link-local addresses are not allowed")
 
     return url
@@ -602,7 +620,7 @@ def _update_llm_config(params: dict) -> dict:
     from func.secret_store import LLM_KEY_MASK
     updates = {k: v for k, v in params.items() if k in ("url", "api_key", "model", "format", "concurrency", "batch_size", "timeout", "max_retries")}
     if "url" in updates:
-        _validate_url(updates["url"])
+        _validate_url(updates["url"], allow_local=True)
     cfg = update_llm_config(updates)
     cfg["api_key"] = LLM_KEY_MASK if cfg.get("api_key") else ""
     return cfg
@@ -612,7 +630,7 @@ def _update_llm_config(params: dict) -> dict:
 def _test_llm_connection(params: dict) -> dict:
     from func.config_loader import test_llm_connection
     cfg = {
-        "url": _validate_url(params.get("url", "")),
+        "url": _validate_url(params.get("url", ""), allow_local=True),
         "api_key": params.get("api_key", ""),
         "format": params.get("format", "openai"),
     }
