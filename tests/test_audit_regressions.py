@@ -140,6 +140,43 @@ def test_url_validation_rejects_private_dns_results():
             tauri_bridge._validate_url("https://internal.example")
 
 
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://127.0.0.1:11434/v1",
+        "http://[::1]:11434/v1",
+        "http://192.168.1.20:8000/v1",
+    ],
+)
+def test_llm_connection_allows_local_endpoints(url):
+    with patch(
+        "func.config_loader.test_llm_connection",
+        return_value={"success": True, "models": ["local-model"], "error": ""},
+    ) as test_connection:
+        result = tauri_bridge._test_llm_connection({
+            "url": url,
+            "api_key": "local-key",
+            "format": "openai",
+        })
+
+    assert result["success"] is True
+    assert test_connection.call_args.args[0]["url"] == url
+
+
+def test_update_llm_config_allows_local_endpoint():
+    config = {
+        "url": "http://127.0.0.1:11434/v1",
+        "api_key": "local-key",
+        "model": "local-model",
+        "format": "openai",
+    }
+    with patch("func.config_loader.update_llm_config", return_value=config) as update:
+        result = tauri_bridge._update_llm_config(config)
+
+    assert result["url"] == config["url"]
+    assert update.call_args.args[0]["url"] == config["url"]
+
+
 class _RecordingCursor:
     def __init__(self, connection):
         self.connection = connection
