@@ -1478,6 +1478,27 @@ def process_maintenance_llm(
             f"已完成 {len(completed)} 条可断点续跑"
         ) from failed_errors[0]
 
+    # 确保目标列存在且 dtype 为 object，避免空列被 pandas 识别为 float64 时赋值字符串报错
+    string_cols = [
+        category_column,
+        minor_column,
+        status_column,
+        "LLM大类",
+        "LLM小类",
+        "LLM理由",
+        "LLM标注状态",
+    ]
+    for col_name in string_cols:
+        if col_name not in df.columns:
+            df[col_name] = ""
+        elif df[col_name].dtype != object:
+            df[col_name] = df[col_name].astype(object)
+
+    if "LLM置信度" not in df.columns:
+        df["LLM置信度"] = pd.NA
+    elif df["LLM置信度"].dtype != object:
+        df["LLM置信度"] = df["LLM置信度"].astype(object)
+
     for index in target_indexes:
         label = completed.get(_record_id(df, index))
         if label is None:
@@ -1485,11 +1506,6 @@ def process_maintenance_llm(
         df.at[index, category_column] = label.major
         df.at[index, minor_column] = label.minor
         df.at[index, status_column] = "LLM标注"
-        for col_name in ("LLM大类", "LLM小类", "LLM理由", "LLM标注状态"):
-            if col_name not in df.columns:
-                df[col_name] = ""
-        if "LLM置信度" not in df.columns:
-            df["LLM置信度"] = pd.NA
         df.at[index, "LLM大类"] = label.major
         df.at[index, "LLM小类"] = label.minor
         df.at[index, "LLM置信度"] = label.confidence

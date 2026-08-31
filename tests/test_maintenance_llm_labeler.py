@@ -1,6 +1,7 @@
 """维修记录大模型标注脚本测试。"""
 import json
 import os
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
@@ -1008,6 +1009,66 @@ def test_process_maintenance_llm_creates_missing_output_columns(tmp_path):
     assert labeled.loc[0, "大类"] == "发动机系统"
     assert labeled.loc[0, "小类"] == "滤清/进排气"
     assert labeled.loc[0, "分类方式"] == "LLM标注"
+
+
+def test_process_maintenance_llm_handles_empty_float64_columns(tmp_path):
+    """当 Excel 中已有空列（如 LLM理由/大类 等被 pandas 解析为 float64）时，赋值字符串不应报错。"""
+    from func.label_maintenance_with_llm import (
+        BatchResult,
+        LLMLabel,
+        process_maintenance_llm,
+    )
+
+    source = tmp_path / "empty_cols.xlsx"
+    output = tmp_path / "empty_cols_out.xlsx"
+    pd.DataFrame({
+        "维修内容": ["底盘漏油"],
+        "大类": [None],
+        "小类": [None],
+        "分类方式": [None],
+        "LLM理由": [None],
+        "LLM大类": [None],
+    }).to_excel(
+        source,
+        index=False,
+        sheet_name="维修明细",
+    )
+
+    class _Client:
+        def label_batch(self, records, **kwargs):
+            return BatchResult(
+                labels=[
+                    LLMLabel(
+                        record_id=records[0]["id"],
+                        major="底盘及车身系统",
+                        minor="液压系统",
+                        confidence=0.85,
+                        reason="仅提漏油未指明具体系统和部件",
+                    )
+                ],
+                skipped_ids=[],
+            )
+
+    with patch(
+        "func.label_maintenance_with_llm.create_llm_client",
+        return_value=_Client(),
+    ):
+        result = process_maintenance_llm(
+            str(source),
+            output_path=str(output),
+            export_mode="details",
+            llm_config={
+                "url": "http://fake",
+                "api_key": "k",
+                "model": "m",
+                "format": "openai",
+            },
+        )
+
+    assert result["llm_completed"] == 1
+    labeled = pd.read_excel(output)
+    assert labeled.loc[0, "大类"] == "底盘及车身系统"
+    assert labeled.loc[0, "LLM理由"] == "仅提漏油未指明具体系统和部件"
 
 
 def test_preview_omits_high_cardinality_value_options(tmp_path):
