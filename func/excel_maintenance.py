@@ -19,6 +19,7 @@ from func.maintenance_classification import (
 )
 from func.maintenance_utils import (
     extract_device_model,
+    normalize_maintenance_shift,
     preprocess_device_name,
 )
 from func.writer import write_excel
@@ -198,7 +199,7 @@ def process_maintenance_data(
             "标准设备名称": std_name,
             "设备型号": model,
             "原因": rec["原因"],
-            "班次": rec["班次"],
+            "班次": normalize_maintenance_shift(rec["班次"]),
             "大类": major,
             "小类": minor,
             "分类方式": (

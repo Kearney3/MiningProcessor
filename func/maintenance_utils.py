@@ -7,6 +7,18 @@ from datetime import date
 
 from func.string_utils import clean_string
 
+# 维修记录报表使用小写英文班次值；未标注等其他值保持原样。
+MAINTENANCE_SHIFT_MAPPING = {
+    "白班": "day",
+    "夜班": "night",
+}
+
+
+def normalize_maintenance_shift(shift: str) -> str:
+    """将维修记录班次统一为报表使用的英文值。"""
+    return MAINTENANCE_SHIFT_MAPPING.get(shift, shift)
+
+
 # ── 批注解析 ──────────────────────────────────────────────────
 
 def parse_comment(comment_text: str) -> list[tuple[str, str]]:
@@ -19,7 +31,7 @@ def parse_comment(comment_text: str) -> list[tuple[str, str]]:
         comment_text: 单元格批注原文。
 
     Returns:
-        [(班次, 维修内容), ...]  班次为 "白班" / "夜班" / "未标注"。
+        [(班次, 维修内容), ...]  班次为 "day" / "night" / "未标注"。
     """
     if not comment_text:
         return []
@@ -44,7 +56,7 @@ def parse_comment(comment_text: str) -> list[tuple[str, str]]:
 
         shift_match = re.match(rf'^(白班|夜班){_SEP}\s*(.*)', part, re.DOTALL)
         if shift_match:
-            shift = shift_match.group(1)
+            shift = normalize_maintenance_shift(shift_match.group(1))
             content = shift_match.group(2).strip()
         else:
             shift = "未标注"
