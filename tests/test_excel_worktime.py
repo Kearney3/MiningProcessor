@@ -339,6 +339,24 @@ class TestNumericSheetNames:
 class TestSkipNonDateSheets:
     """Sheets with non-numeric names produce a warning and are skipped."""
 
+    def test_skip_sheet_beyond_month_length(self, tmp_path):
+        """Sheets beyond the target month's calendar length are ignored."""
+        excel_path = str(tmp_path / "worktime.xlsx")
+        _create_worktime_excel(excel_path, days=[30, 31])
+
+        result = process_excel_data(
+            file_path=excel_path,
+            year=2025,
+            month=9,
+            return_sheets=True,
+        )
+
+        assert result is not None
+        df = result["工时数据"]
+        assert len(df) == 3
+        assert not df["日期"].isna().any()
+        assert set(df["日期"].astype(str)) == {"2025-09-30"}
+
     def test_skip_alpha_sheet(self, tmp_path):
         """Sheet named 'Overview' is skipped entirely."""
         excel_path = str(tmp_path / "worktime.xlsx")

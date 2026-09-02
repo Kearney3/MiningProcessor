@@ -1,4 +1,5 @@
 import argparse
+import calendar
 import os
 
 import pandas as pd
@@ -49,6 +50,8 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"找不到输入文件 '{file_path}'")
 
+    max_day = calendar.monthrange(year, month)[1]
+
     # 向后兼容：skip_hidden 打开时同时跳过隐藏行和列
     if skip_hidden:
         skip_hidden_rows = True
@@ -72,8 +75,20 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
         try:
             for sheet_name in xls.sheet_names:
                 # 确保sheet名称是数字（代表日期）
-                if not clean_string(sheet_name).isdigit():
+                cleaned_sheet_name = clean_string(sheet_name)
+                if not cleaned_sheet_name.isdigit():
                     logger.warning(f"跳过非日期Sheet: {sheet_name}")
+                    continue
+
+                day = int(cleaned_sheet_name)
+                if not 1 <= day <= max_day:
+                    logger.warning(
+                        "跳过超出目标月份天数的日期Sheet: %s（%04d-%02d 最后一天为 %d）",
+                        sheet_name,
+                        year,
+                        month,
+                        max_day,
+                    )
                     continue
 
                 # 读取整个sheet，不设表头
@@ -93,7 +108,6 @@ def process_excel_data(file_path, year, month, output_file=None, return_sheets=F
                 df_raw = df_raw.dropna(how="all")
 
                 # 1. 确定日期字符串 (YYYY-MM-DD)
-                day = int(clean_string(sheet_name))
                 date_str = f"{year}-{month:02d}-{day:02d}"
                 day_list.append(day)
 
