@@ -56,6 +56,11 @@ pnpm install
 git config core.hooksPath hooks
 ```
 
+### 提交规范
+
+提交信息统一使用英文 Conventional Commits 格式：`type(scope): short description`。
+Dependabot 的运行时依赖和开发依赖分别使用 `chore(deps): ...` 与 `chore(deps-dev): ...`，Pull Request 会由 CI 自动检查提交信息。
+
 ### 启动开发环境
 
 ```bash
@@ -215,11 +220,13 @@ MiningProcessor/
 ├── hooks/                      # Git hooks（push 前自动运行测试）
 │   ├── commit-msg              # 提交信息格式校验
 │   └── pre-push                # push 前运行 pytest
-├── .github/workflows/
-│   ├── ci.yml                  # push/PR → 自动跑测试 + 类型 + Rust 检查
-│   ├── build-tauri.yml         # CI 通过 → Tauri 桌面构建（macOS + Windows）
-│   ├── build-flet-client.yml   # CI 通过 → Flet 桌面构建（macOS + Windows）
-│   └── cleanup-artifacts.yml   # 手动清理旧 artifacts
+├── .github/
+│   ├── dependabot.yml          # Python、Node、Rust 与 GitHub Actions 依赖更新
+│   └── workflows/
+│       ├── ci.yml              # push/PR → 自动跑测试 + 类型 + Rust 检查
+│       ├── build-tauri.yml     # CI 通过 → Tauri 桌面构建（macOS + Windows）
+│       ├── build-flet-client.yml # CI 通过 → Flet 桌面构建（macOS + Windows）
+│       └── cleanup-artifacts.yml # 手动清理旧 artifacts
 ├── LICENSE                     # Apache License 2.0
 └── NOTICE                      # 依赖归属声明
 ```
@@ -387,7 +394,7 @@ CI 通过后自动触发桌面应用构建：
 - **Tauri**：macOS arm64 + Windows x64 → `.dmg` / `.exe`
 - **Flet**：macOS + Windows → 独立安装包
 
-触发条件：push 到 `main` 或 `releases/*` 分支，且 CI 全部通过。
+触发条件：push 到 `main` 分支，且 CI 全部通过。
 详见 `.github/workflows/build-tauri.yml` 和 `.github/workflows/build-flet-client.yml`。
 
 ### 本地构建

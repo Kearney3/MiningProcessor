@@ -4,8 +4,9 @@ name: CI
 
 on:
   push:
-    branches: [main, 'releases/**']
+    branches: [main]
     paths:
+      - '.github/**'
       - 'func/**'
       - 'gui/**'
       - 'models/maintenance_classifier.joblib'
@@ -25,9 +26,12 @@ on:
       - 'tsconfig.json'
       - 'tsconfig.node.json'
       - 'vite.config.ts'
+      - 'commitlint.config.mjs'
+      - 'hooks/**'
   pull_request:
     branches: [main]
     paths:
+      - '.github/**'
       - 'func/**'
       - 'gui/**'
       - 'models/maintenance_classifier.joblib'
@@ -47,6 +51,8 @@ on:
       - 'tsconfig.json'
       - 'tsconfig.node.json'
       - 'vite.config.ts'
+      - 'commitlint.config.mjs'
+      - 'hooks/**'
 
 env:
   UV_PYTHON: "3.13"
@@ -58,6 +64,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ─── 提交信息检查 ───────────────────────────────────────
+  commitlint:
+    name: Commit messages
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v6.5.0
+        with:
+          node-version: "24"
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint pull request commits
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: pnpm exec commitlint --from "$BASE_SHA" --to "$HEAD_SHA" --verbose
+
   # ─── Python 测试 ──────────────────────────────────────────
   python-tests:
     name: Python tests

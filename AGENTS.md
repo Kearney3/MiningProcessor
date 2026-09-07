@@ -84,6 +84,8 @@ fix(sync): handle duplicate records
 docs(project): document the local setup
 ~~~
 
+Dependabot 的 PR 标题和提交信息也遵循该格式：运行时依赖使用 `chore(deps): ...`，开发依赖使用 `chore(deps-dev): ...`。
+
 提交检查由 commitlint.config.mjs 和 hooks/commit-msg 执行；推送前的 hooks/pre-push 会运行完整 pytest。首次克隆后启用 hooks：
 
 ~~~bash
