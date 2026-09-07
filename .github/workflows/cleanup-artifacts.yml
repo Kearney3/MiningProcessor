@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Delete artifacts older than ${{ inputs.min_age_days || '30' }} days
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const minAgeDays = parseInt('${{ inputs.min_age_days || '30' }}');
