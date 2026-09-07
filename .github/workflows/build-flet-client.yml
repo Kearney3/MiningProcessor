@@ -45,7 +45,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@v10.0.1
 
       - name: Clean ignored files before packaging
         shell: bash
