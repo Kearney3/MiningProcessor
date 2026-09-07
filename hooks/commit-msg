@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# commit-msg hook: enforce the repository commit message convention.
+set -euo pipefail
+
+commit_msg_file="${1:-}"
+if [[ -z "$commit_msg_file" ]]; then
+    echo "❌ commit-msg: missing commit message file."
+    exit 1
+fi
+
+if ! command -v pnpm >/dev/null 2>&1; then
+    echo "❌ commit-msg: pnpm is required. Install pnpm before committing."
+    exit 1
+fi
+
+pnpm exec commitlint --edit "$commit_msg_file"
+
+# Commitlint validates the Conventional Commits structure. This additional
+# check keeps the required subject description in printable ASCII English.
+header="$(LC_ALL=C sed -n '1p' "$commit_msg_file")"
+english_header_pattern='^[a-z][a-z0-9-]*\([a-z0-9-]+\): [A-Za-z][ -~]*$'
+if [[ ! "$header" =~ $english_header_pattern ]]; then
+    echo ""
+    echo "❌ commit-msg: subject must be ASCII English and match:"
+    echo "   type(scope): short description"
+    echo "   Example: feat(gui): add the export dialog"
+    exit 1
+fi

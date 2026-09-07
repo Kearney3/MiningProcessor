@@ -62,6 +62,42 @@ uv run pytest tests/test_gui_components.py -k config
 
 测试覆盖 887 个用例，涵盖 GUI 组件、配置读写、日志分发、Excel 合并、设备台账、油品台账、Keychain 凭证存储、Tauri RPC、异常值检测等多个模块（详见 README.md 测试章节）。
 
+## 提交规范与 Git hooks
+
+提交信息必须使用英文 Conventional Commits 格式：
+
+~~~text
+type(scope): short description
+~~~
+
+要求如下：
+
+- type 必须是：feat、fix、docs、style、refactor、perf、test、build、ci、chore、revert 或 merge。
+- scope 必须存在，使用小写字母、数字和连字符，例如 gui、production、sync。
+- 描述必须简短、英文，并以英文字母开头；标题最长 120 个字符，不以句号结尾。
+
+示例：
+
+~~~text
+feat(gui): add the export dialog
+fix(sync): handle duplicate records
+docs(project): document the local setup
+~~~
+
+提交检查由 commitlint.config.mjs 和 hooks/commit-msg 执行；推送前的 hooks/pre-push 会运行完整 pytest。首次克隆后启用 hooks：
+
+~~~bash
+pnpm install
+git config core.hooksPath hooks
+~~~
+
+手动检查最近一次提交：
+
+~~~bash
+pnpm lint:commit
+pnpm exec commitlint --from=<base-commit> --to=HEAD
+~~~
+
 ## 高层架构
 
 ## 1. 两层业务组织：处理引擎 + GUI 编排

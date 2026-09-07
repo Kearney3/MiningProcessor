@@ -52,7 +52,7 @@ uv sync
 # 安装前端依赖
 pnpm install
 
-# 启用 Git hooks（push 前自动运行测试）
+# 启用 Git hooks（commit-msg 校验提交格式，push 前自动运行测试）
 git config core.hooksPath hooks
 ```
 
@@ -205,6 +205,7 @@ MiningProcessor/
 ├── assets/                     # 应用图标（多尺寸）
 ├── pyproject.toml              # Python 项目配置（声明 license=Apache-2.0）
 ├── package.json                # Node.js 项目配置
+├── commitlint.config.mjs       # commitlint 提交信息规则
 ├── vite.config.ts              # Vite 构建配置
 ├── tauri.conf.json             # Tauri 应用配置
 ├── tsconfig.json / tsconfig.node.json
@@ -212,7 +213,8 @@ MiningProcessor/
 ├── config.user.json            # 用户覆盖配置（gitignore，含凭据）
 ├── tests/                      # pytest 测试（53 个文件，1403 个用例）
 ├── hooks/                      # Git hooks（push 前自动运行测试）
-│   └── pre-push
+│   ├── commit-msg              # 提交信息格式校验
+│   └── pre-push                # push 前运行 pytest
 ├── .github/workflows/
 │   ├── ci.yml                  # push/PR → 自动跑测试 + 类型 + Rust 检查
 │   ├── build-tauri.yml         # CI 通过 → Tauri 桌面构建（macOS + Windows）
