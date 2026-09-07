@@ -1,25 +1,40 @@
-# ⛏️ MiningProcessor
+<p align="center">
+  <img src="assets/app_icon.png" alt="MiningProcessor 项目图标" width="144" />
+</p>
 
-> 矿山运营 Excel 报表批量处理工具
+<h1 align="center">MiningProcessor</h1>
 
-<p>
-  <img src="https://img.shields.io/badge/version-v2.9.0-blue?style=flat-square" alt="version" />
-  <img src="https://img.shields.io/badge/Python-≥3.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="python" />
-  <img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square" alt="license" />
-  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey?style=flat-square" alt="platform" />
+<p align="center">
+  <strong>矿山运营数据处理工作台</strong><br />
+  将生产、油耗、电耗、工时与维修 Excel 报表，转换为结构化、可追踪的标准化数据。
+</p>
+
+<p align="center">
+  <a href="https://github.com/Kearney3/MiningProcessor/actions/workflows/ci.yml">
+    <img src="https://github.com/Kearney3/MiningProcessor/actions/workflows/ci.yml/badge.svg" alt="CI" />
+  </a>
+  <img src="https://img.shields.io/badge/version-v3.0.0-1769aa?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/Python-%E2%89%A53.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="python" />
   <img src="https://img.shields.io/badge/Tauri-v2-FFC131?style=flat-square&logo=tauri&logoColor=black" alt="tauri" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="react" />
-  <img src="https://img.shields.io/badge/tests-1403%20passed-brightgreen?style=flat-square" alt="tests" />
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square" alt="license" />
+  </a>
 </p>
 
-<p>
-  <strong>CLI</strong> 命令行 + <strong>Tauri 桌面 GUI</strong> + <strong>Flet 桌面 GUI</strong> 三入口<br/>
-  自动解析矿山生产、油耗、电耗、工时报表 → 结构化数据 → 标准化 Excel
+<p align="center">
+  <a href="#-功能模块">功能模块</a> ·
+  <a href="#-快速开始">快速开始</a> ·
+  <a href="#-配置说明">配置说明</a> ·
+  <a href="#-构建桌面应用">构建发布</a> ·
+  <a href="#-更新日志">更新日志</a>
 </p>
+
+> 一套处理引擎，三种使用方式：CLI、Tauri 桌面应用与 Flet 桌面应用。
 
 ---
 
-## 📦 功能模块
+## ✨ 功能模块
 
 | 入口 | CLI 命令 | 功能 | 输入 | 输出 |
 |------|----------|------|------|------|
@@ -44,10 +59,11 @@
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # 克隆仓库
-git clone <repo-url> && cd MiningProcessor
+git clone https://github.com/Kearney3/MiningProcessor.git
+cd MiningProcessor
 
-# 安装 Python 依赖（含 dev 工具）
-uv sync
+# 安装 Python 依赖（含开发工具）
+uv sync --dev
 
 # 安装前端依赖
 pnpm install
@@ -67,8 +83,9 @@ Dependabot 的运行时依赖和开发依赖分别使用 `chore(deps): ...` 与 
 # 一键启动（Python sidecar + Vite 前端 + Tauri 窗口）
 pnpm tauri dev
 
-# 仅启动 Python sidecar
-pnpm dev:bridge
+# Flet 桌面 GUI（可选）
+uv run python main.py
+# 或：uv run python -m flet gui/main.py
 ```
 
 **GUI 功能一览：**
@@ -419,20 +436,21 @@ uv run flet build windows # Windows
 
 - `package.json`（Node.js / Flet 前端）
 - `src-tauri/tauri.conf.json`（Tauri 应用配置）
-- `src-tauri/Cargo.toml`（Rust crate）
+- `src-tauri/Cargo.toml` / `src-tauri/Cargo.lock`（Rust crate）
+- `uv.lock`（Python 锁文件）
 - `src/App.tsx`（前端开发环境的版本回退显示）
 
 ```bash
-# 查看当前版本，同步所有文件
+# 查看当前版本，同步全部元数据文件
 uv run scripts/bump_version.py
 
-# 升级版本号（自动同步五份文件）
-uv run scripts/bump_version.py --bump patch   # 1.5.0 → 1.5.1
-uv run scripts/bump_version.py --bump minor   # 1.5.0 → 1.6.0
-uv run scripts/bump_version.py --bump major   # 1.5.0 → 2.0.0
+# 升级版本号（自动同步运行时元数据和锁文件）
+uv run scripts/bump_version.py --bump patch   # 3.0.0 → 3.0.1
+uv run scripts/bump_version.py --bump minor   # 3.0.0 → 3.1.0
+uv run scripts/bump_version.py --bump major   # 3.0.0 → 4.0.0
 
 # 指定版本号
-uv run scripts/bump_version.py 1.3.1
+uv run scripts/bump_version.py 3.2.0
 
 # 预览变更，不实际写入
 uv run scripts/bump_version.py --bump minor --dry-run
@@ -441,6 +459,11 @@ uv run scripts/bump_version.py --bump minor --dry-run
 ---
 
 ## 📋 更新日志
+
+### v3.0.0 · 2026-09-07
+
+- 🔖 统一 Python、Node.js、Tauri、Rust、`uv.lock`、`Cargo.lock` 与前端兜底显示的项目版本号。
+- 🎨 README 使用项目图标作为主视觉，重新整理安装、使用、配置、构建与测试入口。
 
 ### v2.9.0 · 2026-08-26
 

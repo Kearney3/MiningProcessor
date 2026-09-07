@@ -44,6 +44,16 @@ _TARGETS: list[tuple[Path, str, str]] = [
         r'\g<1>{version}\3',
     ),
     (
+        Path("src-tauri/Cargo.lock"),
+        r'(?ms)(\[\[package\]\]\nname = "mining-processor"\nversion = ")([^"]+)(")',
+        r'\g<1>{version}\3',
+    ),
+    (
+        Path("uv.lock"),
+        r'(?ms)(\[\[package\]\]\nname = "miningprocessor"\nversion = ")([^"]+)(")',
+        r'\g<1>{version}\3',
+    ),
+    (
         Path("src/App.tsx"),
         r'useState\("v[^"]+"\)',
         r'useState("v{version}")',
