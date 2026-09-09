@@ -24,7 +24,10 @@ from typing import Any
 
 import pandas as pd
 
-from func.maintenance_classification import get_default_classifications
+from func.maintenance_classification import (
+    get_default_classifications,
+    get_llm_fallback_taxonomy,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +105,7 @@ def get_allowed_taxonomy() -> dict[str, list[str]]:
         taxonomy.setdefault(entry["major"], [])
         if entry["minor"] not in taxonomy[entry["major"]]:
             taxonomy[entry["major"]].append(entry["minor"])
-    taxonomy["其他/待确认"] = ["信息不足", "仅现象未定位", "多系统/需拆分"]
+    taxonomy.update(get_llm_fallback_taxonomy())
     return taxonomy
 
 

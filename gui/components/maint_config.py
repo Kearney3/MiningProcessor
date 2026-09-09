@@ -7,6 +7,7 @@ import logging
 
 import flet as ft
 
+from func.maintenance_classification import get_llm_fallback_taxonomy
 from gui.i18n import t
 
 from .common import _log_message
@@ -124,6 +125,57 @@ def _build_rules_display(rules: dict) -> ft.Column:
             )
         )
         sections.append(ft.Container(height=8))
+
+    # ── LLM 兜底分类 ──
+    llm_fallback = rules.get("llm_fallback") or get_llm_fallback_taxonomy()
+    if llm_fallback:
+        sections.append(ft.Container(height=4))
+        sections.append(theme.section_title(t("components:maint_config.llmFallbackClassification")))
+        sections.append(
+            ft.Text(
+                t("components:maint_config.llmFallbackNote"),
+                size=12,
+                color=theme.TEXT_SECONDARY,
+            )
+        )
+        for major, minors in llm_fallback.items():
+            fallback_rows = [
+                ft.Container(
+                    content=ft.Text(
+                        minor,
+                        size=12,
+                        weight=ft.FontWeight.W_500,
+                        color=theme.TEXT_PRIMARY,
+                    ),
+                    padding=ft.Padding.symmetric(horizontal=12, vertical=6),
+                )
+                for minor in minors
+            ]
+            fallback_header = ft.Container(
+                content=ft.Row(
+                    [
+                        ft.Text(major, size=13, weight=ft.FontWeight.W_600, color=theme.TEXT_PRIMARY),
+                        ft.Text(
+                            t("components:maint_config.itemssubcategory", count=len(minors)),
+                            size=11,
+                            color=theme.TEXT_SECONDARY,
+                        ),
+                    ],
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                ),
+                padding=ft.Padding.symmetric(horizontal=12, vertical=8),
+                bgcolor=theme.SURFACE_HIGH,
+                border_radius=ft.BorderRadius.only(top_left=6, top_right=6, bottom_left=0, bottom_right=0),
+            )
+            sections.append(
+                ft.Container(
+                    content=ft.Column([fallback_header, *fallback_rows], spacing=0),
+                    border=ft.Border.all(1, theme.BORDER),
+                    border_radius=theme.RADIUS_SM,
+                    clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+                )
+            )
+            sections.append(ft.Container(height=8))
 
     # ── 原因规则 ──
     if reason_rules:

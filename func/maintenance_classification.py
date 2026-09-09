@@ -16,6 +16,14 @@ logger = logging.getLogger(__name__)
 
 MAINTENANCE_CLASSIFICATION_SCHEMA_VERSION = 2
 
+LLM_FALLBACK_MAJOR = "其他/待确认"
+LLM_FALLBACK_MINORS = ("信息不足", "仅现象未定位", "多系统/需拆分")
+
+
+def get_llm_fallback_taxonomy() -> dict[str, list[str]]:
+    """返回 LLM 无法定位具体分类时使用的固定兜底分类。"""
+    return {LLM_FALLBACK_MAJOR: list(LLM_FALLBACK_MINORS)}
+
 
 # ── 默认分类规则 ──────────────────────────────────────────────
 
@@ -212,6 +220,7 @@ def get_default_classifications() -> dict:
     return {
         "schema_version": MAINTENANCE_CLASSIFICATION_SCHEMA_VERSION,
         "classifications": [dict(c) for c in _DEFAULT_CLASSIFICATIONS],
+        "llm_fallback": get_llm_fallback_taxonomy(),
         "noise_exact": set(_DEFAULT_NOISE_EXACT),
         "noise_patterns": list(_DEFAULT_NOISE_PATTERNS),
         "reason_rules": dict(_DEFAULT_REASON_RULES),
@@ -533,10 +542,10 @@ def classify(
     best_entry, is_ambiguous = _best_entry_and_ambiguity(normalized, classifications)
     if best_entry is None:
         if any(marker in normalized for marker in _FAULT_MARKERS):
-            return "其他/待确认", "仅现象未定位"
-        return "其他/待确认", "信息不足"
+            return LLM_FALLBACK_MAJOR, "仅现象未定位"
+        return LLM_FALLBACK_MAJOR, "信息不足"
     if is_ambiguous:
-        return "其他/待确认", "多系统/需拆分"
+        return LLM_FALLBACK_MAJOR, "多系统/需拆分"
     return best_entry["major"], best_entry["minor"]
 
 
@@ -643,6 +652,7 @@ def import_classifications_from_excel(path: str) -> dict:
                 len(classifications), len(noise_exact), len(noise_patterns))
     return {
         "classifications": classifications,
+        "llm_fallback": get_llm_fallback_taxonomy(),
         "noise_exact": noise_exact,
         "noise_patterns": noise_patterns,
         "reason_rules": reason_rules,
@@ -661,6 +671,7 @@ def export_classification_template(path: str, *, with_defaults: bool = False) ->
     """
     data = get_default_classifications() if with_defaults else None
     classifications = data["classifications"] if data else _DEFAULT_CLASSIFICATIONS[:3]
+    llm_fallback = data["llm_fallback"] if data else get_llm_fallback_taxonomy()
     noise_exact = data["noise_exact"] if data else {"出车", "已点检"}
     noise_patterns = data["noise_patterns"] if data else [r"^已?点检[，,/\s]*正常[。]?\s*$"]
     reason_rules = data["reason_rules"] if data else _DEFAULT_REASON_RULES
@@ -735,6 +746,24 @@ def export_classification_template(path: str, *, with_defaults: bool = False) ->
     ws3.column_dimensions["B"].width = 14
     ws3.column_dimensions["C"].width = 30
     ws3.freeze_panes = "A2"
+
+    if with_defaults:
+        # ── Sheet 4: LLM 兜底分类 ──
+        ws4 = wb.create_sheet("LLM兜底分类")
+        headers4 = ["大类", "小类", "说明"]
+        for col, h in enumerate(headers4, 1):
+            _apply_header(ws4.cell(row=1, column=col, value=h))
+        row_idx = 2
+        for major, minors in llm_fallback.items():
+            for minor in minors:
+                _set_cell(ws4, row_idx, 1, major)
+                _set_cell(ws4, row_idx, 2, minor)
+                _set_cell(ws4, row_idx, 3, "LLM 无法识别具体分类时使用的固定兜底分类")
+                row_idx += 1
+        ws4.column_dimensions["A"].width = 16
+        ws4.column_dimensions["B"].width = 20
+        ws4.column_dimensions["C"].width = 50
+        ws4.freeze_panes = "A2"
 
     wb.save(path)
     logger.info("分类配置模板已导出: %s", path)

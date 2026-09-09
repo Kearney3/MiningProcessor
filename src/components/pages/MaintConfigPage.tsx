@@ -13,6 +13,7 @@ interface ClassificationEntry {
 
 interface MaintClassConfig {
   classifications: ClassificationEntry[];
+  llm_fallback: Record<string, string[]>;
   noise_exact: string[];
   noise_patterns: string[];
   reason_rules: Record<string, string>;
@@ -188,6 +189,35 @@ export function MaintConfigPage({ bridge }: { bridge: BridgeProp }) {
                           </span>
                         ))}
                       </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* LLM 兜底分类 */}
+      {config?.llm_fallback && (
+        <div className="bg-white rounded-lg border border-slate-200 p-4">
+          <h3 className="text-sm font-medium text-slate-700 mb-1">
+            {t("pages:MaintConfigPage.llmFallbackClassification")}
+          </h3>
+          <p className="text-xs text-slate-500 mb-3">
+            {t("pages:MaintConfigPage.llmFallbackNote")}
+          </p>
+          <div className="space-y-3">
+            {Object.entries(config.llm_fallback).map(([major, minors]) => (
+              <div key={major} className="border border-slate-100 rounded-md">
+                <div className="px-3 py-2 bg-slate-50 rounded-t-md flex items-center justify-between">
+                  <span className="text-sm font-medium text-slate-700">{major}</span>
+                  <span className="text-xs text-slate-400">{minors.length} {t("pages:MaintConfigPage.subcategory")}</span>
+                </div>
+                <div className="divide-y divide-slate-50">
+                  {minors.map((minor) => (
+                    <div key={minor} className="px-3 py-2 text-xs font-medium text-slate-600">
+                      {minor}
                     </div>
                   ))}
                 </div>

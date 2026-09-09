@@ -702,6 +702,7 @@ def get_maintenance_classifications() -> dict:
         return {
             "schema_version": schema_version,
             "classifications": class_data,
+            "llm_fallback": get_default_classifications()["llm_fallback"],
             "noise_exact": noise_exact,
             "noise_patterns": noise_patterns,
             "reason_rules": reason_rules,

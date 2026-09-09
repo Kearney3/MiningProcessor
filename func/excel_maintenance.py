@@ -12,6 +12,7 @@ from func.building import build_sheets
 from func.extraction import extract_all_records
 from func.logger import get_logger, setup_logging
 from func.maintenance_classification import (
+    LLM_FALLBACK_MAJOR,
     classify,
     compile_noise_patterns,
     get_default_classifications,
@@ -206,7 +207,7 @@ def process_maintenance_data(
                 "噪声过滤"
                 if major is None
                 else "待确认"
-                if major == "其他/待确认"
+                if major == LLM_FALLBACK_MAJOR
                 else "规则"
             ),
             "分类置信度": None,
@@ -221,7 +222,7 @@ def process_maintenance_data(
         pending = [
             rec
             for rec in classified
-            if rec["是否故障"] == "是" and rec["大类"] == "其他/待确认"
+            if rec["是否故障"] == "是" and rec["大类"] == LLM_FALLBACK_MAJOR
         ]
         if pending:
             predictions = ml_classifier.predict_many(

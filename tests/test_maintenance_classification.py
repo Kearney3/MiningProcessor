@@ -2,6 +2,7 @@
 from pathlib import Path
 
 import pytest
+from openpyxl import load_workbook
 
 from func.maintenance_classification import (
     _DEFAULT_CLASSIFICATIONS,
@@ -10,6 +11,8 @@ from func.maintenance_classification import (
     classify,
     compile_noise_patterns,
     export_classification_template,
+    get_default_classifications,
+    get_llm_fallback_taxonomy,
     import_classifications_from_excel,
     is_fault_record,
     normalize_maintenance_content,
@@ -45,6 +48,9 @@ class TestRuleStructure:
             {"major": "B", "minor": "b1", "keywords": ["X"]},
         ]
         assert _best_major("X Y Z", _group_by_major(data)) == "A"
+
+    def test_default_config_exposes_llm_fallback_taxonomy(self):
+        assert get_default_classifications()["llm_fallback"] == get_llm_fallback_taxonomy()
 
 
 class TestNormalizationAndNoise:
@@ -225,6 +231,20 @@ class TestAdvancedExcelRuleSchema:
             entry.get("regex_keywords")
             for entry in rules["classifications"]
         )
+
+    def test_default_export_includes_llm_fallback_sheet(self, tmp_path: Path):
+        path = tmp_path / "rules.xlsx"
+        export_classification_template(str(path), with_defaults=True)
+
+        workbook = load_workbook(path, read_only=True)
+        assert "LLM兜底分类" in workbook.sheetnames
+        rows = list(workbook["LLM兜底分类"].values)
+        assert rows[0] == ("大类", "小类", "说明")
+        assert [(row[0], row[1]) for row in rows[1:]] == [
+            ("其他/待确认", "信息不足"),
+            ("其他/待确认", "仅现象未定位"),
+            ("其他/待确认", "多系统/需拆分"),
+        ]
 
     def test_custom_combination_and_exclusion(self):
         custom = [

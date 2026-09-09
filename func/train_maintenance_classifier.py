@@ -10,9 +10,11 @@ import pandas as pd
 
 from func.config_loader import get_maintenance_classifications
 from func.maintenance_classification import (
+    LLM_FALLBACK_MAJOR,
     classify,
     compile_noise_patterns,
     get_default_classifications,
+    get_llm_fallback_taxonomy,
     normalize_maintenance_content,
 )
 from func.maintenance_ml_classifier import (
@@ -82,7 +84,7 @@ def load_llm_supervision(
             if major not in taxonomy or minor not in taxonomy[major]:
                 invalid_labels += 1
                 continue
-            if major in {"其他/待确认", "计划保养与非故障作业"}:
+            if major in {LLM_FALLBACK_MAJOR, "计划保养与非故障作业"}:
                 continue
             normalized = normalize_maintenance_content(
                 "" if pd.isna(content) else str(content)
@@ -160,9 +162,8 @@ def get_default_taxonomy() -> dict[str, set[str]]:
     taxonomy: dict[str, set[str]] = defaultdict(set)
     for entry in get_default_classifications()["classifications"]:
         taxonomy[entry["major"]].add(entry["minor"])
-    taxonomy["其他/待确认"].update(
-        {"信息不足", "仅现象未定位", "多系统/需拆分"}
-    )
+    for major, minors in get_llm_fallback_taxonomy().items():
+        taxonomy[major].update(minors)
     return dict(taxonomy)
 
 
@@ -197,7 +198,7 @@ def train_from_excel(
         if (
             major
             and minor
-            and major not in {"其他/待确认", "计划保养与非故障作业"}
+            and major not in {LLM_FALLBACK_MAJOR, "计划保养与非故障作业"}
         ):
             training[normalize_maintenance_content(content)] = (
                 content,
