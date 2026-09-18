@@ -134,12 +134,18 @@ def process_maintenance_data(
             return {}
         raise ValueError(msg)
 
-    # 1b. 基于原始日期 + 原始设备名称 + 原始维修工时 + 原始批注去重
+    # 1b. 基于日期 + 设备名称 + 班次 + 维修工时 + 批注去重
     seen: set[tuple] = set()
     deduped: list[dict] = []
     dup_count = 0
     for rec in raw_records:
-        key = (rec["日期"], rec["原始设备名称"], rec["工时_分钟"], rec["维修内容"])
+        key = (
+            rec["日期"],
+            rec["原始设备名称"],
+            rec["班次"],
+            rec["工时_分钟"],
+            rec["维修内容"],
+        )
         # 处理可能不可哈希的类型
         try:
             if key in seen:

@@ -253,7 +253,22 @@ def extract_sheet_records(
                     "工时_分钟": minutes,
                 })
 
-    return records
+    expanded_records: list[dict] = []
+    for record in records:
+        if record["班次"] == "未标注" and record["工时_分钟"] > 720:
+            half_minutes = record["工时_分钟"] / 2
+            expanded_records.extend(
+                {
+                    **record,
+                    "班次": shift,
+                    "工时_分钟": half_minutes,
+                }
+                for shift in ("day", "night")
+            )
+        else:
+            expanded_records.append(record)
+
+    return expanded_records
 
 
 # ── 文件发现 ──────────────────────────────────────────────────
