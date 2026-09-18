@@ -679,8 +679,9 @@ def _checkpoint_scope_digest(
     model: str,
     taxonomy: dict[str, list[str]],
     record_id_column: str | None = None,
+    include_records: bool = True,
 ) -> str:
-    """为 checkpoint 生成内容敏感作用域，防止行重排后错配。"""
+    """为 checkpoint 生成作用域摘要。"""
     metadata = {
         "version": 1,
         "source": str(source.resolve()),
@@ -688,6 +689,7 @@ def _checkpoint_scope_digest(
         "content_column": content_column,
         "model": model,
         "taxonomy": taxonomy,
+        "include_records": include_records,
     }
     digest = hashlib.sha256()
 
@@ -703,16 +705,75 @@ def _checkpoint_scope_digest(
         digest.update(b"\n")
 
     _update(metadata)
-    for index in df.index:
-        _update({
-            "id": _record_id(df, index, record_id_column),
-            "content": (
-                ""
-                if pd.isna(df.at[index, content_column])
-                else str(df.at[index, content_column])
-            ),
-        })
+    if include_records:
+        for index in df.index:
+            _update({
+                "id": _record_id(df, index, record_id_column),
+                "content": (
+                    ""
+                    if pd.isna(df.at[index, content_column])
+                    else str(df.at[index, content_column])
+                ),
+            })
     return digest.hexdigest()
+
+
+def _stable_cell_value(value: Any) -> str:
+    """将维修记录字段规范化为稳定的字符串。"""
+    if value is None or pd.isna(value):
+        return ""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    if hasattr(value, "isoformat") and not isinstance(value, str):
+        return value.isoformat()
+    return str(value).strip()
+
+
+def _maintenance_record_ids(
+    df: pd.DataFrame,
+    *,
+    content_column: str,
+    date_column: str | None,
+    device_column: str | None,
+    model_column: str | None,
+    hours_column: str | None,
+) -> dict[Any, str]:
+    """按维修业务字段生成与行号无关的稳定记录 ID。"""
+    columns: list[str] = []
+    for column in (
+        date_column,
+        "原始设备名称",
+        device_column,
+        "标准设备名称",
+        model_column,
+        "设备编号",
+        "原因",
+        "班次",
+        content_column,
+        hours_column,
+    ):
+        if column and column in df.columns and column not in columns:
+            columns.append(column)
+
+    occurrences: dict[str, int] = {}
+    record_ids: dict[Any, str] = {}
+    for index in df.index:
+        identity = {
+            column: _stable_cell_value(df.at[index, column])
+            for column in columns
+        }
+        digest = hashlib.sha256(
+            json.dumps(
+                identity,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()[:20]
+        occurrence = occurrences.get(digest, 0)
+        occurrences[digest] = occurrence + 1
+        record_ids[index] = f"maintenance-{digest}-{occurrence}"
+    return record_ids
 
 
 def _record_id(
@@ -755,11 +816,16 @@ def _build_records(
     context_columns: list[str],
     max_content_chars: int,
     record_id_column: str | None = None,
+    record_id_map: dict[Any, str] | None = None,
 ) -> list[dict]:
     records = []
     for index in batch_indexes:
         record = {
-            "id": _record_id(df, index, record_id_column),
+            "id": (
+                record_id_map[index]
+                if record_id_map is not None
+                else _record_id(df, index, record_id_column)
+            ),
             "content": str(df.at[index, content_column])[:max_content_chars],
         }
         if context_columns:
@@ -1006,17 +1072,30 @@ def label_file(
         model=str(getattr(client, "model", "")),
         taxonomy=taxonomy,
         record_id_column=record_id_column,
+        include_records=record_id_column is not None,
     )
     checkpoint = Path(
         checkpoint_path
         or f"{output_path}.checkpoint.{checkpoint_scope[:12]}.jsonl"
     )
+    record_id_map = (
+        _maintenance_record_ids(
+            df,
+            content_column=content_column,
+            date_column=_find_column(df, _DATE_COLUMNS),
+            device_column=_find_column(df, _DEVICE_COLUMNS),
+            model_column=_find_column(df, _MODEL_COLUMNS),
+            hours_column=_find_column(df, _HOURS_COLUMNS),
+        )
+        if record_id_column is None
+        else {
+            index: _record_id(df, index, record_id_column)
+            for index in df.index
+        }
+    )
     completed = _load_checkpoint(checkpoint)
-    pending_indexes = [
-        index
-        for index in indexes
-        if _record_id(df, index, record_id_column) not in completed
-    ]
+    record_ids = [record_id_map[index] for index in indexes]
+    pending_indexes = [index for index in indexes if record_id_map[index] not in completed]
     system_prompt = build_system_prompt(taxonomy)
     context_columns = [
         column
@@ -1048,7 +1127,7 @@ def label_file(
             content_column,
             context_columns,
             max_content_chars,
-            record_id_column,
+            record_id_map=record_id_map,
         )
         try:
             result = client.label_batch(
@@ -1125,7 +1204,7 @@ def label_file(
     df["LLM理由"] = ""
     df["LLM标注状态"] = ""
     for index in indexes:
-        label = completed.get(_record_id(df, index, record_id_column))
+        label = completed.get(record_id_map[index])
         if label is None:
             df.at[index, "LLM标注状态"] = "未完成"
             continue
@@ -1145,8 +1224,7 @@ def label_file(
         "input_rows": len(df),
         "candidate_rows": len(indexes),
         "completed_rows": sum(
-            _record_id(df, index, record_id_column) in completed
-            for index in indexes
+            record_id in completed for record_id in record_ids
         ),
         "skipped_rows": len(all_skipped_ids),
         "output": str(target),
@@ -1311,19 +1389,28 @@ def process_maintenance_llm(
         content_column=content_column,
         model=str(llm_config.get("model", "")),
         taxonomy=taxonomy,
+        include_records=False,
     )
     checkpoint = Path(
         checkpoint_path
         or f"{output_path}.checkpoint.{checkpoint_scope[:12]}.jsonl"
     )
     completed = _load_checkpoint(checkpoint)
-    target_ids = [_record_id(df, index) for index in target_indexes]
+    record_id_map = _maintenance_record_ids(
+        df,
+        content_column=content_column,
+        date_column=resolved_date_col,
+        device_column=resolved_device_col,
+        model_column=resolved_model_col,
+        hours_column=resolved_hours_col,
+    )
+    target_ids = [record_id_map[index] for index in target_indexes]
     completed_target_ids = {
         record_id for record_id in target_ids if record_id in completed
     }
     pending_indexes = [
         i for i in target_indexes
-        if _record_id(df, i) not in completed
+        if record_id_map[i] not in completed
     ]
 
     context_columns = []
@@ -1365,7 +1452,12 @@ def process_maintenance_llm(
         nonlocal done_count
         prog.record_running(batch_num)
         records = _build_records(
-            df, batch_indexes, content_column, context_columns, max_content_chars,
+            df,
+            batch_indexes,
+            content_column,
+            context_columns,
+            max_content_chars,
+            record_id_map=record_id_map,
         )
 
         def _on_retry(attempt: int, error: Exception) -> None:
@@ -1503,7 +1595,7 @@ def process_maintenance_llm(
         df["LLM置信度"] = df["LLM置信度"].astype(object)
 
     for index in target_indexes:
-        label = completed.get(_record_id(df, index))
+        label = completed.get(record_id_map[index])
         if label is None:
             continue
         df.at[index, category_column] = label.major

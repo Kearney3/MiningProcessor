@@ -836,8 +836,8 @@ def test_process_maintenance_llm_rejects_conflicting_column_mapping(tmp_path):
         )
 
 
-def test_process_maintenance_llm_checkpoint_scope_changes_with_source_content(tmp_path):
-    """源内容变化后不能复用按旧行号保存的 checkpoint。"""
+def test_process_maintenance_llm_reuses_unchanged_labels_when_source_changes(tmp_path):
+    """源内容变化后只重新标注变化的记录。"""
     from unittest.mock import patch
 
     from func.label_maintenance_with_llm import BatchResult, LLMLabel, process_maintenance_llm
@@ -847,9 +847,11 @@ def test_process_maintenance_llm_checkpoint_scope_changes_with_source_content(tm
     class _RecordingClient:
         def __init__(self):
             self.calls = 0
+            self.record_ids = []
 
         def label_batch(self, records, **kwargs):
             self.calls += 1
+            self.record_ids.extend(record["id"] for record in records)
             return BatchResult(
                 labels=[
                     LLMLabel(
@@ -900,7 +902,119 @@ def test_process_maintenance_llm_checkpoint_scope_changes_with_source_content(tm
         )
 
     assert second_client.calls == 1
-    assert first["checkpoint"] != second["checkpoint"]
+    assert first["checkpoint"] == second["checkpoint"]
+    assert second["from_checkpoint"] == 1
+    assert len(second_client.record_ids) == 1
+    assert set(second_client.record_ids).isdisjoint(first_client.record_ids)
+
+
+def test_process_maintenance_llm_reuses_labels_after_row_insertion(tmp_path):
+    """新增行导致旧行号变化时，旧标签仍按业务 ID 映射。"""
+    from unittest.mock import patch
+
+    from func.label_maintenance_with_llm import (
+        BatchResult,
+        LLMLabel,
+        process_maintenance_llm,
+    )
+
+    source = tmp_path / "input.xlsx"
+    base = pd.DataFrame(
+        {
+            "日期": ["2026-08-01", "2026-08-02"],
+            "原始设备名称": ["TR001", "TR002"],
+            "班次": ["day", "night"],
+            "原因": ["检修", "检修"],
+            "维修内容": ["旧发动机记录", "旧液压记录"],
+            "工时_分钟": [30, 40],
+            "大类": ["其他/待确认", "其他/待确认"],
+            "小类": ["信息不足", "信息不足"],
+            "分类方式": ["待确认", "待确认"],
+        }
+    )
+    base.to_excel(source, index=False, sheet_name="维修明细")
+
+    class _RecordingClient:
+        def __init__(self):
+            self.record_ids = []
+
+        def label_batch(self, records, **kwargs):
+            self.record_ids.extend(record["id"] for record in records)
+            labels = []
+            for record in records:
+                if "电驱动" in record["content"]:
+                    major, minor = "电驱动系统", "轮马达/电动轮"
+                elif "液压" in record["content"]:
+                    major, minor = "液压系统", "压力/功能异常"
+                else:
+                    major, minor = "发动机系统", "性能/工况异常"
+                labels.append(
+                    LLMLabel(
+                        record_id=record["id"],
+                        major=major,
+                        minor=minor,
+                        confidence=0.9,
+                        reason="测试",
+                    )
+                )
+            return BatchResult(labels=labels, skipped_ids=[])
+
+    first_client = _RecordingClient()
+    config = {"url": "http://fake", "api_key": "k", "model": "m", "format": "openai"}
+    with patch(
+        "func.label_maintenance_with_llm.create_llm_client",
+        return_value=first_client,
+    ):
+        first = process_maintenance_llm(
+            source,
+            llm_config=config,
+            export_mode="details",
+        )
+
+    inserted = pd.concat(
+        [
+            pd.DataFrame(
+                {
+                    "日期": ["2026-08-03"],
+                    "原始设备名称": ["TR003"],
+                    "班次": ["day"],
+                    "原因": ["检修"],
+                    "维修内容": ["新增电驱动记录"],
+                    "工时_分钟": [50],
+                    "大类": ["其他/待确认"],
+                    "小类": ["信息不足"],
+                    "分类方式": ["待确认"],
+                }
+            ),
+            base,
+        ],
+        ignore_index=True,
+    )
+    inserted.to_excel(source, index=False, sheet_name="维修明细")
+
+    second_client = _RecordingClient()
+    with patch(
+        "func.label_maintenance_with_llm.create_llm_client",
+        return_value=second_client,
+    ):
+        second = process_maintenance_llm(
+            source,
+            llm_config=config,
+            export_mode="details",
+        )
+
+    assert first["checkpoint"] == second["checkpoint"]
+    assert second["from_checkpoint"] == 2
+    assert len(second_client.record_ids) == 1
+    assert set(second_client.record_ids).isdisjoint(first_client.record_ids)
+
+    labeled = pd.read_excel(second["output"], sheet_name="维修明细")
+    labels_by_content = labeled.set_index("维修内容")["大类"].to_dict()
+    assert labels_by_content == {
+        "新增电驱动记录": "电驱动系统",
+        "旧发动机记录": "发动机系统",
+        "旧液压记录": "液压系统",
+    }
 
 
 def test_process_maintenance_llm_progress_has_consistent_record_breakdown(tmp_path):
@@ -1089,8 +1203,8 @@ def test_preview_omits_high_cardinality_value_options(tmp_path):
     ]
 
 
-def test_label_file_default_checkpoint_changes_with_source(tmp_path):
-    """CLI 默认断点也必须绑定源内容；显式 checkpoint 仍由调用方管理。"""
+def test_label_file_default_checkpoint_reuses_scope_for_source_updates(tmp_path):
+    """CLI 默认断点在源文件更新后复用作用域，并按稳定 ID 重标变化行。"""
 
     class _Client:
         model = "test-model"
@@ -1140,4 +1254,4 @@ def test_label_file_default_checkpoint_changes_with_source(tmp_path):
     )
 
     assert first_client.calls == second_client.calls == 1
-    assert first["checkpoint"] != second["checkpoint"]
+    assert first["checkpoint"] == second["checkpoint"]
