@@ -587,7 +587,7 @@
     "modules.detailsOnly": "仅导出明细",
     "modules.itemFuel": "例如: Fuel",
     "modules.keyword": "关键字",
-    "modules.otherPendingReview": "其他/待确认",
+    "modules.otherPendingReview": "其他",
     "modules.compatibleHeaders": "兼容表头",
     "modules.columnName": "列名",
     "modules.delete": "删除",
@@ -964,7 +964,7 @@
     "config.invalidNumberSkipped": "'{cap_text}' 不是有效数字，跳过 {device}",
     "ledger_base.confirmClearAllData": "确定要清空所有 {label_prefix} 数据吗？\\n清空后需重新导入文件并配置列映射。",
     "llm_labeling.inputValuesHint": "输入值（如\"待确认\"），逗号分隔，回车添加",
-    "modules.mlFallbackHint": "仅对规则仍判为'其他/待确认'的记录进行高置信度回填，不覆盖规则结果"
+    "modules.mlFallbackHint": "仅对规则仍判为'其他'的记录进行高置信度回填，不覆盖规则结果"
   },
   "nav": {
     "workspace": "工作区",

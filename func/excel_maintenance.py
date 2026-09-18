@@ -65,7 +65,7 @@ def process_maintenance_data(
         return_sheets: True 时返回 dict[str, DataFrame]，False 时写文件。
         split_by_year: True 时按年份拆分输出为多个文件。
         details_only: True 时只输出维修明细 sheet（不含统计表）。
-        use_ml_fallback: 是否用轻量模型二次识别“其他/待确认”故障。
+        use_ml_fallback: 是否用轻量模型二次识别“其他”故障。
         ml_classifier: 已加载的 MaintenanceMLClassifier；主要用于测试或复用。
         ml_model_path: 模型文件路径；为空时使用项目 models 下的默认模型。
 
@@ -223,7 +223,7 @@ def process_maintenance_data(
         }
         classified.append(classified_rec)
 
-    # 规则优先，ML 只处理仍为“其他/待确认”的故障记录。
+    # 规则优先，ML 只处理仍为“其他”的故障记录。
     if use_ml_fallback and ml_classifier is not None:
         pending = [
             rec
@@ -349,7 +349,7 @@ def main():
     parser.add_argument("--skip-hidden-rows", action="store_true", help="跳过隐藏行")
     parser.add_argument("--skip-hidden-cols", action="store_true", help="跳过隐藏列")
     parser.add_argument("--details-only", action="store_true", help="只导出维修明细 sheet（不含统计表）")
-    parser.add_argument("--no-ml", action="store_true", help="禁用“其他/待确认”的 ML 二级分类")
+    parser.add_argument("--no-ml", action="store_true", help="禁用“其他”的 ML 二级分类")
     parser.add_argument("--ml-model", default=None, help="维修 ML 分类模型路径")
     args = parser.parse_args()
 

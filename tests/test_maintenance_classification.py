@@ -121,11 +121,11 @@ class TestConfirmedTaxonomy:
         assert classify(content) == expected
 
     def test_generic_cab_noise_does_not_become_engine(self):
-        assert classify("驾驶室异响") == ("其他/待确认", "仅现象未定位")
+        assert classify("驾驶室异响") == ("其他", "仅现象未定位")
 
     def test_unmatched_uses_single_fallback(self):
         assert classify("这台设备没有已知故障描述") == (
-            "其他/待确认",
+            "其他",
             "仅现象未定位",
         )
 
@@ -178,7 +178,7 @@ class TestEngineElectricalBoundary:
     @pytest.mark.parametrize(
         ("content", "expected"),
         [
-            ("发动机打不着", ("其他/待确认", "仅现象未定位")),
+            ("发动机打不着", ("其他", "仅现象未定位")),
             (
                 "发动机打不着，更换启动机",
                 ("低压电气与控制", "启动机/启动回路"),
@@ -241,9 +241,9 @@ class TestAdvancedExcelRuleSchema:
         rows = list(workbook["LLM兜底分类"].values)
         assert rows[0] == ("大类", "小类", "说明")
         assert [(row[0], row[1]) for row in rows[1:]] == [
-            ("其他/待确认", "信息不足"),
-            ("其他/待确认", "仅现象未定位"),
-            ("其他/待确认", "多系统/需拆分"),
+            ("其他", "信息不足"),
+            ("其他", "多系统"),
+            ("其他", "仅现象未定位"),
         ]
 
     def test_custom_combination_and_exclusion(self):
@@ -258,7 +258,7 @@ class TestAdvancedExcelRuleSchema:
         ]
         assert classify("液压系统报警", classifications=custom) == ("A", "组合")
         assert classify("液压报警后检查正常", classifications=custom) == (
-            "其他/待确认",
+            "其他",
             "仅现象未定位",
         )
 
@@ -268,8 +268,8 @@ class TestAdvancedExcelRuleSchema:
             {"major": "B", "minor": "B1", "keywords": ["同词"]},
         ]
         assert classify("同词", classifications=custom) == (
-            "其他/待确认",
-            "多系统/需拆分",
+            "其他",
+            "多系统",
         )
 
 

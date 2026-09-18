@@ -966,7 +966,7 @@
     "LoadConfigPage.ui.previousPage": "上一页",
     "LoadConfigPage.ui.nextPage": "下一页",
     "LoadConfigPage.ui.deleteConfirm": "确定要删除选中的 {count} 条设备记录吗？此操作需要点击“保存”后才会持久化。",
-    "DataProcessingPage.ui.mlFallbackHint": "仅对规则仍判为“其他/待确认”的记录进行高置信度回填，不覆盖规则结果",
+    "DataProcessingPage.ui.mlFallbackHint": "仅对规则仍判为“其他”的记录进行高置信度回填，不覆盖规则结果",
     "LLMLabelingPage.ui.progress": "{current}/{total} 条（{percent}%）",
     "MaintConfigPage.ui.fault": "故障",
     "MaintConfigPage.ui.checkContent": "检查内容",

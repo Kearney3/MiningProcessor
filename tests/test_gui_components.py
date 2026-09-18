@@ -346,7 +346,7 @@ def test_maintenance_module_enables_ml_fallback_by_default(monkeypatch):
 
     ml_toggle = module_refs["maint"]["use_ml"]
     assert ml_toggle.value is True
-    assert "其他/待确认" in ml_toggle.tooltip
+    assert "其他" in ml_toggle.tooltip
 
 
 def test_config_rows_render_with_explicit_checkbox_controls():

@@ -198,7 +198,7 @@ def test_label_file_batches_50_and_resumes(tmp_path):
     checkpoint = tmp_path / "checkpoint.jsonl"
     pd.DataFrame(
         {
-            "大类": ["其他/待确认"] * 120,
+            "大类": ["其他"] * 120,
             "维修内容": [f"待分类维修内容 {index}" for index in range(120)],
         }
     ).to_excel(source, index=False, sheet_name="维修明细")
@@ -248,7 +248,7 @@ def test_only_pending_filter_when_category_exists(tmp_path):
     output = tmp_path / "output.csv"
     pd.DataFrame(
         {
-            "大类": ["其他/待确认", "发动机系统"],
+            "大类": ["其他", "发动机系统"],
             "维修内容": ["液压动作异常", "发动机报警"],
         }
     ).to_csv(source, index=False)
@@ -289,7 +289,7 @@ def test_label_file_uses_stable_record_id_column(tmp_path):
     pd.DataFrame(
         {
             "原始记录ID": ["row-17", "row-204"],
-            "新版大类": ["其他/待确认", "其他/待确认"],
+            "新版大类": ["其他", "其他"],
             "维修内容": ["液压动作慢", "液压无压力"],
         }
     ).to_csv(source, index=False)
@@ -377,7 +377,7 @@ def test_label_file_concurrent_execution(tmp_path):
 
     source = tmp_path / "input.csv"
     output = tmp_path / "output.csv"
-    rows = {"大类": ["其他/待确认"] * 120, "维修内容": [f"内容{i}" for i in range(120)]}
+    rows = {"大类": ["其他"] * 120, "维修内容": [f"内容{i}" for i in range(120)]}
     pd.DataFrame(rows).to_csv(source, index=False)
     result = label_file(
         str(source),
@@ -392,7 +392,7 @@ def test_label_file_concurrent_execution(tmp_path):
 
 def test_label_file_concurrency_must_be_positive(tmp_path):
     source = tmp_path / "input.csv"
-    pd.DataFrame({"大类": ["其他/待确认"], "维修内容": ["内容"]}).to_csv(
+    pd.DataFrame({"大类": ["其他"], "维修内容": ["内容"]}).to_csv(
         source, index=False
     )
     with pytest.raises(ValueError, match="concurrency"):
@@ -443,7 +443,7 @@ def test_label_file_partial_resume_after_interruption(tmp_path):
     source = tmp_path / "input.csv"
     output = tmp_path / "output.csv"
     checkpoint = tmp_path / "checkpoint.jsonl"
-    rows = {"大类": ["其他/待确认"] * 120, "维修内容": [f"内容{i}" for i in range(120)]}
+    rows = {"大类": ["其他"] * 120, "维修内容": [f"内容{i}" for i in range(120)]}
     pd.DataFrame(rows).to_csv(source, index=False)
 
     client1 = FailAfterOneClient()
@@ -578,8 +578,8 @@ def test_parse_and_validate_skips_unfixable():
 def test_resolve_minor_multi_select():
     taxonomy = get_allowed_taxonomy()
     result = _resolve_minor(
-        "其他/待确认",
-        "信息不足、仅现象未定位、多系统/需拆分",
+        "其他",
+        "信息不足、多系统、仅现象未定位",
         taxonomy,
     )
     assert result == "信息不足"
@@ -604,8 +604,8 @@ def test_parse_and_validate_resolves_multi_select_minor():
             "items": [
                 {
                     "id": "row-1",
-                    "major": "其他/待确认",
-                    "minor": "信息不足、仅现象未定位、多系统/需拆分",
+                    "major": "其他",
+                    "minor": "信息不足、多系统、仅现象未定位",
                     "confidence": 0.6,
                     "reason": "信息不足",
                 }
@@ -614,7 +614,7 @@ def test_parse_and_validate_resolves_multi_select_minor():
         ensure_ascii=False,
     )
     labels, skipped = parse_and_validate_labels(content, ["row-1"], taxonomy)
-    assert labels[0].major == "其他/待确认"
+    assert labels[0].major == "其他"
     assert labels[0].minor == "信息不足"
     assert skipped == []
 
@@ -628,7 +628,7 @@ def _make_llm_excel(tmp_path, rows=100, sheet="维修明细"):
     source = tmp_path / "input.xlsx"
     pd.DataFrame({
         "维修内容": [f"维修内容 {i}" for i in range(rows)],
-        "大类": ["其他/待确认"] * rows,
+        "大类": ["其他"] * rows,
         "小类": ["信息不足"] * rows,
         "分类方式": ["待确认"] * rows,
     }).to_excel(source, index=False, sheet_name=sheet)
@@ -927,7 +927,7 @@ def test_process_maintenance_llm_reuses_labels_after_row_insertion(tmp_path):
             "原因": ["检修", "检修"],
             "维修内容": ["旧发动机记录", "旧液压记录"],
             "工时_分钟": [30, 40],
-            "大类": ["其他/待确认", "其他/待确认"],
+            "大类": ["其他", "其他"],
             "小类": ["信息不足", "信息不足"],
             "分类方式": ["待确认", "待确认"],
         }
@@ -981,7 +981,7 @@ def test_process_maintenance_llm_reuses_labels_after_row_insertion(tmp_path):
                     "原因": ["检修"],
                     "维修内容": ["新增电驱动记录"],
                     "工时_分钟": [50],
-                    "大类": ["其他/待确认"],
+                    "大类": ["其他"],
                     "小类": ["信息不足"],
                     "分类方式": ["待确认"],
                 }
@@ -1232,7 +1232,7 @@ def test_label_file_default_checkpoint_reuses_scope_for_source_updates(tmp_path)
     output = tmp_path / "cli-output.xlsx"
     pd.DataFrame({
         "维修内容": ["发动机报警"],
-        "大类": ["其他/待确认"],
+        "大类": ["其他"],
     }).to_excel(source, index=False, sheet_name="维修明细")
 
     first_client = _Client()

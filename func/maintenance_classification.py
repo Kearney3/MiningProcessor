@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 MAINTENANCE_CLASSIFICATION_SCHEMA_VERSION = 2
 
-LLM_FALLBACK_MAJOR = "其他/待确认"
-LLM_FALLBACK_MINORS = ("信息不足", "仅现象未定位", "多系统/需拆分")
+LLM_FALLBACK_MAJOR = "其他"
+LLM_FALLBACK_MINORS = ("信息不足", "多系统", "仅现象未定位")
 
 
 def get_llm_fallback_taxonomy() -> dict[str, list[str]]:
@@ -545,7 +545,7 @@ def classify(
             return LLM_FALLBACK_MAJOR, "仅现象未定位"
         return LLM_FALLBACK_MAJOR, "信息不足"
     if is_ambiguous:
-        return LLM_FALLBACK_MAJOR, "多系统/需拆分"
+        return LLM_FALLBACK_MAJOR, "多系统"
     return best_entry["major"], best_entry["minor"]
 
 
