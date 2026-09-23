@@ -3,6 +3,7 @@
 /** Tauri Python bridge 调用接口 (M9) */
 export interface BridgeProp {
   call: <T = unknown>(method: string, params?: Record<string, unknown>) => Promise<T>;
+  cancel?: () => Promise<void>;
 }
 
 /** Python RPC 请求 */
@@ -43,6 +44,7 @@ export interface LogEntry {
 
 /** 批处理进度事件 */
 export interface BatchProgress {
+  task_id?: string;
   stage: string;
   state?: "preparing" | "running" | "cancelling" | "completed" | "cancelled" | "failed";
   percent: number;
@@ -167,3 +169,15 @@ export type PageId =
   | "load-config"
   | "maint-config"
   | "user-config";
+
+export type BridgeTaskStatus = "running" | "cancelling" | "completed" | "cancelled" | "failed";
+
+export interface BridgeTask {
+  id: string;
+  method: string;
+  page: PageId;
+  status: BridgeTaskStatus;
+  canCancel: boolean;
+  progress: BatchProgress | null;
+  error?: string;
+}

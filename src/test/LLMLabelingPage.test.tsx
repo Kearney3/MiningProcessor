@@ -1,12 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { invoke } from "@tauri-apps/api/core";
 import { ToastProvider } from "../components/Toast";
 import type { BridgeProp } from "../lib/types";
 import { autoDetectColumn, validateColumnMapping } from "../lib/llm-labeling";
 import { LLMLabelingPage } from "../components/pages/LLMLabelingPage";
-
-const mockInvoke = vi.mocked(invoke);
 
 vi.mock("../lib/ui-components", () => ({
   PathInput: ({
@@ -73,7 +70,6 @@ describe("LLMLabelingPage", () => {
         <LLMLabelingPage
           bridge={{ call }}
           progress={null}
-          setProgress={vi.fn()}
         />
       </ToastProvider>,
     );
@@ -90,6 +86,7 @@ describe("LLMLabelingPage", () => {
 
   it("sends the native cancel command and gives immediate feedback", async () => {
     let finishProcess!: (result: Record<string, unknown>) => void;
+    const cancel = vi.fn().mockResolvedValue(undefined);
     const processPending = new Promise<Record<string, unknown>>((resolve) => {
       finishProcess = resolve;
     });
@@ -109,7 +106,7 @@ describe("LLMLabelingPage", () => {
 
     render(
       <ToastProvider>
-        <LLMLabelingPage bridge={{ call }} progress={null} setProgress={vi.fn()} />
+        <LLMLabelingPage bridge={{ call, cancel }} progress={null} />
       </ToastProvider>,
     );
 
@@ -121,7 +118,7 @@ describe("LLMLabelingPage", () => {
     const cancelButton = await screen.findByRole("button", { name: "取消" });
     fireEvent.click(cancelButton);
 
-    expect(mockInvoke).toHaveBeenCalledWith("cancel_task");
+    expect(cancel).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("button", { name: "取消中..." })).toBeDisabled();
 
     finishProcess({

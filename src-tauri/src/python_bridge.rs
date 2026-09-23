@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -11,8 +11,8 @@ type PendingSender = Sender<Result<serde_json::Value, String>>;
 /// Python 子进程桥接
 ///
 /// 通过 stdin/stdout JSON 行协议与 Python 通信。
-/// stdout 由独立 reader 线程读取，并按响应 ID 分发到对应的 call，
-/// 因此多个 Tauri 命令可以同时等待 Python 响应。
+/// stdout 由独立 reader 线程读取，并按响应 ID 分发到对应的 call；
+/// 长任务由 Rust 门禁限制为同一时刻一个。
 /// stderr 用于日志流，由外部线程读取；stdout 的事件由独立 receiver 转发。
 pub struct PythonBridge {
     child: Mutex<Option<Child>>,
@@ -21,8 +21,8 @@ pub struct PythonBridge {
     next_id: AtomicU64,
     pending: Arc<Mutex<HashMap<u64, PendingSender>>>,
     event_receiver: Mutex<Option<Receiver<serde_json::Value>>>,
-    /// 取消当前可取消 call 的 Rust 等待，同时通过独立 RPC 通知 Python 任务。
-    cancelled: AtomicBool,
+    /// 当前长任务的请求 ID；后端一次只允许一个长任务。
+    active_task_request_id: AtomicU64,
     /// 当前可取消 RPC 的请求 ID，用于让 Python 精确匹配取消目标。
     cancellable_request_id: AtomicU64,
 }
@@ -87,10 +87,11 @@ fn spawn_reader(
     });
 }
 
-fn is_cancellable_method(method: &str) -> bool {
+fn is_long_running_method(method: &str) -> bool {
     matches!(
         method,
         "process_fuel"
+            | "process_tire"
             | "process_production"
             | "process_electrical"
             | "process_worktime"
@@ -99,7 +100,12 @@ fn is_cancellable_method(method: &str) -> bool {
             | "process_maintenance_llm"
             | "batch_process"
             | "sync_minebase"
+            | "daily_report_export"
     )
+}
+
+fn is_cancellable_method(method: &str) -> bool {
+    matches!(method, "process_maintenance_llm" | "batch_process")
 }
 
 impl PythonBridge {
@@ -172,7 +178,7 @@ impl PythonBridge {
             next_id: AtomicU64::new(1),
             pending,
             event_receiver: Mutex::new(Some(event_receiver)),
-            cancelled: AtomicBool::new(false),
+            active_task_request_id: AtomicU64::new(0),
             cancellable_request_id: AtomicU64::new(0),
         })
     }
@@ -198,6 +204,16 @@ impl PythonBridge {
             Ordering::SeqCst,
             Ordering::SeqCst,
         );
+    }
+
+    fn clear_task_request(&self, request_id: u64) {
+        let _ = self.active_task_request_id.compare_exchange(
+            request_id,
+            0,
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        );
+        self.clear_cancellable_request(request_id);
     }
 
     fn write_request(
@@ -229,71 +245,78 @@ impl PythonBridge {
         method: &str,
         params: &serde_json::Value,
     ) -> Result<serde_json::Value, String> {
+        let long_running = is_long_running_method(method);
         let cancellable = is_cancellable_method(method);
         let request_id = self.next_request_id();
+        if long_running
+            && self
+                .active_task_request_id
+                .compare_exchange(0, request_id, Ordering::SeqCst, Ordering::SeqCst)
+                .is_err()
+        {
+            return Err("A processing task is already running".into());
+        }
         if cancellable {
-            self.cancelled.store(false, Ordering::SeqCst);
             self.cancellable_request_id
                 .store(request_id, Ordering::SeqCst);
         }
 
         let (sender, receiver) = mpsc::channel();
 
-        self.pending
-            .lock()
-            .map_err(|e| e.to_string())?
-            .insert(request_id, sender);
+        match self.pending.lock() {
+            Ok(mut requests) => {
+                requests.insert(request_id, sender);
+            }
+            Err(error) => {
+                if long_running {
+                    self.clear_task_request(request_id);
+                }
+                return Err(error.to_string());
+            }
+        }
 
         if let Err(error) = self.write_request(request_id, method, params) {
             if let Ok(mut requests) = self.pending.lock() {
                 requests.remove(&request_id);
             }
-            if cancellable {
-                self.clear_cancellable_request(request_id);
+            if long_running {
+                self.clear_task_request(request_id);
             }
             return Err(error);
         }
 
         loop {
-            if cancellable && self.cancelled.load(Ordering::SeqCst) {
-                if let Ok(mut requests) = self.pending.lock() {
-                    requests.remove(&request_id);
-                }
-                self.clear_cancellable_request(request_id);
-                return Err("Task cancelled".into());
-            }
-
             match receiver.recv_timeout(Duration::from_millis(100)) {
                 Ok(Ok(response)) => {
                     if let Some(error) = response.get("error") {
                         let fallback = error.to_string();
                         let message = error.as_str().unwrap_or(&fallback);
-                        if cancellable {
-                            self.clear_cancellable_request(request_id);
+                        if long_running {
+                            self.clear_task_request(request_id);
                         }
                         return Err(message.to_string());
                     }
                     if let Some(result) = response.get("result") {
-                        if cancellable {
-                            self.clear_cancellable_request(request_id);
+                        if long_running {
+                            self.clear_task_request(request_id);
                         }
                         return Ok(result.clone());
                     }
-                    if cancellable {
-                        self.clear_cancellable_request(request_id);
+                    if long_running {
+                        self.clear_task_request(request_id);
                     }
                     return Err(format!("Unexpected response: {}", response));
                 }
                 Ok(Err(error)) => {
-                    if cancellable {
-                        self.clear_cancellable_request(request_id);
+                    if long_running {
+                        self.clear_task_request(request_id);
                     }
                     return Err(error);
                 }
                 Err(mpsc::RecvTimeoutError::Timeout) => continue,
                 Err(mpsc::RecvTimeoutError::Disconnected) => {
-                    if cancellable {
-                        self.clear_cancellable_request(request_id);
+                    if long_running {
+                        self.clear_task_request(request_id);
                     }
                     return Err("Python process exited unexpectedly".into());
                 }
@@ -302,30 +325,18 @@ impl PythonBridge {
     }
 
     /// 发送无需等待响应的控制请求。
-    fn send_notification(&self, method: &str, params: &serde_json::Value) {
+    fn send_notification(&self, method: &str, params: &serde_json::Value) -> bool {
         let request_id = self.next_request_id();
-        let _ = self.write_request(request_id, method, params);
+        self.write_request(request_id, method, params).is_ok()
     }
 
-    /// 取消当前任务：立即结束 Rust 侧等待，并通知 Python 设置任务令牌。
-    pub fn cancel(&self) {
-        self.cancelled.store(true, Ordering::SeqCst);
+    /// 请求 Python 协作取消当前任务；等待原始 RPC 返回确认任务已停止。
+    pub fn cancel(&self) -> bool {
         let request_id = self.cancellable_request_id.load(Ordering::SeqCst);
-        let params = if request_id == 0 {
-            serde_json::json!({})
-        } else {
-            serde_json::json!({"request_id": request_id})
-        };
-        self.send_notification("cancel", &params);
-
-        // LLM 处理器还会在网络请求间隔中读取这个文件，保留文件信号作为兜底。
-        if let Ok(home) = std::env::var("HOME") {
-            let cancel_path = std::path::PathBuf::from(home)
-                .join(".cache")
-                .join("mining_processor_cancel");
-            let _ = std::fs::create_dir_all(cancel_path.parent().unwrap());
-            let _ = std::fs::write(cancel_path, "cancel");
+        if request_id == 0 {
+            return false;
         }
+        self.send_notification("cancel", &serde_json::json!({"request_id": request_id}))
     }
 
     /// 获取子进程 PID（用于前端展示）。
@@ -422,18 +433,30 @@ for line in sys.stdin:
     }
 
     #[test]
-    fn cancel_interrupts_a_call_waiting_for_python() {
+    fn cancellation_waits_for_python_to_confirm_the_task_stopped() {
         let script_path = temp_script(
             "cancel",
             r#"
 import json
 import sys
+import threading
 import time
 
+cancelled = threading.Event()
+
+def handle(request):
+    method = request["method"]
+    if method == "process_maintenance_llm":
+        cancelled.wait(2)
+        time.sleep(0.25)
+        print(json.dumps({"id": request["id"], "result": {"cancelled": True}}), flush=True)
+    elif method == "cancel":
+        cancelled.set()
+    elif method == "ping":
+        print(json.dumps({"id": request["id"], "result": {"ok": True}}), flush=True)
+
 for line in sys.stdin:
-    request = json.loads(line)
-    time.sleep(1 if request["method"] == "process_production" else 0)
-    print(json.dumps({"id": request["id"], "result": {"ok": True}}), flush=True)
+    threading.Thread(target=handle, args=(json.loads(line),), daemon=True).start()
 "#,
         );
 
@@ -444,31 +467,26 @@ for line in sys.stdin:
         );
         let call_bridge = Arc::clone(&bridge);
         let call = std::thread::spawn(move || {
-            call_bridge.call("process_production", &serde_json::json!({}))
+            call_bridge.call("process_maintenance_llm", &serde_json::json!({}))
         });
 
         std::thread::sleep(Duration::from_millis(100));
         let cancelled_at = Instant::now();
-        bridge.cancel();
-        let result = call.join().expect("call thread must finish");
-
-        assert_eq!(result, Err("Task cancelled".to_string()));
-        assert!(
-            cancelled_at.elapsed() < Duration::from_secs(2),
-            "cancelled call should return promptly"
+        assert!(bridge.cancel());
+        assert_eq!(
+            call.join().expect("call thread must finish"),
+            Ok(serde_json::json!({"cancelled": true}))
         );
+        assert!(cancelled_at.elapsed() >= Duration::from_millis(200));
+        assert!(cancelled_at.elapsed() < Duration::from_secs(2));
 
-        let next_result = bridge.call("ping", &serde_json::json!({}));
-        assert_eq!(next_result, Ok(serde_json::json!({"ok": true})));
+        assert_eq!(
+            bridge.call("ping", &serde_json::json!({})),
+            Ok(serde_json::json!({"ok": true}))
+        );
 
         drop(bridge);
         let _ = std::fs::remove_file(&script_path);
-        if let Ok(home) = std::env::var("HOME") {
-            let cancel_path = PathBuf::from(home)
-                .join(".cache")
-                .join("mining_processor_cancel");
-            let _ = std::fs::remove_file(cancel_path);
-        }
     }
 
     #[test]
@@ -487,7 +505,7 @@ cancelled = threading.Event()
 
 def handle(request):
     method = request["method"]
-    if method == "process_production":
+    if method == "batch_process":
         process_id[0] = request["id"]
         cancelled.wait(2)
         time.sleep(0.3)
@@ -517,15 +535,14 @@ for line in sys.stdin:
                 .expect("Python bridge must start"),
         );
         let call_bridge = Arc::clone(&bridge);
-        let call = std::thread::spawn(move || {
-            call_bridge.call("process_production", &serde_json::json!({}))
-        });
+        let call =
+            std::thread::spawn(move || call_bridge.call("batch_process", &serde_json::json!({})));
 
         std::thread::sleep(Duration::from_millis(100));
-        bridge.cancel();
+        assert!(bridge.cancel());
         assert_eq!(
             call.join().expect("call thread must finish"),
-            Err("Task cancelled".to_string())
+            Ok(serde_json::json!({"ok": true}))
         );
 
         let ping = bridge.call("ping", &serde_json::json!({}));
@@ -533,11 +550,52 @@ for line in sys.stdin:
 
         drop(bridge);
         let _ = std::fs::remove_file(&script_path);
-        if let Ok(home) = std::env::var("HOME") {
-            let cancel_path = PathBuf::from(home)
-                .join(".cache")
-                .join("mining_processor_cancel");
-            let _ = std::fs::remove_file(cancel_path);
-        }
+    }
+
+    #[test]
+    fn only_one_long_running_task_can_be_submitted_at_a_time() {
+        let script_path = temp_script(
+            "task_guard",
+            r#"
+import json
+import sys
+import threading
+import time
+
+def handle(request):
+    if request["method"] in ("process_fuel", "batch_process"):
+        time.sleep(0.3)
+    print(json.dumps({"id": request["id"], "result": {"method": request["method"]}}), flush=True)
+
+for line in sys.stdin:
+    threading.Thread(target=handle, args=(json.loads(line),), daemon=True).start()
+"#,
+        );
+        let python = if cfg!(windows) { "python" } else { "python3" };
+        let bridge = Arc::new(
+            PythonBridge::new(python, script_path.to_str().expect("UTF-8 temp path"))
+                .expect("Python bridge must start"),
+        );
+        let first_bridge = Arc::clone(&bridge);
+        let first =
+            std::thread::spawn(move || first_bridge.call("process_fuel", &serde_json::json!({})));
+        std::thread::sleep(Duration::from_millis(100));
+        assert!(!bridge.cancel());
+
+        assert_eq!(
+            bridge.call("batch_process", &serde_json::json!({})),
+            Err("A processing task is already running".into())
+        );
+        assert_eq!(
+            first.join().expect("first task must finish"),
+            Ok(serde_json::json!({"method": "process_fuel"}))
+        );
+        assert_eq!(
+            bridge.call("batch_process", &serde_json::json!({})),
+            Ok(serde_json::json!({"method": "batch_process"}))
+        );
+
+        drop(bridge);
+        let _ = std::fs::remove_file(&script_path);
     }
 }

@@ -1,6 +1,5 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { invoke } from "@tauri-apps/api/core";
 import type { BridgeProp, BatchProgress } from "../../lib/types";
 import { useToast } from "../Toast";
 import { inputClass, btnSecondaryClass, btnPrimaryClass } from "../../lib/ui-classes";
@@ -80,20 +79,13 @@ interface PreviewData {
   sample: Record<string, unknown>[];
 }
 
-export function LLMLabelingPage({ bridge, progress, setProgress }: {
+export function LLMLabelingPage({ bridge, progress }: {
   bridge: BridgeProp;
   progress: BatchProgress | null;
-  setProgress: (p: BatchProgress | null) => void;
 }) {
   const { notify } = useToast();
   const { t } = useTranslation();
   const { initialDir } = useLastDirectory(bridge);
-
-  // Clear stale progress on mount
-  useEffect(() => {
-    setProgress(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Step state
   const [step, setStep] = useState(1);
@@ -197,12 +189,12 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
   const [cancelling, setCancelling] = useState(false);
 
   const handleCancel = async () => {
-    if (!loading || cancelling) return;
+    if (!loading || cancelling || !bridge.cancel) return;
     setCancelling(true);
     // Give immediate feedback even if the native command is slow to resolve.
     notify(t("pages:LLMLabelingPage.textVariant2"), "info");
     try {
-      await invoke("cancel_task");
+      await bridge.cancel();
     } catch (e) {
       setCancelling(false);
       notify(t("pages:LLMLabelingPage.cancelError", { error: String(e) }), "error");
@@ -215,7 +207,6 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
     setCancelling(false);
     setError(null);
     setResult(null);
-    setProgress(null);
     try {
       const res = await bridge.call<{
         input_rows: number;
@@ -236,7 +227,7 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
         export_mode: exportMode,
       });
       if (res.cancelled) {
-        setError(t("pages:LLMLabelingPage.canceledItemItemsItem", { completed: res.llm_completed }));
+        setError(t("pages:LLMLabelingPage.canceledAfterItems", { completed: res.llm_completed }));
         setStep(4);
       } else {
         setResult(res);
@@ -257,7 +248,6 @@ export function LLMLabelingPage({ bridge, progress, setProgress }: {
     } finally {
       setLoading(false);
       setCancelling(false);
-      setProgress(null);
     }
   };
 

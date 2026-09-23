@@ -25,9 +25,8 @@ async fn invoke_python(
 }
 
 #[tauri::command]
-async fn cancel_task(state: State<'_, AppState>) -> Result<(), String> {
-    state.bridge.cancel();
-    Ok(())
+async fn cancel_task(state: State<'_, AppState>) -> Result<bool, String> {
+    Ok(state.bridge.cancel())
 }
 
 #[tauri::command]

@@ -1088,12 +1088,18 @@ export function DataProcessingPage({ bridge }: { bridge: BridgeProp }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
+      <div>
         <div>
           <h2 className="text-lg font-semibold text-slate-800">{t("pages:DataProcessingPage.dataProcessing")}</h2>
           <p className="text-sm text-slate-500">{t("pages:DataProcessingPage.selectAModuleToProcessMiningData")}</p>
         </div>
-        <div className="flex items-center gap-4">
+      </div>
+
+      <details className="rounded-lg border border-slate-200 bg-white px-4 py-2.5">
+        <summary className="cursor-pointer select-none text-sm font-medium text-slate-700">
+          {t("pages:DataProcessingPage.sharedProcessingOptions")}
+        </summary>
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <StyledToggle
             checked={useEquipmentLedger}
             onChange={setUseEquipmentLedger}
@@ -1120,7 +1126,7 @@ export function DataProcessingPage({ bridge }: { bridge: BridgeProp }) {
             label={t("pages:DataProcessingPage.skipHiddenColumns")}
           />
         </div>
-      </div>
+      </details>
 
       <AnomalyPanel
         config={anomaly}

@@ -40,21 +40,92 @@ describe("usePythonBridge", () => {
 
     // Override for the next call
     mockInvoke.mockResolvedValueOnce({ output_file: "/tmp/out.xlsx" });
-    const res = await result.current.call("process_fuel", { path: "/test.xlsx" });
-    expect(res).toEqual({ output_file: "/tmp/out.xlsx" });
-    expect(mockInvoke).toHaveBeenCalledWith("invoke_python", {
-      method: "process_fuel",
-      params: { path: "/test.xlsx" },
+    let res: unknown;
+    await act(async () => {
+      res = await result.current.call("process_fuel", { path: "/test.xlsx" });
     });
+    expect(res).toEqual({ output_file: "/tmp/out.xlsx" });
+    const taskCall = mockInvoke.mock.calls.find(([command, args]) =>
+      command === "invoke_python" && (args as { method?: string }).method === "process_fuel");
+    expect(taskCall?.[1]).toMatchObject({
+      method: "process_fuel",
+      params: { path: "/test.xlsx", _bridge_task_id: expect.any(String) },
+    });
+    expect(result.current.task?.status).toBe("completed");
   });
 
-  it("provides cancel function", async () => {
+  it("only marks a cancellable task stopped after the backend responds", async () => {
+    let finishTask!: (result: unknown) => void;
+    let acceptCancel = false;
+    const pendingTask = new Promise((resolve) => { finishTask = resolve; });
+    mockInvoke.mockImplementation(async (command, args) => {
+      if (command === "invoke_python" && (args as { method?: string }).method === "process_maintenance_llm") {
+        return pendingTask;
+      }
+      if (command === "cancel_task") return acceptCancel;
+      return { pong: true, pid: 1234, version: "1.2.0" };
+    });
+    const { result } = renderHook(() => usePythonBridge("llm-labeling"));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    let taskPromise!: Promise<unknown>;
+    act(() => {
+      taskPromise = result.current.call("process_maintenance_llm");
+    });
+    expect(result.current.task).toMatchObject({ page: "llm-labeling", status: "running", canCancel: true });
+
+    let cancelError: unknown;
+    await act(async () => {
+      try {
+        await result.current.cancel();
+      } catch (error) {
+        cancelError = error;
+      }
+    });
+    expect(cancelError).toEqual(new Error("取消请求尚未发送，请稍后重试。"));
+    expect(result.current.task?.status).toBe("running");
+
+    acceptCancel = true;
+    await act(async () => {
+      await result.current.cancel();
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("cancel_task");
+    expect(result.current.task?.status).toBe("cancelling");
+
+    await act(async () => {
+      finishTask({ cancelled: true });
+      await taskPromise;
+    });
+    expect(result.current.task?.status).toBe("cancelled");
+  });
+
+  it("rejects another long task while one is already active", async () => {
+    let finishTask!: (result: unknown) => void;
+    const pendingTask = new Promise<unknown>((resolve) => { finishTask = resolve; });
+    mockInvoke.mockImplementation(async (command, args) => {
+      if (command === "invoke_python" && (args as { method?: string }).method === "process_fuel") {
+        return pendingTask;
+      }
+      return { pong: true, pid: 1234, version: "1.2.0" };
+    });
     const { result } = renderHook(() => usePythonBridge());
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
-    await result.current.cancel();
-    expect(mockInvoke).toHaveBeenCalledWith("cancel_task");
+
+    let taskPromise!: Promise<unknown>;
+    act(() => {
+      taskPromise = result.current.call("process_fuel");
+    });
+    await expect(result.current.call("process_tire")).rejects.toThrow("已有处理任务正在运行");
+    expect(mockInvoke.mock.calls.filter(([command]) => command === "invoke_python")).toHaveLength(2);
+
+    await act(async () => {
+      finishTask({ output_file: "/tmp/result.xlsx" });
+      await taskPromise;
+    });
   });
 
   it("clears logs", async () => {
@@ -144,17 +215,33 @@ describe("usePythonBridge", () => {
     expect(result.current.logs.map((entry) => entry.seq)).toEqual([1, 2]);
   });
 
-  it("accepts only structurally valid progress events", async () => {
+  it("applies progress only to the task that emitted it", async () => {
     let eventHandler: (event: { payload: { event: string; data: Record<string, unknown> } }) => void;
     mockListen.mockImplementation(async (_event, handler) => {
       eventHandler = handler as typeof eventHandler;
       return () => {};
     });
 
-    const { result } = renderHook(() => usePythonBridge());
+    let finishTask!: (result: unknown) => void;
+    const pendingTask = new Promise((resolve) => { finishTask = resolve; });
+    mockInvoke.mockImplementation(async (command, args) => {
+      if (command === "invoke_python" && (args as { method?: string }).method === "batch_process") {
+        return pendingTask;
+      }
+      return { pong: true, pid: 1234, version: "1.2.0" };
+    });
+    const { result } = renderHook(() => usePythonBridge("batch-processing"));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
+
+    let taskPromise!: Promise<unknown>;
+    act(() => {
+      taskPromise = result.current.call("batch_process");
+    });
+    const taskCall = mockInvoke.mock.calls.find(([command, args]) =>
+      command === "invoke_python" && (args as { method?: string }).method === "batch_process");
+    const taskId = (taskCall?.[1] as { params: { _bridge_task_id: string } }).params._bridge_task_id;
 
     act(() => {
       eventHandler!({
@@ -170,7 +257,17 @@ describe("usePythonBridge", () => {
       eventHandler!({
         payload: {
           event: "progress",
-          data: { stage: "running", percent: 50, current: 1, total: 2, detail: "valid" },
+          data: { task_id: "another-task", stage: "running", percent: 50, current: 1, total: 2, detail: "stale" },
+        },
+      });
+    });
+    expect(result.current.progress).toBeNull();
+
+    act(() => {
+      eventHandler!({
+        payload: {
+          event: "progress",
+          data: { task_id: taskId, stage: "running", percent: 50, current: 1, total: 2, detail: "valid" },
         },
       });
     });
@@ -180,6 +277,11 @@ describe("usePythonBridge", () => {
       current: 1,
       total: 2,
       detail: "valid",
+    });
+
+    await act(async () => {
+      finishTask({ summary: {} });
+      await taskPromise;
     });
   });
 

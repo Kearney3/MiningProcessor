@@ -14,6 +14,7 @@ Tauri-Python 桥接层 — JSON-RPC over stdin/stdout
 from __future__ import annotations
 
 import contextlib
+from contextvars import ContextVar
 import ipaddress
 import json
 import logging
@@ -265,6 +266,9 @@ def _sanitize_rows(rows: list[dict]) -> list[dict]:
 
 def _emit(event: str, data: dict) -> None:
     """向 stdout 推送一个事件。"""
+    task_id = _bridge_task_id.get()
+    if event == "progress" and task_id is not None:
+        data = {**data, "task_id": task_id}
     _send({"event": event, "data": data})
 
 
@@ -341,6 +345,7 @@ _task_state_lock = threading.Lock()
 _active_cancel_event: threading.Event | None = None
 _active_cancel_request_id: int | None = None
 _pending_cancel_requests: set[int] = set()
+_bridge_task_id: ContextVar[str | None] = ContextVar("bridge_task_id", default=None)
 
 
 def _begin_cancellable_task(request_id: int | None = None) -> threading.Event:
@@ -1699,6 +1704,7 @@ def _save_last_directory(params: dict) -> dict:
 # 快速 RPC 使用独立线程池，因此长任务不会阻塞台账、配置和取消请求。
 _LONG_RUNNING_METHODS = frozenset({
     "process_fuel",
+    "process_tire",
     "process_production",
     "process_electrical",
     "process_worktime",
@@ -1707,6 +1713,7 @@ _LONG_RUNNING_METHODS = frozenset({
     "process_maintenance_llm",
     "batch_process",
     "sync_minebase",
+    "daily_report_export",
 })
 
 
@@ -1725,6 +1732,8 @@ def _handle_request(req: dict) -> None:
         # 让处理器把取消令牌绑定到具体 RPC 请求，覆盖任务尚未开始执行的窗口。
         call_params["_bridge_request_id"] = req_id
 
+    task_id = call_params.get("_bridge_task_id")
+    task_token = _bridge_task_id.set(task_id if isinstance(task_id, str) else None)
     try:
         result = _METHODS[method](call_params)
         _send({"id": req_id, "result": result})
@@ -1739,6 +1748,7 @@ def _handle_request(req: dict) -> None:
     finally:
         if method in _LONG_RUNNING_METHODS and req_id is not None:
             _discard_pending_cancel(req_id)
+        _bridge_task_id.reset(task_token)
 
 
 def main() -> None:

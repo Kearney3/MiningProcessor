@@ -24,8 +24,6 @@ import { addLocalDays, formatLocalDate, localToday } from "../../lib/dateUtils";
 
 interface BatchBridgeProp extends BridgeProp {
   cancel: () => Promise<void>;
-  progress: BatchProgress | null;
-  setProgress: (p: BatchProgress | null) => void;
 }
 
 type TableMergeMode = "split" | "merge" | "table_merge";
@@ -94,7 +92,10 @@ function ProgressBar({ percent, stage, detail }: { percent: number; stage: strin
 // Main page component
 // ═══════════════════════════════════════
 
-export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
+export function BatchProcessingPage({ bridge, progress }: {
+  bridge: BatchBridgeProp;
+  progress: BatchProgress | null;
+}) {
   // -- Path & scan --
   const { notify } = useToast();
   const { t } = useTranslation();
@@ -224,7 +225,6 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
     setResult(null);
     setSummary(null);
     setAnomalies([]);
-    bridge.setProgress(null);
     try {
       const params: Record<string, unknown> = {
         folder_path: folderPath,
@@ -284,7 +284,6 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
       }
     } finally {
       setProcessing(false);
-      bridge.setProgress(null);
     }
   }, [scanResult, selectedMatched, hasSelectedFiles, folderPath, year, month, rawStart, useEquipmentLedger, useOilLedger, useModelLedger, skipHiddenRows, skipHiddenCols, filterZeroEngineHours, filterZeroWorkHours, filterZeroHoursMeter, filterZeroKmMeter, filterZeroRunHours, filterZeroRunKm, tableMergeMode, baseTableType, dateFilterEnabled, filterDate, useHeaderMapping, headerMode, bridge, notify, t]);
 
@@ -624,11 +623,11 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
       {/* ════════════════════════════════════
           Section 4: Progress
           ════════════════════════════════════ */}
-      {processing && bridge.progress && (
+      {processing && progress && (
         <ProgressBar
-          percent={bridge.progress.percent}
-          stage={bridge.progress.stage}
-          detail={bridge.progress.detail}
+          percent={progress.percent}
+          stage={progress.stage}
+          detail={progress.detail}
         />
       )}
 
@@ -715,7 +714,7 @@ export function BatchProcessingPage({ bridge }: { bridge: BatchBridgeProp }) {
       {showConfirm && scanResult && (
         <ConfirmDialog
           title={t("pages:BatchProcessingPage.someFilesAreMissing")}
-          message={t("pages:BatchProcessingPage.itemtypeitemfileItemprocessingitemprocessingitemdataContinue")}
+          message={t("pages:BatchProcessingPage.missingReportsContinuePrompt")}
           details={scanResult.missing}
           confirmLabel={t("pages:BatchProcessingPage.continue")}
           cancelLabel={t("pages:BatchProcessingPage.back")}

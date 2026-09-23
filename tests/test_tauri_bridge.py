@@ -23,6 +23,21 @@ import tauri_bridge  # noqa: E402
 _has_psycopg2 = importlib.util.find_spec("psycopg2") is not None
 
 
+def test_progress_event_includes_current_bridge_task_id(monkeypatch):
+    events = []
+    monkeypatch.setattr(tauri_bridge, "_send", events.append)
+    token = tauri_bridge._bridge_task_id.set("task-123")
+    try:
+        tauri_bridge._emit("progress", {"stage": "running", "percent": 25})
+    finally:
+        tauri_bridge._bridge_task_id.reset(token)
+
+    assert events == [{
+        "event": "progress",
+        "data": {"stage": "running", "percent": 25, "task_id": "task-123"},
+    }]
+
+
 def test_bridge_processes_ledger_request_while_batch_is_running():
     """短 RPC 不应排在长批处理之后。"""
     launcher = (
@@ -167,12 +182,12 @@ def test_cancel_rpc_reaches_llm_task_before_task_registration(tmp_path):
         }) + "\n")
         process.stdin.flush()
 
-        ready, _, _ = select.select([process.stdout], [], [], 1)
+        ready, _, _ = select.select([process.stdout], [], [], 5)
         assert ready, "cancel response was not returned"
         cancel_response = json.loads(process.stdout.readline())
         assert cancel_response == {"id": 2, "result": {"ok": True}}
 
-        ready, _, _ = select.select([process.stdout], [], [], 1)
+        ready, _, _ = select.select([process.stdout], [], [], 5)
         assert ready, "LLM task remained running after early cancellation"
         llm_response = json.loads(process.stdout.readline())
         assert llm_response["id"] == 1

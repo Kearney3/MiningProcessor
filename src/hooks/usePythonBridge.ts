@@ -3,11 +3,13 @@ import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   BatchProgress,
+  BridgeTask,
   BridgeInfo,
   ConnectionLog,
   ConnectionStatus,
   LogEntry,
   PythonEvent,
+  PageId,
 } from "../lib/types";
 import { localDateTimeISO } from "../lib/dateUtils";
 import i18n from "../i18n";
@@ -18,6 +20,20 @@ const MAX_CONNECTION_LOGS = 50;
 const MAX_LOGS = 5000;
 const MAX_PENDING_LOGS = 10_000;
 const LOG_FLUSH_INTERVAL = 50;
+const LONG_RUNNING_METHODS = new Set([
+  "process_fuel",
+  "process_tire",
+  "process_production",
+  "process_electrical",
+  "process_worktime",
+  "process_merge",
+  "process_maintenance",
+  "process_maintenance_llm",
+  "batch_process",
+  "sync_minebase",
+  "daily_report_export",
+]);
+const CANCELLABLE_METHODS = new Set(["process_maintenance_llm", "batch_process"]);
 
 function now(): string {
   return new Date().toLocaleTimeString("zh-CN", { hour12: false });
@@ -37,7 +53,8 @@ function isBatchProgress(value: unknown): value is BatchProgress {
     && typeof value.percent === "number" && Number.isFinite(value.percent)
     && typeof value.current === "number" && Number.isFinite(value.current)
     && typeof value.total === "number" && Number.isFinite(value.total)
-    && typeof value.detail === "string";
+    && typeof value.detail === "string"
+    && (value.task_id === undefined || typeof value.task_id === "string");
 }
 
 /** 保留最近日志；溢出时优先保留 WARNING 及以上。 */
@@ -56,10 +73,10 @@ function trimLogs(entries: LogEntry[], capacity: number): LogEntry[] {
  * 提供 invoke（调用 Python 方法）、日志监听、进度监听、取消功能。
  * 增加：连接状态管理、心跳检测、手动重连。
  */
-export function usePythonBridge() {
+export function usePythonBridge(currentPage: PageId = "data-processing") {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isConnected, setIsConnected] = useState(false);
-  const [progress, setProgress] = useState<BatchProgress | null>(null);
+  const [task, setTaskState] = useState<BridgeTask | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("connecting");
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [connectionLogs, setConnectionLogs] = useState<ConnectionLog[]>([]);
@@ -69,6 +86,22 @@ export function usePythonBridge() {
   const pendingLogsRef = useRef<LogEntry[]>([]);
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clientSequenceRef = useRef(0);
+  const taskRef = useRef<BridgeTask | null>(null);
+  const taskSequenceRef = useRef(0);
+  const currentPageRef = useRef(currentPage);
+  currentPageRef.current = currentPage;
+
+  const setTask = useCallback((next: BridgeTask | null | ((current: BridgeTask | null) => BridgeTask | null)) => {
+    const value = typeof next === "function" ? next(taskRef.current) : next;
+    taskRef.current = value;
+    setTaskState(value);
+  }, []);
+
+  const updateTaskProgress = useCallback((progress: BatchProgress) => {
+    const current = taskRef.current;
+    if (!current || progress.task_id !== current.id) return;
+    setTask({ ...current, progress });
+  }, [setTask]);
 
   // 添加连接日志
   const addConnectionLog = useCallback((level: string, message: string) => {
@@ -221,11 +254,11 @@ export function usePythonBridge() {
         // Extract progress events from the batch
         for (const entry of entries) {
           if (entry.event === "progress" && isBatchProgress(entry.data)) {
-            setProgress(entry.data);
+            updateTaskProgress(entry.data);
           }
         }
       } else if (data.event === "progress" && isBatchProgress(data.data)) {
-        setProgress(data.data);
+        updateTaskProgress(data.data);
       }
     });
     return () => {
@@ -236,25 +269,80 @@ export function usePythonBridge() {
       }
       pendingLogsRef.current = [];
     };
-  }, [queueLogEntries]);
+  }, [queueLogEntries, updateTaskProgress]);
 
   /**
    * 调用 Python RPC 方法
    */
   const call = useCallback(
     async <T = unknown>(method: string, params: Record<string, unknown> = {}): Promise<T> => {
-      const result = await invoke("invoke_python", { method, params });
-      return result as T;
+      if (!LONG_RUNNING_METHODS.has(method)) {
+        return await invoke("invoke_python", { method, params }) as T;
+      }
+
+      const current = taskRef.current;
+      if (current && ["running", "cancelling"].includes(current.status)) {
+        throw new Error(i18n.t("hooks:usePythonBridge.taskAlreadyRunning"));
+      }
+
+      const taskId = `task-${Date.now()}-${++taskSequenceRef.current}`;
+      const nextTask: BridgeTask = {
+        id: taskId,
+        method,
+        page: currentPageRef.current,
+        status: "running",
+        canCancel: CANCELLABLE_METHODS.has(method),
+        progress: null,
+      };
+      setTask(nextTask);
+
+      try {
+        const result = await invoke("invoke_python", {
+          method,
+          params: { ...params, _bridge_task_id: taskId },
+        });
+        const wasCancelled = isRecord(result) && result.cancelled === true;
+        setTask((active) => active?.id === taskId
+          ? { ...active, status: wasCancelled ? "cancelled" : "completed" }
+          : active);
+        return result as T;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const wasCancelled = taskRef.current?.status === "cancelling"
+          || /task cancelled|cancelled/i.test(message);
+        setTask((active) => active?.id === taskId
+          ? { ...active, status: wasCancelled ? "cancelled" : "failed", error: wasCancelled ? undefined : message }
+          : active);
+        throw error;
+      }
     },
-    [],
+    [setTask],
   );
 
-  /**
-   * 取消当前批处理
-   */
+  /** 只请求取消桥接层明确支持协作取消的当前任务。 */
   const cancel = useCallback(async () => {
-    await invoke("cancel_task");
-  }, []);
+    const current = taskRef.current;
+    if (!current?.canCancel || current.status !== "running") return;
+    setTask({ ...current, status: "cancelling" });
+    try {
+      const accepted = await invoke<boolean>("cancel_task");
+      if (!accepted) {
+        throw new Error(i18n.t("hooks:usePythonBridge.cancellationNotReady"));
+      }
+    } catch (error) {
+      setTask((active) => active?.id === current.id && active.status === "cancelling"
+        ? { ...active, status: "running" }
+        : active);
+      throw error;
+    }
+  }, [setTask]);
+
+  const dismissTask = useCallback(() => {
+    const current = taskRef.current;
+    if (current && !["running", "cancelling"].includes(current.status)) {
+      setTask(null);
+    }
+  }, [setTask]);
 
   /**
    * 清空日志
@@ -296,13 +384,14 @@ export function usePythonBridge() {
       connectionLogs,
       bridgeInfo,
       reconnect,
-      progress,
-      setProgress,
+      task,
+      dismissTask,
+      progress: task?.progress ?? null,
     }),
     [
       call, cancel, logs, clearLogs, isConnected,
       connectionStatus, connectionError, connectionLogs,
-      bridgeInfo, reconnect, progress, setProgress,
+      bridgeInfo, reconnect, task, dismissTask,
     ],
   );
 

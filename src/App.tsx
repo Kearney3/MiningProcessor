@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect } from "react";
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { useTranslation } from "react-i18next";
 import { usePythonBridge } from "./hooks/usePythonBridge";
@@ -9,10 +9,11 @@ import { ToastProvider } from "./components/Toast";
 import { ConnectionStatusBadge } from "./components/ConnectionStatusBadge";
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { TaskStatusBar } from "./components/TaskStatusBar";
+import type { BatchProgress } from "./lib/types";
 
-// Keep page code out of the initial bundle and mount only the active page. The
-// old display:none wrappers mounted every page at startup, so every page-level
-// effect ran before the user opened that page.
+// Keep page chunks lazy and retain each page only after its first visit so its
+// form state survives navigation without starting every page's effects at boot.
 const DataProcessingPage = lazy(() =>
   import("./components/pages/DataProcessingPage").then(({ DataProcessingPage }) => ({ default: DataProcessingPage })),
 );
@@ -51,19 +52,24 @@ const UserConfigPage = lazy(() =>
 );
 
 type Bridge = ReturnType<typeof usePythonBridge>;
+type PageBridge = Pick<Bridge, "call" | "cancel">;
 
-function ActivePage({ currentPage, bridge }: { currentPage: PageId; bridge: Bridge }) {
+function ActivePage({ currentPage, bridge, progress }: {
+  currentPage: PageId;
+  bridge: PageBridge;
+  progress: BatchProgress | null;
+}) {
   switch (currentPage) {
     case "data-processing":
       return <DataProcessingPage bridge={bridge} />;
     case "batch-processing":
-      return <BatchProcessingPage bridge={bridge} />;
+      return <BatchProcessingPage bridge={bridge} progress={progress} />;
     case "data-sync":
       return <DataSyncPage bridge={bridge} />;
     case "ledger-match":
       return <LedgerMatchPage bridge={bridge} />;
     case "llm-labeling":
-      return <LLMLabelingPage bridge={bridge} progress={bridge.progress} setProgress={bridge.setProgress} />;
+      return <LLMLabelingPage bridge={bridge} progress={progress} />;
     case "equipment-ledger":
       return <EquipmentLedgerPage bridge={bridge} />;
     case "oil-ledger":
@@ -81,6 +87,28 @@ function ActivePage({ currentPage, bridge }: { currentPage: PageId; bridge: Brid
   }
 }
 
+const PageSlot = memo(function PageSlot({
+  page,
+  active,
+  bridge,
+  progress,
+}: {
+  page: PageId;
+  active: boolean;
+  bridge: PageBridge;
+  progress: BatchProgress | null;
+}) {
+  return (
+    <div hidden={!active} aria-hidden={!active}>
+      <ErrorBoundary>
+        <Suspense fallback={<PageLoading />}>
+          <ActivePage currentPage={page} bridge={bridge} progress={progress} />
+        </Suspense>
+      </ErrorBoundary>
+    </div>
+  );
+});
+
 function PageLoading() {
   const { t } = useTranslation();
   return (
@@ -93,8 +121,15 @@ function PageLoading() {
 function App() {
   const { t } = useTranslation();
   const [currentPage, setCurrentPage] = useState<PageId>("data-processing");
+  const [visitedPages, setVisitedPages] = useState<Set<PageId>>(() => new Set(["data-processing"]));
   const [appVersion, setAppVersion] = useState("v3.0.0");
-  const bridge = usePythonBridge();
+  const bridge = usePythonBridge(currentPage);
+  const pageBridge = useMemo(() => ({ call: bridge.call, cancel: bridge.cancel }), [bridge.call, bridge.cancel]);
+
+  const navigate = useCallback((page: PageId) => {
+    setVisitedPages((previous) => previous.has(page) ? previous : new Set([...previous, page]));
+    setCurrentPage(page);
+  }, []);
 
   useEffect(() => {
     getVersion()
@@ -154,14 +189,25 @@ function App() {
 
       {/* Main content area */}
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
-        <ErrorBoundary>
+        <Sidebar currentPage={currentPage} onNavigate={navigate} />
         <main className="workspace-content flex-1 overflow-auto">
-          <Suspense fallback={<PageLoading />}>
-            <ActivePage currentPage={currentPage} bridge={bridge} />
-          </Suspense>
+          <TaskStatusBar
+            task={bridge.task}
+            currentPage={currentPage}
+            onCancel={() => bridge.cancel()}
+            onReturn={navigate}
+            onDismiss={bridge.dismissTask}
+          />
+          {[...visitedPages].map((page) => (
+            <PageSlot
+              key={page}
+              page={page}
+              active={currentPage === page}
+              bridge={pageBridge}
+              progress={page === "batch-processing" || page === "llm-labeling" ? bridge.progress : null}
+            />
+          ))}
         </main>
-        </ErrorBoundary>
       </div>
 
       {/* Log panel */}
