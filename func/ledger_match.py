@@ -1,7 +1,7 @@
 """
 台账匹配数据处理模块
 提供 Excel 导入、设备/油品批量匹配、结果导出等纯数据逻辑，
-由 gui/components/ledger_match.py 薄封装调用。
+供 Python 桥接层执行台账匹配。
 """
 import threading
 from collections.abc import Callable
@@ -26,7 +26,7 @@ EXPORT_BATCH = 1000
 
 class MatchState:
     """Holds mutable data state shared between import/match/export steps.
-    Free of Flet controls so it can be tested without GUI."""
+    UI-toolkit independent matching logic."""
 
     def __init__(self) -> None:
         self.all_sheets: dict[str, pd.DataFrame] = {}

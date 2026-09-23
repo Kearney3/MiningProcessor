@@ -54,7 +54,7 @@ _BUNDLED_ROOT = Path(__file__).parent.parent
 if os.environ.get("MINING_PROCESSOR_DATA_DIR"):
     _persistent_root = Path(os.environ["MINING_PROCESSOR_DATA_DIR"])
 elif getattr(sys, 'frozen', False):
-    # Flet 或其他冻结构建，未显式设置环境变量时自动检测
+    # 未显式设置环境变量时，自动检测冻结构建的持久化目录
     if sys.platform == "darwin":
         _persistent_root = Path.home() / "Library" / "Application Support" / "com.kearney.mining-processor"
     elif sys.platform == "win32":

@@ -84,9 +84,6 @@ build/*.toc
 .github/instructions/
 .github/copilot-instructions.md
 
-# 重复的二进制资源（实际使用 public/fonts/）
-assets/fonts/
-
 # Vite
 dist/.coverage
 

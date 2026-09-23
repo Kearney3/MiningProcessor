@@ -1,7 +1,7 @@
 """
 共享编排逻辑模块
 
-供 Flet GUI 和 Tauri bridge 共用的编排函数，消除跨模块重复代码。
+供 Tauri bridge、批处理和 CLI 共用的编排函数，消除跨模块重复代码。
 """
 
 import logging
@@ -207,7 +207,7 @@ def build_worktime_header_mapping(
 
 
 # ---------------------------------------------------------------------------
-# 输出路径计算（统一供 Flet 和 Tauri 使用）
+# 输出路径计算（统一供 Tauri 和 CLI 使用）
 # ---------------------------------------------------------------------------
 
 
@@ -221,8 +221,7 @@ def get_output_path(
 ) -> str | None:
     """根据模块类型和输入路径，计算输出文件路径。
 
-    统一供 gui/logic.py::_get_output_file() 和 tauri_bridge.py 各 RPC 方法共用，
-    消除两端各自内联计算输出路径的重复代码。
+    统一供 tauri_bridge.py 各 RPC 方法和 CLI 共用，避免重复计算输出路径。
 
     Args:
         module_type: 模块类型 (fuel/electrical/production/worktime/tire/merge/maint/batch)
@@ -300,13 +299,13 @@ def process_single(
     filter_zero_engine_hours: bool = False,
     filter_zero_work_hours: bool = False,
 ) -> dict:
-    """统一单报表处理入口，供 Flet GUI 和 Tauri bridge 共用。
+    """统一单报表处理入口，供 Tauri bridge 和 CLI 共用。
 
     按 module_type 分发到对应的 func/ 处理函数，计算输出文件路径，
     自动执行台账匹配后处理。
 
-    外部可通过 equipment_ledger / oil_ledger 直接传入台账实例（Flet GUI 场景）；
-    未传入时根据 use_*_ledger 开关从缓存自动加载（Tauri bridge 场景）。
+    外部可通过 equipment_ledger / oil_ledger 直接传入台账实例；未传入时根据
+    use_*_ledger 开关从缓存自动加载。
 
     Returns:
         dict，始终包含 "output_file" 键（str | None）；
@@ -343,9 +342,8 @@ def process_single(
         use_model_ledger = False
         model_ledger = None
     elif use_model_ledger and model_ledger is None and equipment_ledger is not None:
-        # Flet GUI 已传入设备台账实例时，型号台账可以在内存中补充加载。
-        # 缓存入口则保留 model_ledger=None，统一交给
-        # postprocess_from_cache() 同时加载设备台账和型号台账。
+        # 已传入设备台账实例时，型号台账可以在内存中补充加载；缓存入口
+        # 则交给 postprocess_from_cache() 同时加载设备台账和型号台账。
         model_ledger = load_model_ledger_from_cache()
 
     # ── 分发到各处理器 ──

@@ -9,7 +9,6 @@ This product depends on the following open source packages:
 Python Dependencies:
 - openpyxl (MIT License)
 - pandas (BSD 3-Clause License)
-- flet (Apache License 2.0)
 - xlsxwriter (BSD 2-Clause License)
 - rapidfuzz (MIT License)
 - cryptography (Apache License 2.0 / BSD License)

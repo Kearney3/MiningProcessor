@@ -6,11 +6,9 @@ from pathlib import Path
 from PIL import Image
 
 from scripts.validate_desktop_icons import (
-    FLET_ICON,
     REQUIRED_WINDOWS_SIZES,
     WINDOWS_ICON,
     read_ico_sizes,
-    read_png_info,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,12 +29,6 @@ def test_windows_icon_contains_high_resolution_layers() -> None:
     assert REQUIRED_WINDOWS_SIZES <= set(sizes)
     # Tauri uses the first ICO entry for the default Windows window icon.
     assert sizes[0] == (32, 32)
-
-
-def test_flet_default_icon_is_high_resolution_png() -> None:
-    width, height, _ = read_png_info(FLET_ICON)
-
-    assert (width, height) == (512, 512)
 
 
 def test_icon_generator_preserves_tauri_first_layer_order(tmp_path: Path) -> None:

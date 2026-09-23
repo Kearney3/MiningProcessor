@@ -119,7 +119,7 @@ class AnomalyConfig:
     ) -> AnomalyConfig:
         """从 UI 参数构建 AnomalyConfig，逐列检测阈值从 config.user.json 读取。
 
-        共享入口，供 Flet GUI 和 Tauri bridge 统一使用。
+        共享入口，供 Tauri bridge 统一使用。
 
         Args:
             enabled: 是否启用异常检测

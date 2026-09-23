@@ -1,4 +1,4 @@
-"""从 assets/logo.png 生成各平台应用图标。"""
+"""从应用 logo 生成 Tauri 各平台图标。"""
 import shutil
 import struct
 import subprocess
@@ -8,11 +8,8 @@ from pathlib import Path
 from PIL import Image
 
 ICONS_DIR = Path(__file__).resolve().parent
-ASSETS_DIR = ICONS_DIR.parent.parent / "assets"
-ASSETS_DIR.mkdir(exist_ok=True)
-
 SZ = 512
-SOURCE_LOGO = ASSETS_DIR / "logo.png"
+SOURCE_LOGO = ICONS_DIR / "logo.png"
 ICO_SIZES = [(32, 32), (16, 16), (24, 24), (48, 48), (64, 64), (128, 128), (256, 256)]
 
 
@@ -28,23 +25,12 @@ def write_files():
 
     # SVG
     svg_path = ICONS_DIR / "app_icon.svg"
-    svg_path.write_text(_svg_str("../../assets/logo.png"), encoding="utf-8")
+    svg_path.write_text(_svg_str("logo.png"), encoding="utf-8")
     print(f"  SVG  -> {svg_path}")
-
-    assets_svg = ASSETS_DIR / "app_icon.svg"
-    assets_svg.write_text(_svg_str("logo.png"), encoding="utf-8")
-    print(f"  SVG  -> {assets_svg}")
 
     # 主 PNG
     img.save(ICONS_DIR / "icon.png", "PNG")
     print(f"  PNG  -> icon.png ({SZ}x{SZ})")
-
-    img.save(ASSETS_DIR / "app_icon.png", "PNG")
-    print("  PNG  -> assets/app_icon.png")
-
-    # Flet's desktop builder discovers the default app icon as assets/icon.*.
-    img.save(ASSETS_DIR / "icon.png", "PNG")
-    print("  PNG  -> assets/icon.png")
 
     # 各尺寸
     sizes = {
@@ -76,8 +62,6 @@ def write_files():
         capture_output=True, check=True,
     )
     print("  ICNS -> icon.icns")
-    shutil.copy2(ICONS_DIR / "icon.icns", ASSETS_DIR / "app_icon.icns")
-    print("  ICNS -> assets/app_icon.icns")
     shutil.rmtree(iconset_dir)
 
     # ico

@@ -134,9 +134,7 @@ coll = COLLECT(
 
 # macOS .app bundle
 _spec_dir = os.path.dirname(os.path.abspath(SPEC))
-app_icon = os.path.join(_spec_dir, 'assets', 'app_icon.icns')
-if not os.path.isfile(app_icon):
-    app_icon = os.path.join(_spec_dir, 'src-tauri', 'icons', 'icon.icns')
+app_icon = os.path.join(_spec_dir, 'src-tauri', 'icons', 'icon.icns')
 
 if os.name == 'posix':
     app = BUNDLE(

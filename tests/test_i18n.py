@@ -8,7 +8,6 @@ from pathlib import Path
 
 import pytest
 
-from gui import i18n
 
 ROOT = Path(__file__).resolve().parents[1]
 LANGUAGES = ("zh", "en", "mn")
@@ -34,7 +33,7 @@ def _load_catalogs(directory: str) -> dict[str, dict[str, str]]:
     return catalogs
 
 
-@pytest.mark.parametrize("directory", ("src/locales", "gui/locales"))
+@pytest.mark.parametrize("directory", ("src/locales",))
 def test_locale_catalogs_have_matching_keys_and_placeholders(directory: str):
     catalogs = _load_catalogs(directory)
     key_sets = [set(catalog) for catalog in catalogs.values()]
@@ -48,7 +47,7 @@ def test_locale_catalogs_have_matching_keys_and_placeholders(directory: str):
         assert placeholders["zh"] == placeholders["en"] == placeholders["mn"], key
 
 
-@pytest.mark.parametrize("directory", ("src/locales", "gui/locales"))
+@pytest.mark.parametrize("directory", ("src/locales",))
 def test_locale_values_do_not_expose_source_fragments(directory: str):
     catalogs = _load_catalogs(directory)
     for language, catalog in catalogs.items():
@@ -57,7 +56,7 @@ def test_locale_values_do_not_expose_source_fragments(directory: str):
         assert leaked == {}, f"{directory}/{language}.json contains source fragments: {leaked}"
 
 
-@pytest.mark.parametrize("directory", ("src/locales", "gui/locales"))
+@pytest.mark.parametrize("directory", ("src/locales",))
 def test_non_default_locales_do_not_leak_cjk_ui_text(directory: str):
     """EN/MH must not silently fall back to Chinese UI copy."""
     catalogs = _load_catalogs(directory)
@@ -70,7 +69,7 @@ def test_non_default_locales_do_not_leak_cjk_ui_text(directory: str):
         assert leaked == {}, f"{directory}/{language}.json contains CJK UI text: {leaked}"
 
 
-@pytest.mark.parametrize("directory", ("src/locales", "gui/locales"))
+@pytest.mark.parametrize("directory", ("src/locales",))
 def test_locale_keys_do_not_use_legacy_hash_suffixes(directory: str):
     """Namespace keys remain stable semantic identifiers after the migration."""
     catalogs = _load_catalogs(directory)
@@ -80,9 +79,9 @@ def test_locale_keys_do_not_use_legacy_hash_suffixes(directory: str):
 
 
 def test_source_i18n_literals_do_not_use_legacy_hash_suffixes():
-    """Literal Flet/Tauri references must use the renamed semantic keys too."""
+    """Literal Tauri references must use the renamed semantic keys too."""
     legacy = []
-    for source_root in (ROOT / "src", ROOT / "gui"):
+    for source_root in (ROOT / "src",):
         for path in source_root.rglob("*"):
             if path.suffix not in {".ts", ".tsx", ".py"}:
                 continue
@@ -93,14 +92,13 @@ def test_source_i18n_literals_do_not_use_legacy_hash_suffixes():
     assert legacy == []
 
 
-@pytest.mark.parametrize("app", ("src", "gui"))
-def test_source_i18n_calls_are_namespaced_and_resolvable(app: str):
+def test_source_i18n_calls_are_namespaced_and_resolvable():
     """Every production literal call must use namespace:key and exist in the app catalog."""
-    catalogs = _load_catalogs(f"{app}/locales")
+    catalogs = _load_catalogs("src/locales")
     catalog_keys = set(catalogs["zh"])
     unnamespaced: list[str] = []
     missing: list[str] = []
-    source_root = ROOT / app
+    source_root = ROOT / "src"
     for path in source_root.rglob("*"):
         if path.suffix not in {".ts", ".tsx", ".py"} or "/test" in str(path):
             continue
@@ -120,36 +118,3 @@ def test_business_identifiers_remain_chinese_and_do_not_depend_on_i18n():
     assert "from \"../i18n\"" not in llm_business
     assert '"维修内容列"' in llm_business
     assert "列映射冲突：" in llm_business
-
-    ledger_specs = {
-        "ledger.py": ("设备台账", "设备台账模板.xlsx"),
-        "oil_ledger.py": ("油品台账", "油品台账模板.xlsx"),
-        "model_ledger.py": ("型号台账", "型号台账模板.xlsx"),
-    }
-    for filename, (title, template) in ledger_specs.items():
-        source = (ROOT / "gui/components" / filename).read_text(encoding="utf-8")
-        assert f'section_title="{title}"' in source
-        assert f'template_filename="{template}"' in source
-
-    ledger_base = (ROOT / "gui/components/ledger_base.py").read_text(encoding="utf-8")
-    assert 'write_formatted_excel(save_path, {"模板": df})' in ledger_base
-
-
-def test_gui_i18n_normalizes_language_and_supports_namespaces():
-    original = i18n.get_language()
-    try:
-        assert i18n.normalize_language("en-US") == "en"
-        assert i18n.normalize_language("mn_MN") == "mn"
-        assert i18n.normalize_language("fr-FR") is None
-
-        i18n.init("en-US")
-        assert i18n.get_language() == "en"
-        assert i18n.t("common:ok") == "OK"
-        assert "pending review" in i18n.t("components:llm_labeling.inputValuesHint")
-        assert i18n.t("logic:successSkippedFailed", success=1, skipped=2, failed=3) == (
-            "Success: 1  Skipped: 2  Failed: 3"
-        )
-        assert "preview.xlsx" in i18n.t("logic:previewFile", dry_run_file="preview.xlsx")
-        assert i18n.t("common.ok") == "common.ok"
-    finally:
-        i18n.init(original)

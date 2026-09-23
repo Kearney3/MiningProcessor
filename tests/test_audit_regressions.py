@@ -1,6 +1,5 @@
 """Regression tests for findings confirmed in the 2026-08-24 audit."""
 
-import asyncio
 import json
 import os
 import threading
@@ -17,7 +16,6 @@ from func import ledger_match
 from func.sync import sync_engines
 from func.sync.api_client import MineBaseAPIClient
 from func.sync.db_client import MineBaseDBClient
-from gui import logic
 import tauri_bridge
 
 
@@ -370,128 +368,3 @@ def test_match_sheet_passes_id_to_excavator_matching():
     ledger_match.match_sheet(frame, Ledger(), None, "矿卡名称", "设备编号", None)
 
     assert calls == [("TRUCK", "ID-7"), ("EXCAVATOR", "ID-7")]
-
-
-def test_module_labels_follow_language_changes():
-    from gui import i18n
-
-    i18n.init("zh")
-    i18n.set_language("en")
-    assert logic._module_label("merge") == "File Merge"
-    i18n.init("zh")
-
-
-def test_language_change_dialog_uses_dialog_lifecycle():
-    import importlib
-
-    main = importlib.import_module("gui.main")
-    from gui import i18n
-
-    class Page:
-        def __init__(self):
-            self.overlay = []
-            self.shown = []
-            self.popped = 0
-
-        def show_dialog(self, dialog):
-            self.shown.append(dialog)
-
-        def pop_dialog(self):
-            self.popped += 1
-
-        def update(self):
-            pass
-
-    i18n.init("zh")
-    page = Page()
-    switcher = main._create_lang_switcher(page)
-    with patch.object(main, "update_user_config"):
-        switcher.content.on_change(SimpleNamespace(data="en"))
-
-    assert len(page.shown) == 1
-    page.shown[0].actions[0].on_click(None)
-    assert page.popped == 1
-    i18n.init("zh")
-
-
-def test_log_system_chains_and_restores_existing_resize_handler():
-    from gui.log_system import LogSystem
-
-    class Control:
-        def __init__(self, value=None, height=None):
-            self.value = value
-            self.height = height
-            self.data = {}
-            self.on_click = None
-            self.on_select = None
-            self.on_scroll = None
-            self.on_vertical_drag_start = None
-            self.on_vertical_drag_update = None
-
-        def update(self):
-            pass
-
-    class Page:
-        def __init__(self):
-            self.services = []
-            self.height = 800
-            self.window = SimpleNamespace(height=800, on_resize=None)
-
-        def run_task(self, *_args, **_kwargs):
-            return None
-
-    refs = {
-        key: Control(height=300 if key == "list_container" else None)
-        for key in (
-            "log_list", "list_container", "level_filter", "export_button",
-            "resize_handle", "clear_button", "scroll_bottom_button",
-            "follow_status", "count_text",
-        )
-    }
-    page = Page()
-    calls = []
-    previous = lambda event: calls.append(event)
-    page.window.on_resize = previous
-    system = LogSystem(page, refs)
-    system.start()
-    page.window.on_resize("resize")
-    assert calls == ["resize"]
-    system.shutdown()
-    assert page.window.on_resize == previous
-
-
-class _DialogPage:
-    def show_dialog(self, dialog):
-        # Simulate the user selecting Continue immediately.
-        dialog.actions[0].on_click(None)
-
-    def pop_dialog(self):
-        pass
-
-
-def test_batch_process_missing_file_confirmation_does_not_raise_name_error(tmp_path, monkeypatch):
-    monkeypatch.setattr(
-        logic,
-        "scan_files",
-        lambda _path: ({"fuel": ["Fuel.xlsx"]}, ["production"]),
-    )
-    monkeypatch.setattr(
-        logic,
-        "process_files",
-        lambda *_args, **_kwargs: ({"fuel": {"油耗信息": None}}, {}),
-    )
-    monkeypatch.setattr(logic, "set_btn_state", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(logic, "_show_batch_progress", lambda *_args: None)
-    monkeypatch.setattr(logic, "_hide_batch_progress", lambda *_args: None)
-    monkeypatch.setattr(logic, "_show_snackbar", lambda *_args, **_kwargs: None)
-
-    refs = {
-        "path": SimpleNamespace(value=str(tmp_path)),
-        "year": SimpleNamespace(value="2025"),
-        "month": SimpleNamespace(value="1"),
-        "auto_detect": SimpleNamespace(value=True),
-        "merge": SimpleNamespace(value=False),
-        "btn": object(),
-    }
-
-    asyncio.run(logic.on_batch_process(_DialogPage(), refs, lambda *_args, **_kwargs: None))

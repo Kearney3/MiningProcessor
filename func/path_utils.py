@@ -1,7 +1,7 @@
 """
 路径校验工具模块
 
-供 Flet GUI 和 Tauri bridge 共用的路径校验函数。
+供 Tauri bridge 和 CLI 共用的路径校验函数。
 """
 
 from pathlib import Path

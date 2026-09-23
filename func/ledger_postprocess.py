@@ -1,6 +1,6 @@
 """
 台账匹配后处理模块
-供 Flet GUI 和 Tauri 客户端共用，避免逻辑重复。
+供 Tauri 客户端和 CLI 共用，避免逻辑重复。
 """
 
 import logging

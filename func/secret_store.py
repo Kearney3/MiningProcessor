@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 # 加密值前缀，用于识别配置中的加密字段
 _ENCRYPTED_PREFIX = "__enc__"
 
-# UI 掩码常量：统一供 Flet GUI 和 Tauri bridge 使用
+# UI 掩码常量：统一供 Tauri bridge 和前端使用
 # MineBase 密码在 UI 中显示的掩码文本
 MINEBASE_PASSWORD_MASK = "********"
 # LLM API Key 在 UI 中显示的掩码文本

@@ -1,22 +1,10 @@
-"""gui/logic.py 辅助函数测试"""
-import logging
+"""共享编排与台账后处理辅助函数测试"""
 import os
-import pathlib
-import sys
-from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
-ROOT = pathlib.Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-
 from func.ledger_postprocess import _find_col, match_sheets  # noqa: E402
 from func.orchestration import get_output_path, postprocess_with_ledgers  # noqa: E402
-from gui.logic import (  # noqa: E402
-    _dispatch_module,
-    _execute_task,
-    _log_message,
-)
 
 
 # ---------------------------------------------------------------------------
@@ -102,47 +90,6 @@ class TestGetOutputFile:
     def test_unknown_type_returns_none(self, tmp_path):
         result = get_output_path("unknown", str(tmp_path))
         assert result is None
-
-
-def test_maintenance_dispatch_forwards_ml_switch(tmp_path):
-    input_file = str(tmp_path / "maintenance.xlsx")
-    pathlib.Path(input_file).touch()
-
-    with patch("func.orchestration.process_single") as process:
-        process.return_value = {"output_file": None}
-        _dispatch_module("maint", input_file, use_ml_fallback=False)
-
-    assert process.call_args.kwargs["use_ml_fallback"] is False
-
-
-# ---------------------------------------------------------------------------
-# _log_message
-# ---------------------------------------------------------------------------
-class TestLogMessage:
-    def test_calls_with_level(self):
-        calls = []
-        def mock_log(msg, level=None):
-            calls.append((msg, level))
-
-        _log_message(mock_log, "test msg", level=logging.WARNING)
-        assert calls == [("test msg", logging.WARNING)]
-
-    def test_fallback_for_old_callback(self):
-        """只接受 message 的旧回调"""
-        calls = []
-        def old_log(msg):
-            calls.append(msg)
-
-        _log_message(old_log, "test msg", level=logging.ERROR)
-        assert calls == ["test msg"]
-
-    def test_default_level_is_info(self):
-        calls = []
-        def mock_log(msg, level=None):
-            calls.append((msg, level))
-
-        _log_message(mock_log, "info msg")
-        assert calls == [("info msg", logging.INFO)]
 
 
 # ---------------------------------------------------------------------------
@@ -533,125 +480,3 @@ class TestMatchSheets:
         sheets = {"数据": df}
         result = match_sheets(sheets, equipment_ledger=self._StubEquipmentLedger())
         assert result["数据"]["标准设备编号"].iloc[0] == "ID_HT#1"
-
-
-# ---------------------------------------------------------------------------
-# _execute_task 返回值测试
-# ---------------------------------------------------------------------------
-
-
-class TestExecuteTaskReturnValues:
-    """_execute_task 统一返回值测试（process_single dict 格式）。"""
-
-    def test_dispatch_returns_dict_with_output_file(self, tmp_path):
-        """_dispatch_module 应返回包含 output_file 的 dict。"""
-        from gui.logic import _dispatch_module
-        input_file = str(tmp_path / "test.xlsx")
-        pd.DataFrame().to_excel(input_file, index=False)
-
-        mock_result = {"output_file": str(tmp_path / "Fuel.xlsx")}
-        with patch("func.orchestration.process_single", return_value=mock_result):
-            result = _dispatch_module("fuel", input_file, year=2025)
-        assert isinstance(result, dict)
-        assert "output_file" in result
-
-    def test_execute_task_returns_extra_for_production(self, tmp_path):
-        """production 模块的 summary 应作为 extra 返回。"""
-        input_file = str(tmp_path / "test.xlsx")
-        pd.DataFrame().to_excel(input_file, index=False)
-
-        mock_result = {"output_file": str(tmp_path / "合并产量.xlsx"), "summary": {"total_files": 1}}
-        with patch("gui.logic._dispatch_module", return_value=mock_result):
-            result, extra = _execute_task("production", input_file)
-
-        assert result is None
-        assert extra == {"total_files": 1}
-
-    def test_execute_task_returns_none_extra_for_fuel(self, tmp_path):
-        """非 production 模块 extra 为 None。"""
-        input_file = str(tmp_path / "test.xlsx")
-        pd.DataFrame().to_excel(input_file, index=False)
-
-        mock_result = {"output_file": str(tmp_path / "Fuel.xlsx")}
-        with patch("gui.logic._dispatch_module", return_value=mock_result):
-            result, extra = _execute_task("fuel", input_file)
-
-        assert result is None
-        assert extra is None
-
-    def test_execute_task_returns_anomalies_for_non_production(self, tmp_path):
-        """非 production 模块的异常明细应传给界面。"""
-        input_file = str(tmp_path / "test.xlsx")
-        pd.DataFrame().to_excel(input_file, index=False)
-
-        anomalies = [{"数据类型": "油耗信息", "异常列": "油品消耗", "异常值": 60000}]
-        mock_result = {"output_file": str(tmp_path / "Fuel.xlsx"), "anomalies": anomalies}
-        with patch("gui.logic._dispatch_module", return_value=mock_result):
-            result, extra = _execute_task("fuel", input_file)
-
-        assert result is None
-        assert extra == {"anomalies": anomalies}
-
-
-# ---------------------------------------------------------------------------
-# wire_sync_button 导入路径测试
-# ---------------------------------------------------------------------------
-
-
-class TestWireSyncButtonImport:
-    """wire_sync_button 中 build_anomaly_config_from_refs 应从正确路径导入。"""
-
-    def test_build_anomaly_config_from_refs_importable_from_components(self):
-        """gui.components.common 应包含 build_anomaly_config_from_refs。"""
-        from gui.components.common import build_anomaly_config_from_refs
-        assert callable(build_anomaly_config_from_refs)
-
-    def test_wire_sync_button_sets_on_click(self):
-        """wire_sync_button 应正确绑定 on_click，且点击时不抛出 ImportError。"""
-        import asyncio
-
-        from gui.logic import wire_sync_button
-
-        mock_page = MagicMock()
-        mock_log = MagicMock()
-
-        # 构造 sync_refs 满足 wire_sync_button 的最低要求
-        sync_refs = {
-            "btn": MagicMock(),
-            "path": MagicMock(value="/tmp/test"),
-            "mode": MagicMock(value="api"),
-            "types": {"fuel": MagicMock(value=True)},
-            "dry_run": MagicMock(value=True),
-            "result_text": MagicMock(visible=False),
-            "year": MagicMock(value="2025"),
-            "month": MagicMock(value="6"),
-            "date_filter_toggle": MagicMock(value=False),
-            "date_start": MagicMock(value=""),
-            "date_end": MagicMock(value=""),
-            "apply_header": MagicMock(value=False),
-            "use_equipment_ledger": MagicMock(value=False),
-            "use_oil_ledger": MagicMock(value=False),
-            "skip_hidden_rows": MagicMock(value=False),
-            "skip_hidden_cols": MagicMock(value=False),
-            "_anomaly_enabled": MagicMock(value=False),
-            "_anomaly_report": MagicMock(value=False),
-            "_anomaly_mode": MagicMock(return_value="flag"),
-            "warnings_container": MagicMock(visible=False),
-            "warnings_list": MagicMock(),
-            "warnings_count_text": MagicMock(),
-            "export_warnings_btn": MagicMock(),
-        }
-
-        wire_sync_button(sync_refs, mock_page, mock_log)
-
-        # 确认 on_click 被赋值为一个异步函数
-        assert sync_refs["btn"].on_click is not None
-
-        # 调用 on_click 不应抛出 ImportError（即 import 路径正确）
-        # 由于 dry_run=True，同步不会真正执行
-        handler = sync_refs["btn"].on_click
-        try:
-            asyncio.get_event_loop().run_until_complete(handler(None))
-        except Exception as e:
-            # ImportError 是我们想检测的；其他异常（如 sync 失败）在此可忽略
-            assert "gui.common" not in str(e), f"应从 gui.components.common 导入，但报错: {e}"

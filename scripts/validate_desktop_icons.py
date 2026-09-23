@@ -6,7 +6,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WINDOWS_ICON = ROOT / "src-tauri" / "icons" / "icon.ico"
-FLET_ICON = ROOT / "assets" / "icon.png"
 REQUIRED_WINDOWS_SIZES = {
     (16, 16),
     (24, 24),
@@ -40,15 +39,7 @@ def read_ico_sizes(path: Path) -> list[tuple[int, int]]:
     return sizes
 
 
-def read_png_info(path: Path) -> tuple[int, int, int]:
-    data = path.read_bytes()
-    if len(data) < 26 or data[:8] != b"\x89PNG\r\n\x1a\n" or data[12:16] != b"IHDR":
-        raise ValueError(f"invalid PNG header: {path}")
-    width, height = struct.unpack_from(">II", data, 16)
-    return width, height, data[25]
-
-
-def validate() -> tuple[list[tuple[int, int]], tuple[int, int, int]]:
+def validate() -> list[tuple[int, int]]:
     ico_sizes = read_ico_sizes(WINDOWS_ICON)
     missing_sizes = REQUIRED_WINDOWS_SIZES - set(ico_sizes)
     if missing_sizes:
@@ -56,22 +47,17 @@ def validate() -> tuple[list[tuple[int, int]], tuple[int, int, int]]:
     if ico_sizes[0] != (32, 32):
         raise ValueError(f"first Windows ICO layer must be 32x32 for Tauri: {ico_sizes[0]}")
 
-    png_info = read_png_info(FLET_ICON)
-    width, height, _ = png_info
-    if width < 512 or height < 512:
-        raise ValueError(f"Flet icon must be at least 512x512: {width}x{height}")
-    return ico_sizes, png_info
+    return ico_sizes
 
 
 def main() -> int:
     try:
-        ico_sizes, (width, height, _) = validate()
+        ico_sizes = validate()
     except (OSError, ValueError) as exc:
         print(f"Desktop icon validation failed: {exc}", file=sys.stderr)
         return 1
 
     print(f"Windows ICO: {', '.join(f'{w}x{h}' for w, h in ico_sizes)}")
-    print(f"Flet icon: {width}x{height}")
     return 0
 
 

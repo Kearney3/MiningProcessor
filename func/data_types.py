@@ -1,6 +1,6 @@
 """数据类型常量定义
 
-统一供 Flet GUI、Tauri bridge 和前端使用的数据类型 ID 与标签映射。
+统一供 Tauri bridge 和前端使用的数据类型 ID 与标签映射。
 """
 
 # MineBase 同步支持的数据类型

@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, time
+from datetime import date, datetime
 
 
 def local_now() -> datetime:
@@ -26,14 +26,3 @@ def local_datetime_from_timestamp(timestamp: float) -> datetime:
     """将 Unix 时间戳转换为带本地时区信息的 datetime。"""
 
     return datetime.fromtimestamp(timestamp).astimezone()
-
-
-def local_midnight(day: date) -> datetime:
-    """将日期转换为本地时区的当天零点。
-
-    主要供 Flet DatePicker 使用，避免 Flet 将 naive datetime 当作 UTC
-    序列化后产生日期偏移。
-    """
-
-    return datetime.combine(day, time.min).astimezone()
-
