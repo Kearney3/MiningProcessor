@@ -400,8 +400,13 @@ def _process_work_efficiency_file(
 def _process_maintenance_file(
     file_path: Path,
     column_mapping: dict[str, str],
+    *,
+    fallback_shift: str | None = None,
 ) -> list[dict[str, Any]]:
-    """读取已处理维修报表，并将故障标记转换为 MineBase 维修类型名称。"""
+    """读取已处理维修报表，并将故障标记转换为 MineBase 维修类型名称。
+
+    fallback_shift 为 day / night 时，将空白或“未标注”班次替换为该值。
+    """
     try:
         df = pd.read_excel(file_path, sheet_name="维修明细")
     except Exception as e:
@@ -416,6 +421,13 @@ def _process_maintenance_file(
         if filtered_count:
             logger.info("maintenance 过滤无完整分类记录: %d 行", filtered_count)
             df = df.loc[has_category]
+
+    if fallback_shift:
+        if "班次" not in df.columns:
+            df["班次"] = fallback_shift
+        else:
+            shift_values = df["班次"].fillna("").astype(str).str.strip()
+            df.loc[shift_values.isin({"", "未标注"}), "班次"] = fallback_shift
 
     rows = _get_df_to_mapped_rows()(df, column_mapping)
     for row in rows:

@@ -574,6 +574,8 @@
     "DataSyncPage.databaseMode": "Database mode",
     "DataSyncPage.dataDirectory": "Data directory",
     "DataSyncPage.dataType": "Data Type",
+    "DataSyncPage.fallbackShift": "Fallback shift",
+    "DataSyncPage.useShiftFallback": "Use a default shift for unrecognized maintenance shifts",
     "DataSyncPage.dataFilters": "Data Filters",
     "DataSyncPage.dateRangeFilter": "Date range filter",
     "DataSyncPage.mappingMode": "Mapping Mode",

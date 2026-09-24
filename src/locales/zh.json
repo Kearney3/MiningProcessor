@@ -574,6 +574,8 @@
     "DataSyncPage.databaseMode": "数据库模式",
     "DataSyncPage.dataDirectory": "数据目录",
     "DataSyncPage.dataType": "数据类型",
+    "DataSyncPage.fallbackShift": "回退班次",
+    "DataSyncPage.useShiftFallback": "未识别维修班次时使用默认班次",
     "DataSyncPage.dataFilters": "数据过滤",
     "DataSyncPage.dateRangeFilter": "日期范围过滤",
     "DataSyncPage.mappingMode": "映射模式",

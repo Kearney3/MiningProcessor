@@ -98,6 +98,8 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
   const [minebaseProfiles, setMinebaseProfiles] = useState<MineBaseSyncProfile[]>([]);
   const [conflictPolicy, setConflictPolicy] = useState<"SKIP" | "UPDATE" | "REJECT">("SKIP");
   const [dataTypes, setDataTypes] = useState<string[]>(ALL_TYPES.map((type) => type.id));
+  const [useShiftFallback, setUseShiftFallback] = useState(true);
+  const [fallbackShift, setFallbackShift] = useState("day");
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   const [scanning, setScanning] = useState(false);
@@ -272,6 +274,8 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
         conflict_policy: conflictPolicy,
         data_types: dataTypes,
         selected_files: scanResult ? selectedFilesByType : undefined,
+        use_shift_fallback: useShiftFallback,
+        fallback_shift: fallbackShift,
         dry_run: dryRun,
         year: year ? Number(year) : undefined,
         month: month ? Number(month) : undefined,
@@ -540,6 +544,41 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
             ))}
           </div>
         </div>
+
+        {dataTypes.includes("maintenance") && (
+          <div className="border-t border-slate-100 pt-3">
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={useShiftFallback}
+                aria-label={t("pages:DataSyncPage.useShiftFallback")}
+                onClick={() => setUseShiftFallback(!useShiftFallback)}
+                className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors ${
+                  useShiftFallback ? "bg-blue-600" : "bg-slate-200"
+                }`}
+              >
+                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
+                  useShiftFallback ? "translate-x-4" : "translate-x-0.5"
+                }`} />
+              </button>
+              <span className="text-sm text-slate-700">{t("pages:DataSyncPage.useShiftFallback")}</span>
+            </div>
+            {useShiftFallback && (
+              <div className="mt-2 pl-10 flex items-center gap-2">
+                <span className="text-xs text-slate-500">{t("pages:DataSyncPage.fallbackShift")}</span>
+                <ChipToggle
+                  value={fallbackShift}
+                  onChange={setFallbackShift}
+                  options={[
+                    { label: t("common:dayShift"), value: "day" },
+                    { label: t("common:nightShift"), value: "night" },
+                  ]}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Dry run toggle */}
         <div className="flex items-start gap-3">

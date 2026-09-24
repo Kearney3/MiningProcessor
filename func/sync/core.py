@@ -160,6 +160,8 @@ def sync(
     conflict_policy: str = "SKIP",
     selected_files: dict[str, list[str | Path]] | None = None,
     profile_id: str | None = None,
+    use_shift_fallback: bool = True,
+    fallback_shift: str = "day",
 ) -> dict[str, dict[str, Any]]:
     """执行同步的主入口。
 
@@ -183,6 +185,8 @@ def sync(
         skip_hidden: 向后兼容，True 时等价于 skip_hidden_rows=True, skip_hidden_cols=True。
         skip_hidden_rows: 是否跳过隐藏行。
         skip_hidden_cols: 是否跳过隐藏列。
+        use_shift_fallback: 同步维修记录时是否回退未识别班次。
+        fallback_shift: 未识别维修班次的回退值，支持 day / night。
         selected_files: 用户扫描后选中的文件，按数据类型映射。为 None 时沿用
             自动发现；传入空字典表示用户明确关闭了所有文件。
 
@@ -222,6 +226,9 @@ def sync(
     if skip_hidden:
         skip_hidden_rows = True
         skip_hidden_cols = True
+
+    if use_shift_fallback and fallback_shift not in {"day", "night"}:
+        raise ValueError("fallback_shift 必须是 day 或 night")
 
     input_path = Path(input_dir)
     if not input_path.is_dir():
@@ -387,7 +394,11 @@ def sync(
                             anomaly_config=anomaly_config,
                         )
                     elif data_type == "maintenance":
-                        rows = _process_maintenance(file_path, mapping)
+                        rows = _process_maintenance(
+                            file_path,
+                            mapping,
+                            fallback_shift=fallback_shift if use_shift_fallback else None,
+                        )
                     else:
                         rows = _read_and_map(file_path, DATA_TYPE_REGISTRY[data_type]["sheet"], mapping)
                     all_rows.extend(rows)

@@ -876,6 +876,8 @@ def _sync_minebase(params: dict) -> dict:
         conflict_policy=params.get("conflict_policy", "SKIP"),
         selected_files=params.get("selected_files"),
         profile_id=params.get("profile_id"),
+        use_shift_fallback=params.get("use_shift_fallback", True),
+        fallback_shift=params.get("fallback_shift", "day"),
     )
     dry_run_file = results.pop("_dry_run_file", None)
     resp: dict = {"results": results}
