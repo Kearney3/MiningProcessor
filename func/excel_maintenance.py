@@ -133,8 +133,11 @@ def process_maintenance_data(
         file_path, file_keywords,
         skip_hidden_rows=skip_hidden_rows,
         skip_hidden_cols=skip_hidden_cols,
-        fallback_shift=fallback_shift if use_shift_fallback else None,
     )
+    if use_shift_fallback:
+        for rec in raw_records:
+            if rec["班次"] == "未标注":
+                rec["班次"] = fallback_shift
     if not raw_records:
         msg = "未提取到任何维修记录"
         logger.warning(msg)

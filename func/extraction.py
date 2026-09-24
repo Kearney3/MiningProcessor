@@ -146,7 +146,6 @@ def extract_sheet_records(
     skip_hidden_rows: bool = False,
     skip_hidden_cols: bool = False,
     ws_values=None,
-    fallback_shift: str | None = None,
 ) -> list[dict]:
     """从单个工作表提取维修记录。
 
@@ -158,7 +157,6 @@ def extract_sheet_records(
         skip_hidden_cols: 跳过 Excel 中的隐藏列对应的日期数据。
         ws_values: data_only=True 模式的 Worksheet（用于读取公式计算结果）。
                    为 None 时回退到 ws.cell.value。
-        fallback_shift: 未识别班次时使用的默认班次；None 时保留“未标注”。
 
     Returns:
         记录列表，每条包含 原始设备名称、原因、班次、维修内容、工时_分钟、日期。
@@ -237,8 +235,6 @@ def extract_sheet_records(
                 # 多班次时平分工时
                 per_shift_minutes = round(minutes / len(entries)) if minutes and len(entries) > 1 else minutes
                 for shift, content in entries:
-                    if shift == "未标注" and fallback_shift:
-                        shift = fallback_shift
                     records.append({
                         "日期": dt,
                         "原始设备名称": current_vehicle or "",
@@ -252,7 +248,7 @@ def extract_sheet_records(
                     "日期": dt,
                     "原始设备名称": current_vehicle or "",
                     "原因": reason_type,
-                    "班次": fallback_shift or "未标注",
+                    "班次": "未标注",
                     "维修内容": "",
                     "工时_分钟": minutes,
                 })
@@ -310,7 +306,6 @@ def extract_all_records(
     *,
     skip_hidden_rows: bool = False,
     skip_hidden_cols: bool = False,
-    fallback_shift: str | None = None,
 ) -> list[dict]:
     """从文件或文件夹提取全部维修记录（去重）。
 
@@ -319,7 +314,6 @@ def extract_all_records(
         file_keywords: 文件名关键字。
         skip_hidden_rows: 跳过隐藏行。
         skip_hidden_cols: 跳过隐藏列。
-        fallback_shift: 未识别班次时使用的默认班次；None 时保留“未标注”。
 
     Returns:
         合并后的记录列表。
@@ -370,7 +364,6 @@ def extract_all_records(
                         skip_hidden_rows=skip_hidden_rows,
                         skip_hidden_cols=skip_hidden_cols,
                         ws_values=None,
-                        fallback_shift=fallback_shift,
                     )
                     all_records.extend(records)
                     processed_months.add(key)
@@ -413,7 +406,6 @@ def extract_all_records(
                         skip_hidden_rows=skip_hidden_rows,
                         skip_hidden_cols=skip_hidden_cols,
                         ws_values=ws_values,
-                        fallback_shift=fallback_shift,
                     )
                     all_records.extend(records)
                     processed_months.add(key)
