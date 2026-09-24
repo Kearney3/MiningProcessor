@@ -1012,6 +1012,8 @@ const MaintenanceCard = memo(function MaintenanceCard({
   const [splitByYear, setSplitByYear] = useState(false);
   const [detailsOnly, setDetailsOnly] = useState(false);
   const [useMlFallback, setUseMlFallback] = useState(true);
+  const [useShiftFallback, setUseShiftFallback] = useState(true);
+  const [fallbackShift, setFallbackShift] = useState("day");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1030,6 +1032,8 @@ const MaintenanceCard = memo(function MaintenanceCard({
         split_by_year: splitByYear,
         details_only: detailsOnly,
         use_ml_fallback: useMlFallback,
+        use_shift_fallback: useShiftFallback,
+        fallback_shift: fallbackShift,
       });
       const msg = res.output_files
         ? t("pages:DataProcessingPage.outputItemsfile", { count: res.output_files.length })
@@ -1053,6 +1057,26 @@ const MaintenanceCard = memo(function MaintenanceCard({
       </div>
       <div className="mt-2">
         <StyledToggle checked={detailsOnly} onChange={setDetailsOnly} label={t("pages:DataProcessingPage.detailsOnly")} />
+      </div>
+      <div className="mt-2">
+        <StyledToggle
+          checked={useShiftFallback}
+          onChange={setUseShiftFallback}
+          label={t("pages:DataProcessingPage.useShiftFallback")}
+        />
+        {useShiftFallback && (
+          <div className="mt-2 pl-[42px] flex items-center gap-2">
+            <span className="text-xs text-slate-500">{t("pages:DataProcessingPage.fallbackShift")}</span>
+            <ChipToggle
+              value={fallbackShift}
+              onChange={setFallbackShift}
+              options={[
+                { label: t("common:dayShift"), value: "day" },
+                { label: t("common:nightShift"), value: "night" },
+              ]}
+            />
+          </div>
+        )}
       </div>
       <div className="mt-2">
         <StyledToggle

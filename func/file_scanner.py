@@ -17,7 +17,7 @@ from func.sync.constants import DATA_TYPE_REGISTRY
 EXCEL_SUFFIXES = frozenset({".xlsx", ".xls"})
 
 BATCH_TYPES = ("fuel", "electrical", "production", "worktime")
-SYNC_TYPES = ("fuel", "production", "electrical", "work_efficiency", "operation")
+SYNC_TYPES = ("fuel", "production", "electrical", "work_efficiency", "operation", "maintenance")
 DAILY_TYPES = ("worktime", "production", "electrical", "fuel")
 
 TYPE_LABELS = {
@@ -27,6 +27,7 @@ TYPE_LABELS = {
     "operation": "运行",
     "worktime": "工时",
     "work_efficiency": "工时",
+    "maintenance": "维修记录",
 }
 
 

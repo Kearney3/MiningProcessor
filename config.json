@@ -313,6 +313,17 @@
             "运次": "tripCount",
             "产量": "production",
             "备注": "remark"
+        },
+        "maintenance": {
+            "日期": "startedAt",
+            "班次": "shiftType",
+            "标准设备名称": "sourceEquipmentName",
+            "是否故障": "typeCode",
+            "大类": "majorCategoryCode",
+            "小类": "minorCategoryCode",
+            "维修内容": "description",
+            "维修工时（分钟）": "downtime",
+            "原因": "remark"
         }
     },
     "minebase": {

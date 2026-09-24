@@ -49,6 +49,9 @@ def _build_field_mappings(column_mapping: dict[str, str], table: str) -> list[di
         "sourceTruckName": {"relation": "equipment", "matchField": "equipName"},
         "sourceExcavatorName": {"relation": "equipment", "matchField": "equipName"},
         "materialTypeId": {"relation": "materialType", "matchField": "code"},
+        "typeCode": {"relation": "maintenanceType", "matchField": "name"},
+        "majorCategoryCode": {"relation": "maintenanceCategory", "matchField": "name"},
+        "minorCategoryCode": {"relation": "maintenanceCategory", "matchField": "name"},
     }
 
     mappings = []
@@ -70,6 +73,7 @@ _LEDGER_NAME_FIELDS: dict[str, list[str]] = {
     "electrical": ["sourceEquipmentName"],
     "operation": ["sourceEquipmentName"],
     "work_efficiency": ["sourceEquipmentName"],
+    "maintenance": ["sourceEquipmentName"],
     "production": ["sourceTruckName", "sourceExcavatorName"],
 }
 
@@ -77,6 +81,7 @@ _LEDGER_ID_FIELDS: dict[tuple[str, str], str] = {
     ("fuel", "sourceEquipmentName"): "sourceEquipmentCode",
     ("operation", "sourceEquipmentName"): "sourceEquipmentCode",
     ("work_efficiency", "sourceEquipmentName"): "sourceEquipmentCode",
+    ("maintenance", "sourceEquipmentName"): "sourceEquipmentCode",
     ("production", "sourceTruckName"): "sourceTruckCode",
     ("production", "sourceExcavatorName"): "sourceExcavatorCode",
 }
@@ -320,6 +325,38 @@ def _resolve_fks_for_db(
                 })
             return None
 
+    if data_type == "maintenance":
+        lookups = (
+            ("typeCode", "typeId", db_client.resolve_maintenance_type_id, "维修类型"),
+            (
+                "majorCategoryCode",
+                "majorCategoryId",
+                lambda value: db_client.resolve_maintenance_category_id(value, is_minor=False),
+                "维修大类",
+            ),
+            (
+                "minorCategoryCode",
+                "minorCategoryId",
+                lambda value: db_client.resolve_maintenance_category_id(value, is_minor=True),
+                "维修小类",
+            ),
+        )
+        for source_field, target_field, resolver, label in lookups:
+            value = row.get(source_field)
+            resolved_id = resolver(value) if value else None
+            if not resolved_id:
+                message = f"{label} '{value or '（空）'}' 未找到，跳过该行"
+                logger.warning(message)
+                if warnings is not None:
+                    warnings.append({
+                        "row": row.get("_row_num", "?"),
+                        "field": source_field,
+                        "value": str(value) if value else "（空）",
+                        "message": message,
+                    })
+                return None
+            resolved[target_field] = resolved_id
+
     return resolved
 
 
@@ -368,7 +405,7 @@ def _filter_by_date_range(
 
     result = []
     for row in rows:
-        row_date = row.get("date")
+        row_date = row.get("date", row.get("startedAt"))
         if not row_date:
             result.append(row)
             continue

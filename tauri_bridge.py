@@ -572,6 +572,8 @@ def _process_maintenance(params: dict) -> dict:
         split_by_year=params.get("split_by_year", False),
         details_only=params.get("details_only", False),
         use_ml_fallback=params.get("use_ml_fallback", True),
+        use_shift_fallback=params.get("use_shift_fallback", True),
+        fallback_shift=params.get("fallback_shift", "day"),
         **common,
     )
 

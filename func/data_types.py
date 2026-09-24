@@ -11,6 +11,7 @@ SYNC_DATA_TYPES: list[tuple[str, str]] = [
     ("electrical", "电力消耗"),
     ("work_efficiency", "工时数据"),
     ("operation", "设备运行"),
+    ("maintenance", "维修记录"),
 ]
 
 # 仅 id 列表

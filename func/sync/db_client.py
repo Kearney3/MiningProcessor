@@ -83,6 +83,34 @@ class MineBaseDBClient:
                 return str(row[0])
         return None
 
+    def resolve_maintenance_type_id(self, value: str) -> str | None:
+        """通过维修类型编码或名称查找 ID。"""
+        value = value.strip()
+        with self.conn.cursor() as cur:
+            cur.execute(
+                "SELECT id FROM maintenance_type WHERE LOWER(code) = LOWER(%s) OR LOWER(name) = LOWER(%s) LIMIT 1",
+                (value, value),
+            )
+            row = cur.fetchone()
+            if row:
+                return str(row[0])
+        return None
+
+    def resolve_maintenance_category_id(self, value: str, *, is_minor: bool) -> str | None:
+        """通过维修分类编码或名称查找指定层级的 ID。"""
+        value = value.strip()
+        parent_condition = "parent_id IS NOT NULL" if is_minor else "parent_id IS NULL"
+        with self.conn.cursor() as cur:
+            cur.execute(
+                "SELECT id FROM maintenance_category "
+                f"WHERE (LOWER(code) = LOWER(%s) OR LOWER(name) = LOWER(%s)) AND {parent_condition} LIMIT 1",
+                (value, value),
+            )
+            row = cur.fetchone()
+            if row:
+                return str(row[0])
+        return None
+
     def check_duplicate(self, table: str, dedup_fields: dict[str, Any]) -> bool:
         """检查是否已存在重复记录。"""
         if not dedup_fields:

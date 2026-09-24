@@ -48,6 +48,8 @@ def process_maintenance_data(
     split_by_year: bool = False,
     details_only: bool = False,
     use_ml_fallback: bool = True,
+    use_shift_fallback: bool = True,
+    fallback_shift: str = "day",
     ml_classifier=None,
     ml_model_path: str | None = None,
 ) -> str | list[str] | dict:
@@ -66,6 +68,8 @@ def process_maintenance_data(
         split_by_year: True 时按年份拆分输出为多个文件。
         details_only: True 时只输出维修明细 sheet（不含统计表）。
         use_ml_fallback: 是否用轻量模型二次识别“其他”故障。
+        use_shift_fallback: 是否将未识别班次回退到默认班次。
+        fallback_shift: 未识别班次回退值，支持 day / night。
         ml_classifier: 已加载的 MaintenanceMLClassifier；主要用于测试或复用。
         ml_model_path: 模型文件路径；为空时使用项目 models 下的默认模型。
 
@@ -122,10 +126,14 @@ def process_maintenance_data(
             logger.warning("维修 ML 模型加载失败，继续使用规则分类: %s", exc)
 
     # 1. 提取记录
+    fallback_shift = normalize_maintenance_shift(fallback_shift)
+    if use_shift_fallback and fallback_shift not in {"day", "night"}:
+        raise ValueError("fallback_shift 必须是 day 或 night")
     raw_records = extract_all_records(
         file_path, file_keywords,
         skip_hidden_rows=skip_hidden_rows,
         skip_hidden_cols=skip_hidden_cols,
+        fallback_shift=fallback_shift if use_shift_fallback else None,
     )
     if not raw_records:
         msg = "未提取到任何维修记录"
@@ -350,6 +358,8 @@ def main():
     parser.add_argument("--skip-hidden-cols", action="store_true", help="跳过隐藏列")
     parser.add_argument("--details-only", action="store_true", help="只导出维修明细 sheet（不含统计表）")
     parser.add_argument("--no-ml", action="store_true", help="禁用“其他”的 ML 二级分类")
+    parser.add_argument("--no-shift-fallback", action="store_true", help="未识别班次时保留“未标注”")
+    parser.add_argument("--fallback-shift", choices=["day", "night"], default="day", help="未识别班次回退为 day 或 night（默认 day）")
     parser.add_argument("--ml-model", default=None, help="维修 ML 分类模型路径")
     args = parser.parse_args()
 
@@ -377,6 +387,8 @@ def main():
         skip_hidden_cols=args.skip_hidden_cols,
         details_only=args.details_only,
         use_ml_fallback=not args.no_ml,
+        use_shift_fallback=not args.no_shift_fallback,
+        fallback_shift=args.fallback_shift,
         ml_model_path=args.ml_model,
     )
     print(f"\n输出: {output}")

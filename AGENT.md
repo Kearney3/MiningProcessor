@@ -1,4 +1,4 @@
-# AGENTS.md
+# AGENT.md
 
 本文件为 MiningProcessor 仓库开发指引。
 

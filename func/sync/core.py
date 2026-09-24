@@ -100,7 +100,7 @@ def load_column_mapping(mapping_file: str | Path | None = None) -> dict[str, dic
     Returns:
         {data_type: {源列名: 目标字段名}} 的嵌套字典。
     """
-    from func.config_loader import get_minebase_column_mapping
+    from func.config_loader import get_minebase_column_mapping, load_config
 
     if mapping_file is None:
         mapping = get_minebase_column_mapping()
@@ -112,6 +112,15 @@ def load_column_mapping(mapping_file: str | Path | None = None) -> dict[str, dic
         else:
             with open(path, encoding="utf-8") as f:
                 mapping = json.load(f)
+
+    # Older user mapping files predate maintenance sync. Keep their settings,
+    # while adding the new type's defaults so it works without a config reset.
+    mapping = dict(mapping)
+    configured = load_config().get("minebase_column_mapping", {}).get("maintenance", {})
+    custom = mapping.get("maintenance_record", {})
+    custom = {**custom, **mapping.get("maintenance", {})}
+    if configured:
+        mapping["maintenance"] = {**configured, **custom}
 
     return _migrate_field_names(mapping)
 
@@ -206,6 +215,7 @@ def sync(
     _process_electrical = _mod._process_electrical_file
     _process_production = _mod._process_production_file
     _process_work_eff = _mod._process_work_efficiency_file
+    _process_maintenance = _mod._process_maintenance_file
     _read_and_map = _mod.read_and_map_excel
 
     # 向后兼容：skip_hidden=True 等价于同时启用行和列
@@ -376,6 +386,8 @@ def sync(
                             skip_hidden_cols=skip_hidden_cols,
                             anomaly_config=anomaly_config,
                         )
+                    elif data_type == "maintenance":
+                        rows = _process_maintenance(file_path, mapping)
                     else:
                         rows = _read_and_map(file_path, DATA_TYPE_REGISTRY[data_type]["sheet"], mapping)
                     all_rows.extend(rows)

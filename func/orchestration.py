@@ -290,6 +290,8 @@ def process_single(
     split_by_year: bool = False,
     details_only: bool = False,
     use_ml_fallback: bool = True,
+    use_shift_fallback: bool = True,
+    fallback_shift: str = "day",
     # production 专属过滤
     filter_zero_hours_meter: bool = False,
     filter_zero_km_meter: bool = False,
@@ -452,6 +454,8 @@ def process_single(
             split_by_year=split_by_year,
             details_only=details_only,
             use_ml_fallback=use_ml_fallback,
+            use_shift_fallback=use_shift_fallback,
+            fallback_shift=fallback_shift,
         )
         # maintenance 自带台账匹配，但仍需外部后处理（oil_ledger 等）
         if isinstance(maint_result, list):

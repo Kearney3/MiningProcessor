@@ -7,6 +7,7 @@ import { useToast } from "../Toast";
 import {
   FolderIcon, FuelIcon, ProductionIcon, ElectricalIcon, WorktimeIcon,
   OperationIcon, GlobeIcon, DatabaseIcon, CheckIcon, MinusIcon,
+  MaintenanceIcon,
   CheckCircleIcon, XCircleIcon, AlertTriangleIcon, DownloadIcon, PlayIcon,
   QuestionIcon,
 } from "../../lib/icons";
@@ -29,6 +30,7 @@ const ALL_TYPES = [
   { id: "electrical", labelKey: "electricalData", icon: <ElectricalIcon /> },
   { id: "work_efficiency", labelKey: "worktimeData", icon: <WorktimeIcon /> },
   { id: "operation", labelKey: "operationData", icon: <OperationIcon /> },
+  { id: "maintenance", labelKey: "maintenanceRecords", icon: <MaintenanceIcon /> },
 ] as const;
 
 type MineBaseSyncProfile = {

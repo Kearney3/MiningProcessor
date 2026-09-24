@@ -397,6 +397,38 @@ def _process_work_efficiency_file(
         return []
 
 
+def _process_maintenance_file(
+    file_path: Path,
+    column_mapping: dict[str, str],
+) -> list[dict[str, Any]]:
+    """读取已处理维修报表，并将故障标记转换为 MineBase 维修类型名称。"""
+    try:
+        df = pd.read_excel(file_path, sheet_name="维修明细")
+    except Exception as e:
+        logger.error("maintenance 处理器失败: %s — %s", file_path, e)
+        return []
+
+    if "大类" in df.columns:
+        has_category = df["大类"].fillna("").astype(str).str.strip().ne("")
+        if "小类" in df.columns:
+            has_category &= df["小类"].fillna("").astype(str).str.strip().ne("")
+        filtered_count = int((~has_category).sum())
+        if filtered_count:
+            logger.info("maintenance 过滤无完整分类记录: %d 行", filtered_count)
+            df = df.loc[has_category]
+
+    rows = _get_df_to_mapped_rows()(df, column_mapping)
+    for row in rows:
+        fault_value = str(row.get("typeCode", "")).strip().casefold()
+        if fault_value in {"是", "yes", "true", "1"}:
+            row["typeCode"] = "检修"
+        elif fault_value in {"否", "no", "false", "0"}:
+            row["typeCode"] = "保养"
+
+    logger.info("maintenance 处理器: %s → %d 行", file_path.name, len(rows))
+    return rows
+
+
 # ---------------------------------------------------------------------------
 # Excel 读取与列映射
 # ---------------------------------------------------------------------------
@@ -523,8 +555,20 @@ def discover_files(
         pattern = info["file_pattern"]
         matches = _excel_pattern_matches(pattern)
         if matches:
-            found[data_type] = [matches[0]]
-            logger.info("精确匹配: %s → %s", data_type, matches[0].name)
+            if data_type == "maintenance":
+                preferred = next((p for p in matches if p.stem == "维修记录统计"), None)
+                preferred = preferred or next(
+                    (p for p in matches if p.stem == "维修记录统计_汇总"), None,
+                )
+                found[data_type] = [preferred] if preferred else matches
+                logger.info(
+                    "精确匹配: %s → %s",
+                    data_type,
+                    [p.name for p in found[data_type]],
+                )
+            else:
+                found[data_type] = [matches[0]]
+                logger.info("精确匹配: %s → %s", data_type, matches[0].name)
 
     # 2. work_efficiency 专用 glob: 按 year/month 构造精确文件名模式（补充）
     if "work_efficiency" not in found and year and month:

@@ -482,6 +482,8 @@
     "DataProcessingPage.mergeComplete": "item",
     "DataProcessingPage.nameMapping": "Name Mapping",
     "DataProcessingPage.enableMlAssistedClassification": "Enable ML-assisted classification",
+    "DataProcessingPage.fallbackShift": "Fallback shift",
+    "DataProcessingPage.useShiftFallback": "Use a default shift when the shift is unrecognized",
     "DataProcessingPage.modelLedgerMatch": "Загварын бүртгэл тааруулах",
     "DataProcessingPage.processingCompleted": "Processing completed",
     "DataProcessingPage.compositeHeaderRow": "Composite header row",

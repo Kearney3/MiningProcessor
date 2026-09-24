@@ -40,6 +40,11 @@ DATA_TYPE_REGISTRY: dict[str, dict[str, Any]] = {
         "file_pattern": "*工作效率表*.xlsx",
         "sheet": None,
     },
+    "maintenance": {
+        "table": "maintenance_record",
+        "file_pattern": "维修记录统计*.xlsx",
+        "sheet": "维修明细",
+    },
 }
 
 # MineBase 导入 API 合约版本
@@ -64,6 +69,9 @@ DEDUP_FIELDS_MAP: dict[str, list[str]] = {
     "production_record": [
         "date", "shift_type", "truck_id", "excavator_id", "material_type_id",
         "trip_count", "production",
+    ],
+    "maintenance_record": [
+        "equipment_id", "type_id", "major_category_id", "minor_category_id", "started_at",
     ],
 }
 
@@ -117,6 +125,17 @@ FIELD_TO_COLUMN_MAP: dict[str, str] = {
     "mileage": "mileage",
     "tripCount": "trip_count",
     "production": "production",
+    "workOrderNo": "work_order_no",
+    "typeId": "type_id",
+    "majorCategoryId": "major_category_id",
+    "minorCategoryId": "minor_category_id",
+    "description": "description",
+    "cost": "cost",
+    "startedAt": "started_at",
+    "completedAt": "completed_at",
+    "downtime": "downtime",
+    "nextMaintenance": "next_maintenance",
+    "specs": "specs",
     # 向后兼容旧字段名（DB 直连模式仍可能遇到）
     "equipmentName": "source_equipment_name",
     "equipmentCode": "source_equipment_code",
