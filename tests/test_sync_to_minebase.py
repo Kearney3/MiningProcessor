@@ -168,8 +168,12 @@ def sample_worktime_excel(tmp_path_factory):
 
 
 class TestLoadColumnMapping:
-    def test_load_existing_file(self, sample_mapping):
+    def test_load_existing_file_adds_maintenance_defaults(self, sample_mapping):
+        from func.config_loader import load_config
+
         path, expected = sample_mapping
+        expected = dict(expected)
+        expected["maintenance"] = load_config()["minebase_column_mapping"]["maintenance"]
         result = load_column_mapping(path)
         assert result == expected
 

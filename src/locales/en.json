@@ -874,7 +874,7 @@
     "DataSyncPage.ui.worktimeData": "Worktime Data",
     "DataSyncPage.ui.operationData": "Equipment Operation",
     "DataSyncPage.ui.maintenanceRecords": "Maintenance Records",
-    "DataSyncPage.ui.maintenanceSyncHint": "Maintenance sync reads the “维修明细” sheet from processed “维修记录统计*.xlsx” files. Run maintenance processing on the original equipment attendance reports first.",
+    "DataSyncPage.ui.maintenanceSyncHint": "Maintenance sync reads the details sheet from processed maintenance summary workbooks. Run maintenance processing on the original equipment attendance reports first.",
     "DataSyncPage.ui.selectAll": "Select all",
     "DataSyncPage.ui.yesterday": "Yesterday",
     "DataSyncPage.ui.clear": "Clear",
