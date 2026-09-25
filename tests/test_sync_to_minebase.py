@@ -1191,6 +1191,21 @@ class TestDfToMappedRows:
         assert rows[0]["date"] == "2025-06-15"
         assert rows[1]["date"] == "2025-07-01"
 
+    def test_datetime_fields_keep_time_and_include_time_for_date_only_values(self):
+        """MineBase datetime fields need an ISO time component; date fields stay date-only."""
+        df = pd.DataFrame({
+            "开始": [pd.Timestamp("2025-06-15 09:12:00"), pd.Timestamp("2025-07-01")],
+            "下次": [pd.Timestamp("2025-06-20"), pd.Timestamp("2025-07-10")],
+        })
+        mapping = {"开始": "startedAt", "下次": "nextMaintenance"}
+
+        rows = _df_to_mapped_rows(df, mapping)
+
+        assert rows == [
+            {"startedAt": "2025-06-15T09:12:00", "nextMaintenance": "2025-06-20"},
+            {"startedAt": "2025-07-01T00:00:00", "nextMaintenance": "2025-07-10"},
+        ]
+
     def test_empty_dataframe(self):
         """Empty df returns empty list."""
         df = pd.DataFrame(columns=["日期", "班次", "设备名称"])

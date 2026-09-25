@@ -16,6 +16,8 @@ from func.logger import get_logger
 
 logger = get_logger(__name__)
 
+_DATETIME_TARGET_FIELDS = frozenset({"startedAt", "completedAt", "createdAt", "updatedAt"})
+
 
 # ---------------------------------------------------------------------------
 # DataFrame → 行列表转换
@@ -28,7 +30,7 @@ def _df_to_mapped_rows(
 ) -> list[dict[str, Any]]:
     """将 DataFrame 按映射配置转换为行字典列表。
 
-    跳过 __SKIP__ 映射列和 NaN/NaT 值，Timestamp 转为 YYYY-MM-DD 字符串。
+    跳过 __SKIP__ 映射列和 NaN/NaT 值；日期字段输出 YYYY-MM-DD，时间戳字段输出 ISO 8601。
 
     Args:
         df: 源 DataFrame。
@@ -57,9 +59,17 @@ def _df_to_mapped_rows(
             if pd.isna(value):
                 continue
             if isinstance(value, (pd.Timestamp, datetime)):
-                value = value.strftime("%Y-%m-%d")
+                value = (
+                    value.isoformat()
+                    if target_field in _DATETIME_TARGET_FIELDS
+                    else value.strftime("%Y-%m-%d")
+                )
             elif isinstance(value, date):
-                value = value.isoformat()
+                value = (
+                    f"{value.isoformat()}T00:00:00"
+                    if target_field in _DATETIME_TARGET_FIELDS
+                    else value.isoformat()
+                )
             mapped[target_field] = value
         if mapped:
             rows.append(mapped)
