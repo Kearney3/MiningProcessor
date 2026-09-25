@@ -543,6 +543,9 @@ export function DataSyncPage({ bridge }: { bridge: BridgeProp }) {
               />
             ))}
           </div>
+          <p className="mt-2 text-xs text-slate-500">
+            {t("pages:DataSyncPage.ui.maintenanceSyncHint")}
+          </p>
         </div>
 
         {dataTypes.includes("maintenance") && (

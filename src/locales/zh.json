@@ -874,6 +874,7 @@
     "DataSyncPage.ui.worktimeData": "工时数据",
     "DataSyncPage.ui.operationData": "设备运行",
     "DataSyncPage.ui.maintenanceRecords": "维修记录",
+    "DataSyncPage.ui.maintenanceSyncHint": "维修记录同步读取处理后的“维修记录统计*.xlsx”中的“维修明细”工作表；原始设备出勤表请先运行“维修记录处理”。",
     "DataSyncPage.ui.selectAll": "全选",
     "DataSyncPage.ui.yesterday": "昨日",
     "DataSyncPage.ui.clear": "清除",

@@ -873,6 +873,8 @@
     "DataSyncPage.ui.electricalData": "Цахилгааны өгөгдөл",
     "DataSyncPage.ui.worktimeData": "Ажлын цагийн өгөгдөл",
     "DataSyncPage.ui.operationData": "Тоног төхөөрөмжийн ажиллагаа",
+    "DataSyncPage.ui.maintenanceRecords": "Засварын бүртгэл",
+    "DataSyncPage.ui.maintenanceSyncHint": "Засварын синхрончлол нь боловсруулсан “维修记录统计*.xlsx” файлын “维修明细” хуудсыг уншина. Тоног төхөөрөмжийн засварын эх тайланг эхлээд боловсруулна уу.",
     "DataSyncPage.ui.selectAll": "Бүгдийг сонгох",
     "DataSyncPage.ui.yesterday": "Өчигдөр",
     "DataSyncPage.ui.clear": "Цэвэрлэх",
