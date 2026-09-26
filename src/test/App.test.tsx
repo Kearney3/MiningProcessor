@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import App from "../App";
 
 vi.mock("@tauri-apps/api/app", () => ({
-  getVersion: vi.fn(() => Promise.resolve("3.0.0")),
+  getVersion: vi.fn(() => Promise.resolve("3.0.1")),
 }));
 
 const mockInvoke = vi.mocked(invoke);

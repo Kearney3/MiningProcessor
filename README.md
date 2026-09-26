@@ -13,7 +13,7 @@
   <a href="https://github.com/Kearney3/MiningProcessor/actions/workflows/ci.yml">
     <img src="https://github.com/Kearney3/MiningProcessor/actions/workflows/ci.yml/badge.svg" alt="CI" />
   </a>
-  <img src="https://img.shields.io/badge/version-v3.0.0-1769aa?style=flat-square" alt="version" />
+  <img src="https://img.shields.io/badge/version-v3.0.1-1769aa?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/Python-%E2%89%A53.12-3776AB?style=flat-square&logo=python&logoColor=white" alt="python" />
   <img src="https://img.shields.io/badge/Tauri-v2-FFC131?style=flat-square&logo=tauri&logoColor=black" alt="tauri" />
   <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="react" />
@@ -434,6 +434,10 @@ uv run scripts/bump_version.py --bump minor --dry-run
 ---
 
 ## 📋 更新日志
+
+### v3.0.1 · 2026-09-26
+
+- 🚀 推送 `v*` tag 后自动构建并发布 macOS 与 Windows 安装包到 GitHub Release。
 
 ### v3.0.0 · 2026-09-07
 

@@ -122,7 +122,7 @@ function App() {
   const { t } = useTranslation();
   const [currentPage, setCurrentPage] = useState<PageId>("data-processing");
   const [visitedPages, setVisitedPages] = useState<Set<PageId>>(() => new Set(["data-processing"]));
-  const [appVersion, setAppVersion] = useState("v3.0.0");
+  const [appVersion, setAppVersion] = useState("v3.0.1");
   const bridge = usePythonBridge(currentPage);
   const pageBridge = useMemo(() => ({ call: bridge.call, cancel: bridge.cancel }), [bridge.call, bridge.cancel]);
 
